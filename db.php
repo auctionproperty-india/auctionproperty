@@ -1,14 +1,10 @@
 <?php
-// यह एक फ्री टेस्ट MySQL डेटाबेस है ताकि आपका प्रोजेक्ट तुरंत लाइव हो सके
-$host     = 'sql12.freesqldatabase.com'; 
-$db_name  = 'sql12781452';
-$user     = 'sql12781452';
-$password = 'mR8fX8bL2e';
-$port     = '3306'; 
+// रेंडर PostgreSQL डेटाबेस कनेक्शन
+$connection_string = "postgresql://admin:JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM@dpg-d8ok6lflk1mc739ce1j0-a.oregon-postgres.render.com/auction_db_r1hx";
 
-$conn = mysqli_connect($host, $user, $password, $db_name, $port);
+$conn = pg_connect($connection_string);
 
 if (!$conn) {
-    die("Database Connection Failed: " . mysqli_connect_error());
+    die("Database Connection Failed: " . pg_last_error());
 }
 ?>
