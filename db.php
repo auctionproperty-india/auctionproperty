@@ -1,15 +1,14 @@
 <?php
-// अपनी Aiven.io डेटाबेस की डिटेल्स यहाँ भरें
-$host = "आपका_AIVEN_HOST_यहाँ_डालें"; 
-$port = "आपका_AIVEN_PORT_यहाँ_डालें"; // ऐवन पर जो पोर्ट लिखा हो (जैसे 11494 या 3306)
-$user = "avnadmin"; 
-$password = "आपका_AIVEN_PASSWORD_यहाँ_डालें";
-$dbname = "defaultdb"; // ऐवन पर डेटाबेस का नाम आमतौर पर defaultdb ही होता है
+// रेंडर पर जो MySQL डेटाबेस बनाया है, उसके क्रेडेंशियल्स यहाँ आएँगे
+$host     = 'आपका_डेटाबेस_होस्ट_यानी_EXTERNAL_URL'; 
+$db_name  = 'आपका_डेटाबेस_नाम';
+$user     = 'आपका_डेटाबेस_यूजरनेम';
+$password = 'आपका_डेटाबेस_पासवर्ड';
+$port     = '3306'; // आमतौर पर 3306 होता है
 
-// डेटाबेस से कनेक्शन बनाना
-$conn = mysqli_connect($host, $user, $password, $dbname, $port);
+$conn = mysqli_connect($host, $user, $password, $db_name, $port);
 
-// अगर कनेक्शन फेल हो जाए तो स्क्रीन पर एरर दिखे
+// कनेक्शन चेक करने के लिए
 if (!$conn) {
     die("Database Connection Failed: " . mysqli_connect_error());
 }
