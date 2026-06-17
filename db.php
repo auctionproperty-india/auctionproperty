@@ -61,3 +61,16 @@ try {
     die("Database Connection Failed: " . $e->getMessage());
 }
 ?>
+    // ... पुरानी टेबल्स का कोड यहाँ खत्म हो रहा है ...
+    );");
+
+
+    // 🔥 जादुई कोड: इसे यहाँ डालना है (catch से ठीक पहले)
+    // यह कोड admin@test.com को डेटाबेस में एडमिन बना देगा
+    $conn->exec("UPDATE users SET role = 'admin' WHERE email = 'admin@test.com';");
+
+
+} catch (PDOException $e) {
+    die("Database Connection Failed: " . $e->getMessage());
+}
+?>
