@@ -1,67 +1,44 @@
 <?php
-include('db.php');
-$message = "";
+// डेटाबेस कनेक्शन फाइल को जोड़ना
+include 'db.php';
 
-if (isset($_POST['register'])) {
-    $name = mysqli_real_escape_string($conn, $_POST['name']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $phone = mysqli_real_escape_string($conn, $_POST['phone']);
-    $password = password_hash($_POST['password'], PASSWORD_BCRYPT); 
+// जब यूज़र फॉर्म सबमिट करे (POST रिक्वेस्ट)
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    
+    // 1. फॉर्म से डेटा लेना (PDO में mysqli_real_escape_string की कोई ज़रूरत नहीं होती)
+    $username = isset($_POST['username']) ? trim($_POST['username']) : '';
+    $email = isset($_POST['email']) ? trim($_POST['email']) : '';
+    $password = isset($_POST['password']) ? trim($_POST['password']) : '';
 
-    $check = mysqli_query($conn, "SELECT * FROM users WHERE email='$email' OR phone='$phone'");
-    if (mysqli_num_rows($check) > 0) {
-        $message = "<div class='alert alert-danger'>Email or Phone already registered!</div>";
-    } else {
-        $query = "INSERT INTO users (name, email, phone, password) VALUES ('$name', '$email', '$phone', '$password')";
-        if (mysqli_query($conn, $query)) {
-            $message = "<div class='alert alert-success'>Registration Successful! <a href='login.php'>Login here</a></div>";
+    // 2. बेसिक वैलिडेशन (चेक करना कि फील्ड्स खाली तो नहीं हैं)
+    if (empty($username) || empty($email) || empty($password)) {
+        die("कृपया सभी फ़ील्ड्स को भरें।");
+    }
+
+    try {
+        // 3. PostgreSQL के लिए सुरक्षित SQL Query (Placeholders के साथ)
+        // ध्यान दें: अगर आपके डेटाबेस टेबल का नाम 'users' की जगह कुछ और है, तो उसे यहाँ बदल लें
+        $query = "INSERT INTO users (username, email, password) VALUES (:username, :email, :password)";
+        $stmt = $conn->prepare($query);
+
+        // 4. डेटा को सुरक्षित तरीके से बाइंड करना (SQL Injection से सुरक्षा)
+        $stmt->bindParam(':username', $username);
+        $stmt->bindParam(':email', $email);
+        $stmt->bindParam(':password', $password);
+
+        // 5. क्वेरी को चलाना (Execute)
+        if ($stmt->execute()) {
+            echo "<div style='color: green; text-align: center; margin-top: 20px;'>";
+            echo "<h3>रजिस्ट्रेशन सफल रहा! 🎉</h3>";
+            echo "<a href='index.php'>यहाँ से लॉगिन करें</a>";
+            echo "</div>";
         } else {
-            $message = "<div class='alert alert-danger'>Error: " . mysqli_error($conn) . "</div>";
+            echo "रजिस्ट्रेशन विफल रहा। कृपया दोबारा प्रयास करें।";
         }
+
+    } catch (PDOException $e) {
+        // अगर डेटाबेस में कोई गड़बड़ आती है (जैसे टेबल न मिलना या डुप्लीकेट ईमेल)
+        die("डेटाबेस एरर: " . $e->getMessage());
     }
 }
 ?>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - AuctionProperty</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    <div class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-md-5">
-                <div class="card shadow">
-                    <div class="card-header bg-primary text-white text-center fw-bold">Create Free Account</div>
-                    <div class="card-body">
-                        <?php echo $message; ?>
-                        <form action="register.php" method="POST">
-                            <div class="mb-3">
-                                <label>Full Name</label>
-                                <input type="text" name="name" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label>Email Address</label>
-                                <input type="email" name="email" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label>Mobile Number</label>
-                                <input type="text" name="phone" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label>Password</label>
-                                <input type="password" name="password" class="form-control" required>
-                            </div>
-                            <button type="submit" name="register" class="btn btn-primary w-100">Register Now</button>
-                        </form>
-                        <p class="text-center mt-3 small">Already have an account? <a href="login.php">Login</a></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
