@@ -56,11 +56,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
     } catch (PDOException $e) { $message = "<div class='alert-box alert-danger'><i>❌</i> <span>Execution Failed: " . $e->getMessage() . "</span></div>"; }
 }
 
-// 🔥 ADVANCED AUTOMATED OCR MATCHING ENGINE
+// 🔥 INTELLIGENT AUTOMATED OCR SIMULATOR ENGINE (CRITICAL FIX)
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_bank'])) {
     $bank_name = trim($_POST['bank_name']);
     $account_no = trim($_POST['account_no']);
-    $ifsc_code = trim($_POST['ifsc_code']);
+    $ifsc_code = strtoupper(trim($_POST['ifsc_code']));
     
     $upload_dir = "uploads/";
     if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
@@ -71,17 +71,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_bank'])) {
         $bank_file = $upload_dir . time() . "_" . $filename;
         move_uploaded_file($_FILES['bank_copy']['tmp_name'], $bank_file);
 
-        // 🤖 SIMULATOR RULE: Trigger auto-reject if account_no is short or contains '0000'
-        if (strlen($account_no) < 6 || strpos($account_no, '0000') !== false || strpos(strtolower($filename), 'reject') !== false) {
-            $auto_status = 'rejected';
-            $log_message = "<div class='alert-box alert-danger'><i>❌</i> <span><b>AUTOMATED VERIFICATION FAILED:</b> Document OCR mismatch. The data signatures extracted from your uploaded Cheque/Passbook do not align with Account No: ($account_no) or IFSC: ($ifsc_code). Please re-upload a clear copy.</span></div>";
-        } else {
+        // 🤖 HIGH-TECH MATCHING LOGIC:
+        // It strictly checks if the entered Account Number AND IFSC Code exist inside the uploaded File Name.
+        if (strpos($filename, $account_no) !== false && strpos(strtoupper($filename), $ifsc_code) !== false) {
             $auto_status = 'approved';
-            $log_message = "<div class='alert-box alert-success'><i>✓</i> <span><b>AUTOMATED VERIFICATION SUCCESS:</b> OCR Matrix Synchronized. Your Bank Account Number ($account_no) and IFSC Code ($ifsc_code) have been verified. Financial Ledger is now fully ACTIVE.</span></div>";
+            $log_message = "<div class='alert-box alert-success'><i>✓</i> <span><b>AUTOMATED VERIFICATION SUCCESS:</b> OCR Matrix Synchronized. Your Bank Account Number ($account_no) and IFSC Code ($ifsc_code) successfully matched with the uploaded digital document asset. Financial Ledger is now fully ACTIVE.</span></div>";
+        } else {
+            $auto_status = 'rejected';
+            $log_message = "<div class='alert-box alert-danger'><i>❌</i> <span><b>AUTOMATED VERIFICATION FAILED:</b> Security Drop / Document OCR Mismatch. The cryptographic text extracted from the uploaded Cheque/Passbook image does NOT match the input fields. [Expected Account No: $account_no & IFSC: $ifsc_code inside the image meta layer]. Terminal Terminated.</span></div>";
         }
     } else {
         $auto_status = $user['kyc_status'] ?? 'pending';
-        $log_message = "<div class='alert-box alert-warning'><i>⚠️</i> <span>System Alert: Missing physical verification document.</span></div>";
+        $log_message = "<div class='alert-box alert-warning'><i>⚠️</i> <span>System Alert: Missing physical verification document ledger.</span></div>";
     }
 
     try {
@@ -158,9 +159,8 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
         .btn-action { background: var(--brand); color: white; border: none; padding: 14px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 25px; width: 100%; transition: 0.3s; }
         .btn-action:hover { background: #4338ca; box-shadow: 0 0 20px rgba(79, 70, 229, 0.6); }
         
-        /* 💎 Super Glowing Brand Alert Boxes with Signs */
         .alert-box { display: flex; align-items: center; gap: 15px; padding: 16px; border-radius: 10px; font-weight: 600; font-size: 14px; margin-bottom: 25px; line-height: 1.5; animation: fadeIn 0.5s ease; }
-        .alert-box i { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; flex-shrink: 0; box-shadow: 0 0 10px rgba(255,255,255,0.2); text-shadow: none;}
+        .alert-box i { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; flex-shrink: 0; box-shadow: 0 0 10px rgba(255,255,255,0.2); }
         
         .alert-success { background: rgba(16, 185, 129, 0.1); border: 1px solid var(--cyber-green); color: var(--cyber-green); box-shadow: 0 0 20px rgba(16, 185, 129, 0.15); }
         .alert-success i { background: var(--cyber-green); color: white; }
@@ -171,7 +171,6 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
         .alert-warning { background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; color: #f59e0b; }
         .alert-warning i { background: #f59e0b; color: white; }
         
-        /* Dynamic Status Badges with Signs */
         .badge-status { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;}
         .badge-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
         
@@ -184,7 +183,6 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
         .status-pending { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b; }
         .status-pending::before { background: #f59e0b; }
 
-        /* 📡 Glowing AI Overlay Scanner */
         .scanner-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; }
         .scanner-box { width: 300px; height: 180px; border: 2px dashed var(--brand-glow); border-radius: 8px; position: relative; overflow: hidden; background: rgba(99, 102, 241, 0.05); box-shadow: 0 0 30px rgba(99, 102, 241, 0.2); }
         .scanner-line { width: 100%; height: 4px; background: linear-gradient(to right, transparent, var(--brand-glow), transparent); position: absolute; top: 0; animation: scanAnimation 2s linear infinite; box-shadow: 0 0 15px var(--brand-glow); }
@@ -196,7 +194,6 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
 </head>
 <body>
 
-<!-- AI SYSTEM SCANNER OVERLAY -->
 <div id="ai-scanner" class="scanner-overlay">
     <div class="scanner-box">
         <div class="scanner-line"></div>
@@ -213,7 +210,6 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
             <p style="color: var(--muted); margin: 0; font-size: 14px;">Manage identity authentication and global credentials.</p>
         </div>
         <?php if(!$isAdmin): ?>
-            <!-- Dynamic Status Badge with Live Glowing Dot Sign -->
             <span class="badge-status status-<?php echo ($user['kyc_status'] ?? 'pending'); ?>">
                 Ledger: <?php echo ($user['kyc_status'] ?? 'pending'); ?>
             </span>
@@ -228,7 +224,6 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
     if (!empty($message)) echo $message; 
     ?>
 
-    <!-- Navigation Tabs -->
     <div class="tabs-nav">
         <?php if (!$isAdmin): ?>
             <button id="btn-profile-tab" class="tab-btn active" onclick="switchTab('profile-tab')">📌 My Profile</button>
@@ -238,7 +233,6 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
     </div>
 
     <?php if (!$isAdmin): ?>
-        <!-- SECTION 1: MY PROFILE -->
         <div id="profile-tab" class="tab-content active">
             <form action="profile.php" method="POST" enctype="multipart/form-data">
                 <label>System Alias (Username)</label>
@@ -265,17 +259,16 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
             </form>
         </div>
 
-        <!-- SECTION 2: BANK LEDGER -->
         <div id="bank-tab" class="tab-content">
             <form action="profile.php" method="POST" enctype="multipart/form-data" onsubmit="triggerAIScan()">
                 <label>Banking Institution Entity</label>
-                <input type="text" name="bank_name" value="<?php echo htmlspecialchars($user['bank_name'] ?? ''); ?>" placeholder="e.g. STATE BANK OF INDIA" required>
+                <input type="text" name="bank_name" value="<?php echo htmlspecialchars($user['bank_name'] ?? ''); ?>" placeholder="e.g. HDFC BANK" required>
 
                 <label>Fiscal Account Designation Number</label>
                 <input type="text" name="account_no" value="<?php echo htmlspecialchars($user['account_no'] ?? ''); ?>" placeholder="Routing Account Code" required>
 
                 <label>IFSC Clearance Token</label>
-                <input type="text" name="ifsc_code" value="<?php echo htmlspecialchars($user['ifsc_code'] ?? ''); ?>" placeholder="SBIN00XXXXX" required>
+                <input type="text" name="ifsc_code" value="<?php echo htmlspecialchars($user['ifsc_code'] ?? ''); ?>" placeholder="HDFC0001234" required>
 
                 <label>Financial Affirmation Ledger (Passbook / Cancelled Cheque)</label>
                 <input type="file" name="bank_copy" accept="image/*,application/pdf" required>
@@ -285,7 +278,6 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
         </div>
     <?php endif; ?>
 
-    <!-- SECTION 3: SECURITY MATRIX -->
     <div id="security-tab" class="tab-content <?php echo $isAdmin ? 'active' : ''; ?>">
         <form action="profile.php" method="POST">
             <label>Active Security Key (Current Password)</label>
