@@ -1,9 +1,6 @@
 <?php
-// रेंडर PostgreSQL कनेक्शन स्ट्रिंग
 $database_url = "postgresql://admin:JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM@dpg-d8ok6lflk1mc739ce1j0-a.oregon-postgres.render.com/auction_db_r1hx";
-
 $dbopts = parse_url($database_url);
-
 $host = $dbopts["host"];
 $port = isset($dbopts["port"]) ? $dbopts["port"] : "5432"; 
 $user = $dbopts["user"];
@@ -15,7 +12,7 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $conn = $pdo; 
 
-    // 1. यूज़र्स, एडमिन और सब-एडमिन की कंबाइंड टेबल (अगर पहले से नहीं है)
+    // 1. यूज़र्स टेबल
     $conn->exec("CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(100) NOT NULL,
@@ -25,10 +22,20 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
 
-    // 🔥 जादुई फिक्स: अगर पुरानी टेबल में role कॉलम नहीं है, तो यह लाइन उसे जोड़ देगी
-    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';");
+    // 🔥 KYC और प्रोफाइल के नए कॉलम्स (अगर पहले से नहीं हैं तो जुड़ जाएंगे)
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(15);");
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;");
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100);");
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS account_no VARCHAR(50);");
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(20);");
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS adhaar_file VARCHAR(255);");
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS pan_file VARCHAR(255);");
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_file VARCHAR(255);");
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_status VARCHAR(20) DEFAULT 'pending';"); // pending, approved, rejected
 
-    // 2. प्रोडक्ट्स / प्रॉपर्टी टेबल (जो एडमिन या सब-एडमिन डालेंगे)
+    // बाकी बची हुई पुरानी टेबल्स
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';");
+    
     $conn->exec("CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -42,7 +49,6 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
 
-    // 3. बिड्स टेबल (बोली लगाने के लिए)
     $conn->exec("CREATE TABLE IF NOT EXISTS bids (
         id SERIAL PRIMARY KEY,
         product_id INT REFERENCES products(id) ON DELETE CASCADE,
@@ -51,7 +57,6 @@ try {
         bid_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
 
-    // 4. पासवर्ड रीसेट टेबल
     $conn->exec("CREATE TABLE IF NOT EXISTS password_resets (
         id SERIAL PRIMARY KEY,
         email VARCHAR(100) NOT NULL,
@@ -59,7 +64,6 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
 
-    // 🔥 यह admin@test.com को डेटाबेस में एडमिन रोल पर सेट रखेगी
     $conn->exec("UPDATE users SET role = 'admin' WHERE email = 'admin@test.com';");
 
 } catch (PDOException $e) {
