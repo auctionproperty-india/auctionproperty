@@ -6,36 +6,51 @@ if (!isset($_SESSION['user_id'])) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>User Dashboard</title>
+    <title>Investor Terminal - Prime Property</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #e9ecef; margin: 0; padding: 0; }
-        .navbar { background: #007bff; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
-        .navbar a { color: white; text-decoration: none; font-weight: bold; }
-        .container { max-width: 1000px; margin: 30px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); }
-        .welcome-box { background: #e7f1ff; padding: 15px; border-radius: 5px; color: #0c5460; margin-bottom: 20px; }
+        :root {
+            --primary-brand: #4f46e5;
+            --brand-glow: #6366f1;
+            --bg-light: #f8fafc;
+            --card-white: #ffffff;
+        }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-light); margin: 0; padding: 0; color: #1e293b; }
+        .navbar { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: white; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .nav-brand { font-size: 24px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 0 10px var(--brand-glow); text-transform: uppercase; }
+        .nav-actions { display: flex; align-items: center; }
+        .btn-profile { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-right: 15px; transition: all 0.3s ease; }
+        .btn-profile:hover { background: white; color: #1e1b4b; box-shadow: 0 0 15px rgba(255,255,255,0.4); }
+        .btn-logout { background: #ef4444; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: 0.3s; }
+        .btn-logout:hover { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+        .container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+        .welcome-hero { background: linear-gradient(to right, #eff6ff, #dbeafe); border-left: 5px solid var(--primary-brand); padding: 25px; border-radius: 8px; margin-bottom: 30px; }
+        .listing-grid-empty { border: 2px dashed #cbd5e1; padding: 60px; text-align: center; color: #64748b; border-radius: 12px; background: #fff; font-size: 16px; font-style: italic; }
     </style>
 </head>
 <body>
 
 <div class="navbar">
-    <h2>Prime Property Portal</h2>
-    <div> 
-        <a href="profile.php" style="background: #28a745; padding: 8px 15px; border-radius: 4px; margin-right: 10px; text-decoration: none;">👤 Profile & KYC</a>
-        <span style="margin-right: 20px;">👤 <?php echo htmlspecialchars($_SESSION['username']); ?> (यूज़र)</span>
-        <a href="login.php" style="background: #dc3545; padding: 8px 15px; border-radius: 4px;">Log Out</a>
+    <div class="nav-brand">Prime Property</div>
+    <div class="nav-actions">
+        <span style="margin-right: 20px; color: #cbd5e1; font-weight: 500;">👤 Active User: <?php echo htmlspecialchars($_SESSION['username']); ?></span>
+        <a href="profile.php" class="btn-profile">My Profile</a>
+        <a href="login.php" class="btn-logout">Sign Out</a>
     </div>
 </div>
 
 <div class="container">
-    <div class="welcome-box">
-        <strong>लॉगिन सफल रहा!</strong> आप यूज़र डैशबोर्ड पर हैं।
+    <div class="welcome-hero">
+        <h3 style="margin: 0; color: #1e3a8a; font-size: 20px;">Authentication Successful</h3>
+        <p style="margin: 5px 0 0 0; color: #1e40af; font-size: 14px;">Welcome to your private asset deployment portal.</p>
     </div>
-    <h3>🏢 लाइव प्रॉपर्टीज / आइटम्स</h3>
-    <div style="border: 2px dashed #ccc; padding: 40px; text-align: center; color: #999; margin-top: 20px; border-radius: 6px;">
-        अभी एडमिन ने कोई आइटम नहीं डाला है। एडमिन पैनल से एंट्री होते ही यहाँ डेटा दिखने लगेगा!
+
+    <h2 style="font-weight: 800; color: #0f172a; margin-bottom: 20px;">Live Premium Acquisitions</h2>
+    
+    <div class="listing-grid-empty">
+        No active assets deployed by the administrator at this moment. Real-time entries will update automatically.
     </div>
 </div>
 
