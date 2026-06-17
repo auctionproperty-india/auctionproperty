@@ -22,7 +22,8 @@ if (!isset($_SESSION['user_id'])) {
 
 <div class="navbar">
     <h2>Prime Property Portal</h2>
-    <div>
+    <div> 
+        <a href="profile.php" style="background: #28a745; padding: 8px 15px; border-radius: 4px; margin-right: 10px; text-decoration: none;">👤 Profile & KYC</a>
         <span style="margin-right: 20px;">👤 <?php echo htmlspecialchars($_SESSION['username']); ?> (यूज़र)</span>
         <a href="login.php" style="background: #dc3545; padding: 8px 15px; border-radius: 4px;">Log Out</a>
     </div>
