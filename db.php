@@ -6,11 +6,12 @@ $password = "JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM";
 $port = "5432";
 
 try {
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
+    // SSL mode add kiya hai taaki connection close na ho
+    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
     $conn = new PDO($dsn, $user, $password);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    // Connection successful
+    echo "SUCCESS: Database Connected Securely!";
 } catch (PDOException $e) {
-    die("Database Connection Error: " . $e->getMessage());
+    die("Connection Failed: " . $e->getMessage());
 }
 ?>
