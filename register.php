@@ -3,13 +3,18 @@ require_once 'db.php';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = $_POST['username'];
-    $email = $_POST['email'];
+    $email    = $_POST['email'];
     $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+    $role     = 'user'; // Default role
 
-    $sql = "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$username, $email, $password]);
-    echo "Registration successful! <a href='login.php'>Login here</a>";
+    try {
+        $sql = "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([$username, $email, $password, $role]);
+        echo "Registration successful! <a href='login.php'>Login</a>";
+    } catch (PDOException $e) {
+        echo "Registration Error: " . $e->getMessage();
+    }
 }
 ?>
 <form method="POST">
