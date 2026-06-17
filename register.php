@@ -1,88 +1,109 @@
 <?php
-// 1. एरर दिखाने के लिए सेटिंग
+session_start();
 ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-
-// 2. डेटाबेस कनेक्शन फाइल को जोड़ना
 include 'db.php';
 
-// संदेश दिखाने के लिए वेरिएबल
 $message = "";
 
-// 3. जब यूज़र फॉर्म का बटन दबाकर सबमिट करे (POST रिक्वेस्ट)
+// ⚙️ ऑटो-पैच: चेक करें कि यूजर्स टेबल में referred_by कॉलम है या नहीं, नहीं तो जोड़ देगा
+try {
+    $checkRefColumn = $conn->query("SHOW COLUMNS FROM users LIKE 'referred_by'");
+    if ($checkRefColumn->rowCount() == 0) {
+        $conn->exec("ALTER TABLE users ADD COLUMN referred_by VARCHAR(100) DEFAULT NULL");
+    }
+} catch (PDOException $e) {}
+
+// 🔗 यूआरएल से रेफरल कोड (यूजरनेम) ऑटो-कैप्चर करना
+$ref_code = "";
+if (isset($_GET['ref'])) {
+    $ref_code = trim($_GET['ref']);
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    
-    $username = isset($_POST['username']) ? trim($_POST['username']) : '';
-    $email = isset($_POST['email']) ? trim($_POST['email']) : '';
-    $password = isset($_POST['password']) ? trim($_POST['password']) : '';
+    $username = trim($_POST['username']);
+    $email = trim($_POST['email']);
+    $password = trim($_POST['password']);
+    $referred_by = !empty($_POST['referred_by']) ? trim($_POST['referred_by']) : null;
 
-    if (empty($username) || empty($email) || empty($password)) {
-        $message = "<p style='color: red;'>कृपया सभी फ़ील्ड्स को भरें।</p>";
-    } else {
+    if (!empty($username) && !empty($email) && !empty($password)) {
         try {
-            // PostgreSQL के लिए सुरक्षित SQL Query
-            $query = "INSERT INTO users (username, email, password) VALUES (:username, :email, :password)";
-            $stmt = $conn->prepare($query);
+            // चेक करें कि ईमेल पहले से तो नहीं है
+            $check_stmt = $conn->prepare("SELECT id FROM users WHERE email = :email");
+            $check_stmt->bindParam(':email', $email);
+            $check_stmt->execute();
 
-            $stmt->bindParam(':username', $username);
-            $stmt->bindParam(':email', $email);
-            $stmt->bindParam(':password', $password);
-
-            if ($stmt->execute()) {
-                $message = "<p style='color: green;'>रजिस्ट्रेशन सफल रहा! 🎉 <a href='login.php' style='color: #007bff; font-weight: bold;'>यहाँ से लॉगिन करें</a></p>";
+            if ($check_stmt->rowCount() > 0) {
+                $message = "<div class='alert alert-danger'>Email already registered under another node core.</div>";
             } else {
-                $message = "<p style='color: red;'>रजिस्ट्रेशन विफल रहा।</p>";
-            }
+                // नया यूजर रजिस्टर करना (referred_by के साथ)
+                $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, status, referred_by) VALUES (:username, :email, :password, 'user', 'active', :referred_by)");
+                $stmt->bindParam(':username', $username);
+                $stmt->bindParam(':email', $email);
+                $stmt->bindParam(':password', $password);
+                $stmt->bindParam(':referred_by', $referred_by);
 
+                if ($stmt->execute()) {
+                    $message = "<div class='alert alert-success'>Registration successful! Redirecting to login terminal...</div>";
+                    header("Refresh:2;url=login.php");
+                }
+            }
         } catch (PDOException $e) {
-            $message = "<p style='color: red;'>डेटाबेस एरर: " . $e->getMessage() . "</p>";
+            $message = "<div class='alert alert-danger'>Database Error: " . $e->getMessage() . "</div>";
         }
+    } else {
+        $message = "<div class='alert alert-danger'>All registration fields are required.</div>";
     }
 }
 ?>
 
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>रजिस्ट्रेशन पेज</title>
+    <title>Register Terminal // Prime Property</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f4; text-align: center; padding-top: 50px; }
-        .form-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0px 0px 10px #ccc; display: inline-block; width: 320px; text-align: left; }
-        h2 { text-align: center; color: #333; margin-bottom: 20px; }
-        label { font-weight: bold; color: #555; display: block; margin-top: 10px; }
-        input { width: 93%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; }
-        button { width: 100%; padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
-        button:hover { background-color: #218838; }
-        .links-container { text-align: center; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px; }
-        .links-container a { color: #007bff; text-decoration: none; font-size: 14px; display: inline-block; margin: 5px 10px; }
-        .links-container a:hover { text-decoration: underline; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .register-box { background: #1e293b; border: 1px solid #334155; padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        h2 { margin: 0 0 5px 0; font-size: 24px; color: #6366f1; text-align: center; }
+        p { margin: 0 0 25px 0; color: #94a3b8; font-size: 14px; text-align: center; }
+        label { display: block; font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: bold; margin-top: 15px; }
+        input { width: 94%; padding: 12px; margin-top: 5px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 6px; font-size: 14px; }
+        input:focus { border-color: #6366f1; outline: none; }
+        .btn-submit { background: #4f46e5; color: white; width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 25px; font-size: 15px; }
+        .btn-submit:hover { background: #4338ca; }
+        .alert { padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: 600; text-align: center; }
+        .alert-success { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; color: #10b981; }
+        .alert-danger { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; }
     </style>
 </head>
 <body>
 
-<div class="form-container">
-    <h2>Create Account</h2>
-    
+<div class="register-box">
+    <h2>Create New Node</h2>
+    <p>Establish your credentials in the framework ecosystem</p>
+
     <?php echo $message; ?>
 
     <form action="register.php" method="POST">
         <label>Username</label>
-        <input type="text" name="username" placeholder="Enter Username" required>
-        
-        <label>Email Address</label>
-        <input type="email" name="email" placeholder="Enter Email Address" required>
-        
-        <label>Password</label>
-        <input type="password" name="password" placeholder="Enter Password" required>
-        
-        <button type="submit">Register</button>
-    </form>
+        <input type="text" name="username" placeholder="Choose unique identity" required>
 
-    <div class="links-container">
-        <a href="login.php">पहले से अकाउंट है? लॉगिन करें</a>
-        <a href="forgot_password.php" style="color: #dc3545;">Password भूल गए?</a>
+        <label>Email Endpoint</label>
+        <input type="email" name="email" placeholder="name@domain.com" required>
+
+        <label>Security Key (Password)</label>
+        <input type="password" name="password" placeholder="••••••••" required>
+
+        <!-- 🔗 रेफरल इनपुट: लिंक से आने पर यह ऑटोमैटिकली नाम भर देगा -->
+        <label>Referral Node Partner (Optional)</label>
+        <input type="text" name="referred_by" value="<?php echo htmlspecialchars($ref_code); ?>" placeholder="Partner Username">
+
+        <button type="submit" class="btn-submit">Initialize Account</button>
+    </form>
+    
+    <div style="text-align: center; margin-top: 20px; font-size: 13px;">
+        <a href="login.php" style="color: #6366f1; text-decoration: none;">Return to Login Core</a>
     </div>
 </div>
 
