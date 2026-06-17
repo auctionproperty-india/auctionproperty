@@ -1,22 +1,15 @@
 <?php
-// Render ke Dashboard se ye values utha raha hai
-$host     = getenv('DB_HOST');
-$dbname   = getenv('DB_NAME');
-$user     = getenv('DB_USER');
-$password = getenv('DB_PASSWORD');
-$port     = "5432"; // Fix port
+$host = "dpg-cuv66rtu4l7c739m13sg-a.singapore-postgres.render.com";
+$dbname = "auctionproperty_p917";
+$user = "auctionproperty_p917_user";
+$password = "JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM";
 
 try {
-    // Connection string ka sahi format
-    $dsn = "pgsql:host=" . $host . ";port=" . $port . ";dbname=" . $dbname;
-    
-    // PDO Connection
-    $conn = new PDO($dsn, $user, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
+    // Connection string simple rakhi hai taaki error na aaye
+    $conn = new PDO("pgsql:host=$host;dbname=$dbname", $user, $password);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    // Agar error aaya toh seedha pata chal jayega
     die("Database Connection Error: " . $e->getMessage());
 }
 ?>
