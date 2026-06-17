@@ -1,12 +1,14 @@
 FROM php:8.2-apache
 
-# PostgreSQL extension ke liye dependencies aur driver install karna
-RUN apt-get update && apt-get install -y libpq-dev \
+# SSL aur PostgreSQL ke liye zaroori dependencies install karna
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
     && docker-php-ext-install pdo pdo_pgsql \
-    && docker-php-ext-enable pdo_pgsql
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Aapki files ko web server mein copy karna
+# Web directory set karna
+WORKDIR /var/www/html
 COPY . /var/www/html/
 
-# Permissions sahi karna
+# Permissions
 RUN chown -R www-data:www-data /var/www/html
