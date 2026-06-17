@@ -10,20 +10,18 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $user_id = $_SESSION['user_id'];
-$user_role = $_SESSION['role']; // एडमिन है या यूज़र
+$user_role = $_SESSION['role'];
 $message = "";
 
-// 1. डेटाबेस से वर्तमान यूज़र/एडमिन की जानकारी निकालना
 try {
     $stmt = $conn->prepare("SELECT * FROM users WHERE id = :id");
     $stmt->bindParam(':id', $user_id);
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    $message = "<p style='color:red;'>डेटा लोड एरर: " . $e->getMessage() . "</p>";
+    $message = "<p class='msg-err'>System Error: " . $e->getMessage() . "</p>";
 }
 
-// 2. केवल यूज़र के लिए: प्रोफाइल और KYC सबमिट होने पर प्रोसेस करना
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile']) && $user_role !== 'admin' && $user_role !== 'sub_admin') {
     $phone = trim($_POST['phone']);
     $address = trim($_POST['address']);
@@ -32,9 +30,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile']) && $
     $ifsc_code = trim($_POST['ifsc_code']);
 
     $upload_dir = "uploads/";
-    if (!is_dir($upload_dir)) {
-        mkdir($upload_dir, 0777, true);
-    }
+    if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
 
     $adhaar_file = $user['adhaar_file'] ?? '';
     $pan_file = $user['pan_file'] ?? '';
@@ -70,15 +66,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile']) && $
         $up_stmt->bindParam(':id', $user_id);
         
         if ($up_stmt->execute()) {
-            $message = "<p style='color:green; font-weight:bold;'>प्रोفाइल और KYC डिटेल्स सफलतापूर्वक अपडेट हो गईं! ⏳ वेरिफिकेशन पेंडिंग है।</p>";
+            $message = "<p class='msg-ok'>Profile parameters updated successfully. Certification pending.</p>";
             header("Refresh:2");
         }
     } catch (PDOException $e) {
-        $message = "<p style='color:red;'>अपडेट एरर: " . $e->getMessage() . "</p>";
+        $message = "<p class='msg-err'>Update Interrupted: " . $e->getMessage() . "</p>";
     }
 }
 
-// 3. एडमिन और यूज़र दोनों के लिए: पासवर्ड बदलने का लॉजिक
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     $old_password = trim($_POST['old_password']);
     $new_password = trim($_POST['new_password']);
@@ -89,113 +84,82 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
             $pass_stmt->bindParam(':pass', $new_password);
             $pass_stmt->bindParam(':id', $user_id);
             if ($pass_stmt->execute()) {
-                $message = "<p style='color:green; font-weight:bold;'>पासवर्ड सफलतापूर्वक बदल गया है! 🔑</p>";
+                $message = "<p class='msg-ok'>Security token / password modified successfully.</p>";
             }
         } catch (PDOException $e) {
-            $message = "<p style='color:red;'>पासवर्ड एरर: " . $e->getMessage() . "</p>";
+            $message = "<p class='msg-err'>Security Update Error: " . $e->getMessage() . "</p>";
         }
     } else {
-        $message = "<p style='color:red;'>पुराना पासवर्ड गलत है!</p>";
+        $message = "<p class='msg-err'>Invalid master password provided.</p>";
     }
 }
 
 $back_link = ($user_role === 'admin' || $user_role === 'sub_admin') ? "admin_dashboard.php" : "dashboard.php";
+$isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
 ?>
 
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo ($user_role === 'admin' || $user_role === 'sub_admin') ? 'Admin Settings' : 'My Profile & KYC'; ?></title>
+    <title>Manage Profile // Prime Property</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f1f3f5; margin: 0; padding: 20px; }
-        .container { max-width: 700px; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h2, h3 { color: #333; border-bottom: 2px solid #dee2e6; padding-bottom: 8px; }
-        label { font-weight: bold; display: block; margin-top: 12px; color: #555; }
-        input, textarea { width: 96%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-        .btn-submit { background: #28a745; color: white; border: none; padding: 12px 20px; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 15px; width: 100%; }
-        .btn-pass { background: #dc3545; color: white; border: none; padding: 12px 20px; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 15px; width: 100%; }
-        .badge { display: inline-block; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; color: white; background: #dc3545; }
-        .back-btn { text-decoration: none; color: #007bff; font-weight: bold; display: inline-block; margin-bottom: 15px; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: <?php echo $isAdmin ? '#0f172a' : '#f8fafc'; ?>; margin: 0; padding: 40px; color: <?php echo $isAdmin ? '#f8fafc' : '#1e293b'; ?>; }
+        .wrapper { max-width: 650px; margin: 0 auto; background: <?php echo $isAdmin ? '#1e293b' : '#ffffff'; ?>; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid <?php echo $isAdmin ? '#334155' : '#e2e8f0'; ?>; }
+        h2, h3 { font-weight: 700; border-bottom: 1px solid <?php echo $isAdmin ? '#334155' : '#e2e8f0'; ?>; padding-bottom: 10px; margin-top: 30px; }
+        label { font-weight: 600; display: block; margin-top: 15px; font-size: 14px; color: <?php echo $isAdmin ? '#94a3b8' : '#475569'; ?>; }
+        input, textarea { width: 96%; padding: 12px; margin-top: 6px; border: 1px solid <?php echo $isAdmin ? '#334155' : '#cbd5e1'; ?>; border-radius: 6px; background: <?php echo $isAdmin ? '#0f172a' : '#fff'; ?>; color: <?php echo $isAdmin ? '#fff' : '#000'; ?>; font-size: 14px; }
+        input:focus { border-color: #6366f1; outline: none; }
+        .btn-action { background: #4f46e5; color: white; border: none; padding: 14px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 20px; width: 100%; transition: 0.3s; }
+        .btn-action:hover { background: #4338ca; box-shadow: 0 0 15px rgba(79, 70, 229, 0.4); }
+        .msg-ok { background: rgba(34, 197, 94, 0.1); border: 1px solid #22c55e; color: #22c55e; padding: 12px; border-radius: 6px; font-weight: 600; }
+        .msg-err { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; padding: 12px; border-radius: 6px; font-weight: 600; }
+        .back-link { text-decoration: none; color: #6366f1; font-weight: bold; font-size: 14px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <a href="<?php echo $back_link; ?>" class="back-btn">← वापस डैशबोर्ड पर जाएं</a>
+<div class="wrapper">
+    <a href="<?php echo $back_link; ?>" class="back-link">← Return to Dashboard</a>
     
-    <?php if ($user_role === 'admin' || $user_role === 'sub_admin'): ?>
-        <!-- 👑 केवल एडमिन को दिखने वाला इंटरफ़ेस -->
-        <h2>⚙️ एडमिन सेटिंग्स (Account Settings)</h2>
-        <p>आपका रोल: <span class="badge"><?php echo strtoupper($user_role); ?></span></p>
-        
+    <?php if ($isAdmin): ?>
+        <h2 style="text-shadow: 0 0 10px #38bdf8;">⚙️ Corporate Identity Setup</h2>
         <?php echo $message; ?>
-
-        <form action="profile.php" method="POST" style="margin-top: 20px;">
-            <h3>🔑 पासवर्ड बदलें (Change Password)</h3>
-            
-            <label>वर्तमान पासवर्ड (Current Password):</label>
-            <input type="password" name="old_password" placeholder="Enter Current Password" required>
-
-            <label>नया पासवर्ड (New Password):</label>
-            <input type="password" name="new_password" placeholder="Enter New Password" required>
-
-            <button type="submit" name="change_password" class="btn-pass">Update Password</button>
-        </form>
-
-    <?php else: ?>
-        <!-- 👤 केवल नॉर्मल यूज़र को दिखने वाला इंटरफ़ेस -->
-        <h2>👤 प्रोफाइल और KYC मैनेजमेंट</h2>
-        <p>KYC स्टेटस: <span class="badge" style="background:#ffc107; color:black;"><?php echo strtoupper($user['kyc_status'] ?? 'PENDING'); ?></span></p>
-
-        <?php echo $message; ?>
-
-        <form action="profile.php" method="POST" enctype="multipart/form-data">
-            <h3>🏠 पर्सनल और बैंक डिटेल्स</h3>
-            
-            <label>यूज़रनेम:</label>
-            <input type="text" value="<?php echo htmlspecialchars($user['username']); ?>" disabled style="background:#eee;">
-
-            <label>ईमेल एड्रेस:</label>
-            <input type="text" value="<?php echo htmlspecialchars($user['email']); ?>" disabled style="background:#eee;">
-
-            <label>मोबाइल नंबर:</label>
-            <input type="text" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" placeholder="Enter Mobile Number" required>
-
-            <label>पूरा पता (Address):</label>
-            <textarea name="address" rows="3" required><?php echo htmlspecialchars($user['address'] ?? ''); ?></textarea>
-
-            <label>बैंक का नाम (Bank Name):</label>
-            <input type="text" name="bank_name" value="<?php echo htmlspecialchars($user['bank_name'] ?? ''); ?>" placeholder="e.g. SBI, HDFC" required>
-
-            <label>अकाउंट नंबर (Account Number):</label>
-            <input type="text" name="account_no" value="<?php echo htmlspecialchars($user['account_no'] ?? ''); ?>" placeholder="Enter Account Number" required>
-
-            <label>IFSC कोड:</label>
-            <input type="text" name="ifsc_code" value="<?php echo htmlspecialchars($user['ifsc_code'] ?? ''); ?>" placeholder="Enter IFSC Code" required>
-
-            <h3>📁 डॉक्यूमेंट अपलोड (KYC Documents)</h3>
-            
-            <label>आधार कार्ड (Aadhaar Photo):</label>
-            <input type="file" name="adhaar" accept="image/*,application/pdf">
-
-            <label>पैन कार्ड (PAN Photo):</label>
-            <input type="file" name="pan" accept="image/*,application/pdf">
-
-            <label>बैंक पासबुक copy:</label>
-            <input type="file" name="bank_copy" accept="image/*,application/pdf">
-
-            <button type="submit" name="update_profile" class="btn-submit">Save KYC Details</button>
-        </form>
-
-        <br><br>
         <form action="profile.php" method="POST">
-            <h3>🔑 पासवर्ड बदलें</h3>
-            <label>पुराना पासवर्ड:</label>
-            <input type="password" name="old_password" required>
-            <label>नया पासवर्ड:</label>
-            <input type="password" name="new_password" required>
-            <button type="submit" name="change_password" class="btn-pass">Update Password</button>
+            <h3>Update Core Authentication Token</h3>
+            <label>Current Security Key</label>
+            <input type="password" name="old_password" placeholder="Verify Active Password" required>
+            <label>New Elite Password</label>
+            <input type="password" name="new_password" placeholder="Establish New Password" required>
+            <button type="submit" name="change_password" class="btn-action">Commit Security Changes</button>
+        </form>
+    <?php else: ?>
+        <h2>👤 Account Settings & Verification</h2>
+        <?php echo $message; ?>
+        <form action="profile.php" method="POST" enctype="multipart/form-data">
+            <h3>Merchant & Financial Dossier</h3>
+            <label>System Alias</label>
+            <input type="text" value="<?php echo htmlspecialchars($user['username']); ?>" disabled style="background:#f1f5f9; color:#64748b;">
+            <label>Corporate Communications Email</label>
+            <input type="text" value="<?php echo htmlspecialchars($user['email']); ?>" disabled style="background:#f1f5f9; color:#64748b;">
+            <label>Contact Number</label>
+            <input type="text" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" required>
+            <label>Physical Address</label>
+            <textarea name="address" rows="3" required><?php echo htmlspecialchars($user['address'] ?? ''); ?></textarea>
+            <label>Banking Institution</label>
+            <input type="text" name="bank_name" value="<?php echo htmlspecialchars($user['bank_name'] ?? ''); ?>" required>
+            <label>Account Number</label>
+            <input type="text" name="account_no" value="<?php echo htmlspecialchars($user['account_no'] ?? ''); ?>" required>
+            <label>IFSC Clearing Code</label>
+            <input type="text" name="ifsc_code" value="<?php echo htmlspecialchars($user['ifsc_code'] ?? ''); ?>" required>
+            <h3>📁 Verification Documentation (KYC)</h3>
+            <label>National ID (Aadhaar Ledger)</label>
+            <input type="file" name="adhaar" accept="image/*,application/pdf">
+            <label>Taxation Token (PAN Record)</label>
+            <input type="file" name="pan" accept="image/*,application/pdf">
+            <label>Financial Affirmation (Passbook Copy)</label>
+            <input type="file" name="bank_copy" accept="image/*,application/pdf">
+            <button type="submit" name="update_profile" class="btn-action">Deploy KYC Information</button>
         </form>
     <?php endif; ?>
 </div>
