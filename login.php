@@ -1,29 +1,19 @@
 <?php
-require_once 'db.php'; // Yeh file load karega
+require_once 'db.php';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
     $password = $_POST['password'];
 
-    // Verify connection exists
-    if (!isset($conn)) {
-        die("System Error: Database connection not established.");
-    }
+    $sql = "SELECT * FROM users WHERE email = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$email]);
+    $user = $stmt->fetch();
 
-    try {
-        $sql = "SELECT * FROM users WHERE email = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->execute([$email]);
-        $user = $stmt->fetch();
-
-        if ($user && password_verify($password, $user['password'])) {
-            echo "Login Successful!";
-            // Yahan session start kar sakte hain baad mein
-        } else {
-            echo "Invalid email or password.";
-        }
-    } catch (PDOException $e) {
-        echo "Error: " . $e->getMessage();
+    if ($user && password_verify($password, $user['password'])) {
+        echo "Login Successful!";
+    } else {
+        echo "Invalid email or password.";
     }
 }
 ?>
