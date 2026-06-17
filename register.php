@@ -6,18 +6,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
     $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
 
-    if (!isset($conn)) {
-        die("System Error: Database connection not established.");
-    }
-
-    try {
-        $sql = "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->execute([$username, $email, $password]);
-        echo "Registration successful! You can now <a href='login.php'>Login</a>";
-    } catch (PDOException $e) {
-        echo "Registration Error: " . $e->getMessage();
-    }
+    $sql = "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$username, $email, $password]);
+    echo "Registration successful! <a href='login.php'>Login here</a>";
 }
 ?>
 <form method="POST">
