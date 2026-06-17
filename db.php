@@ -1,19 +1,13 @@
 <?php
-$host     = "dpg-cuv66rtu4l7c739m13sg-a.singapore-postgres.render.com";
-$dbname   = "auctionproperty_p917";
-$user     = "auctionproperty_p917_user";
-$password = "JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM";
-$port     = "5432";
+// Internal Connection URL (Render recommended)
+$db_url = "postgres://auctionproperty_p917_user:JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM@dpg-cuv66rtu4l7c739m13sg-a.singapore-postgres.render.com:5432/auctionproperty_p917";
 
 try {
-    // Basic connection string - koi extra SSL option nahi
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
-    
-    $conn = new PDO($dsn, $user, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
+    $conn = new PDO($db_url);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    die("Database Connection Error: " . $e->getMessage());
+    // Agar yahan error aaye, toh samajh lo Database access issue hai
+    die("Database Error: " . $e->getMessage());
 }
 ?>
