@@ -1,5 +1,16 @@
 <?php
+// डेटाबेस कनेक्शन फाइल को जोड़ना <?php
+// ये 3 लाइनें एरर को स्क्रीन पर दिखाने के लिए हैं (इसे सबसे ऊपर रखें)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // डेटाबेस कनेक्शन फाइल को जोड़ना
+include 'db.php';
+
+// जब यूज़र फॉर्म सबमिट करे (POST रिक्वेस्ट)
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+// ... बाकी पूरा कोड वैसा ही रहने दें ...
 include 'db.php';
 
 // जब यूज़र फॉर्म सबमिट करे (POST रिक्वेस्ट)
