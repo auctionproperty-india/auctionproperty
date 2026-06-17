@@ -16,13 +16,12 @@ try {
     $conn = $pdo; 
 
     // 1. यूज़र्स, एडमिन और सब-एडमिन की कंबाइंड टेबल
-    // (role कॉलम से तय होगा कि कौन User है, कौन Admin, और कौन Sub-Admin)
     $conn->exec("CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(100) NOT NULL,
         email VARCHAR(100) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
-        role VARCHAR(20) DEFAULT 'user', -- 'user', 'admin', 'sub_admin'
+        role VARCHAR(20) DEFAULT 'user', 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
 
@@ -35,8 +34,8 @@ try {
         current_price NUMERIC(10, 2) NOT NULL,
         image_url VARCHAR(255),
         end_time TIMESTAMP NOT NULL,
-        added_by INT REFERENCES users(id) ON DELETE SET NULL, -- किसने ऐड किया (Admin/Sub-Admin ID)
-        status VARCHAR(20) DEFAULT 'visible', -- 'visible' या 'hidden' (इसे बाद में मैनेज करेंगे)
+        added_by INT REFERENCES users(id) ON DELETE SET NULL, 
+        status VARCHAR(20) DEFAULT 'visible', 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
 
@@ -49,7 +48,7 @@ try {
         bid_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
 
-    // 4. पासवर्ड रीसेट OTP टेबल
+    // 4. पासवर्ड रीसेट टेबल
     $conn->exec("CREATE TABLE IF NOT EXISTS password_resets (
         id SERIAL PRIMARY KEY,
         email VARCHAR(100) NOT NULL,
@@ -57,18 +56,8 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
 
-} catch (PDOException $e) {
-    die("Database Connection Failed: " . $e->getMessage());
-}
-?>
-    // ... पुरानी टेबल्स का कोड यहाँ खत्म हो रहा है ...
-    );");
-
-
-    // 🔥 जादुई कोड: इसे यहाँ डालना है (catch से ठीक पहले)
-    // यह कोड admin@test.com को डेटाबेस में एडमिन बना देगा
+    // 🔥 जादुई लाइन: यह admin@test.com को डेटाबेस में एडमिन रोल पर सेट रखेगी
     $conn->exec("UPDATE users SET role = 'admin' WHERE email = 'admin@test.com';");
-
 
 } catch (PDOException $e) {
     die("Database Connection Failed: " . $e->getMessage());
