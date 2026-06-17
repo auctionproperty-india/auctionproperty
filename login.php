@@ -19,19 +19,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt->execute();
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // पासवर्ड मैच करना
+            // अगर यूज़र मिलता है और पासवर्ड मैच होता है
             if ($user && $user['password'] === $password) {
-                // सेशन में यूज़र का डेटा सेव करना
+                
+                // 🔥 सुरक्षा चेक: अगर डेटाबेस में role कॉलम खाली या अनडिफाइंड है, तो उसे 'user' मान लें
+                $user_role = (isset($user['role']) && !empty($user['role'])) ? $user['role'] : 'user';
+
+                // सेशन में डेटा सेव करना
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
+                $_SESSION['role'] = $user_role;
 
-                // रोल के हिसाब से मैसेज दिखाना (एडमिन/यूज़र)
-                if ($user['role'] == 'admin' || $user['role'] == 'sub_admin') {
-                    $message = "<p style='color: green; font-weight: bold;'>लॉगिन सफल! आप एडमिन हैं। 🎉</p>";
+                // 🔥 सही डैशबोर्ड पर रीडायरेक्ट करना
+                if ($user_role === 'admin' || $user_role === 'sub_admin') {
+                    header("Location: admin_dashboard.php");
+                    exit();
                 } else {
-                    $message = "<p style='color: green; font-weight: bold;'>लॉगिन सफल! आप यूज़र हैं। 🎉</p>";
+                    header("Location: dashboard.php");
+                    exit();
                 }
+
             } else {
                 $message = "<p style='color: red;'>गलत ईमेल या पासवर्ड।</p>";
             }
