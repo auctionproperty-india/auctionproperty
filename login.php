@@ -12,25 +12,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (!empty($email) && !empty($password)) {
         try {
-            // डेटाबेस से यूज़र ढूंढना
             $query = "SELECT * FROM users WHERE email = :email";
             $stmt = $conn->prepare($query);
             $stmt->bindParam(':email', $email);
             $stmt->execute();
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // अगर यूज़र मिलता है और पासवर्ड मैच होता है
             if ($user && $user['password'] === $password) {
                 
-                // 🔥 सुरक्षा चेक: अगर डेटाबेस में role कॉलम खाली या अनडिफाइंड है, तो उसे 'user' मान लें
                 $user_role = (isset($user['role']) && !empty($user['role'])) ? $user['role'] : 'user';
 
-                // सेशन में डेटा सेव करना
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['role'] = $user_role;
 
-                // 🔥 सही डैशबोर्ड पर रीडायरेक्ट करना
                 if ($user_role === 'admin' || $user_role === 'sub_admin') {
                     header("Location: admin_dashboard.php");
                     exit();
@@ -57,7 +52,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta charset="UTF-8">
     <title>लॉगिन पेज</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f4; text-align: center; padding-top: 50px; }
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; padding-top: 50px; text-align: center; }
         .form-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0px 0px 10px #ccc; display: inline-block; width: 320px; text-align: left; }
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
         label { font-weight: bold; color: #555; display: block; margin-top: 10px; }
@@ -73,19 +68,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <div class="form-container">
     <h2>Login Account</h2>
-    
     <?php echo $message; ?>
-
     <form action="login.php" method="POST">
         <label>Email Address</label>
         <input type="email" name="email" placeholder="Enter Email Address" required>
-        
         <label>Password</label>
         <input type="password" name="password" placeholder="Enter Password" required>
-        
         <button type="submit">Login</button>
     </form>
-
     <div class="links-container">
         <a href="register.php">नया अकाउंट बनाएं</a>
         <a href="forgot_password.php" style="color: #dc3545;">Password भूल गए?</a>
