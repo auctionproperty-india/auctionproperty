@@ -1,25 +1,15 @@
 <?php
-// Fresh Start - Checking Connection
 require_once 'db.php';
 ?>
-
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>New Property Portal</title>
+    <title>Property Portal</title>
 </head>
 <body>
-    <h1>System Successfully Rebuilt!</h1>
-    <p>Agar aapko ye dikh raha hai, toh hamara "Fresh Start" kaam kar raha hai.</p>
-    
-    <nav>
-        <a href="index.php">Home</a> | 
-        <a href="register.php">Register</a> | 
-        <a href="login.php">Sign In</a>
-    </nav>
-    
+    <h1>System Status: Online</h1>
+    <p style="color: green;">Database Connection: <strong>SUCCESSFUL!</strong></p>
     <hr>
-    <p>Database Status: <strong>Connected!</strong></p>
+    <a href="login.php">Login</a> | <a href="register.php">Register</a>
 </body>
 </html>
