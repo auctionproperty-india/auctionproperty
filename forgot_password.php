@@ -3,6 +3,11 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 include 'db.php';
 
+// PHPMailer की फाइलों को शामिल करना
+require 'vendor/autoload.php';
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 $message = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -10,7 +15,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (!empty($email)) {
         try {
-            // चेक करें कि यह ईमेल डेटाबेस में है या नहीं
             $query = "SELECT * FROM users WHERE email = :email";
             $stmt = $conn->prepare($query);
             $stmt->bindParam(':email', $email);
@@ -18,28 +22,50 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($user) {
-                // 6 अंकों का रैंडम OTP जनरेट करें
-                $otp = rand(100000, 999990);
+                $otp = rand(100000, 999999);
 
-                // पहले से अगर कोई पुराना OTP इस ईमेल का है तो उसे डिलीट करें
-                $del_query = "DELETE FROM password_resets WHERE email = :email";
-                $del_stmt = $conn->prepare($del_query);
+                // पुराना OTP डिलीट करना
+                $del_stmt = $conn->prepare("DELETE FROM password_resets WHERE email = :email");
                 $del_stmt->bindParam(':email', $email);
                 $del_stmt->execute();
 
-                // नया OTP डेटाबेस में सेव करें
-                $ins_query = "INSERT INTO password_resets (email, otp) VALUES (:email, :otp)";
-                $ins_stmt = $conn->prepare($ins_query);
+                // नया OTP सेव करना
+                $ins_stmt = $conn->prepare("INSERT INTO password_resets (email, otp) VALUES (:email, :otp)");
                 $ins_stmt->bindParam(':email', $email);
                 $ins_stmt->bindParam(':otp', $otp);
                 
                 if ($ins_stmt->execute()) {
-                    // 🚨 भाई ध्यान दें: असली ईमेल भेजने के लिए यहाँ SMTP कोड लगेगा।
-                    // अभी टेस्टिंग के लिए हम स्क्रीन पर ही OTP दिखा देते हैं ताकि काम न रुके!
-                    $message = "<div style='color: green; font-weight: bold; background: #e2f0d9; padding: 10px; border-radius: 4px; margin-bottom: 15px;'>
-                        OTP जनरेट हो गया है! (टेस्टिंग के लिए आपका OTP है: $otp)<br>
-                        <a href='verify_otp.php?email=" . urlencode($email) . "' style='color: #007bff;'>यहाँ क्लिक करके OTP वेरीफाई करें</a>
-                    </div>";
+                    
+                    // 🔥 यहाँ से असली ईमेल जाएगा
+                    $mail = new PHPMailer(true);
+                    try {
+                        $mail->isSMTP();
+                        $mail->Host       = 'smtp.gmail.com';
+                        $mail->SMTPAuth   = true;
+                        
+                        // 🚨 अपनी ईमेल डिटेल्स यहाँ डालें
+                        $mail->Username   = 'YOUR_GMAIL_EMAIL@gmail.com'; // आपका जीमेल
+                        $mail->Password   = 'YOUR_GMAIL_APP_PASSWORD';   // आपका 16 अक्षरों का ऐप पासवर्ड
+                        
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                        $mail->Port       = 587;
+
+                        $mail->setFrom('YOUR_GMAIL_EMAIL@gmail.com', 'Auction Site');
+                        $mail->addAddress($email); // यूज़र का ईमेल
+
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Password Reset OTP';
+                        $mail->Body    = "आपका पासवर्ड रीसेट करने का OTP है: <b>$otp</b>. यह OTP किसी के साथ शेयर न करें।";
+
+                        $mail->send();
+                        
+                        // ईमेल जाने के बाद सीधे OTP वाले पेज पर भेजें
+                        header("Location: verify_otp.php?email=" . urlencode($email));
+                        exit();
+
+                    } catch (Exception $e) {
+                        $message = "<p style='color: red;'>ईमेल भेजने में गड़बड़ हुई: {$mail->ErrorInfo}</p>";
+                    }
                 }
             } else {
                 $message = "<p style='color: red;'>यह ईमेल हमारे रिकॉर्ड में नहीं है।</p>";
@@ -70,22 +96,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </style>
 </head>
 <body>
-
 <div class="form-container">
     <h2>Forgot Password</h2>
-    <p style="color: #666; font-size: 14px;">अपना रजिस्टर्ड ईमेल डालें, हम पासवर्ड रीसेट करने के लिए OTP जनरेट करेंगे।</p>
-    
+    <p style="color: #666; font-size: 14px;">अपना रजिस्टर्ड ईमेल डालें, हम पासवर्ड रीसेट करने के लिए आपके ईमेल पर OTP भेजेंगे।</p>
     <?php echo $message; ?>
-
     <form action="forgot_password.php" method="POST">
         <input type="email" name="email" placeholder="Enter Registered Email" required>
-        <button type="submit">Send OTP</button>
+        <button type="submit">Send OTP to Email</button>
     </form>
-
     <div class="links-container">
         <a href="login.php">वापस लॉगिन पर जाएं</a>
     </div>
 </div>
-
 </body>
 </html>
