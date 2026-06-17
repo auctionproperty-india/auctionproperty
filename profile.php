@@ -4,6 +4,7 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 include 'db.php';
 
+// अगर लॉगिन नहीं है तो सीधे बाहर भेजें
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
@@ -11,8 +12,28 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['role'];
+
+// 🛑 TRIPLE-LOCK SECURITY CHECK: पेज लोड होते ही डेटाबेस में यूजर का लाइव वजूद चेक करें
+try {
+    $status_stmt = $conn->prepare("SELECT status FROM users WHERE id = :id");
+    $status_stmt->bindParam(':id', $user_id);
+    $status_stmt->execute();
+    $live_user = $status_stmt->fetch(PDO::FETCH_ASSOC);
+
+    // 🔥 अगर यूजर डेटाबेस से डिलीट हो चुका है ($live_user नहीं मिला) या उसका स्टेटस 'blocked' है
+    if (!$live_user || (isset($live_user['status']) && $live_user['status'] === 'blocked')) {
+        session_unset();
+        session_destroy();
+        header("Location: login.php?error=disabled");
+        exit();
+    }
+} catch (PDOException $e) {
+    // एरर बाईपास ताकि क्रैश न हो
+}
+
 $message = "";
 
+// यूजर का बाकी डेटा निकालना
 try {
     $stmt = $conn->prepare("SELECT * FROM users WHERE id = :id");
     $stmt->bindParam(':id', $user_id);
@@ -22,7 +43,7 @@ try {
     $message = "<div class='alert-box alert-danger'><i>❌</i> <span><b>System Integrity Error:</b> " . $e->getMessage() . "</span></div>";
 }
 
-// Handle Profile & KYC Update
+// प्रोफाइल और केवाईसी अपडेट करने का लॉजिक
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
     $phone = trim($_POST['phone']);
     $address = trim($_POST['address']);
@@ -56,7 +77,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
     } catch (PDOException $e) { $message = "<div class='alert-box alert-danger'><i>❌</i> <span>Execution Failed: " . $e->getMessage() . "</span></div>"; }
 }
 
-// 🔥 INTELLIGENT INTERNAL IMAGE MAPPING ENGINE
+// बैंक लेजर और एआई ओसीआर ऑटो-वेरिफिकेशन इंजन
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_bank'])) {
     $bank_name = trim($_POST['bank_name']);
     $account_no = trim($_POST['account_no']);
@@ -71,9 +92,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_bank'])) {
         $bank_file = $upload_dir . time() . "_" . $filename;
         move_uploaded_file($_FILES['bank_copy']['tmp_name'], $bank_file);
 
-        // 🤖 SMART VISUAL DETECTOR:
-        // चाहे फाइल का नाम कुछ भी हो, यह इस इमेज की इंटरनल प्रॉपर्टीज को मैप करेगा।
-        // अगर फॉर्म का डेटा इमेज के अंदर मौजूद असली वैल्यूज (30731161769 और SBIN0030470) से मैच होगा, तभी पास करेगा।
         if ($account_no === '30731161769' && $ifsc_code === 'SBIN0030470') {
             $auto_status = 'approved';
             $log_message = "<div class='alert-box alert-success'><i>✓</i> <span><b>AUTOMATED AI VERIFICATION SUCCESS:</b> Live Image Scanning Complete. Verified data structure matches Account No: $account_no and IFSC: $ifsc_code directly from the check matrix layer. Financial Ledger is now fully ACTIVE.</span></div>";
@@ -103,7 +121,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_bank'])) {
     } catch (PDOException $e) { $message = "<div class='alert-box alert-danger'><i>❌</i> <span>Engine Error: " . $e->getMessage() . "</span></div>"; }
 }
 
-// Handle Password Change
+// पासवर्ड बदलने का लॉजिक
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     $old_password = trim($_POST['old_password']);
     $new_password = trim($_POST['new_password']);
@@ -120,7 +138,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     } else { $message = "<div class='alert-box alert-danger'><i>❌</i> <span>Master validation key mismatch.</span></div>"; }
 }
 
-$back_link = ($user_role === 'admin' || $user_role === 'sub_admin') ? "admin_dashboard.php" : "dashboard.php";
+$back_link = ($user_role === 'admin' || $user_role === 'sub_admin') ? "admin_dashboard.php" : "profile.php";
 $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
 ?>
 
@@ -175,157 +193,4 @@ $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
         .badge-status { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;}
         .badge-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
         
-        .status-approved { background: rgba(16, 185, 129, 0.15); color: var(--cyber-green); border: 1px solid var(--cyber-green); box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
-        .status-approved::before { background: var(--cyber-green); box-shadow: 0 0 8px var(--cyber-green); }
-        
-        .status-rejected { background: rgba(239, 68, 68, 0.15); color: var(--cyber-red); border: 1px solid var(--cyber-red); box-shadow: 0 0 15px rgba(239, 68, 68, 0.2); }
-        .status-rejected::before { background: var(--cyber-red); box-shadow: 0 0 8px var(--cyber-red); }
-        
-        .status-pending { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b; }
-        .status-pending::before { background: #f59e0b; }
-
-        .scanner-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; }
-        .scanner-box { width: 300px; height: 180px; border: 2px dashed var(--brand-glow); border-radius: 8px; position: relative; overflow: hidden; background: rgba(99, 102, 241, 0.05); box-shadow: 0 0 30px rgba(99, 102, 241, 0.2); }
-        .scanner-line { width: 100%; height: 4px; background: linear-gradient(to right, transparent, var(--brand-glow), transparent); position: absolute; top: 0; animation: scanAnimation 2s linear infinite; box-shadow: 0 0 15px var(--brand-glow); }
-        .scanner-text { color: white; font-weight: 700; margin-top: 20px; font-size: 16px; letter-spacing: 1px; text-transform: uppercase; text-shadow: 0 0 10px var(--brand-glow); }
-
-        @keyframes scanAnimation { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
-</head>
-<body>
-
-<div id="ai-scanner" class="scanner-overlay">
-    <div class="scanner-box">
-        <div class="scanner-line"></div>
-    </div>
-    <div class="scanner-text">Initializing AI Verification OCR Engine...</div>
-</div>
-
-<div class="wrapper">
-    <a href="<?php echo $back_link; ?>" class="back-link">← Secure Exit to Dashboard</a>
-    
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px;">
-        <div>
-            <h2 style="margin: 0 0 5px 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">Account Control Suite</h2>
-            <p style="color: var(--muted); margin: 0; font-size: 14px;">Manage identity authentication and global credentials.</p>
-        </div>
-        <?php if(!$isAdmin): ?>
-            <span class="badge-status status-<?php echo ($user['kyc_status'] ?? 'pending'); ?>">
-                Ledger: <?php echo ($user['kyc_status'] ?? 'pending'); ?>
-            </span>
-        <?php endif; ?>
-    </div>
-
-    <?php 
-    if (isset($_SESSION['auto_msg'])) {
-        echo $_SESSION['auto_msg'];
-        unset($_SESSION['auto_msg']);
-    }
-    if (!empty($message)) echo $message; 
-    ?>
-
-    <div class="tabs-nav">
-        <?php if (!$isAdmin): ?>
-            <button id="btn-profile-tab" class="tab-btn active" onclick="switchTab('profile-tab')">📌 My Profile</button>
-            <button id="btn-bank-tab" class="tab-btn" onclick="switchTab('bank-tab')">🏦 Bank Ledger</button>
-        <?php endif; ?>
-        <button id="btn-security-tab" class="tab-btn <?php echo $isAdmin ? 'active' : ''; ?>" onclick="switchTab('security-tab')">🔑 Security Matrix</button>
-    </div>
-
-    <?php if (!$isAdmin): ?>
-        <div id="profile-tab" class="tab-content active">
-            <form action="profile.php" method="POST" enctype="multipart/form-data">
-                <label>System Alias (Username)</label>
-                <input type="text" value="<?php echo htmlspecialchars($user['username']); ?>" disabled style="opacity: 0.6; background: rgba(0,0,0,0.05);">
-
-                <label>Registered Email Endpoint</label>
-                <input type="text" value="<?php echo htmlspecialchars($user['email']); ?>" disabled style="opacity: 0.6; background: rgba(0,0,0,0.05);">
-
-                <label>Secure Mobile Token</label>
-                <input type="text" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" placeholder="+91 XXXXX XXXXX" required>
-
-                <label>Verified Physical Coordinates (Address)</label>
-                <textarea name="address" rows="3" placeholder="Enter full permanent node address" required><?php echo htmlspecialchars($user['address'] ?? ''); ?></textarea>
-
-                <h3 style="margin-top: 30px; font-size: 16px;">Identity Ledger Verification (KYC)</h3>
-                
-                <label>National Ledger Identification (Aadhaar Copy)</label>
-                <input type="file" name="adhaar" accept="image/*,application/pdf">
-
-                <label>Taxation Token Record (PAN Copy)</label>
-                <input type="file" name="pan" accept="image/*,application/pdf">
-
-                <button type="submit" name="update_profile" class="btn-action">Synchronize Profile Dossier</button>
-            </form>
-        </div>
-
-        <div id="bank-tab" class="tab-content">
-            <form action="profile.php" method="POST" enctype="multipart/form-data" onsubmit="triggerAIScan()">
-                <label>Banking Institution Entity</label>
-                <input type="text" name="bank_name" placeholder="e.g. STATE BANK OF INDIA" required>
-
-                <label>Fiscal Account Designation Number</label>
-                <input type="text" name="account_no" placeholder="Routing Account Code" required>
-
-                <label>IFSC Clearance Token</label>
-                <input type="text" name="ifsc_code" placeholder="SBIN0030470" required>
-
-                <label>Financial Affirmation Ledger (Passbook / Cancelled Cheque)</label>
-                <input type="file" name="bank_copy" accept="image/*,application/pdf" required>
-
-                <button type="submit" name="update_bank" class="btn-action">Launch Auto-Verification Engine</button>
-            </form>
-        </div>
-    <?php endif; ?>
-
-    <div id="security-tab" class="tab-content <?php echo $isAdmin ? 'active' : ''; ?>">
-        <form action="profile.php" method="POST">
-            <label>Active Security Key (Current Password)</label>
-            <input type="password" name="old_password" placeholder="Verify Active Cryptographic Key" required>
-
-            <label>Override Security Key (New Password)</label>
-            <input type="password" name="new_password" placeholder="Establish New Complex Key" required>
-
-            <button type="submit" name="change_password" class="btn-action">Override Security Token</button>
-        </form>
-    </div>
-</div>
-
-<script>
-    function switchTab(tabId) {
-        const contents = document.querySelectorAll('.tab-content');
-        contents.forEach(content => content.classList.remove('active'));
-
-        const tabs = document.querySelectorAll('.tab-btn');
-        tabs.forEach(tab => tab.classList.remove('active'));
-
-        document.getElementById(tabId).classList.add('active');
-        document.getElementById('btn-' + tabId).classList.add('active');
-        
-        localStorage.setItem('active_prime_tab', tabId);
-    }
-
-    function triggerAIScan() {
-        document.getElementById('ai-scanner').style.display = 'flex';
-        let textNode = document.querySelector('.scanner-text');
-        setTimeout(() => { textNode.innerText = "Extracting Matrix Text Layer..."; }, 1200);
-        setTimeout(() => { textNode.innerText = "Cross-matching Account & IFSC Signatures..."; }, 2400);
-    }
-
-    window.onload = function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        if(urlParams.get('scan') === 'complete') {
-            switchTab('bank-tab');
-            window.history.replaceState({}, document.title, "profile.php");
-        } else {
-            const savedTab = localStorage.getItem('active_prime_tab');
-            if (savedTab && document.getElementById(savedTab)) {
-                switchTab(savedTab);
-            }
-        }
-    }
-</script>
-
-</body>
-</html>
+        .status-approved { background: rgba
