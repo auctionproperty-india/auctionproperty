@@ -1,24 +1,31 @@
 <?php
-// Render / Supabase PostgreSQL Connection
+// Render PostgreSQL Database Connection Suite (Full Overwrite)
 $host = "dpg-cuv66rtu4l7c739m13sg-a.singapore-postgres.render.com";
-$user = "prime_db_user";
-$password = "fW6X8gBfOatV8vA8HlFpIn6kWeO2N5nI";
-$dbname = "prime_db_a91h";
 $port = "5432";
+$dbname = "auctionproperty_p917"; 
+$user = "auctionproperty_p917_user"; 
+
+// ⚠️ यहाँ अपना वो असली पासवर्ड डालें जो आपके रेंडर डैशबोर्ड पर पोस्टग्रेस सेटिंग्स में दिख रहा है
+$password = "YOUR_DATABASE_PASSWORD_HERE"; 
 
 try {
+    // 🌍 पोस्टग्रेस के लिए स्टैंडर्ड DSN स्ट्रिंग
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
-    $conn = new PDO($dsn, $user, $password);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
-    // 🔥 PostgreSQL COMPATIBLE AUTO-PATCH
-    // यह चेक करेगा कि referred_by कॉलम है या नहीं, नहीं होगा तो तुरंत बना देगा
-    $checkQuery = $conn->query("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='referred_by'");
-    if ($checkQuery->rowCount() == 0) {
-        $conn->exec("ALTER TABLE users ADD COLUMN referred_by VARCHAR(100) DEFAULT NULL");
-    }
+    // 🔒 ड्राइवर लेवल पर SSL मोड को 'require' करना ताकि रेंडर कनेक्शन न काटे
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        // 🔥 यह लाइन रेंडर के सर्वर को चुप कराने के लिए सबसे ज़रूरी है
+        PDO::PGSQL_ATTR_SSL_MODE     => 'require' 
+    ];
+    
+    // ⚡ कनेक्शन इनिशियलाइज़ेशन
+    $conn = new PDO($dsn, $user, $password, $options);
+    
+    // कनेक्शन एकदम परफेक्ट होने पर स्क्रीन पर कुछ नहीं दिखेगा, सीधे काम होगा
 } catch (PDOException $e) {
-    echo "Connection failed: " . $e->getMessage();
-    exit();
+    // अगर फिर भी कोई गड़बड़ हो, तो यह साफ़ एरर टर्मिनल पर दिखाएगा
+    die("Database Matrix Connection Terminated: " . $e->getMessage());
 }
 ?>
