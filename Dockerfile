@@ -1,11 +1,16 @@
 FROM php:8.2-apache
 
-# PostgreSQL ड्राइवर इंस्टॉल करने के लिए ये कमांड्स ज़रूरी हैं
-RUN apt-get update && apt-get install -y libpq-dev \
+# आवश्यक टूल्स और PostgreSQL ड्राइवर इंस्टॉल करना
+RUN apt-get update && apt-get install -y libpq-dev git unzip \
     && docker-php-ext-install pdo pdo_pgsql pgsql
 
-# आपके प्रोजेक्ट की फाइलों को सर्वर में कॉपी करने के लिए
+# कंपोज़र (Composer) इंस्टॉल करना - जो PHPMailer को लाएगा
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
 COPY . /var/www/html/
 
-# पोर्ट 80 को ओपन करने के लिए
+# PHPMailer इंस्टॉल करना
+RUN composer require phpmailer/phpmailer
+
 EXPOSE 80
