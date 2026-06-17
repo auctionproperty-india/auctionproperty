@@ -1,6 +1,6 @@
 FROM php:8.2-apache
 
-# SSL aur PostgreSQL ke liye zaroori dependencies install karna
+# PostgreSQL support ke liye zaroori libraries aur drivers install karna
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     && docker-php-ext-install pdo pdo_pgsql \
