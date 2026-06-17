@@ -12,6 +12,24 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'admin' && $_SESSION[
 
 $message = "";
 
+// 🤖 SELF-HEALING DATABASE AUTO-PATCH (यह अपने आप कॉलम जोड़ देगा)
+try {
+    // चेक करते हैं कि क्या status कॉलम पहले से मौजूद है
+    $checkColumn = $conn->query("SHOW COLUMNS FROM users LIKE 'status'");
+    if ($checkColumn->rowCount() == 0) {
+        // अगर कॉलम नहीं है, तो तुरंत जोड़ दो
+        $conn->exec("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'");
+        $message = "<div class='alert alert-success'>⚙️ [System Sync]: Database integrity patch applied. 'status' column added successfully!</div>";
+    }
+} catch (PDOException $e) {
+    // अगर SQL Server (जैसे PostgreSQL) SHOW COLUMNS सपोर्ट नहीं करता, तो ALTER सीधे ट्राई करो
+    try {
+        $conn->exec("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'");
+    } catch (Exception $ex) {
+        // कॉलम पहले से होगा तो एरर को इग्नोर करो
+    }
+}
+
 // 1. यूजर का पासवर्ड बदलने का लॉजिक
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_user_password'])) {
     $target_user_id = $_POST['target_user_id'];
@@ -76,7 +94,6 @@ try {
         .alert-success { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; color: #10b981; }
         .alert-danger { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; }
 
-        /* User Grid/Cards */
         .user-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 25px; margin-bottom: 25px; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
         .user-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 15px; }
         .user-title { font-size: 18px; font-weight: 700; color: #6366f1; }
@@ -85,13 +102,11 @@ try {
         .detail-item { font-size: 13px; color: #94a3b8; }
         .detail-item strong { color: #f8fafc; display: block; margin-bottom: 2px; font-size: 14px; }
         
-        /* Badges */
         .badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; display: inline-block; }
         .badge-active { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }
         .badge-blocked { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; }
         .badge-kyc { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; }
 
-        /* Actions */
         .action-zone { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: #0f172a; padding: 15px; border-radius: 8px; border: 1px solid #334155; gap: 15px; }
         .password-form { display: flex; gap: 10px; align-items: center; }
         .password-form input { background: #1e293b; border: 1px solid #334155; color: white; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
@@ -137,7 +152,7 @@ try {
                         <span style="font-size: 13px; color: #64748b; font-weight: normal; margin-left: 10px;">(ID: <?php echo $u['id']; ?>)</span>
                     </div>
                     <div>
-                        <span class="badge badge-<?php echo ($u['status'] === 'blocked' ? 'blocked' : 'active'); ?>">
+                        <span class="badge badge-<?php echo ((isset($u['status']) && $u['status'] === 'blocked') ? 'blocked' : 'active'); ?>">
                             System Access: <?php echo $u['status'] ?? 'active'; ?>
                         </span>
                         <span class="badge badge-kyc" style="margin-left: 5px;">
@@ -146,7 +161,6 @@ try {
                     </div>
                 </div>
 
-                <!-- यूज़र की सारी डिटेल्स का ग्रिड -->
                 <div class="grid-details">
                     <div class="detail-item">
                         <strong>Email Endpoint</strong>
@@ -167,7 +181,6 @@ try {
                     </div>
                 </div>
 
-                <!-- बैंक लेजर डिटेल्स -->
                 <div class="grid-details" style="background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; border: 1px dashed #334155;">
                     <div class="detail-item">
                         <strong>Bank Entity Name</strong>
@@ -189,18 +202,15 @@ try {
 
                 <div style="margin-top: 20px;"></div>
 
-                <!-- एक्शन जोन: पासवर्ड और ब्लॉक/अनब्लॉक कंट्रोल्स -->
                 <div class="action-zone">
-                    <!-- पासवर्ड बदलें फॉर्म -->
                     <form action="admin_dashboard.php" method="POST" class="password-form">
                         <input type="hidden" name="target_user_id" value="<?php echo $u['id']; ?>">
                         <input type="text" name="new_password" placeholder="Enter New Plaintext Password" required>
                         <button type="submit" name="change_user_password">Override Password</button>
                     </form>
 
-                    <!-- इनेबल/डिसएबल बटन -->
                     <div>
-                        <?php if ($u['status'] === 'blocked'): ?>
+                        <?php if (isset($u['status']) && $u['status'] === 'blocked'): ?>
                             <a href="admin_dashboard.php?action=unblock&id=<?php echo $u['id']; ?>" class="btn-status btn-unblock">✓ Enable User (Unblock)</a>
                         <?php else: ?>
                             <a href="admin_dashboard.php?action=block&id=<?php echo $u['id']; ?>" class="btn-status btn-block">❌ Disable User (Block)</a>
