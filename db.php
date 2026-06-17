@@ -7,18 +7,19 @@ $password = "JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM";
 $port     = "5432";
 
 try {
-    // SSL connection stable karne ke liye 'no-verify' mode best hai
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=no-verify";
+    // Standard DSN string for Postgres
+    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
     
-    // PDO Connection
-    $conn = new PDO($dsn, $user, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    // Connection options
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_TIMEOUT => 15
-    ]);
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ];
+
+    $conn = new PDO($dsn, $user, $password, $options);
     
 } catch (PDOException $e) {
-    // Agar error aaya toh seedha dikhega
     die("Database Connection Error: " . $e->getMessage());
 }
 ?>
