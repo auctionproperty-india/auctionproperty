@@ -25,7 +25,8 @@ if (!isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['ro
 <body>
 
 <div class="sidebar">
-    <h3>Admin Panel</h3>
+    <h3>Admin Panel</h3> 
+    <a href="profile.php" style="color: #ffc107; font-weight: bold;">👤 मेरी प्रोफाइल & KYC</a>
     <a href="#">📊 मुख्य डैशबोर्ड</a>
     <a href="#">🏢 प्रॉपर्टी/प्रोडक्ट जोड़ें</a>
     <a href="#">👥 यूज़र्स लिस्ट</a>
