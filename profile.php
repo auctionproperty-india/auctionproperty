@@ -31,24 +31,6 @@ try {
 
 $message = "";
 $isAdmin = ($user_role === 'admin' || $user_role === 'sub_admin');
-$back_link = $isAdmin ? "admin_dashboard.php" : "profile.php"; 
-
-// रेफरल लिस्ट फेच करना
-$referred_users = [];
-if (isset($user['username'])) {
-    try {
-        $ref_stmt = $conn->prepare("SELECT username, email FROM users WHERE referred_by = :ref_by ORDER BY id DESC");
-        $ref_stmt->bindParam(':ref_by', $user['username']);
-        $ref_stmt->execute();
-        $referred_users = $ref_stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {}
-}
-
-// 🔥 सीक्रेट कंपनी स्टाइल लिंक जनरेशन (नाम की जगह ID का सीक्रेट कोड)
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
-$domainName = $_SERVER['HTTP_HOST'];
-$secret_code = "REF" . ($user['id'] ?? '');
-$referral_link = $protocol . $domainName . "/register.php?ref=" . $secret_code;
 
 // प्रोफाइल अपडेट लॉजिक
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
@@ -168,14 +150,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
         label { font-weight: 600; display: block; margin-top: 18px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
         input, textarea { width: 96%; padding: 12px; margin-top: 6px; border: 1px solid var(--border); border-radius: 8px; background: <?php echo $isAdmin ? '#0f172a' : '#fff'; ?>; color: var(--text); font-size: 14px; }
         .btn-action { background: var(--brand); color: white; border: none; padding: 14px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 25px; width: 100%; }
-        
-        .referral-box { background: linear-gradient(135deg, #1e1b4b, #2e104d); color: #e0e7ff; padding: 25px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #4338ca; }
-        .ref-input-group { display: flex; gap: 10px; margin-top: 10px; }
-        .ref-input-group input { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid #4338ca; color: #fff; margin-top: 0; }
-        .btn-share { background: #10b981; color: white; border: none; padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-        .ref-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
-        .ref-table th, .ref-table td { padding: 10px 15px; text-align: left; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .ref-table th { background: rgba(255,255,255,0.05); color: #a5b4fc; }
         .alert-box { display: flex; align-items: center; gap: 15px; padding: 16px; border-radius: 10px; font-weight: 600; font-size: 14px; margin-bottom: 25px; }
         .alert-success { background: rgba(16, 185, 129, 0.1); border: 1px solid var(--cyber-green); color: var(--cyber-green); }
         .alert-danger { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--cyber-red); color: var(--cyber-red); }
@@ -186,9 +160,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 <body>
 
 <div class="wrapper">
-    <a href="<?php echo $isAdmin ? 'admin_dashboard.php' : 'logout.php'; ?>" class="back-link">
-        <?php echo $isAdmin ? '← Back to Admin Console' : '← Secure Logout / Exit'; ?>
-    </a>
+    <!-- वापस मुख्य डैशबोर्ड पर भेजने का लिंक -->
+    <a href="dashboard.php" class="back-link">← Back to Dashboard Console</a>
     
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px;">
         <div>
@@ -199,41 +172,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
             <span class="badge-status" style="color: var(--cyber-green);">Node Live Active</span>
         <?php endif; ?>
     </div>
-
-    <?php if (!$isAdmin): ?>
-        <div class="referral-box">
-            <h3 style="margin: 0 0 5px 0; font-size: 18px; color: #fff;">📢 Infrastructure Network Routing</h3>
-            <p style="margin: 0 0 15px 0; font-size: 13px; color: #94a3b8;">Share your encrypted link to connect child server nodes to your ecosystem grid.</p>
-            
-            <label style="color: #a5b4fc;">Corporate Invitation Link</label>
-            <div class="ref-input-group">
-                <input type="text" id="refLink" value="<?php echo $referral_link; ?>" readonly>
-                <button type="button" class="btn-share" onclick="shareReferralLink()">🌐 Share Link</button>
-            </div>
-
-            <h4 style="margin: 25px 0 5px 0; font-size: 14px; color: #fff;">📊 Sub-Nodes Integrated (Total: <?php echo count($referred_users); ?>)</h4>
-            <?php if (empty($referred_users)): ?>
-                <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b; font-style: italic;">No child nodes registered under your link matrix yet.</p>
-            <?php else: ?>
-                <table class="ref-table">
-                    <thead>
-                        <tr>
-                            <th>Node User</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($referred_users as $ru): ?>
-                            <tr>
-                                <td><b><?php echo htmlspecialchars($ru['username']); ?></b></td>
-                                <td><span style="color: #10b981;">● Connected</span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php endif; ?>
-        </div>
-    <?php endif; ?>
 
     <?php 
     if (isset($_SESSION['auto_msg'])) { echo $_SESSION['auto_msg']; unset($_SESSION['auto_msg']); }
@@ -314,20 +252,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
         tabs.forEach(tab => tab.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         document.getElementById('btn-' + tabId).classList.add('active');
-    }
-
-    function shareReferralLink() {
-        const shareData = {
-            title: 'Prime Property Secure Node',
-            text: 'Initialize your deployment server link with Prime Property Framework:',
-            url: document.getElementById('refLink').value
-        };
-        if (navigator.share) {
-            navigator.share(shareData).catch((error) => console.log('Error sharing:', error));
-        } else {
-            navigator.clipboard.writeText(shareData.url);
-            alert("🔗 Corporate Link copied to clipboard!");
-        }
     }
 </script>
 </body>
