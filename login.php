@@ -4,81 +4,93 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 include 'db.php';
 
-$message = "";
+$error = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = isset($_POST['email']) ? trim($_POST['email']) : '';
-    $password = isset($_POST['password']) ? trim($_POST['password']) : '';
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
+    $email = trim($_POST['email']);
+    $password = trim($_POST['password']);
 
     if (!empty($email) && !empty($password)) {
         try {
-            $query = "SELECT * FROM users WHERE email = :email";
-            $stmt = $conn->prepare($query);
+            // डेटाबेस से यूज़र को निकालना
+            $stmt = $conn->prepare("SELECT * FROM users WHERE email = :email");
             $stmt->bindParam(':email', $email);
             $stmt->execute();
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($user && $user['password'] === $password) {
+            // पासवर्ड मैच करना (बिना हैश वाले सिंपल पासवर्ड के लिए)
+            if ($user && $password === $user['password']) {
                 
-                $user_role = (isset($user['role']) && !empty($user['role'])) ? $user['role'] : 'user';
-
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user_role;
-
-                if ($user_role === 'admin' || $user_role === 'sub_admin') {
-                    header("Location: admin_dashboard.php");
-                    exit();
+                // 🛑 CRITICAL CHECK: अगर एडमिन ने यूज़र को ब्लॉक (Disable) किया है
+                if (isset($user['status']) && $user['status'] === 'blocked') {
+                    $error = "❌ Your account access has been disabled by the administrator core.";
                 } else {
-                    header("Location: dashboard.php");
+                    // अगर एक्टिव है तो लॉगिन होने दें
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['role'] = $user['role'];
+                    $_SESSION['username'] = $user['username'];
+
+                    if ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'sub_admin') {
+                        header("Location: admin_dashboard.php");
+                    } else {
+                        header("Location: dashboard.php");
+                    }
                     exit();
                 }
-
             } else {
-                $message = "<p style='color: red;'>गलत ईमेल या पासवर्ड।</p>";
+                $error = "❌ Invalid email or cryptographic password matrix.";
             }
         } catch (PDOException $e) {
-            $message = "<p style='color: red;'>डेटाबेस एरर: " . $e->getMessage() . "</p>";
+            $error = "❌ System Matrix Error: " . $e->getMessage();
         }
     } else {
-        $message = "<p style='color: red;'>कृपया सभी फ़ील्ड्स भरें।</p>";
+        $error = "❌ Please populate all required authentication parameters.";
     }
 }
 ?>
 
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>लॉगिन पेज</title>
+    <title>Login // Prime Property</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; padding-top: 50px; text-align: center; }
-        .form-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0px 0px 10px #ccc; display: inline-block; width: 320px; text-align: left; }
-        h2 { text-align: center; color: #333; margin-bottom: 20px; }
-        label { font-weight: bold; color: #555; display: block; margin-top: 10px; }
-        input { width: 93%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; }
-        button { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
-        button:hover { background-color: #0056b3; }
-        .links-container { text-align: center; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px; }
-        .links-container a { color: #007bff; text-decoration: none; font-size: 14px; display: inline-block; margin: 5px 10px; }
-        .links-container a:hover { text-decoration: underline; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #0f172a; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; color: #f8fafc; }
+        .login-box { background: #1e293b; padding: 40px; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border: 1px solid #334155; width: 100%; max-width: 400px; }
+        h2 { margin: 0 0 10px 0; font-size: 26px; font-weight: 800; text-align: center; color: #6366f1; }
+        p { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 30px; }
+        label { font-weight: 600; display: block; margin-top: 15px; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+        input { width: 93%; padding: 12px; margin-top: 6px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: white; font-size: 14px; }
+        input:focus { border-color: #6366f1; outline: none; }
+        .btn-submit { background: #4f46e5; color: white; border: none; padding: 14px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 25px; width: 100%; transition: 0.3s; }
+        .btn-submit:hover { background: #4338ca; box-shadow: 0 0 20px rgba(79, 70, 229, 0.5); }
+        .error-box { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-bottom: 20px; text-align: center; line-height: 1.4; }
+        .footer-link { text-align: center; margin-top: 20px; font-size: 13px; color: #64748b; }
+        .footer-link a { color: #6366f1; text-decoration: none; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="form-container">
-    <h2>Login Account</h2>
-    <?php echo $message; ?>
+<div class="login-box">
+    <h2>Secure Gateway</h2>
+    <p>Enter your authorization tokens to session initialize.</p>
+
+    <?php if (!empty($error)): ?>
+        <div class="error-box"><?php echo $error; ?></div>
+    <?php endif; ?>
+
     <form action="login.php" method="POST">
-        <label>Email Address</label>
-        <input type="email" name="email" placeholder="Enter Email Address" required>
-        <label>Password</label>
-        <input type="password" name="password" placeholder="Enter Password" required>
-        <button type="submit">Login</button>
+        <label>Identity Email Node</label>
+        <input type="email" name="email" placeholder="name@domain.com" required>
+
+        <label>Security Access Key</label>
+        <input type="password" name="password" placeholder="••••••••" required>
+
+        <button type="submit" name="login" class="btn-submit">Initialize Core Session</button>
     </form>
-    <div class="links-container">
-        <a href="register.php">नया अकाउंट बनाएं</a>
-        <a href="forgot_password.php" style="color: #dc3545;">Password भूल गए?</a>
+    
+    <div class="footer-link">
+        Don't have an asset token? <a href="register.php">Register Node</a>
     </div>
 </div>
 
