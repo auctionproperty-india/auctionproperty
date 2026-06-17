@@ -5,7 +5,6 @@ $database_url = "postgresql://admin:JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM@dpg-d8ok6lf
 $dbopts = parse_url($database_url);
 
 $host = $dbopts["host"];
-// अगर यूआरएल में पोर्ट नहीं है, तो अपने आप डिफ़ॉल्ट 5432 पोर्ट ले लेगा, एरर नहीं आएगी
 $port = isset($dbopts["port"]) ? $dbopts["port"] : "5432"; 
 $user = $dbopts["user"];
 $pass = $dbopts["pass"];
@@ -14,7 +13,18 @@ $dbname = ltrim($dbopts["path"], '/');
 try {
     $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$dbname", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $conn = $pdo; // आपके पुराने कोड के सपोर्ट के लिए
+    $conn = $pdo; 
+
+    // 🔥 जादूई कोड: अगर 'users' टेबल नहीं है, तो यह अपने आप बना देगा
+    $table_query = "CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(100) NOT NULL,
+        email VARCHAR(100) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );";
+    $conn->exec($table_query);
+
 } catch (PDOException $e) {
     die("Database Connection Failed: " . $e->getMessage());
 }
