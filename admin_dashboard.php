@@ -12,25 +12,35 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'admin' && $_SESSION[
 
 $message = "";
 
-// 🤖 SELF-HEALING DATABASE AUTO-PATCH (यह अपने आप कॉलम जोड़ देगा)
+// 🤖 SELF-HEALING DATABASE AUTO-PATCH (यह अपने आप कॉलम जोड़ देगा अगर नहीं होगा तो)
 try {
-    // चेक करते हैं कि क्या status कॉलम पहले से मौजूद है
     $checkColumn = $conn->query("SHOW COLUMNS FROM users LIKE 'status'");
     if ($checkColumn->rowCount() == 0) {
-        // अगर कॉलम नहीं है, तो तुरंत जोड़ दो
         $conn->exec("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'");
         $message = "<div class='alert alert-success'>⚙️ [System Sync]: Database integrity patch applied. 'status' column added successfully!</div>";
     }
 } catch (PDOException $e) {
-    // अगर SQL Server (जैसे PostgreSQL) SHOW COLUMNS सपोर्ट नहीं करता, तो ALTER सीधे ट्राई करो
     try {
         $conn->exec("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'");
-    } catch (Exception $ex) {
-        // कॉलम पहले से होगा तो एरर को इग्नोर करो
+    } catch (Exception $ex) {}
+}
+
+// 🔥 1. यूजर को डेटाबेस से हमेशा के लिए गायब (DELETE) करने का लॉजिक
+if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
+    $target_id = $_GET['id'];
+    
+    try {
+        $stmt = $conn->prepare("DELETE FROM users WHERE id = :id");
+        $stmt->bindParam(':id', $target_id);
+        if ($stmt->execute()) {
+            $message = "<div class='alert alert-success'>🗑️ User Node permanently purged from database ledger. They can now re-register fresh.</div>";
+        }
+    } catch (PDOException $e) {
+        $message = "<div class='alert alert-danger'>Error deleting user node: " . $e->getMessage() . "</div>";
     }
 }
 
-// 1. यूजर का पासवर्ड बदलने का लॉजिक
+// 2. यूजर का पासवर्ड बदलने का लॉजिक
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_user_password'])) {
     $target_user_id = $_POST['target_user_id'];
     $new_password = trim($_POST['new_password']);
@@ -49,8 +59,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_user_password']
     }
 }
 
-// 2. यूजर को Enable / Disable (Block/Unblock) करने का लॉजिक
-if (isset($_GET['action']) && isset($_GET['id'])) {
+// 3. यूजर को Enable / Disable (Block/Unblock) करने का लॉजिक
+if (isset($_GET['action']) && ($_GET['action'] === 'block' || $_GET['action'] === 'unblock') && isset($_GET['id'])) {
     $target_id = $_GET['id'];
     $action = $_GET['action'];
     $new_status = ($action === 'block') ? 'blocked' : 'active';
@@ -113,11 +123,15 @@ try {
         .password-form button { background: #4f46e5; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
         .password-form button:hover { background: #4338ca; }
 
-        .btn-status { padding: 8px 16px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 13px; transition: 0.2s; }
+        .btn-status { padding: 8px 16px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 13px; transition: 0.2s; display: inline-block; }
         .btn-block { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; }
         .btn-block:hover { background: #ef4444; color: white; }
         .btn-unblock { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }
         .btn-unblock:hover { background: #10b981; color: white; }
+        
+        /* 🗑️ नया डिलीट बटन स्टाइल */
+        .btn-delete { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); margin-left: 8px; }
+        .btn-delete:hover { background: #b91c1c; color: white; border-color: #b91c1c; box-shadow: 0 0 15px rgba(185, 28, 28, 0.4); }
         
         .doc-link { color: #38bdf8; text-decoration: none; font-weight: 600; }
         .doc-link:hover { text-decoration: underline; }
@@ -209,12 +223,18 @@ try {
                         <button type="submit" name="change_user_password">Override Password</button>
                     </form>
 
-                    <div>
+                    <div style="display: flex; align-items: center;">
                         <?php if (isset($u['status']) && $u['status'] === 'blocked'): ?>
-                            <a href="admin_dashboard.php?action=unblock&id=<?php echo $u['id']; ?>" class="btn-status btn-unblock">✓ Enable User (Unblock)</a>
+                            <a href="admin_dashboard.php?action=unblock&id=<?php echo $u['id']; ?>" class="btn-status btn-unblock">✓ Enable User</a>
                         <?php else: ?>
-                            <a href="admin_dashboard.php?action=block&id=<?php echo $u['id']; ?>" class="btn-status btn-block">❌ Disable User (Block)</a>
+                            <a href="admin_dashboard.php?action=block&id=<?php echo $u['id']; ?>" class="btn-status btn-block">❌ Disable User</a>
                         <?php endif; ?>
+
+                        <a href="admin_dashboard.php?action=delete&id=<?php echo $u['id']; ?>" 
+                           class="btn-status btn-delete" 
+                           onclick="return confirm('⚠️ WARNING: Are you absolutely sure you want to PERMANENTLY DELETE this user from the database? This action cannot be undone and they will have to register fresh.');">
+                           🗑️ Delete Account
+                        </a>
                     </div>
                 </div>
             </div>
