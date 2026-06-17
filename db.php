@@ -15,7 +15,7 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $conn = $pdo; 
 
-    // 1. यूज़र्स, एडमिन और सब-एडमिन की कंबाइंड टेबल
+    // 1. यूज़र्स, एडमिन और सब-एडमिन की कंबाइंड टेबल (अगर पहले से नहीं है)
     $conn->exec("CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(100) NOT NULL,
@@ -24,6 +24,9 @@ try {
         role VARCHAR(20) DEFAULT 'user', 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
+
+    // 🔥 जादुई फिक्स: अगर पुरानी टेबल में role कॉलम नहीं है, तो यह लाइन उसे जोड़ देगी
+    $conn->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';");
 
     // 2. प्रोडक्ट्स / प्रॉपर्टी टेबल (जो एडमिन या सब-एडमिन डालेंगे)
     $conn->exec("CREATE TABLE IF NOT EXISTS products (
@@ -56,7 +59,7 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );");
 
-    // 🔥 जादुई लाइन: यह admin@test.com को डेटाबेस में एडमिन रोल पर सेट रखेगी
+    // 🔥 यह admin@test.com को डेटाबेस में एडमिन रोल पर सेट रखेगी
     $conn->exec("UPDATE users SET role = 'admin' WHERE email = 'admin@test.com';");
 
 } catch (PDOException $e) {
