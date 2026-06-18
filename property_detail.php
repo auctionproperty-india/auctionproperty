@@ -12,7 +12,7 @@ $prop = $stmt->fetch();
 if(!$prop) { die("Property not found!"); }
 
 // Check if user has ANY active subscription (for all properties)
-$active_sub = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURDATE()");
+$active_sub = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
 $active_sub->execute([$user_id]);
 $has_access = $active_sub->rowCount() > 0;
 
