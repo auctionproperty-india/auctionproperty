@@ -73,8 +73,8 @@ if($role == 'admin'):
     $user->execute([$user_id]);
     $user = $user->fetch();
 
-    // Check if user has any active subscription
-    $has_active_sub = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURDATE()");
+    // Check if user has any active subscription (CURRENT_DATE)
+    $has_active_sub = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
     $has_active_sub->execute([$user_id]);
     $is_subscribed = $has_active_sub->rowCount() > 0;
 
@@ -95,7 +95,7 @@ if($role == 'admin'):
             $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
             foreach($packages as $pkg) {
                 // Check if user already has this package active?
-                $already = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND package_id = ? AND status = 'active' AND end_date >= CURDATE()");
+                $already = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND package_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
                 $already->execute([$user_id, $pkg['id']]);
                 $is_active = $already->rowCount() > 0;
             ?>
