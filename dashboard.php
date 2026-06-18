@@ -5,7 +5,7 @@ require_once 'functions.php';
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'];
 
-// Admin Actions (Toggle, Delete, Reset) - same as before
+// Admin Actions
 if($role == 'admin') {
     if(isset($_GET['toggle_status'])) {
         $id = $_GET['toggle_status'];
@@ -36,7 +36,6 @@ include 'header.php';
 $total_props = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
 
 if($role == 'admin'): 
-    // --- Admin View (Stats & Users Table) ---
     $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
 ?>
@@ -78,7 +77,6 @@ if($role == 'admin'):
     $has_active_sub->execute([$user_id]);
     $is_subscribed = $has_active_sub->rowCount() > 0;
 
-    // Purchases count (if any)
     try { $purchases = $pdo->prepare("SELECT COUNT(*) FROM purchases WHERE user_id = ?"); $purchases->execute([$user_id]); $purchase_count = $purchases->fetchColumn(); } catch(Exception $e) { $purchase_count = 0; }
 ?>
     <div class="user-welcome-banner">
@@ -86,7 +84,7 @@ if($role == 'admin'):
         <div><a href="index.php" class="btn btn-light text-success fw-bold">Explore All →</a></div>
     </div>
 
-    <!-- ===== 🆕 BUY SEARCH ENGINE SECTION ===== -->
+    <!-- ===== BUY SEARCH ENGINE SECTION ===== -->
     <div class="card-premium mb-4" style="border: 2px solid #fbbf24; background: #fffbeb;">
         <h4><i class="fas fa-search-dollar me-2" style="color: #f59e0b;"></i>Buy Search Engine Access</h4>
         <p class="text-muted">Subscribe to view full details of all auction properties. Choose your plan:</p>
@@ -94,7 +92,6 @@ if($role == 'admin'):
             <?php
             $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
             foreach($packages as $pkg) {
-                // Check if user already has this package active?
                 $already = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND package_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
                 $already->execute([$user_id, $pkg['id']]);
                 $is_active = $already->rowCount() > 0;
@@ -138,7 +135,7 @@ if($role == 'admin'):
         </form>
     </div>
 
-    <!-- Property Cards (only if subscribed, show full details? Actually still show cards but detail link checks subscription) -->
+    <!-- Property Cards -->
     <div class="row">
         <?php
         $sql = "SELECT * FROM properties WHERE status = 'available'";
