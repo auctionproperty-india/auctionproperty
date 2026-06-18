@@ -6,7 +6,7 @@ $password = "JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM";
 $port = "5432";
 
 try {
-    // SSL Mode set kiya hai taaki server ke rules satisfy hon
+    // SSL Required mode
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
     $conn = new PDO($dsn, $user, $password, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
