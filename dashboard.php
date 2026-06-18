@@ -1,4 +1,6 @@
-<?php 
+<?php
+ob_start(); // ⭐ Buffer Start - Header Error से बचने के लिए
+
 require_once 'db.php'; 
 include 'header.php'; 
 
@@ -68,7 +70,6 @@ if($role == 'admin'):
     <div id="users-section" class="mt-4">
         <div class="card-premium">
             <h4><i class="fas fa-users-cog me-2"></i>Manage Users & Admins</h4>
-            <!-- Mobile के लिए Scrollable Table -->
             <div class="table-responsive">
                 <table class="table table-hover mt-3">
                     <thead class="table-light"><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
@@ -89,7 +90,7 @@ if($role == 'admin'):
                                     <a href="?toggle_status=<?= $u['id'] ?>" class="btn btn-sm btn-<?= ($u['status']=='active')?'warning':'success' ?>">
                                         <?= ($u['status']=='active')?'Disable':'Enable' ?>
                                     </a>
-                                    <a href="?reset_pass=<?= $u['id'] ?>" class="btn btn-sm btn-info" onclick="return confirm('Reset password?')">Reset</a>
+                                    <a href="change_password.php?user_id=<?= $u['id'] ?>" class="btn btn-sm btn-warning">🔑 Change</a>
                                     <a href="?delete_user=<?= $u['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">Delete</a>
                                 <?php else: ?>
                                     <span class="text-muted"><i class="fas fa-lock"></i> You</span>
@@ -109,7 +110,6 @@ if($role == 'admin'):
     $user_stmt->execute([$user_id]);
     $user = $user_stmt->fetch();
     
-    // Purchases
     try {
         $purchases_stmt = $pdo->prepare("SELECT p.*, pr.title FROM purchases p JOIN properties pr ON p.property_id = pr.id WHERE p.user_id = ?");
         $purchases_stmt->execute([$user_id]);
@@ -177,4 +177,7 @@ if($role == 'admin'):
     </script>
 <?php endif; ?>
 
-<?php include 'footer.php'; ?>
+<?php
+include 'footer.php';
+ob_end_flush(); // ⭐ Buffer End
+?>
