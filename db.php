@@ -6,13 +6,22 @@ $password = "JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM";
 $port = "5432";
 
 try {
-    // 'prefer' mode SSL ka best option hai jab connection drop ho raha ho
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=prefer";
-    $conn = new PDO($dsn, $user, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
-    echo "<h1>SUCCESS: Database Connected!</h1>";
+    // DSN String with SSL mode
+    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
+    
+    // Connection options
+    $options = [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ];
+
+    $conn = new PDO($dsn, $user, $password, $options);
+    
+    // Success message for testing
+    echo "<h1>DATABASE CONNECTION SUCCESSFUL</h1>";
+    
 } catch (PDOException $e) {
-    die("<h1>Connection Failed:</h1><p>" . $e->getMessage() . "</p>");
+    // Detailed error output for troubleshooting
+    die("<h1>DATABASE CONNECTION FAILED</h1><p>Error: " . $e->getMessage() . "</p>");
 }
 ?>
