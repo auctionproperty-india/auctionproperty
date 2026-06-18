@@ -36,6 +36,7 @@ include 'header.php';
 $total_props = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
 
 if($role == 'admin'): 
+    // --- Admin View (unchanged) ---
     $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
 ?>
@@ -72,7 +73,7 @@ if($role == 'admin'):
     $user->execute([$user_id]);
     $user = $user->fetch();
 
-    // Check if user has any active subscription (CURRENT_DATE)
+    // Check active subscription
     $has_active_sub = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
     $has_active_sub->execute([$user_id]);
     $is_subscribed = $has_active_sub->rowCount() > 0;
