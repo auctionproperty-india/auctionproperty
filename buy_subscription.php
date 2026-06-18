@@ -14,8 +14,8 @@ $pkg->execute([$package_id]);
 $pkg = $pkg->fetch();
 if(!$pkg) { die("Invalid package"); }
 
-// Insert pending subscription (property_id = 0 means general)
-$stmt = $pdo->prepare("INSERT INTO subscriptions (user_id, package_id, property_id, amount, payment_method, status) VALUES (?, ?, 0, ?, 'bank', 'pending')");
+// Insert pending subscription (property_id = NULL means ALL properties)
+$stmt = $pdo->prepare("INSERT INTO subscriptions (user_id, package_id, property_id, amount, payment_method, status) VALUES (?, ?, NULL, ?, 'bank', 'pending')");
 $stmt->execute([$user_id, $package_id, $pkg['price']]);
 
 header("Location: dashboard.php?msg=request_sent");
