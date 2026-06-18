@@ -20,8 +20,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['auction_date']);
         if($date_obj) $auction_date_db = $date_obj->format('Y-m-d');
     }
+    // ✅ Update में भी description = '' डाला
     $sql = "UPDATE properties SET 
-        title=?, price=?, location=?, city=?, type=?, google_location=?, image_url=?, 
+        title=?, description='', price=?, location=?, city=?, type=?, google_location=?, image_url=?, 
         bank_name=?, sqft=?, possession_type=?, auction_date=?, 
         borrower_name=?, emd_amount=?, bid_increment=?, emd_deadline=?, 
         auction_start_time=?, auction_end_time=?, locality=?, reserve_price_per_sqft=?, contact_number=? 
