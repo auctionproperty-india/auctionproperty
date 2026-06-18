@@ -11,8 +11,8 @@ function indianCurrencyFormat($number) {
     return $rest . ',' . $last;
 }
 
-function hasActiveSubscription($pdo, $user_id, $property_id = 0) {
-    if($property_id > 0) {
+function hasActiveSubscription($pdo, $user_id, $property_id = null) {
+    if($property_id) {
         $stmt = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND property_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
         $stmt->execute([$user_id, $property_id]);
     } else {
