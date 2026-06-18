@@ -1,20 +1,12 @@
 <?php 
 require_once 'db.php'; 
+require_once 'functions.php';
 
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'];
 
-if($role == 'admin' && isset($_GET['view_user'])) {
-    $view_user_id = (int)$_GET['view_user'];
-    $check = $pdo->prepare("SELECT id FROM users WHERE id = ?");
-    $check->execute([$view_user_id]);
-    if($check->fetch()) {
-        $user_id = $view_user_id;
-        $role = 'user';
-    }
-}
-
-if($_SESSION['role'] == 'admin' && !isset($_GET['view_user'])) {
+// Admin Actions (Toggle, Delete, Reset) - same as before
+if($role == 'admin') {
     if(isset($_GET['toggle_status'])) {
         $id = $_GET['toggle_status'];
         $pdo->prepare("UPDATE users SET status = CASE WHEN status='active' THEN 'inactive' ELSE 'active' END WHERE id = ?")->execute([$id]);
@@ -43,151 +35,138 @@ if($_SESSION['role'] == 'admin' && !isset($_GET['view_user'])) {
 include 'header.php'; 
 $total_props = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
 
-// Indian Number Format Function
-function indianFormat($number) {
-    $number = (int)$number;
-    $number = (string)$number;
-    $last3 = substr($number, -3);
-    $rest = substr($number, 0, -3);
-    if ($rest != '') {
-        $rest = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $rest);
-        return $rest . ',' . $last3;
-    }
-    return $last3;
-}
-
-if($_SESSION['role'] == 'admin' && !isset($_GET['view_user'])): 
+if($role == 'admin'): 
+    // --- Admin View (Stats & Users Table) ---
     $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
 ?>
     <div class="row g-4">
-        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-primary me-3"><i class="fas fa-building"></i></div><div><h5 class="mb-0"><?= $total_props ?></h5><small>Total Properties</small></div></div></div>
-        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div><div><h5 class="mb-0"><?= $total_users ?></h5><small>Total Users</small></div></div></div>
-        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div><div><h5 class="mb-0"><?= $total_sold ?></h5><small>Sold</small></div></div></div>
+        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-primary me-3"><i class="fas fa-building"></i></div><div><h5><?= $total_props ?></h5><small>Total Properties</small></div></div></div>
+        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div><div><h5><?= $total_users ?></h5><small>Total Users</small></div></div></div>
+        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div><div><h5><?= $total_sold ?></h5><small>Sold</small></div></div></div>
     </div>
-
-    <?php if(isset($_SESSION['new_pass_display'])): ?>
-        <div class="alert alert-success mt-4"><?= $_SESSION['new_pass_display']; unset($_SESSION['new_pass_display']); ?></div>
-    <?php endif; ?>
-
     <div id="users-section" class="mt-4">
-        <div class="card-premium">
-            <h4><i class="fas fa-users-cog me-2"></i>Manage Users & Admins</h4>
-            <div class="table-responsive">
-                <table class="table table-hover mt-3">
-                    <thead class="table-light"><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-                    <tbody>
-                    <?php 
-                    $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
-                    foreach($users as $u) { 
-                        $is_self = ($u['id'] == $_SESSION['user_id']);
-                    ?>
-                        <tr>
-                            <td><?= $u['id'] ?></td>
-                            <td>
-                                <?php if(!$is_self): ?>
-                                    <a href="dashboard.php?view_user=<?= $u['id'] ?>" target="_blank" style="color: #60a5fa; font-weight:600; text-decoration:underline;">
-                                        <?= htmlspecialchars($u['name']) ?>
-                                    </a>
-                                <?php else: ?>
-                                    <?= htmlspecialchars($u['name']) ?>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= $u['email'] ?></td>
-                            <td><span class="badge bg-<?= ($u['role']=='admin')?'danger':'info' ?>"><?= $u['role'] ?></span></td>
-                            <td><span class="badge bg-<?= ($u['status']=='active')?'success':'secondary' ?>"><?= $u['status'] ?></span></td>
-                            <td>
-                                <?php if(!$is_self): ?>
-                                    <a href="?toggle_status=<?= $u['id'] ?>" class="btn btn-sm btn-<?= ($u['status']=='active')?'warning':'success' ?>"><?= ($u['status']=='active')?'Disable':'Enable' ?></a>
-                                    <a href="change_password.php?user_id=<?= $u['id'] ?>" class="btn btn-sm btn-warning">🔑 Change</a>
-                                    <a href="?delete_user=<?= $u['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">Delete</a>
-                                <?php else: ?>
-                                    <span class="text-muted"><i class="fas fa-lock"></i> You</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php } ?>
-                    </tbody>
-                </table>
-            </div>
+        <div class="card-premium"><h4>👥 Manage Users</h4>
+            <div class="table-responsive"><table class="table table-hover">
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                <?php 
+                $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
+                foreach($users as $u) { 
+                    $is_self = ($u['id'] == $_SESSION['user_id']);
+                    echo "<tr><td><a href='dashboard.php?view_user=".$u['id']."' target='_blank'>".htmlspecialchars($u['name'])."</a></td><td>".$u['email']."</td>";
+                    echo "<td><span class='badge bg-".($u['role']=='admin'?'danger':'info')."'>".$u['role']."</span></td>";
+                    echo "<td><span class='badge bg-".($u['status']=='active'?'success':'secondary')."'>".$u['status']."</span></td>";
+                    if(!$is_self) {
+                        echo "<td><a href='?toggle_status=".$u['id']."' class='btn btn-sm btn-warning'>Toggle</a> <a href='change_password.php?user_id=".$u['id']."' class='btn btn-sm btn-info'>Pass</a> <a href='?delete_user=".$u['id']."' class='btn btn-sm btn-danger' onclick='return confirm(\"Delete?\")'>Del</a></td>";
+                    } else { echo "<td>You</td>"; }
+                    echo "</tr>";
+                } ?>
+                </tbody>
+            </table></div>
         </div>
     </div>
 
 <?php else: 
-    $user_stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-    $user_stmt->execute([$user_id]);
-    $user = $user_stmt->fetch();
-    
-    try {
-        $purchases_stmt = $pdo->prepare("SELECT p.*, pr.title FROM purchases p JOIN properties pr ON p.property_id = pr.id WHERE p.user_id = ?");
-        $purchases_stmt->execute([$user_id]);
-        $purchases = $purchases_stmt->fetchAll();
-        $purchase_count = count($purchases);
-    } catch(Exception $e) {
-        $purchases = [];
-        $purchase_count = 0;
-    }
+    // --- USER VIEW ---
+    $user = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+    $user->execute([$user_id]);
+    $user = $user->fetch();
 
-    if(isset($_GET['view_user']) && $_SESSION['role'] == 'admin'): ?>
-        <div class="alert alert-info mb-3">
-            <i class="fas fa-eye me-2"></i> You are viewing <strong><?= htmlspecialchars($user['name']) ?></strong>'s Dashboard. 
-            <a href="dashboard.php" class="btn btn-sm btn-primary ms-2">⬅ Back to Admin Panel</a>
-        </div>
-    <?php endif; ?>
+    // Check if user has any active subscription
+    $has_active_sub = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURDATE()");
+    $has_active_sub->execute([$user_id]);
+    $is_subscribed = $has_active_sub->rowCount() > 0;
 
+    // Purchases count (if any)
+    try { $purchases = $pdo->prepare("SELECT COUNT(*) FROM purchases WHERE user_id = ?"); $purchases->execute([$user_id]); $purchase_count = $purchases->fetchColumn(); } catch(Exception $e) { $purchase_count = 0; }
+?>
     <div class="user-welcome-banner">
-        <div class="d-flex justify-content-between align-items-center flex-wrap">
-            <div><h2>🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h2><p>Find your dream property today.</p></div>
-            <div><a href="index.php" class="btn btn-light text-success fw-bold">Explore More →</a></div>
-        </div>
+        <div><h2>🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h2><p>Find your dream property today.</p></div>
+        <div><a href="index.php" class="btn btn-light text-success fw-bold">Explore All →</a></div>
     </div>
 
-    <div class="row g-4 mb-4">
-        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-primary me-3"><i class="fas fa-shopping-bag"></i></div><div><h5><?= $purchase_count ?></h5><small>Purchases</small></div></div></div>
-        <div class="col-md-4"><div class="card-premium d-flex align-items-center" style="border-left:4px solid #10b981;"><div class="stat-icon bg-soft-success me-3"><i class="fas fa-gift"></i></div><div><h5><span class="badge bg-success"><?= $user['referral_code'] ?></span></h5><small>Referral Code</small></div></div></div>
-        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-building"></i></div><div><h5><?= $total_props ?></h5><small>Total Properties</small></div></div></div>
-    </div>
-
-    <div class="card-premium mt-3" style="border:1px solid #10b981; background:#f0fdf4;">
-        <h5 class="text-success"><i class="fas fa-link me-2"></i>Share & Earn</h5>
-        <div class="input-group"><input type="text" class="form-control border-success" id="refLink" value="https://<?= $_SERVER['HTTP_HOST'] ?>/register.php?ref=<?= $user['referral_code'] ?>" readonly><button class="btn btn-success" onclick="copyRef()"><i class="fas fa-copy"></i> Copy</button></div>
-    </div>
-
-    <div class="card-premium mt-3">
-        <div class="d-flex justify-content-between"><h5><i class="fas fa-fire me-2" style="color:#f97316;"></i>Live Auctions for You</h5><a href="index.php" class="btn btn-sm btn-outline-primary">View All</a></div>
-        <div class="row mt-3">
+    <!-- ===== 🆕 BUY SEARCH ENGINE SECTION ===== -->
+    <div class="card-premium mb-4" style="border: 2px solid #fbbf24; background: #fffbeb;">
+        <h4><i class="fas fa-search-dollar me-2" style="color: #f59e0b;"></i>Buy Search Engine Access</h4>
+        <p class="text-muted">Subscribe to view full details of all auction properties. Choose your plan:</p>
+        <div class="row">
             <?php
-            $stmt = $pdo->query("SELECT * FROM properties WHERE status = 'available' ORDER BY id DESC LIMIT 6");
-            $props = $stmt->fetchAll();
-            if(count($props) > 0) {
-                foreach($props as $p) { ?>
-                    <div class="col-md-4 col-sm-6 mb-3">
-                        <div class="card" style="border-radius: 16px; overflow: hidden; border: 1px solid #e9edf4; height: 100%;">
-                            <img src="<?= htmlspecialchars($p['image_url'] ?: 'https://via.placeholder.com/300x200?text=Property') ?>" style="height: 150px; width:100%; object-fit: cover;">
-                            <div class="p-3">
-                                <span class="badge bg-light text-dark">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
-                                <h6 class="fw-bold mt-1"><?= htmlspecialchars($p['title']) ?></h6>
-                                <p class="text-muted small"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($p['city']) ?></p>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <!-- ✅ Indian Format Price -->
-                                    <span class="fw-bold text-success">₹ <?= indianFormat($p['price']) ?></span>
-                                    <span class="badge bg-secondary"><?= $p['sqft'] ?? 0 ?> Sq Ft</span>
-                                </div>
-                                <a href="#" class="btn btn-primary btn-sm w-100 mt-2">View Auction</a>
-                            </div>
+            $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
+            foreach($packages as $pkg) {
+                // Check if user already has this package active?
+                $already = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND package_id = ? AND status = 'active' AND end_date >= CURDATE()");
+                $already->execute([$user_id, $pkg['id']]);
+                $is_active = $already->rowCount() > 0;
+            ?>
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100 text-center shadow-sm" style="border-radius: 16px; <?= $is_active ? 'border: 2px solid #10b981;' : '' ?>">
+                        <div class="card-body">
+                            <h5 class="fw-bold"><?= htmlspecialchars($pkg['name']) ?></h5>
+                            <h4 class="text-success">₹ <?= indianCurrencyFormat($pkg['price']) ?></h4>
+                            <small><?= $pkg['duration_months'] ?> Months</small>
+                            <?php if($is_active): ?>
+                                <div class="badge bg-success w-100 mt-2">✅ Active</div>
+                            <?php else: ?>
+                                <form method="POST" action="buy_subscription.php" class="mt-2">
+                                    <input type="hidden" name="package_id" value="<?= $pkg['id'] ?>">
+                                    <button type="submit" class="btn btn-primary w-100 btn-sm">Buy Now</button>
+                                </form>
+                            <?php endif; ?>
                         </div>
                     </div>
-                <?php }
-            } else { echo "<p class='text-muted'>No live auctions right now.</p>"; }
-            ?>
+                </div>
+            <?php } ?>
         </div>
+        <small class="text-muted">* After payment, admin will activate your subscription.</small>
     </div>
 
-    <script>
-        function copyRef() {
-            let inp = document.getElementById('refLink');
-            inp.select(); navigator.clipboard.writeText(inp.value).then(() => alert('Copied!')).catch(() => document.execCommand('copy'));
-        }
-    </script>
+    <!-- Search Bar -->
+    <div class="card-premium mb-3">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4"><input type="text" name="city" placeholder="City" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>"></div>
+            <div class="col-md-3">
+                <select name="type" class="form-control">
+                    <option value="">All Types</option>
+                    <option value="Flat" <?= ($_GET['type']??'')=='Flat'?'selected':'' ?>>Flat</option>
+                    <option value="Plot" <?= ($_GET['type']??'')=='Plot'?'selected':'' ?>>Plot</option>
+                    <option value="Shop" <?= ($_GET['type']??'')=='Shop'?'selected':'' ?>>Shop</option>
+                </select>
+            </div>
+            <div class="col-md-3"><input type="number" name="max_price" placeholder="Max Price" class="form-control" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>"></div>
+            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button></div>
+        </form>
+    </div>
+
+    <!-- Property Cards (only if subscribed, show full details? Actually still show cards but detail link checks subscription) -->
+    <div class="row">
+        <?php
+        $sql = "SELECT * FROM properties WHERE status = 'available'";
+        $params = [];
+        if(!empty($_GET['city'])) { $sql .= " AND city ILIKE ?"; $params[] = '%'.$_GET['city'].'%'; }
+        if(!empty($_GET['type'])) { $sql .= " AND type = ?"; $params[] = $_GET['type']; }
+        if(!empty($_GET['max_price'])) { $sql .= " AND price <= ?"; $params[] = $_GET['max_price']; }
+        $sql .= " ORDER BY id DESC LIMIT 6";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $props = $stmt->fetchAll();
+        if(count($props) > 0) {
+            foreach($props as $p) { ?>
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100 shadow-sm border-0" style="border-radius:16px; overflow:hidden;">
+                        <img src="<?= htmlspecialchars($p['image_url'] ?: 'https://via.placeholder.com/300x200') ?>" style="height:150px; width:100%; object-fit:cover;">
+                        <div class="p-3">
+                            <span class="badge bg-light text-dark">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
+                            <h6 class="fw-bold mt-1"><?= htmlspecialchars($p['title']) ?></h6>
+                            <div class="fw-bold text-success">₹ <?= indianCurrencyFormat($p['price']) ?></div>
+                            <a href="property_detail.php?id=<?= $p['id'] ?>" class="btn btn-primary btn-sm w-100 mt-2">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            <?php }
+        } else { echo "<p class='text-muted'>No properties match your search.</p>"; }
+        ?>
+    </div>
+
 <?php endif; ?>
 <?php include 'footer.php'; ?>
