@@ -11,13 +11,12 @@ $stmt->execute([$property_id]);
 $prop = $stmt->fetch();
 if(!$prop) { die("Property not found!"); }
 
-// Check if user has ANY active subscription (for all properties)
+// Check if user has ANY active subscription (for all properties) - CURRENT_DATE
 $active_sub = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
 $active_sub->execute([$user_id]);
 $has_access = $active_sub->rowCount() > 0;
 
 if(!$has_access) {
-    // Redirect to dashboard (where they can buy a subscription)
     header("Location: dashboard.php?msg=subscribe_first");
     exit;
 }
