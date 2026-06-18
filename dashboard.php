@@ -68,51 +68,52 @@ if($role == 'admin'):
     <div id="users-section" class="mt-4">
         <div class="card-premium">
             <h4><i class="fas fa-users-cog me-2"></i>Manage Users & Admins</h4>
-            <table class="table table-hover mt-3">
-                <thead class="table-light"><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody>
-                <?php 
-                $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
-                foreach($users as $u) { 
-                    $is_self = ($u['id'] == $_SESSION['user_id']);
-                ?>
-                    <tr>
-                        <td><?= $u['id'] ?></td>
-                        <td><?= htmlspecialchars($u['name']) ?></td>
-                        <td><?= $u['email'] ?></td>
-                        <td><span class="badge bg-<?= ($u['role']=='admin')?'danger':'info' ?>"><?= $u['role'] ?></span></td>
-                        <td><span class="badge bg-<?= ($u['status']=='active')?'success':'secondary' ?>"><?= $u['status'] ?></span></td>
-                        <td>
-                            <?php if(!$is_self): ?>
-                                <a href="?toggle_status=<?= $u['id'] ?>" class="btn btn-sm btn-<?= ($u['status']=='active')?'warning':'success' ?>">
-                                    <?= ($u['status']=='active')?'Disable':'Enable' ?>
-                                </a>
-                                <a href="?reset_pass=<?= $u['id'] ?>" class="btn btn-sm btn-info" onclick="return confirm('Reset password?')">Reset Pass</a>
-                                <a href="?delete_user=<?= $u['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">Delete</a>
-                            <?php else: ?>
-                                <span class="text-muted"><i class="fas fa-lock"></i> You</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php } ?>
-                </tbody>
-            </table>
+            <!-- Mobile के लिए Scrollable Table -->
+            <div class="table-responsive">
+                <table class="table table-hover mt-3">
+                    <thead class="table-light"><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody>
+                    <?php 
+                    $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
+                    foreach($users as $u) { 
+                        $is_self = ($u['id'] == $_SESSION['user_id']);
+                    ?>
+                        <tr>
+                            <td><?= $u['id'] ?></td>
+                            <td><?= htmlspecialchars($u['name']) ?></td>
+                            <td><?= $u['email'] ?></td>
+                            <td><span class="badge bg-<?= ($u['role']=='admin')?'danger':'info' ?>"><?= $u['role'] ?></span></td>
+                            <td><span class="badge bg-<?= ($u['status']=='active')?'success':'secondary' ?>"><?= $u['status'] ?></span></td>
+                            <td>
+                                <?php if(!$is_self): ?>
+                                    <a href="?toggle_status=<?= $u['id'] ?>" class="btn btn-sm btn-<?= ($u['status']=='active')?'warning':'success' ?>">
+                                        <?= ($u['status']=='active')?'Disable':'Enable' ?>
+                                    </a>
+                                    <a href="?reset_pass=<?= $u['id'] ?>" class="btn btn-sm btn-info" onclick="return confirm('Reset password?')">Reset</a>
+                                    <a href="?delete_user=<?= $u['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">Delete</a>
+                                <?php else: ?>
+                                    <span class="text-muted"><i class="fas fa-lock"></i> You</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php } ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
 <?php else: 
     // ---- USER VIEW ----
-    $user_data = $pdo->prepare("SELECT * FROM users WHERE id = ?")->execute([$user_id]);
-    $user = $pdo->prepare("SELECT * FROM users WHERE id = ?")->execute([$user_id]);
-    $user = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-    $user->execute([$user_id]);
-    $user = $user->fetch();
+    $user_stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+    $user_stmt->execute([$user_id]);
+    $user = $user_stmt->fetch();
     
-    // Purchases (अगर Purchases टेबल है तो, वरना शांत रहें)
+    // Purchases
     try {
-        $purchases = $pdo->prepare("SELECT p.*, pr.title FROM purchases p JOIN properties pr ON p.property_id = pr.id WHERE p.user_id = ?");
-        $purchases->execute([$user_id]);
-        $purchases = $purchases->fetchAll();
+        $purchases_stmt = $pdo->prepare("SELECT p.*, pr.title FROM purchases p JOIN properties pr ON p.property_id = pr.id WHERE p.user_id = ?");
+        $purchases_stmt->execute([$user_id]);
+        $purchases = $purchases_stmt->fetchAll();
         $purchase_count = count($purchases);
     } catch(Exception $e) {
         $purchases = [];
@@ -145,22 +146,33 @@ if($role == 'admin'):
     <div class="card-premium mt-3">
         <h5><i class="fas fa-history me-2"></i>Recent Purchases</h5>
         <?php if($purchase_count > 0) { ?>
-            <ul class="list-group list-group-flush">
-            <?php foreach($purchases as $p) { ?>
-                <li class="list-group-item d-flex justify-content-between">
-                    <?= htmlspecialchars($p['title']) ?>
-                    <span class="badge bg-<?= ($p['status']=='completed')?'success':'warning' ?>">₹<?= $p['amount'] ?> (<?= $p['status'] ?>)</span>
-                </li>
-            <?php } ?>
-            </ul>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Property</th><th>Amount</th><th>Status</th></tr></thead>
+                    <tbody>
+                    <?php foreach($purchases as $p) { ?>
+                        <tr>
+                            <td><?= htmlspecialchars($p['title']) ?></td>
+                            <td>₹<?= $p['amount'] ?></td>
+                            <td><span class="badge bg-<?= ($p['status']=='completed')?'success':'warning' ?>"><?= $p['status'] ?></span></td>
+                        </tr>
+                    <?php } ?>
+                    </tbody>
+                </table>
+            </div>
         <?php } else { echo "<p class='text-muted'>No purchases yet.</p>"; } ?>
     </div>
 
     <script>
         function copyRef() {
             let inp = document.getElementById('refLink');
-            inp.select(); document.execCommand('copy');
-            alert('Referral Link Copied!');
+            inp.select(); 
+            navigator.clipboard.writeText(inp.value).then(() => {
+                alert('Referral Link Copied!');
+            }).catch(() => {
+                document.execCommand('copy');
+                alert('Referral Link Copied!');
+            });
         }
     </script>
 <?php endif; ?>
