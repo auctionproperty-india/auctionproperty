@@ -1,6 +1,7 @@
 <?php
 if(session_status() == PHP_SESSION_NONE) session_start();
 if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+$role = $_SESSION['role'] ?? 'user';
 ?>
 <!DOCTYPE html>
 <html>
@@ -22,7 +23,7 @@ if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
             display: block; padding: 12px 20px; color: #b0c4de; text-decoration: none;
             border-left: 3px solid transparent;
         }
-        .sidebar a:hover { background: #111b26; color: #fff; border-left-color: #3498db; }
+        .sidebar a:hover, .sidebar a.active { background: #111b26; color: #fff; border-left-color: #3498db; }
         .sidebar a i { width: 25px; }
         .main-content { margin-left: 250px; padding: 20px; }
         .top-bar {
@@ -30,6 +31,7 @@ if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
+        .badge-role { font-size: 12px; padding: 4px 10px; }
     </style>
 </head>
 <body>
@@ -37,8 +39,8 @@ if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
     <h4>🏠 PropertyDeal</h4>
     <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
     <a href="properties.php"><i class="fas fa-building"></i> Properties</a>
-    <?php if(isset($_SESSION['role']) && $_SESSION['role'] == 'admin'): ?>
-    <a href="users.php"><i class="fas fa-users-cog"></i> Users</a>
+    <?php if($role == 'admin'): ?>
+    <a href="dashboard.php#users-section"><i class="fas fa-users-cog"></i> Manage Users</a>
     <?php endif; ?>
     <hr style="border-color:#2c3e50;">
     <a href="logout.php" style="color:#e74c3c;"><i class="fas fa-sign-out-alt"></i> Logout</a>
@@ -46,7 +48,7 @@ if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 <div class="main-content">
     <div class="top-bar">
         <span><strong><?= htmlspecialchars($_SESSION['user_name']) ?></strong> 
-            <span class="badge bg-<?= ($_SESSION['role']=='admin')?'danger':'info' ?>"><?= strtoupper($_SESSION['role']) ?></span>
+            <span class="badge bg-<?= ($role=='admin')?'danger':'info' ?> badge-role"><?= strtoupper($role) ?></span>
         </span>
         <span><?= date('d M Y, h:i A') ?></span>
     </div>
