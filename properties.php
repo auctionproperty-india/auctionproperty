@@ -1,11 +1,9 @@
 <?php 
 require_once 'db.php'; 
-
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { 
     header("Location: dashboard.php"); 
     exit; 
 }
-
 $default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
 if(!$default_contact) $default_contact = '9238215516';
 
@@ -24,12 +22,13 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
         $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['auction_date']);
         if($date_obj) $auction_date_db = $date_obj->format('Y-m-d');
     }
+    // ✅ SQL में description = '' (खाली) डाला है ताकि Error न आए
     $sql = "INSERT INTO properties (
-        title, price, location, city, type, google_location, image_url, 
+        title, description, price, location, city, type, google_location, image_url, 
         bank_name, sqft, possession_type, auction_date, 
         borrower_name, emd_amount, bid_increment, emd_deadline, 
         auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         $_POST['title'], $_POST['price'], $_POST['location'], 
@@ -42,6 +41,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
     header("Location: properties.php?added=1#add-form");
     exit;
 }
+include 'header.php'; 
+?>
 <?php if(isset($_GET['added'])): ?>
     <div class="alert alert-success">✅ Property Added Successfully!</div>
 <?php endif; ?>
@@ -50,9 +51,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
     <form method="POST" class="mt-3" enctype="multipart/form-data">
         <div class="row g-3">
             <div class="col-md-6"><label>Title</label><input type="text" name="title" class="form-control" required></div>
-            <div class="col-md-6"><label>Address (Start typing for Map)</label>
-                <input type="text" name="location" id="location_input" class="form-control" placeholder="e.g. Sapna Sangeeta, Indore" required>
-            </div>
+            <div class="col-md-6"><label>Address</label><input type="text" name="location" id="location_input" class="form-control" placeholder="e.g. Sapna Sangeeta, Indore" required></div>
             <div class="col-md-3"><label>City</label><input type="text" name="city" class="form-control" required></div>
             <div class="col-md-3"><label>Locality</label><input type="text" name="locality" class="form-control" placeholder="e.g. Sapna Sangeeta"></div>
             <div class="col-md-3"><label>Reserve Price (₹)</label><input type="number" step="0.01" name="price" class="form-control" required></div>
@@ -84,7 +83,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
             <div class="col-md-6"><label>Contact Number</label>
                 <input type="text" name="contact_number" class="form-control" value="<?= htmlspecialchars($default_contact) ?>" required>
             </div>
-            <div class="col-12"><label>Google Map Link (Auto-generated)</label>
+            <div class="col-12"><label>Google Map Link</label>
                 <input type="text" name="google_location" id="google_location" class="form-control" readonly style="background:#f1f5f9;">
             </div>
             <div class="col-12"><label>Upload Property Image</label>
@@ -135,6 +134,3 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
 </script>
 <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&callback=initAutocomplete" async defer></script>
 <?php include 'footer.php'; ?>
-
-include 'header.php'; 
-?>
