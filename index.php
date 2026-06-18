@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🏠 PropertyDeal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f7fc; font-family: 'Segoe UI', sans-serif; }
+        .search-card { background: #fff; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 25px; }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -25,10 +29,10 @@
 
     <div class="container mt-4">
         <!-- Search Form -->
-        <div class="card p-4 shadow-sm mb-4">
+        <div class="search-card mb-4">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
-                    <input type="text" name="city" placeholder="City (e.g. Delhi)" class="form-control" value="<?= $_GET['city'] ?? '' ?>">
+                    <input type="text" name="city" placeholder="City (e.g. Delhi)" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>">
                 </div>
                 <div class="col-md-3">
                     <select name="type" class="form-control">
@@ -43,10 +47,10 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <input type="number" name="min_price" placeholder="Min Price" class="form-control" value="<?= $_GET['min_price'] ?? '' ?>">
+                    <input type="number" name="min_price" placeholder="Min Price" class="form-control" value="<?= htmlspecialchars($_GET['min_price'] ?? '') ?>">
                 </div>
                 <div class="col-md-2">
-                    <input type="number" name="max_price" placeholder="Max Price" class="form-control" value="<?= $_GET['max_price'] ?? '' ?>">
+                    <input type="number" name="max_price" placeholder="Max Price" class="form-control" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>">
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100">🔍 Search</button>
@@ -57,9 +61,9 @@
         <h2 class="text-center mb-4">Available Properties</h2>
         <div class="row">
             <?php
-            // Query बनाएँ
             $sql = "SELECT * FROM properties WHERE status = 'available'";
             $params = [];
+            
             if(!empty($_GET['city'])) {
                 $sql .= " AND city ILIKE ?";
                 $params[] = '%'.$_GET['city'].'%';
@@ -85,15 +89,15 @@
                 foreach($properties as $prop) { ?>
                     <div class="col-md-4 mb-4">
                         <div class="card h-100 shadow">
-                            <img src="<?= htmlspecialchars($prop['image_url']) ?>" class="card-img-top" style="height: 200px; object-fit: cover;">
+                            <img src="<?= htmlspecialchars($prop['image_url'] ?: 'https://via.placeholder.com/300x200?text=Property') ?>" 
+                                 class="card-img-top" style="height: 200px; object-fit: cover;">
                             <div class="card-body">
                                 <h5><?= htmlspecialchars($prop['title']) ?></h5>
-                                <p><strong>📍 <?= htmlspecialchars($prop['city']) ?></strong> (<?= $prop['type'] ?>)</p>
+                                <p><strong>📍 <?= htmlspecialchars($prop['city'] ?? 'N/A') ?></strong> (<?= $prop['type'] ?? 'N/A' ?>)</p>
                                 <p>₹ <?= number_format($prop['price'], 2) ?></p>
                                 <p><small><?= htmlspecialchars($prop['location']) ?></small></p>
                                 <?php if(isset($_SESSION['user_id'])): ?>
-                                    <!-- आगे Step 2 में इसे Detail पेज पर भेजेंगे -->
-                                    <a href="property_detail.php?id=<?= $prop['id'] ?>" class="btn btn-info w-100">View Details</a>
+                                    <a href="#" class="btn btn-info w-100">View Details (Soon)</a>
                                 <?php else: ?>
                                     <a href="login.php" class="btn btn-secondary w-100">Login to View</a>
                                 <?php endif; ?>
