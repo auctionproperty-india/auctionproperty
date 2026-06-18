@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏠 FindAuction - Bank Properties</title>
+    <title>Prime Property - Bank Auctions</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -31,7 +31,7 @@
         .property-card .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 14px; color: #475569; margin-top: 10px; }
         .property-card .btn-auction {
             background: #1e3a8a; border: none; color: white; font-weight: 700; padding: 10px; border-radius: 12px;
-            width: 100%; margin-top: 15px; transition: 0.3s;
+            width: 100%; margin-top: 15px; transition: 0.3s; text-decoration: none; display: block; text-align: center;
         }
         .property-card .btn-auction:hover { background: #0b1d4a; }
         .sidebar-card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.02); border: 1px solid #e9edf4; margin-bottom: 25px; }
@@ -45,11 +45,11 @@
 <!-- Navbar -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand fw-bold" href="index.php"><i class="fas fa-gavel me-2"></i>FindAuction</a>
+        <a class="navbar-brand fw-bold" href="index.php"><i class="fas fa-gavel me-2"></i>Prime Property</a>
         <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
         <div class="collapse navbar-collapse" id="nav">
             <ul class="navbar-nav mx-auto">
-                <li class="nav-item"><a class="nav-link" href="#">Home</a></li>
+                <li class="nav-item"><a class="nav-link" href="index.php">Home</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">Search</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">Premium</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">FAQ</a></li>
@@ -109,7 +109,6 @@
                 if(!empty($_GET['city'])) { $sql .= " AND city ILIKE ?"; $params[] = '%'.$_GET['city'].'%'; }
                 if(!empty($_GET['type'])) { $sql .= " AND type = ?"; $params[] = $_GET['type']; }
                 
-                // Sorting
                 if(isset($_GET['sort'])) {
                     if($_GET['sort'] == 'low') $sql .= " ORDER BY price ASC";
                     else if($_GET['sort'] == 'high') $sql .= " ORDER BY price DESC";
@@ -138,7 +137,7 @@
                                     </div>
                                     <div class="price mt-2">₹ <?= number_format($prop['price'], 2) ?> <span>Starting Bid</span></div>
                                     <?php if(isset($_SESSION['user_id'])): ?>
-                                        <a href="#" class="btn-auction text-center d-block"><i class="fas fa-gavel"></i> VIEW AUCTION</a>
+                                        <a href="#" class="btn-auction"><i class="fas fa-gavel"></i> VIEW AUCTION</a>
                                     <?php else: ?>
                                         <a href="login.php" class="btn btn-secondary w-100 mt-3">Login to Bid</a>
                                     <?php endif; ?>
@@ -153,7 +152,6 @@
 
         <!-- Right Sidebar -->
         <div class="col-lg-4">
-            <!-- Daily Alert -->
             <div class="sidebar-card">
                 <h6><i class="fas fa-bell text-primary"></i> Daily Alert</h6>
                 <div class="input-group">
@@ -161,8 +159,6 @@
                     <button class="btn btn-primary" type="button">Subscribe</button>
                 </div>
             </div>
-
-            <!-- Share -->
             <div class="sidebar-card">
                 <h6><i class="fas fa-share-alt text-primary"></i> Share</h6>
                 <div class="social-icons">
@@ -172,8 +168,6 @@
                     <a href="#"><i class="fas fa-envelope"></i></a>
                 </div>
             </div>
-
-            <!-- Top Cities -->
             <div class="sidebar-card">
                 <h6><i class="fas fa-city text-primary"></i> Top Cities</h6>
                 <?php
