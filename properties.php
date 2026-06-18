@@ -31,13 +31,25 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
         </div>
     </form>
 </div>
+
 <table class="table table-bordered table-hover bg-white shadow-sm">
-    <thead><tr><th>ID</th><th>Title</th><th>City</th><th>Type</th><th>Price</th><th>Status</th></tr></thead>
+    <thead><tr><th>ID</th><th>Title</th><th>City</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>
     <?php 
     $stmt = $pdo->query("SELECT * FROM properties ORDER BY id DESC");
     while($row = $stmt->fetch()) { ?>
-        <tr><td><?= $row['id'] ?></td><td><?= htmlspecialchars($row['title']) ?></td><td><?= $row['city'] ?></td><td><?= $row['type'] ?></td><td>₹<?= $row['price'] ?></td><td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td></tr>
+        <tr>
+            <td><?= $row['id'] ?></td>
+            <td><?= htmlspecialchars($row['title']) ?></td>
+            <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
+            <td><?= htmlspecialchars($row['type'] ?? '') ?></td>
+            <td>₹<?= $row['price'] ?></td>
+            <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
+            <td>
+                <a href="edit_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-primary">✏️ Edit</a>
+                <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this property?')">🗑️ Delete</a>
+            </td>
+        </tr>
     <?php } ?>
     </tbody>
 </table>
