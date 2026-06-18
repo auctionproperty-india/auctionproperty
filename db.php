@@ -6,12 +6,13 @@ $password = "JYJZAvIWxQymTwDzCN4lWZo3LdAOqNWM";
 $port = "5432";
 
 try {
-    // sslmode=disable ka use kiya hai kyunki internal network par SSL verify nahi ho raha
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=disable";
+    // SSL Mode set kiya hai taaki server ke rules satisfy hon
+    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
     $conn = new PDO($dsn, $user, $password, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
     ]);
+    echo "<h1>Database Connected Successfully!</h1>";
 } catch (PDOException $e) {
-    die("Database Connection Failed: " . $e->getMessage());
+    die("<h1>Connection Failed:</h1><p>" . $e->getMessage() . "</p>");
 }
 ?>
