@@ -8,7 +8,7 @@ $role = $_SESSION['role'] ?? 'user';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>PropertyDeal</title>
+    <title>Prime Property</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
@@ -222,7 +222,7 @@ $role = $_SESSION['role'] ?? 'user';
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
 <div class="sidebar" id="mainSidebar">
-    <div class="brand"><i class="fas fa-building"></i> <span>PropertyDeal</span></div>
+    <div class="brand"><i class="fas fa-building"></i> <span>Prime Property</span></div>
     
     <a href="dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
     
@@ -230,7 +230,7 @@ $role = $_SESSION['role'] ?? 'user';
         <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
         <a href="dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
     <?php else: ?>
-        <a href="#"><i class="fas fa-search"></i> <span>Explore Properties</span></a>
+        <a href="index.php"><i class="fas fa-search"></i> <span>Explore Properties</span></a>
         <a href="#"><i class="fas fa-heart"></i> <span>My Favorites</span></a>
     <?php endif; ?>
     
