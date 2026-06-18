@@ -1,6 +1,6 @@
 <?php 
 require_once 'db.php'; 
-require_once 'functions.php'; // Format function include करें
+require_once 'functions.php'; 
 ?>
 <!DOCTYPE html>
 <html>
@@ -20,6 +20,7 @@ require_once 'functions.php'; // Format function include करें
         .price { font-size: 22px; font-weight: 800; color: #0b1120; }
         .btn-auction { background: #1e3a8a; border: none; color: white; font-weight: 700; padding: 10px; border-radius: 12px; width: 100%; transition: 0.3s; display: block; text-align: center; text-decoration: none; }
         .btn-auction:hover { background: #0b1d4a; color: #fff; }
+        .search-box { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.03); border: 1px solid #e9edf4; margin-bottom: 30px; }
     </style>
 </head>
 <body>
@@ -39,30 +40,56 @@ require_once 'functions.php'; // Format function include करें
 </nav>
 
 <div class="container mt-4">
+    <!-- Search Bar -->
+    <div class="search-box">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <input type="text" name="city" placeholder="Search by City" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>">
+            </div>
+            <div class="col-md-3">
+                <select name="type" class="form-control">
+                    <option value="">All Types</option>
+                    <option value="Flat" <?= ($_GET['type']??'')=='Flat'?'selected':'' ?>>Flat</option>
+                    <option value="Plot" <?= ($_GET['type']??'')=='Plot'?'selected':'' ?>>Plot</option>
+                    <option value="Shop" <?= ($_GET['type']??'')=='Shop'?'selected':'' ?>>Shop</option>
+                    <option value="Land" <?= ($_GET['type']??'')=='Land'?'selected':'' ?>>Land</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="number" name="max_price" placeholder="Max Price" class="form-control" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button>
+            </div>
+        </form>
+    </div>
+
     <div class="row">
         <?php
-        $sql = "SELECT * FROM properties WHERE status = 'available' ORDER BY id DESC";
-        $stmt = $pdo->query($sql);
+        $sql = "SELECT * FROM properties WHERE status = 'available'";
+        $params = [];
+        if(!empty($_GET['city'])) { $sql .= " AND city ILIKE ?"; $params[] = '%'.$_GET['city'].'%'; }
+        if(!empty($_GET['type'])) { $sql .= " AND type = ?"; $params[] = $_GET['type']; }
+        if(!empty($_GET['max_price'])) { $sql .= " AND price <= ?"; $params[] = $_GET['max_price']; }
+        $sql .= " ORDER BY id DESC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $properties = $stmt->fetchAll();
+
         if(count($properties) > 0) {
             foreach($properties as $prop) { ?>
                 <div class="col-md-4 mb-4">
                     <div class="property-card">
-                        <img src="<?= htmlspecialchars($prop['image_url'] ?: 'https://via.placeholder.com/600x400?text=Property') ?>" alt="Property">
+                        <img src="<?= htmlspecialchars($prop['image_url'] ?: 'https://via.placeholder.com/600x400?text=Property') ?>">
                         <div class="card-body">
-                            <!-- Bank & Date -->
                             <div class="d-flex justify-content-between">
                                 <span class="bank-badge">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
                                 <span class="text-muted small"><i class="far fa-calendar"></i> <?= date('d M Y', strtotime($prop['auction_date'] ?? 'now')) ?></span>
                             </div>
-                            <!-- Title (Only) -->
                             <h6 class="fw-bold mt-2"><?= htmlspecialchars($prop['title']) ?></h6>
-                            <!-- Price in Indian Format -->
-                            <div class="price mt-2">₹ <?= indianCurrencyFormat($prop['price']) ?> <span class="fs-6 fw-normal text-muted">Starting Bid</span></div>
-                            <!-- Location / City (Optional, small text) -->
+                            <div class="price">₹ <?= indianCurrencyFormat($prop['price']) ?> <span class="fs-6 fw-normal text-muted">Starting</span></div>
                             <p class="text-muted small mt-1"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></p>
                             
-                            <!-- Button -->
                             <?php if(isset($_SESSION['user_id'])): ?>
                                 <a href="property_detail.php?id=<?= $prop['id'] ?>" class="btn-auction"><i class="fas fa-eye"></i> View Details</a>
                             <?php else: ?>
@@ -72,7 +99,7 @@ require_once 'functions.php'; // Format function include करें
                     </div>
                 </div>
             <?php }
-        } else { echo "<p class='text-center text-muted'>No properties available.</p>"; }
+        } else { echo "<p class='text-center text-muted'>No properties match your search.</p>"; }
         ?>
     </div>
 </div>
