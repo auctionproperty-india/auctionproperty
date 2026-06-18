@@ -5,7 +5,6 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit; 
 }
 
-// Update Logic
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_contact'])) {
     $new_contact = trim($_POST['default_contact']);
     $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'default_contact'")->execute([$new_contact]);
