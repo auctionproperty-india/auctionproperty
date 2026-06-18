@@ -108,16 +108,27 @@
                 $params = [];
                 if(!empty($_GET['city'])) { $sql .= " AND city ILIKE ?"; $params[] = '%'.$_GET['city'].'%'; }
                 if(!empty($_GET['type'])) { $sql .= " AND type = ?"; $params[] = $_GET['type']; }
-                
                 if(isset($_GET['sort'])) {
                     if($_GET['sort'] == 'low') $sql .= " ORDER BY price ASC";
                     else if($_GET['sort'] == 'high') $sql .= " ORDER BY price DESC";
                     else $sql .= " ORDER BY id DESC";
                 } else { $sql .= " ORDER BY id DESC"; }
-                
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
                 $properties = $stmt->fetchAll();
+
+                // Indian Number Format Function
+                function indianFormat($number) {
+                    $number = (int)$number;
+                    $number = (string)$number;
+                    $last3 = substr($number, -3);
+                    $rest = substr($number, 0, -3);
+                    if ($rest != '') {
+                        $rest = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $rest);
+                        return $rest . ',' . $last3;
+                    }
+                    return $last3;
+                }
 
                 if(count($properties) > 0) {
                     foreach($properties as $prop) { ?>
@@ -135,7 +146,8 @@
                                         <span><i class="fas fa-vector-square"></i> <?= $prop['sqft'] ?? 0 ?> Sq Ft</span>
                                         <span><i class="fas fa-hand"></i> <?= htmlspecialchars($prop['possession_type'] ?? 'Physical') ?></span>
                                     </div>
-                                    <div class="price mt-2">₹ <?= number_format($prop['price'], 2) ?> <span>Starting Bid</span></div>
+                                    <!-- ✅ यहाँ Price Indian Format में दिखाया गया है -->
+                                    <div class="price mt-2">₹ <?= indianFormat($prop['price']) ?> <span>Starting Bid</span></div>
                                     <?php if(isset($_SESSION['user_id'])): ?>
                                         <a href="#" class="btn-auction"><i class="fas fa-gavel"></i> VIEW AUCTION</a>
                                     <?php else: ?>
