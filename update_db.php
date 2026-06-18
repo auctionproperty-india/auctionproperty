@@ -1,28 +1,30 @@
 <?php
 require_once 'db.php';
 try {
-    // 1. Users Table में Role और Status कॉलम जोड़ें
-    $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'");
-    $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'");
+    // Properties में नए कॉलम जोड़ें
+    $pdo->exec("ALTER TABLE properties ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'Flat'");
+    $pdo->exec("ALTER TABLE properties ADD COLUMN IF NOT EXISTS city VARCHAR(100) DEFAULT ''");
+    $pdo->exec("ALTER TABLE properties ADD COLUMN IF NOT EXISTS google_location TEXT DEFAULT ''");
     
-    // 2. Properties Table बनाएँ (अगर नहीं है)
-    $pdo->exec("CREATE TABLE IF NOT EXISTS properties (
+    // Packages Table (Payment के लिए)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS packages (
         id SERIAL PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        description TEXT,
-        price DECIMAL(10,2) NOT NULL,
-        location VARCHAR(255),
-        image_url TEXT,
-        status VARCHAR(20) DEFAULT 'available',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        name VARCHAR(50) NOT NULL,
+        duration_months INT NOT NULL,
+        price DECIMAL(10,2) NOT NULL
     )");
     
-    // 3. आपको Admin बनाएँ (आपका ईमेल पहले से सेट है)
-    $pdo->exec("UPDATE users SET role = 'admin', status = 'active' WHERE email = 'bliveindia2018@gmail.com'");
-    
-    echo "✅ Database पूरी तरह सेट हो गया! <br>";
-    echo "✅ आप (bliveindia2018@gmail.com) अब Admin हैं। <br>";
-    echo "<a href='dashboard.php' class='btn btn-primary mt-3'>Dashboard पर जाएँ</a>";
+    // डिफॉल्ट पैकेज (अगर खाली है)
+    $count = $pdo->query("SELECT COUNT(*) FROM packages")->fetchColumn();
+    if($count == 0) {
+        $pdo->exec("INSERT INTO packages (name, duration_months, price) VALUES 
+            ('1 Month', 1, 99.00),
+            ('3 Months', 3, 199.00),
+            ('6 Months', 6, 299.00),
+            ('1 Year', 12, 499.00)");
+    }
+
+    echo "✅ Database अपडेट हो गया! अब Admin से Type और City डाल सकते हैं।";
 } catch (Exception $e) {
     echo "❌ Error: " . $e->getMessage();
 }
