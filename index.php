@@ -46,8 +46,9 @@ try {
             <a class="navbar-brand" href="index.php">🏠 PropertyDeal</a>
             <div class="ms-auto">
                 <!-- अभी सिर्फ डमी बटन हैं, आगे बदलेंगे -->
-                <a href="#" class="btn btn-outline-light me-2">Login</a>
-                <a href="#" class="btn btn-primary">Register</a>
+                php
+<a href="login.php" class="btn btn-outline-light me-2">Login</a>
+<a href="register.php" class="btn btn-primary">Register</a>
             </div>
         </div>
     </nav>
