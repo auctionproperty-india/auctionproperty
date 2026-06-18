@@ -43,26 +43,29 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
 
 <div class="card-premium">
     <h5>📋 All Properties</h5>
-    <table class="table table-hover mt-2">
-        <thead class="table-light"><tr><th>ID</th><th>Title</th><th>City</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-        <?php 
-        $stmt = $pdo->query("SELECT * FROM properties ORDER BY id DESC");
-        while($row = $stmt->fetch()) { ?>
-            <tr>
-                <td><?= $row['id'] ?></td>
-                <td><?= htmlspecialchars($row['title']) ?></td>
-                <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
-                <td><?= htmlspecialchars($row['type'] ?? '') ?></td>
-                <td>₹<?= $row['price'] ?></td>
-                <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
-                <td>
-                    <a href="edit_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-primary">✏️</a>
-                    <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
-                </td>
-            </tr>
-        <?php } ?>
-        </tbody>
-    </table>
+    <!-- Mobile के लिए Scrollable Table -->
+    <div class="table-responsive">
+        <table class="table table-hover mt-2">
+            <thead class="table-light"><tr><th>ID</th><th>Title</th><th>City</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            <?php 
+            $stmt = $pdo->query("SELECT * FROM properties ORDER BY id DESC");
+            while($row = $stmt->fetch()) { ?>
+                <tr>
+                    <td><?= $row['id'] ?></td>
+                    <td><?= htmlspecialchars($row['title']) ?></td>
+                    <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($row['type'] ?? '') ?></td>
+                    <td>₹<?= $row['price'] ?></td>
+                    <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
+                    <td>
+                        <a href="edit_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-primary">✏️</a>
+                        <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
+                    </td>
+                </tr>
+            <?php } ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 <?php include 'footer.php'; ?>
