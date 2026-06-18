@@ -229,7 +229,9 @@ $role = $_SESSION['role'] ?? 'user';
     <?php if($role == 'admin'): ?>
         <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
         <a href="dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
-        <!-- ✅ यहाँ Settings का लिंक डाला गया है (Manage Users के ठीक नीचे) -->
+        <!-- ✅ यहाँ 2 नए लिंक डाले गए हैं -->
+        <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
+        <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Subscriptions</span></a>
         <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
     <?php else: ?>
         <a href="index.php"><i class="fas fa-search"></i> <span>Explore Properties</span></a>
