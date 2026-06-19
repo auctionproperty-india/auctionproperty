@@ -10,16 +10,6 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 $default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
 if(!$default_contact) $default_contact = '9238215516';
 
-// ---- EDIT MODE ----
-$edit_id = $_GET['edit'] ?? 0;
-$edit_data = null;
-if($edit_id) {
-    $stmt = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
-    $stmt->execute([$edit_id]);
-    $edit_data = $stmt->fetch();
-    if(!$edit_data) { $edit_id = 0; $edit_data = null; }
-}
-
 // ---- FILTERS ----
 $filter_city = $_GET['filter_city'] ?? '';
 $filter_bank = $_GET['filter_bank'] ?? '';
@@ -68,7 +58,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     // UPDATE
-    if(isset($_POST['update_property']) && $edit_id) {
+    if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
+        $id = $_POST['property_id'];
         $image_path = $_POST['existing_image'] ?? '';
         $use_uploaded_image = false;
 
@@ -117,16 +108,16 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeString($_POST['locality'] ?? ''),
             safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
             safeString($_POST['contact_number'] ?? $default_contact),
-            $edit_id
+            $id
         ]);
 
         if (!$use_uploaded_image) {
             $updated_prop = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
-            $updated_prop->execute([$edit_id]);
+            $updated_prop->execute([$id]);
             $prop_data = $updated_prop->fetch();
             $generated_path = generateSocialCard($prop_data);
             if ($generated_path) {
-                $pdo->prepare("UPDATE properties SET image_url = ? WHERE id = ?")->execute([$generated_path, $edit_id]);
+                $pdo->prepare("UPDATE properties SET image_url = ? WHERE id = ?")->execute([$generated_path, $id]);
             }
         }
 
@@ -216,13 +207,13 @@ include 'header.php';
 <?php endif; ?>
 
 <!-- ============================================= -->
-<!-- ========== PROPERTY LIST ========== -->
+<!-- ========== PROPERTY LIST ===================== -->
 <!-- ============================================= -->
 
 <div class="card-premium">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Properties</h5>
-        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#propertyModal">
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#propertyModal" onclick="openAddModal()">
             <i class="fas fa-plus-circle me-1"></i> Add New Property
         </button>
     </div>
@@ -252,7 +243,7 @@ include 'header.php';
             <thead class="table-light">
                 <tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr>
             </thead>
-            <tbody>
+            <tbody id="propertyTableBody">
                 <?php 
                 if(count($rows) > 0) {
                     foreach($rows as $row) { ?>
@@ -264,7 +255,7 @@ include 'header.php';
                             <td>₹<?= number_format($row['price'], 2) ?></td>
                             <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
                             <td>
-                                <a href="#" class="btn btn-sm btn-primary edit-btn" data-id="<?= $row['id'] ?>" data-bs-toggle="modal" data-bs-target="#propertyModal">✏️</a>
+                                <button class="btn btn-sm btn-primary" onclick="openEditModal(<?= $row['id'] ?>)">✏️</button>
                                 <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
                             </td>
                         </tr>
@@ -278,64 +269,62 @@ include 'header.php';
 </div>
 
 <!-- ============================================= -->
-<!-- ========== MODAL (Popup Form) =============== -->
+<!-- ========== MODAL POPUP (Add / Edit) ========= -->
 <!-- ============================================= -->
 
 <div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
-                <h5 class="modal-title text-white" id="modalTitle">
-                    <i class="fas fa-plus-circle me-2"></i>Add New Property
-                </h5>
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius: 20px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #334155); color: white; border-radius: 20px 20px 0 0;">
+                <h5 class="modal-title" id="modalTitle"><i class="fas fa-plus-circle me-2"></i>Add New Property</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="propertyForm" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="edit_id" id="edit_id" value="0">
+                    <input type="hidden" name="property_id" id="property_id" value="">
                     <input type="hidden" name="existing_image" id="existing_image" value="">
 
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Title *</label>
-                            <input type="text" name="title" id="modal_title" class="form-control" required>
+                            <input type="text" name="title" id="edit_title" class="form-control" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Address *</label>
-                            <input type="text" name="location" id="modal_location" class="form-control" required>
+                            <input type="text" name="location" id="edit_location" class="form-control" required>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">City *</label>
-                            <input type="text" name="city" id="modal_city" class="form-control" required>
+                            <input type="text" name="city" id="edit_city" class="form-control" required>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">State</label>
-                            <input type="text" name="state" id="modal_state" class="form-control">
+                            <input type="text" name="state" id="edit_state" class="form-control">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Locality</label>
-                            <input type="text" name="locality" id="modal_locality" class="form-control">
+                            <input type="text" name="locality" id="edit_locality" class="form-control">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Reserve Price (₹) *</label>
-                            <input type="number" step="0.01" name="price" id="modal_price" class="form-control" required>
+                            <input type="number" step="0.01" name="price" id="edit_price" class="form-control" required>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Price per Sq Ft</label>
-                            <input type="number" step="0.01" name="reserve_price_per_sqft" id="modal_reserve_price_per_sqft" class="form-control">
+                            <input type="number" step="0.01" name="reserve_price_per_sqft" id="edit_reserve_price_per_sqft" class="form-control">
                         </div>
 
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Bank Name</label>
-                            <input type="text" name="bank_name" id="modal_bank_name" class="form-control">
+                            <input type="text" name="bank_name" id="edit_bank_name" class="form-control">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Borrower Name</label>
-                            <input type="text" name="borrower_name" id="modal_borrower_name" class="form-control">
+                            <input type="text" name="borrower_name" id="edit_borrower_name" class="form-control">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Property Type</label>
-                            <select name="type" id="modal_type" class="form-control">
+                            <select name="type" id="edit_type" class="form-control">
                                 <option value="Flat">Flat</option>
                                 <option value="Plot">Plot</option>
                                 <option value="Shop">Shop</option>
@@ -347,62 +336,63 @@ include 'header.php';
 
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Area (Sq Ft)</label>
-                            <input type="number" step="0.01" name="sqft" id="modal_sqft" class="form-control">
+                            <input type="number" step="0.01" name="sqft" id="edit_sqft" class="form-control">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Possession</label>
-                            <select name="possession_type" id="modal_possession_type" class="form-control">
+                            <select name="possession_type" id="edit_possession_type" class="form-control">
                                 <option value="Physical">Physical</option>
                                 <option value="Symbolic">Symbolic</option>
                             </select>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">EMD Amount (₹)</label>
-                            <input type="number" step="0.01" name="emd_amount" id="modal_emd_amount" class="form-control">
+                            <input type="number" step="0.01" name="emd_amount" id="edit_emd_amount" class="form-control">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Bid Increment (₹)</label>
-                            <input type="number" step="0.01" name="bid_increment" id="modal_bid_increment" class="form-control">
+                            <input type="number" step="0.01" name="bid_increment" id="edit_bid_increment" class="form-control">
                         </div>
 
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Auction Start</label>
-                            <input type="text" name="auction_start_time" id="modal_auction_start_time" class="form-control" placeholder="Wed, 24 Jun 2026 12:00 PM">
+                            <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control" placeholder="Wed, 24 Jun 2026 12:00 PM">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Auction End</label>
-                            <input type="text" name="auction_end_time" id="modal_auction_end_time" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM">
+                            <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">EMD Deadline</label>
-                            <input type="text" name="emd_deadline" id="modal_emd_deadline" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM">
+                            <input type="text" name="emd_deadline" id="edit_emd_deadline" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM">
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Auction Date (DD/MM/YYYY)</label>
-                            <input type="text" name="auction_date" id="modal_auction_date" class="form-control" placeholder="e.g. 24/06/2026">
+                            <input type="text" name="auction_date" id="edit_auction_date" class="form-control" placeholder="e.g. 24/06/2026">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Contact Number</label>
-                            <input type="text" name="contact_number" id="modal_contact_number" class="form-control" value="<?= htmlspecialchars($default_contact) ?>" required>
+                            <input type="text" name="contact_number" id="edit_contact_number" class="form-control" value="<?= $default_contact ?>" required>
                         </div>
 
                         <div class="col-12">
                             <label class="form-label fw-semibold">Google Map Link (Auto)</label>
-                            <input type="text" name="google_location" id="modal_google_location" class="form-control" readonly style="background:#f1f5f9;">
+                            <input type="text" name="google_location" id="edit_google_location" class="form-control" readonly style="background:#f1f5f9;">
                         </div>
 
                         <div class="col-12">
                             <label class="form-label fw-semibold">Upload Image</label>
-                            <div id="current_image_preview"></div>
-                            <input type="file" name="image_file" id="modal_image_file" class="form-control" accept="image/*">
-                            <small id="image_help_text">Leave empty to auto-generate premium social card.</small>
+                            <div id="currentImagePreview" style="display:none; margin-bottom:10px;">
+                                <img id="currentImage" src="" style="max-height:120px; border-radius:10px; border:1px solid #ddd;">
+                            </div>
+                            <input type="file" name="image_file" id="edit_image_file" class="form-control" accept="image/*">
+                            <small id="imageHelpText">Leave empty to auto-generate premium social card.</small>
                         </div>
+                    </div>
 
-                        <div class="col-12 text-end">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" name="add_property" id="modal_submit_btn" class="btn btn-primary">Add Property</button>
-                        </div>
+                    <div class="mt-4">
+                        <button type="submit" name="add_property" id="submitBtn" class="btn btn-primary btn-lg w-100">Add Property</button>
                     </div>
                 </form>
             </div>
@@ -410,88 +400,94 @@ include 'header.php';
     </div>
 </div>
 
-<!-- JavaScript to handle modal data and Google Autocomplete -->
+<!-- Google Maps Autocomplete Script -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('propertyModal');
-    
-    // When modal is shown, check if we are editing
-    modal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget; // Button that triggered the modal
-        const isEdit = button && button.classList.contains('edit-btn');
-        
-        if (isEdit) {
-            // Edit mode - fetch data via AJAX
-            const id = button.getAttribute('data-id');
-            fetch(`get_property.php?id=${id}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data) {
-                        document.getElementById('edit_id').value = data.id;
-                        document.getElementById('modal_title').value = data.title || '';
-                        document.getElementById('modal_location').value = data.location || '';
-                        document.getElementById('modal_city').value = data.city || '';
-                        document.getElementById('modal_state').value = data.state || '';
-                        document.getElementById('modal_locality').value = data.locality || '';
-                        document.getElementById('modal_price').value = data.price || '';
-                        document.getElementById('modal_reserve_price_per_sqft').value = data.reserve_price_per_sqft || '';
-                        document.getElementById('modal_bank_name').value = data.bank_name || '';
-                        document.getElementById('modal_borrower_name').value = data.borrower_name || '';
-                        document.getElementById('modal_type').value = data.type || 'Flat';
-                        document.getElementById('modal_sqft').value = data.sqft || '';
-                        document.getElementById('modal_possession_type').value = data.possession_type || 'Physical';
-                        document.getElementById('modal_emd_amount').value = data.emd_amount || '';
-                        document.getElementById('modal_bid_increment').value = data.bid_increment || '';
-                        document.getElementById('modal_auction_start_time').value = data.auction_start_time || '';
-                        document.getElementById('modal_auction_end_time').value = data.auction_end_time || '';
-                        document.getElementById('modal_emd_deadline').value = data.emd_deadline || '';
-                        document.getElementById('modal_auction_date').value = data.auction_date || '';
-                        document.getElementById('modal_contact_number').value = data.contact_number || '<?= htmlspecialchars($default_contact) ?>';
-                        document.getElementById('modal_google_location').value = data.google_location || '';
-                        document.getElementById('existing_image').value = data.image_url || '';
-                        
-                        // Show current image preview if exists
-                        const preview = document.getElementById('current_image_preview');
-                        if (data.image_url) {
-                            preview.innerHTML = `<img src="${data.image_url}" style="max-height:120px; border-radius:10px; margin-bottom:10px;">`;
-                        } else {
-                            preview.innerHTML = '';
-                        }
-                        
-                        document.getElementById('modal_submit_btn').name = 'update_property';
-                        document.getElementById('modal_submit_btn').innerHTML = 'Update Property';
-                        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + data.id;
-                        document.getElementById('image_help_text').innerText = 'Leave empty to keep current image or auto-generate.';
-                    }
-                });
-        } else {
-            // Add mode - reset form
-            document.getElementById('propertyForm').reset();
-            document.getElementById('edit_id').value = '0';
-            document.getElementById('existing_image').value = '';
-            document.getElementById('current_image_preview').innerHTML = '';
-            document.getElementById('modal_submit_btn').name = 'add_property';
-            document.getElementById('modal_submit_btn').innerHTML = 'Add Property';
-            document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Add New Property';
-            document.getElementById('image_help_text').innerText = 'Leave empty to auto-generate premium social card.';
-            document.getElementById('modal_contact_number').value = '<?= htmlspecialchars($default_contact) ?>';
+    // Google Maps Autocomplete
+    function initAutocomplete() {
+        var input = document.getElementById('edit_location');
+        if (input) {
+            var autocomplete = new google.maps.places.Autocomplete(input);
+            autocomplete.addListener('place_changed', function() {
+                var place = autocomplete.getPlace();
+                if (place.geometry) {
+                    var lat = place.geometry.location.lat();
+                    var lng = place.geometry.location.lng();
+                    document.getElementById('edit_google_location').value = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+                }
+            });
         }
-    });
-
-    // Google Autocomplete
-    const locationInput = document.getElementById('modal_location');
-    if (locationInput) {
-        const autocomplete = new google.maps.places.Autocomplete(locationInput);
-        autocomplete.addListener('place_changed', function() {
-            const place = autocomplete.getPlace();
-            if (place.geometry) {
-                const lat = place.geometry.location.lat();
-                const lng = place.geometry.location.lng();
-                document.getElementById('modal_google_location').value = 'https://www.google.com/maps?q=' + lat + ',' + lng;
-            }
-        });
     }
-});
+
+    // Open Add Modal
+    function openAddModal() {
+        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Add New Property';
+        document.getElementById('propertyForm').reset();
+        document.getElementById('property_id').value = '';
+        document.getElementById('existing_image').value = '';
+        document.getElementById('submitBtn').name = 'add_property';
+        document.getElementById('submitBtn').innerHTML = 'Add Property';
+        document.getElementById('currentImagePreview').style.display = 'none';
+        document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
+        // Clear hidden fields
+        document.getElementById('edit_google_location').value = '';
+        // Reset form
+        document.getElementById('propertyForm').reset();
+    }
+
+    // Open Edit Modal (AJAX)
+    function openEditModal(id) {
+        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + id;
+        document.getElementById('submitBtn').name = 'update_property';
+        document.getElementById('submitBtn').innerHTML = 'Update Property';
+        document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
+
+        // Fetch property data via AJAX
+        fetch('get_property.php?id=' + id)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('property_id').value = data.id;
+                document.getElementById('edit_title').value = data.title || '';
+                document.getElementById('edit_location').value = data.location || '';
+                document.getElementById('edit_city').value = data.city || '';
+                document.getElementById('edit_state').value = data.state || '';
+                document.getElementById('edit_locality').value = data.locality || '';
+                document.getElementById('edit_price').value = data.price || '';
+                document.getElementById('edit_reserve_price_per_sqft').value = data.reserve_price_per_sqft || '';
+                document.getElementById('edit_bank_name').value = data.bank_name || '';
+                document.getElementById('edit_borrower_name').value = data.borrower_name || '';
+                document.getElementById('edit_type').value = data.type || 'Flat';
+                document.getElementById('edit_sqft').value = data.sqft || '';
+                document.getElementById('edit_possession_type').value = data.possession_type || 'Physical';
+                document.getElementById('edit_emd_amount').value = data.emd_amount || '';
+                document.getElementById('edit_bid_increment').value = data.bid_increment || '';
+                document.getElementById('edit_auction_start_time').value = data.auction_start_time || '';
+                document.getElementById('edit_auction_end_time').value = data.auction_end_time || '';
+                document.getElementById('edit_emd_deadline').value = data.emd_deadline || '';
+                document.getElementById('edit_auction_date').value = data.auction_date || '';
+                document.getElementById('edit_contact_number').value = data.contact_number || '';
+                document.getElementById('edit_google_location').value = data.google_location || '';
+                document.getElementById('existing_image').value = data.image_url || '';
+
+                // Show current image if exists
+                if (data.image_url) {
+                    document.getElementById('currentImage').src = data.image_url;
+                    document.getElementById('currentImagePreview').style.display = 'block';
+                } else {
+                    document.getElementById('currentImagePreview').style.display = 'none';
+                }
+
+                // Trigger modal show
+                var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
+                modal.show();
+            })
+            .catch(error => {
+                alert('Error loading property data: ' + error);
+            });
+    }
+
+    // Close modal after submit (handled via redirect)
+    // The page will reload after submit, which closes the modal automatically.
 </script>
+<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&callback=initAutocomplete" async defer></script>
 
 <?php include 'footer.php'; ?>
