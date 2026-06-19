@@ -3,13 +3,28 @@ require_once 'db.php';
 require_once 'functions.php';
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { header("Location: dashboard.php"); exit; }
 
+if(!hasPermission('packages', $pdo)) {
+    die("You do not have permission to access this page.");
+}
+
+$error = '';
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_prices'])) {
-    foreach($_POST['price'] as $id => $price) {
-        $discount = $_POST['discount'][$id] ?? null;
-        $pdo->prepare("UPDATE packages SET price = ?, discount_price = ? WHERE id = ?")->execute([$price, $discount ?: null, $id]);
+    // ✅ Password Verification
+    $password_attempt = $_POST['admin_password'] ?? '';
+    $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $admin = $stmt->fetch();
+    
+    if(!$admin || !password_verify($password_attempt, $admin['password'])) {
+        $error = "❌ Incorrect Admin Password! Please try again.";
+    } else {
+        foreach($_POST['price'] as $id => $price) {
+            $discount = $_POST['discount'][$id] ?? null;
+            $pdo->prepare("UPDATE packages SET price = ?, discount_price = ? WHERE id = ?")->execute([$price, $discount ?: null, $id]);
+        }
+        header("Location: admin_packages.php?updated=1");
+        exit;
     }
-    header("Location: admin_packages.php?updated=1");
-    exit;
 }
 
 include 'header.php'; 
@@ -18,6 +33,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
 <div class="card-premium">
     <h4><i class="fas fa-tags me-2"></i>Manage Package Prices & Discounts</h4>
     <?php if(isset($_GET['updated'])) echo "<div class='alert alert-success'>✅ Prices Updated!</div>"; ?>
+    <?php if($error) echo "<div class='alert alert-danger'>$error</div>"; ?>
     <form method="POST">
         <div class="table-responsive">
             <table class="table table-bordered">
@@ -28,16 +44,20 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                         <td><?= htmlspecialchars($pkg['name']) ?></td>
                         <td><?= $pkg['duration_months'] ?> Months</td>
                         <td><input type="number" step="0.01" name="price[<?= $pkg['id'] ?>]" value="<?= $pkg['price'] ?>" class="form-control" style="width:150px;" required></td>
-                        <td>
-                            <input type="number" step="0.01" name="discount[<?= $pkg['id'] ?>]" value="<?= $pkg['discount_price'] ?>" class="form-control" style="width:150px;" placeholder="Leave empty for no discount">
-                            <small class="text-muted">Discount price (if set) will be shown on user dashboard.</small>
-                        </td>
+                        <td><input type="number" step="0.01" name="discount[<?= $pkg['id'] ?>]" value="<?= $pkg['discount_price'] ?>" class="form-control" style="width:150px;" placeholder="Leave empty"></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
-        <button type="submit" name="update_prices" class="btn btn-primary">Save Changes</button>
+        <!-- ✅ Password Field -->
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <label class="fw-bold">Verify Admin Password *</label>
+                <input type="password" name="admin_password" class="form-control" placeholder="Enter your password to save changes" required>
+            </div>
+        </div>
+        <button type="submit" name="update_prices" class="btn btn-primary mt-3">Save Changes</button>
     </form>
 </div>
 <?php include 'footer.php'; ?>
