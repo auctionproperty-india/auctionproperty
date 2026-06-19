@@ -1,5 +1,4 @@
 <?php
-// ---- Currency Format ----
 function indianCurrencyFormat($number) {
     if ($number === null || $number === '') return '0';
     $number = (float) $number;
@@ -12,7 +11,6 @@ function indianCurrencyFormat($number) {
     return $rest . ',' . $last;
 }
 
-// ---- Subscription Check ----
 function hasActiveSubscription($pdo, $user_id, $property_id = null) {
     if($property_id) {
         $stmt = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND property_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
@@ -24,14 +22,13 @@ function hasActiveSubscription($pdo, $user_id, $property_id = null) {
     return $stmt->rowCount() > 0;
 }
 
-// ---- 🆕 Permission Helpers ----
+// ---- 🆕 Permission Functions (यही missing था) ----
 function getUserPermissions($user_id, $pdo) {
     $stmt = $pdo->prepare("SELECT permissions, is_super_admin FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $user = $stmt->fetch();
     if(!$user) return [];
     if($user['is_super_admin']) {
-        // Super admin के पास सब कुछ Access है
         return ['properties' => true, 'users' => true, 'packages' => true, 'subscriptions' => true, 'settings' => true];
     }
     $perms = json_decode($user['permissions'], true);
@@ -45,7 +42,6 @@ function hasPermission($permission, $pdo) {
     return isset($perms[$permission]) && $perms[$permission] === true;
 }
 
-// ---- Social Image Generator ----
 function generateSocialCard($property) {
     if (!extension_loaded('gd')) {
         error_log("GD extension missing");
@@ -84,7 +80,6 @@ function generateSocialCard($property) {
             imagestring($img, $f_size, $px, 450, $price, $gold);
             return saveImage($img);
         }
-        // Premium Layout
         $bank = strtoupper($property['bank_name'] ?? 'BANK AUCTION');
         $bank_size = 34;
         $bank_box = imagettfbbox($bank_size, 0, $font_path, $bank);
