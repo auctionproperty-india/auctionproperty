@@ -1,4 +1,29 @@
+<?php
+function indianCurrencyFormat($number) {
+    if ($number === null || $number === '') return '0';
+    $number = (float) $number;
+    $num = (string) floor($number);
+    $len = strlen($num);
+    if ($len <= 3) return $num;
+    $last = substr($num, -3);
+    $rest = substr($num, 0, $len - 3);
+    $rest = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $rest);
+    return $rest . ',' . $last;
+}
+
+function hasActiveSubscription($pdo, $user_id, $property_id = null) {
+    if($property_id) {
+        $stmt = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND property_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
+        $stmt->execute([$user_id, $property_id]);
+    } else {
+        $stmt = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
+        $stmt->execute([$user_id]);
+    }
+    return $stmt->rowCount() > 0;
+}
+
 function generateSocialCard($property) {
+    // Check GD
     if (!extension_loaded('gd')) {
         error_log("GD extension missing");
         return $property['image_url'] ?? '';
@@ -13,9 +38,11 @@ function generateSocialCard($property) {
         $img = imagecreatetruecolor($width, $height);
         if (!$img) return $property['image_url'] ?? '';
 
-        // Background Gradient
+        // Background
         $dark_blue = imagecolorallocate($img, 15, 23, 42);
         imagefilledrectangle($img, 0, 0, $width, $height, $dark_blue);
+        
+        // Gradient Effect
         for ($i = 0; $i < $height; $i += 10) {
             $ratio = $i / $height;
             $r = (int)(15 + (30 - 15) * $ratio);
@@ -30,61 +57,102 @@ function generateSocialCard($property) {
         $light_gray = imagecolorallocate($img, 200, 210, 220);
         $dark_bg = imagecolorallocate($img, 15, 23, 42);
 
+        // If font not found, use built-in font
         if (!$font_exists) {
-            // Fallback simple image
             $f_size = 5;
             $title = strtoupper($property['title'] ?? 'PROPERTY');
             $x = (int)(($width - (strlen($title) * imagefontwidth($f_size))) / 2);
             imagestring($img, $f_size, $x, 180, $title, $gold);
+            
+            $bank = $property['bank_name'] ?? 'BANK AUCTION';
+            $bx = (int)(($width - (strlen($bank) * imagefontwidth($f_size))) / 2);
+            imagestring($img, $f_size, $bx, 300, $bank, $white);
+            
+            $price = '₹ ' . indianCurrencyFormat($property['price'] ?? 0);
+            $px = (int)(($width - (strlen($price) * imagefontwidth($f_size))) / 2);
+            imagestring($img, $f_size, $px, 450, $price, $gold);
+            
             return saveImage($img);
         }
 
-        // 1. Title (Biggest)
+        // ====== PREMIUM LAYOUT (TrueType Font) ======
+        
+        // 1. BANK NAME (Top Badge)
+        $bank = strtoupper($property['bank_name'] ?? 'BANK AUCTION');
+        $bank_size = 34;
+        $bank_box = imagettfbbox($bank_size, 0, $font_path, $bank);
+        $bank_w = ($bank_box[2] - $bank_box[0]) + 60;
+        $bank_h = 70;
+        $bank_x = (int)(($width - $bank_w) / 2);
+        imagefilledrectangle($img, $bank_x, 120, $bank_x + $bank_w, 120 + $bank_h, $gold);
+        $txt_x = $bank_x + 30;
+        $txt_y = 120 + 48;
+        imagettftext($img, $bank_size, 0, $txt_x, $txt_y, $dark_bg, $font_path, $bank);
+
+        // 2. TITLE (Biggest)
         $title = strtoupper($property['title'] ?? 'PRIME PROPERTY');
-        $title_size = 74;
+        $title_size = 72;
         $title_box = imagettfbbox($title_size, 0, $font_path, $title);
         $title_width = $title_box[2] - $title_box[0];
         $x = (int)(($width - $title_width) / 2);
-        imagettftext($img, $title_size, 0, $x, 220, $gold, $font_path, $title);
+        imagettftext($img, $title_size, 0, $x, 280, $white, $font_path, $title);
 
-        // 2. City (Large)
-        $city = strtoupper($property['city'] ?? 'PREMIUM LOCATION');
-        $city_size = 42;
-        $city_box = imagettfbbox($city_size, 0, $font_path, $city);
-        $city_w = $city_box[2] - $city_box[0];
-        $x = (int)(($width - $city_w) / 2);
-        imagettftext($img, $city_size, 0, $x, 310, $white, $font_path, $city);
+        // 3. LOCATION / CITY
+        $city = strtoupper($property['city'] ?? '');
+        if (!empty($city)) {
+            $city_size = 38;
+            $city_box = imagettfbbox($city_size, 0, $font_path, $city);
+            $city_w = $city_box[2] - $city_box[0];
+            $x = (int)(($width - $city_w) / 2);
+            imagettftext($img, $city_size, 0, $x, 350, $light_gray, $font_path, $city);
+        }
 
-        // 3. Bank Name Badge
-        $bank = $property['bank_name'] ?? 'BANK AUCTION';
-        $bank_size = 30;
-        $bank_box = imagettfbbox($bank_size, 0, $font_path, $bank);
-        $bank_w = ($bank_box[2] - $bank_box[0]) + 60;
-        $bank_h = 60;
-        $bank_x = (int)(($width - $bank_w) / 2);
-        imagefilledrectangle($img, $bank_x, 370, $bank_x + $bank_w, 370 + $bank_h, $gold);
-        $txt_x = $bank_x + 30;
-        $txt_y = 370 + 42;
-        imagettftext($img, $bank_size, 0, $txt_x, $txt_y, $dark_bg, $font_path, $bank);
-
-        // 4. Reserve Price (Big)
+        // 4. RESERVE PRICE (Big & Bold)
         $price_label = "RESERVE PRICE";
         $price_val = "₹ " . indianCurrencyFormat($property['price'] ?? 0);
-        $label_size = 34;
-        $val_size = 64;
-
+        
+        $label_size = 32;
         $label_box = imagettfbbox($label_size, 0, $font_path, $price_label);
         $label_w = $label_box[2] - $label_box[0];
         $x = (int)(($width - $label_w) / 2);
-        imagettftext($img, $label_size, 0, $x, 540, $light_gray, $font_path, $price_label);
-
+        imagettftext($img, $label_size, 0, $x, 480, $light_gray, $font_path, $price_label);
+        
+        $val_size = 72;
         $val_box = imagettfbbox($val_size, 0, $font_path, $price_val);
         $val_w = $val_box[2] - $val_box[0];
         $x = (int)(($width - $val_w) / 2);
-        imagettftext($img, $val_size, 0, $x, 640, $gold, $font_path, $price_val);
+        imagettftext($img, $val_size, 0, $x, 600, $gold, $font_path, $price_val);
 
-        // 5. Footer Brand
-        imagettftext($img, 30, 0, 100, 980, $light_gray, $font_path, "🔹 PRIME PROPERTY");
+        // 5. PER SQ FT (Small badge below price)
+        $per_sqft = "₹ " . indianCurrencyFormat($property['reserve_price_per_sqft'] ?? 0) . " PER SQ FT";
+        $ps_size = 26;
+        $ps_box = imagettfbbox($ps_size, 0, $font_path, $per_sqft);
+        $ps_w = $ps_box[2] - $ps_box[0];
+        $x = (int)(($width - $ps_w) / 2);
+        imagettftext($img, $ps_size, 0, $x, 660, $white, $font_path, $per_sqft);
+
+        // 6. BORROWER & CONTACT (Bottom Left)
+        $borrower = "BORROWER: " . ($property['borrower_name'] ?? 'N/A');
+        $contact = "CONTACT: " . ($property['contact_number'] ?? 'N/A');
+        $info_size = 26;
+        imagettftext($img, $info_size, 0, 80, 780, $light_gray, $font_path, $borrower);
+        imagettftext($img, $info_size, 0, 80, 830, $light_gray, $font_path, $contact);
+
+        // 7. EMD & POSSESSION (Bottom Right)
+        $emd = "EMD: ₹ " . indianCurrencyFormat($property['emd_amount'] ?? 0);
+        $possession = "POSSESSION: " . ($property['possession_type'] ?? 'Physical');
+        imagettftext($img, $info_size, 0, 680, 780, $light_gray, $font_path, $emd);
+        imagettftext($img, $info_size, 0, 680, 830, $light_gray, $font_path, $possession);
+
+        // 8. FOOTER (Brand Name)
+        $brand = "🔹 PRIME PROPERTY";
+        $brand_size = 28;
+        imagettftext($img, $brand_size, 0, 80, 980, $gold, $font_path, $brand);
+        
+        // Auction Start/End (Small at bottom right)
+        $auction = "AUCTION: " . ($property['auction_start_time'] ?? 'N/A') . " - " . ($property['auction_end_time'] ?? 'N/A');
+        $auction_size = 22;
+        imagettftext($img, $auction_size, 0, 600, 980, $white, $font_path, $auction);
 
         return saveImage($img);
 
@@ -93,3 +161,15 @@ function generateSocialCard($property) {
         return $property['image_url'] ?? '';
     }
 }
+
+// Helper function
+function saveImage($img) {
+    $upload_dir = 'uploads/';
+    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+    $filename = 'social_' . time() . '_' . bin2hex(random_bytes(6)) . '.png';
+    $path = $upload_dir . $filename;
+    imagepng($img, $path, 9);
+    imagedestroy($img);
+    return $path;
+}
+?>
