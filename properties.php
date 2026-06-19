@@ -20,7 +20,7 @@ if($edit_id) {
     if(!$edit_data) { $edit_id = 0; $edit_data = null; }
 }
 
-// ---- FILTERS (Admin) ----
+// ---- FILTERS ----
 $filter_city = $_GET['filter_city'] ?? '';
 $filter_bank = $_GET['filter_bank'] ?? '';
 $filter_price_min = $_GET['filter_price_min'] ?? '';
@@ -209,25 +209,25 @@ include 'header.php';
 
 <!-- Success Messages -->
 <?php if(isset($_GET['added'])): ?>
-    <div class="alert alert-success">✅ Property Added Successfully!</div>
+    <div class="alert alert-success alert-dismissible fade show">✅ Property Added Successfully!</div>
 <?php endif; ?>
 <?php if(isset($_GET['updated'])): ?>
-    <div class="alert alert-success">✅ Property Updated Successfully!</div>
+    <div class="alert alert-success alert-dismissible fade show">✅ Property Updated Successfully!</div>
 <?php endif; ?>
 
 <!-- ============================================= -->
-<!-- ========== PROPERTY LIST (MAIN VIEW) ========== -->
+<!-- ========== PROPERTY LIST ========== -->
 <!-- ============================================= -->
 
 <div class="card-premium">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Properties</h5>
-        <a href="?add=1" class="btn btn-primary btn-sm">
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#propertyModal">
             <i class="fas fa-plus-circle me-1"></i> Add New Property
-        </a>
+        </button>
     </div>
 
-    <!-- Search Filters (3 separate fields) -->
+    <!-- Filters -->
     <form method="GET" class="row g-2 mb-3">
         <div class="col-md-3">
             <input type="text" name="filter_city" class="form-control" placeholder="🏙️ City" value="<?= htmlspecialchars($filter_city) ?>">
@@ -246,7 +246,7 @@ include 'header.php';
         </div>
     </form>
 
-    <!-- Properties Table -->
+    <!-- Table -->
     <div class="table-responsive">
         <table class="table table-hover">
             <thead class="table-light">
@@ -264,13 +264,13 @@ include 'header.php';
                             <td>₹<?= number_format($row['price'], 2) ?></td>
                             <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
                             <td>
-                                <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary">✏️</a>
+                                <a href="#" class="btn btn-sm btn-primary edit-btn" data-id="<?= $row['id'] ?>" data-bs-toggle="modal" data-bs-target="#propertyModal">✏️</a>
                                 <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
                             </td>
                         </tr>
                     <?php }
                 } else { ?>
-                    <tr><td colspan="7" class="text-center text-muted">No properties match your filters.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted">No properties found.</td></tr>
                 <?php } ?>
             </tbody>
         </table>
@@ -278,154 +278,220 @@ include 'header.php';
 </div>
 
 <!-- ============================================= -->
-<!-- ========== ADD / EDIT FORM (BELOW LIST) ===== -->
+<!-- ========== MODAL (Popup Form) =============== -->
 <!-- ============================================= -->
 
-<?php if(isset($_GET['add']) || $edit_id): ?>
-<div class="card-premium mt-4" id="add-form" style="border-left: 4px solid #fbbf24;">
-    <h5>
-        <i class="fas fa-<?= $edit_id ? 'edit' : 'plus-circle' ?> me-2" style="color: #fbbf24;"></i>
-        <?= $edit_id ? 'Edit Property #'.$edit_id : 'Add New Property' ?>
-        <a href="properties.php" class="btn btn-sm btn-outline-secondary float-end">✕ Close</a>
-    </h5>
-    <form method="POST" class="mt-3" enctype="multipart/form-data">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">Title *</label>
-                <input type="text" name="title" class="form-control" required value="<?= htmlspecialchars($edit_data['title'] ?? '') ?>">
+<div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
+                <h5 class="modal-title text-white" id="modalTitle">
+                    <i class="fas fa-plus-circle me-2"></i>Add New Property
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">Address *</label>
-                <input type="text" name="location" id="location_input" class="form-control" required value="<?= htmlspecialchars($edit_data['location'] ?? '') ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">City *</label>
-                <input type="text" name="city" class="form-control" required value="<?= htmlspecialchars($edit_data['city'] ?? '') ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">State</label>
-                <input type="text" name="state" class="form-control" value="<?= htmlspecialchars($edit_data['state'] ?? '') ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Locality</label>
-                <input type="text" name="locality" class="form-control" value="<?= htmlspecialchars($edit_data['locality'] ?? '') ?>">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">Reserve Price (₹) *</label>
-                <input type="number" step="0.01" name="price" class="form-control" required value="<?= htmlspecialchars($edit_data['price'] ?? '') ?>">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">Price per Sq Ft</label>
-                <input type="number" step="0.01" name="reserve_price_per_sqft" class="form-control" value="<?= htmlspecialchars($edit_data['reserve_price_per_sqft'] ?? '') ?>">
-            </div>
+            <div class="modal-body">
+                <form id="propertyForm" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="edit_id" id="edit_id" value="0">
+                    <input type="hidden" name="existing_image" id="existing_image" value="">
 
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Bank Name</label>
-                <input type="text" name="bank_name" class="form-control" value="<?= htmlspecialchars($edit_data['bank_name'] ?? '') ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Borrower Name</label>
-                <input type="text" name="borrower_name" class="form-control" value="<?= htmlspecialchars($edit_data['borrower_name'] ?? '') ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Property Type</label>
-                <select name="type" class="form-control">
-                    <option value="Flat" <?= ($edit_data['type']??'')=='Flat'?'selected':'' ?>>Flat</option>
-                    <option value="Plot" <?= ($edit_data['type']??'')=='Plot'?'selected':'' ?>>Plot</option>
-                    <option value="Shop" <?= ($edit_data['type']??'')=='Shop'?'selected':'' ?>>Shop</option>
-                    <option value="Land" <?= ($edit_data['type']??'')=='Land'?'selected':'' ?>>Land</option>
-                    <option value="Row House" <?= ($edit_data['type']??'')=='Row House'?'selected':'' ?>>Row House</option>
-                    <option value="Bungalow" <?= ($edit_data['type']??'')=='Bungalow'?'selected':'' ?>>Bungalow</option>
-                </select>
-            </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Title *</label>
+                            <input type="text" name="title" id="modal_title" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Address *</label>
+                            <input type="text" name="location" id="modal_location" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">City *</label>
+                            <input type="text" name="city" id="modal_city" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">State</label>
+                            <input type="text" name="state" id="modal_state" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Locality</label>
+                            <input type="text" name="locality" id="modal_locality" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Reserve Price (₹) *</label>
+                            <input type="number" step="0.01" name="price" id="modal_price" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Price per Sq Ft</label>
+                            <input type="number" step="0.01" name="reserve_price_per_sqft" id="modal_reserve_price_per_sqft" class="form-control">
+                        </div>
 
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">Area (Sq Ft)</label>
-                <input type="number" step="0.01" name="sqft" class="form-control" value="<?= htmlspecialchars($edit_data['sqft'] ?? '') ?>">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">Possession</label>
-                <select name="possession_type" class="form-control">
-                    <option value="Physical" <?= ($edit_data['possession_type']??'')=='Physical'?'selected':'' ?>>Physical</option>
-                    <option value="Symbolic" <?= ($edit_data['possession_type']??'')=='Symbolic'?'selected':'' ?>>Symbolic</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">EMD Amount (₹)</label>
-                <input type="number" step="0.01" name="emd_amount" class="form-control" value="<?= htmlspecialchars($edit_data['emd_amount'] ?? '') ?>">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">Bid Increment (₹)</label>
-                <input type="number" step="0.01" name="bid_increment" class="form-control" value="<?= htmlspecialchars($edit_data['bid_increment'] ?? '') ?>">
-            </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Bank Name</label>
+                            <input type="text" name="bank_name" id="modal_bank_name" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Borrower Name</label>
+                            <input type="text" name="borrower_name" id="modal_borrower_name" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Property Type</label>
+                            <select name="type" id="modal_type" class="form-control">
+                                <option value="Flat">Flat</option>
+                                <option value="Plot">Plot</option>
+                                <option value="Shop">Shop</option>
+                                <option value="Land">Land</option>
+                                <option value="Row House">Row House</option>
+                                <option value="Bungalow">Bungalow</option>
+                            </select>
+                        </div>
 
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Auction Start</label>
-                <input type="text" name="auction_start_time" class="form-control" placeholder="Wed, 24 Jun 2026 12:00 PM" value="<?= htmlspecialchars($edit_data['auction_start_time'] ?? '') ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Auction End</label>
-                <input type="text" name="auction_end_time" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM" value="<?= htmlspecialchars($edit_data['auction_end_time'] ?? '') ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">EMD Deadline</label>
-                <input type="text" name="emd_deadline" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM" value="<?= htmlspecialchars($edit_data['emd_deadline'] ?? '') ?>">
-            </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Area (Sq Ft)</label>
+                            <input type="number" step="0.01" name="sqft" id="modal_sqft" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Possession</label>
+                            <select name="possession_type" id="modal_possession_type" class="form-control">
+                                <option value="Physical">Physical</option>
+                                <option value="Symbolic">Symbolic</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">EMD Amount (₹)</label>
+                            <input type="number" step="0.01" name="emd_amount" id="modal_emd_amount" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Bid Increment (₹)</label>
+                            <input type="number" step="0.01" name="bid_increment" id="modal_bid_increment" class="form-control">
+                        </div>
 
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">Auction Date (DD/MM/YYYY)</label>
-                <input type="text" name="auction_date" class="form-control" placeholder="e.g. 24/06/2026" value="<?= htmlspecialchars($edit_data['auction_date'] ?? '') ?>">
-            </div>
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">Contact Number</label>
-                <input type="text" name="contact_number" class="form-control" value="<?= htmlspecialchars($edit_data['contact_number'] ?? $default_contact) ?>" required>
-            </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Auction Start</label>
+                            <input type="text" name="auction_start_time" id="modal_auction_start_time" class="form-control" placeholder="Wed, 24 Jun 2026 12:00 PM">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Auction End</label>
+                            <input type="text" name="auction_end_time" id="modal_auction_end_time" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">EMD Deadline</label>
+                            <input type="text" name="emd_deadline" id="modal_emd_deadline" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM">
+                        </div>
 
-            <div class="col-12">
-                <label class="form-label fw-semibold">Google Map Link (Auto)</label>
-                <input type="text" name="google_location" id="google_location" class="form-control" readonly style="background:#f1f5f9;" value="<?= htmlspecialchars($edit_data['google_location'] ?? '') ?>">
-            </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Auction Date (DD/MM/YYYY)</label>
+                            <input type="text" name="auction_date" id="modal_auction_date" class="form-control" placeholder="e.g. 24/06/2026">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Contact Number</label>
+                            <input type="text" name="contact_number" id="modal_contact_number" class="form-control" value="<?= htmlspecialchars($default_contact) ?>" required>
+                        </div>
 
-            <div class="col-12">
-                <label class="form-label fw-semibold">Upload Image</label>
-                <?php if($edit_id && !empty($edit_data['image_url']) && file_exists($edit_data['image_url'])): ?>
-                    <div class="mb-2"><img src="<?= $edit_data['image_url'] ?>" style="max-height:120px; border-radius:10px;"></div>
-                    <input type="hidden" name="existing_image" value="<?= htmlspecialchars($edit_data['image_url']) ?>">
-                <?php endif; ?>
-                <input type="file" name="image_file" class="form-control" accept="image/*">
-                <small><?= $edit_id ? 'Leave empty to keep/auto-generate.' : 'Leave empty to auto-generate premium social card.' ?></small>
-            </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Google Map Link (Auto)</label>
+                            <input type="text" name="google_location" id="modal_google_location" class="form-control" readonly style="background:#f1f5f9;">
+                        </div>
 
-            <div class="col-12">
-                <?php if($edit_id): ?>
-                    <input type="hidden" name="property_id" value="<?= $edit_id ?>">
-                    <button type="submit" name="update_property" class="btn btn-success btn-lg w-100">Update Property</button>
-                <?php else: ?>
-                    <button type="submit" name="add_property" class="btn btn-primary btn-lg w-100">Add Property</button>
-                <?php endif; ?>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Upload Image</label>
+                            <div id="current_image_preview"></div>
+                            <input type="file" name="image_file" id="modal_image_file" class="form-control" accept="image/*">
+                            <small id="image_help_text">Leave empty to auto-generate premium social card.</small>
+                        </div>
+
+                        <div class="col-12 text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" name="add_property" id="modal_submit_btn" class="btn btn-primary">Add Property</button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
-    </form>
+    </div>
 </div>
-<?php endif; ?>
 
-<!-- Google Maps Autocomplete -->
+<!-- JavaScript to handle modal data and Google Autocomplete -->
 <script>
-    function initAutocomplete() {
-        var input = document.getElementById('location_input');
-        if (input) {
-            var autocomplete = new google.maps.places.Autocomplete(input);
-            autocomplete.addListener('place_changed', function() {
-                var place = autocomplete.getPlace();
-                if (place.geometry) {
-                    var lat = place.geometry.location.lat();
-                    var lng = place.geometry.location.lng();
-                    document.getElementById('google_location').value = 'https://www.google.com/maps?q=' + lat + ',' + lng;
-                }
-            });
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('propertyModal');
+    
+    // When modal is shown, check if we are editing
+    modal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget; // Button that triggered the modal
+        const isEdit = button && button.classList.contains('edit-btn');
+        
+        if (isEdit) {
+            // Edit mode - fetch data via AJAX
+            const id = button.getAttribute('data-id');
+            fetch(`get_property.php?id=${id}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data) {
+                        document.getElementById('edit_id').value = data.id;
+                        document.getElementById('modal_title').value = data.title || '';
+                        document.getElementById('modal_location').value = data.location || '';
+                        document.getElementById('modal_city').value = data.city || '';
+                        document.getElementById('modal_state').value = data.state || '';
+                        document.getElementById('modal_locality').value = data.locality || '';
+                        document.getElementById('modal_price').value = data.price || '';
+                        document.getElementById('modal_reserve_price_per_sqft').value = data.reserve_price_per_sqft || '';
+                        document.getElementById('modal_bank_name').value = data.bank_name || '';
+                        document.getElementById('modal_borrower_name').value = data.borrower_name || '';
+                        document.getElementById('modal_type').value = data.type || 'Flat';
+                        document.getElementById('modal_sqft').value = data.sqft || '';
+                        document.getElementById('modal_possession_type').value = data.possession_type || 'Physical';
+                        document.getElementById('modal_emd_amount').value = data.emd_amount || '';
+                        document.getElementById('modal_bid_increment').value = data.bid_increment || '';
+                        document.getElementById('modal_auction_start_time').value = data.auction_start_time || '';
+                        document.getElementById('modal_auction_end_time').value = data.auction_end_time || '';
+                        document.getElementById('modal_emd_deadline').value = data.emd_deadline || '';
+                        document.getElementById('modal_auction_date').value = data.auction_date || '';
+                        document.getElementById('modal_contact_number').value = data.contact_number || '<?= htmlspecialchars($default_contact) ?>';
+                        document.getElementById('modal_google_location').value = data.google_location || '';
+                        document.getElementById('existing_image').value = data.image_url || '';
+                        
+                        // Show current image preview if exists
+                        const preview = document.getElementById('current_image_preview');
+                        if (data.image_url) {
+                            preview.innerHTML = `<img src="${data.image_url}" style="max-height:120px; border-radius:10px; margin-bottom:10px;">`;
+                        } else {
+                            preview.innerHTML = '';
+                        }
+                        
+                        document.getElementById('modal_submit_btn').name = 'update_property';
+                        document.getElementById('modal_submit_btn').innerHTML = 'Update Property';
+                        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + data.id;
+                        document.getElementById('image_help_text').innerText = 'Leave empty to keep current image or auto-generate.';
+                    }
+                });
+        } else {
+            // Add mode - reset form
+            document.getElementById('propertyForm').reset();
+            document.getElementById('edit_id').value = '0';
+            document.getElementById('existing_image').value = '';
+            document.getElementById('current_image_preview').innerHTML = '';
+            document.getElementById('modal_submit_btn').name = 'add_property';
+            document.getElementById('modal_submit_btn').innerHTML = 'Add Property';
+            document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Add New Property';
+            document.getElementById('image_help_text').innerText = 'Leave empty to auto-generate premium social card.';
+            document.getElementById('modal_contact_number').value = '<?= htmlspecialchars($default_contact) ?>';
         }
+    });
+
+    // Google Autocomplete
+    const locationInput = document.getElementById('modal_location');
+    if (locationInput) {
+        const autocomplete = new google.maps.places.Autocomplete(locationInput);
+        autocomplete.addListener('place_changed', function() {
+            const place = autocomplete.getPlace();
+            if (place.geometry) {
+                const lat = place.geometry.location.lat();
+                const lng = place.geometry.location.lng();
+                document.getElementById('modal_google_location').value = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+            }
+        });
     }
+});
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&callback=initAutocomplete" async defer></script>
 
 <?php include 'footer.php'; ?>
