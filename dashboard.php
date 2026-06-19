@@ -1,10 +1,11 @@
 <?php 
-require_once 'db.php'; 
-require_once 'functions.php';
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/functions.php';
 
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'];
 
+// Admin Actions
 if($role == 'admin') {
     if(isset($_GET['toggle_status'])) {
         $id = $_GET['toggle_status'];
@@ -123,7 +124,7 @@ if($role == 'admin'):
         </div>
     </div>
 
-    <!-- ===== BUY SEARCH ENGINE WITH STYLISH OFFER ===== -->
+    <!-- ===== BUY SEARCH ENGINE ===== -->
     <div id="packages" class="card-premium mb-4" style="border: 2px solid #fbbf24; background: #fffbeb;">
         <h4><i class="fas fa-search-dollar me-2" style="color: #f59e0b;"></i>Buy Search Engine Access</h4>
         <p class="text-muted">Subscribe to view full details of all auction properties. Choose your plan:</p>
@@ -142,7 +143,6 @@ if($role == 'admin'):
                             <h5 class="fw-bold"><?= htmlspecialchars($pkg['name']) ?></h5>
                             <div class="my-2">
                                 <?php if($show_discount): ?>
-                                    <!-- ✅ शानदार Offer Design -->
                                     <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">
                                         <span style="font-size: 22px; font-weight: 700; color: #dc3545; text-decoration: line-through; background: #fee2e2; padding: 0 12px; border-radius: 8px;">
                                             ₹ <?= indianCurrencyFormat($regular_price) ?>
@@ -172,7 +172,6 @@ if($role == 'admin'):
         <small class="text-muted">* After payment, admin will activate your subscription.</small>
     </div>
 
-    <!-- Search Bar -->
     <div class="card-premium mb-3">
         <form method="GET" class="row g-3">
             <div class="col-md-4"><input type="text" name="city" placeholder="City" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>"></div>
