@@ -35,76 +35,41 @@ if($role == 'admin') {
 include 'header.php'; 
 $total_props = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
 
-// =============================================
-// =============== ADMIN VIEW ==================
-// =============================================
 if($role == 'admin'): 
     $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
 ?>
     <div class="row g-4">
-        <div class="col-md-4">
-            <div class="card-premium d-flex align-items-center">
-                <div class="stat-icon bg-soft-primary me-3"><i class="fas fa-building"></i></div>
-                <div><h5 class="mb-0"><?= $total_props ?></h5><small class="text-muted">Total Properties</small></div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card-premium d-flex align-items-center">
-                <div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div>
-                <div><h5 class="mb-0"><?= $total_users ?></h5><small class="text-muted">Total Users</small></div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card-premium d-flex align-items-center">
-                <div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div>
-                <div><h5 class="mb-0"><?= $total_sold ?></h5><small class="text-muted">Sold Properties</small></div>
-            </div>
-        </div>
+        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-primary me-3"><i class="fas fa-building"></i></div><div><h5><?= $total_props ?></h5><small>Total Properties</small></div></div></div>
+        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div><div><h5><?= $total_users ?></h5><small>Total Users</small></div></div></div>
+        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div><div><h5><?= $total_sold ?></h5><small>Sold</small></div></div></div>
     </div>
-
-    <?php if(isset($_SESSION['new_pass_display'])): ?>
-        <div class="alert alert-success mt-4"><?= $_SESSION['new_pass_display']; unset($_SESSION['new_pass_display']); ?></div>
-    <?php endif; ?>
-
     <div id="users-section" class="mt-4">
-        <div class="card-premium">
-            <h4><i class="fas fa-users-cog me-2"></i>Manage Users & Admins</h4>
-            <div class="table-responsive">
-                <table class="table table-hover mt-3">
-                    <thead class="table-light"><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-                    <tbody>
-                    <?php 
-                    $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
-                    foreach($users as $u) { 
-                        $is_self = ($u['id'] == $_SESSION['user_id']);
-                        echo "<tr>";
-                        echo "<td><a href='dashboard.php?view_user=".$u['id']."' target='_blank'>".htmlspecialchars($u['name'])."</a></td>";
-                        echo "<td>".$u['email']."</td>";
-                        echo "<td><span class='badge bg-".($u['role']=='admin'?'danger':'info')."'>".$u['role']."</span></td>";
-                        echo "<td><span class='badge bg-".($u['status']=='active'?'success':'secondary')."'>".$u['status']."</span></td>";
-                        if(!$is_self) {
-                            echo "<td>
-                                <a href='?toggle_status=".$u['id']."' class='btn btn-sm btn-warning'>Toggle</a>
-                                <a href='change_password.php?user_id=".$u['id']."' class='btn btn-sm btn-info'>Pass</a>
-                                <a href='?delete_user=".$u['id']."' class='btn btn-sm btn-danger' onclick='return confirm(\"Delete?\")'>Del</a>
-                            </td>";
-                        } else {
-                            echo "<td><span class='text-muted'><i class='fas fa-lock'></i> You</span></td>";
-                        }
-                        echo "</tr>";
-                    } ?>
-                    </tbody>
-                </table>
-            </div>
+        <div class="card-premium"><h4>👥 Manage Users</h4>
+            <div class="table-responsive"><table class="table table-hover">
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                <?php 
+                $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
+                foreach($users as $u) { 
+                    $is_self = ($u['id'] == $_SESSION['user_id']);
+                    echo "<tr><td><a href='dashboard.php?view_user=".$u['id']."' target='_blank'>".htmlspecialchars($u['name'])."</a></td><td>".$u['email']."</td>";
+                    echo "<td><span class='badge bg-".($u['role']=='admin'?'danger':'info')."'>".$u['role']."</span></td>";
+                    echo "<td><span class='badge bg-".($u['status']=='active'?'success':'secondary')."'>".$u['status']."</span></td>";
+                    if(!$is_self) {
+                        echo "<td><a href='?toggle_status=".$u['id']."' class='btn btn-sm btn-warning'>Toggle</a> <a href='change_password.php?user_id=".$u['id']."' class='btn btn-sm btn-info'>Pass</a> <a href='?delete_user=".$u['id']."' class='btn btn-sm btn-danger' onclick='return confirm(\"Delete?\")'>Del</a></td>";
+                    } else { echo "<td>You</td>"; }
+                    echo "</tr>";
+                } ?>
+                </tbody>
+            </table></div>
         </div>
     </div>
 
-<?php 
-// =============================================
-// =============== USER VIEW ===================
-// =============================================
-else: 
+<?php else: 
+    // =============================================
+    // =============== USER VIEW ===================
+    // =============================================
     $user_stmt = $pdo->prepare("SELECT *, created_at as reg_date FROM users WHERE id = ?");
     $user_stmt->execute([$user_id]);
     $user = $user_stmt->fetch();
@@ -127,14 +92,11 @@ else:
 
     try { $purchases = $pdo->prepare("SELECT COUNT(*) FROM purchases WHERE user_id = ?"); $purchases->execute([$user_id]); $purchase_count = $purchases->fetchColumn(); } catch(Exception $e) { $purchase_count = 0; }
 ?>
-
-    <!-- Welcome Banner -->
     <div class="user-welcome-banner">
         <div><h2>🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h2><p>Find your dream property today.</p></div>
         <div><a href="index.php" class="btn btn-light text-success fw-bold">Explore All →</a></div>
     </div>
 
-    <!-- Subscription Status -->
     <div class="card-premium mb-4" style="border-left: 5px solid <?= $is_subscribed ? '#10b981' : '#f59e0b' ?>; background: <?= $is_subscribed ? '#f0fdf4' : '#fffbeb' ?>;">
         <div class="row align-items-center">
             <div class="col-md-6">
@@ -168,7 +130,7 @@ else:
         </div>
     </div>
 
-    <!-- Packages Section -->
+    <!-- ===== BUY SEARCH ENGINE ===== -->
     <div id="packages" class="card-premium mb-4" style="border: 2px solid #fbbf24; background: #fffbeb;">
         <h4><i class="fas fa-search-dollar me-2" style="color: #f59e0b;"></i>Buy Search Engine Access</h4>
         <p class="text-muted">Subscribe to view full details of all auction properties. Choose your plan:</p>
@@ -177,20 +139,29 @@ else:
             $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
             foreach($packages as $pkg) {
                 $is_active = ($is_subscribed && $sub_info['package_id'] == $pkg['id']);
+                // ✅ Check discount
+                $discount_price = $pkg['discount_price'] ?? null;
+                $regular_price = $pkg['price'];
+                $show_discount = $discount_price && $discount_price < $regular_price;
             ?>
                 <div class="col-md-3 mb-3">
                     <div class="card h-100 text-center shadow-sm" style="border-radius: 16px; <?= $is_active ? 'border: 2px solid #10b981; background: #f0fdf4;' : '' ?>">
                         <div class="card-body">
                             <h5 class="fw-bold"><?= htmlspecialchars($pkg['name']) ?></h5>
-                            <h4 class="text-success">₹ <?= indianCurrencyFormat($pkg['price']) ?></h4>
+                            <div>
+                                <?php if($show_discount): ?>
+                                    <span style="text-decoration:line-through; color:#999; font-size:14px;">₹ <?= indianCurrencyFormat($regular_price) ?></span>
+                                    <h4 class="text-success fw-bold">₹ <?= indianCurrencyFormat($discount_price) ?></h4>
+                                    <span class="badge bg-danger">🔥 Offer</span>
+                                <?php else: ?>
+                                    <h4 class="text-success">₹ <?= indianCurrencyFormat($regular_price) ?></h4>
+                                <?php endif; ?>
+                            </div>
                             <small><?= $pkg['duration_months'] ?> Months</small>
                             <?php if($is_active): ?>
                                 <div class="badge bg-success w-100 mt-2">✅ Active (<?= $days_left ?> days left)</div>
                             <?php else: ?>
-                                <form method="POST" action="buy_subscription.php" class="mt-2">
-                                    <input type="hidden" name="package_id" value="<?= $pkg['id'] ?>">
-                                    <button type="submit" class="btn btn-primary w-100 btn-sm">Buy Now</button>
-                                </form>
+                                <a href="buy_subscription.php?package_id=<?= $pkg['id'] ?>" class="btn btn-primary w-100 btn-sm mt-2">Buy Now</a>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -217,7 +188,7 @@ else:
         </form>
     </div>
 
-    <!-- Property Cards (with clickable image) -->
+    <!-- Property Cards -->
     <div class="row">
         <?php
         $sql = "SELECT * FROM properties WHERE status = 'available'";
@@ -233,7 +204,6 @@ else:
             foreach($props as $p) { ?>
                 <div class="col-md-4 mb-3">
                     <div class="card h-100 shadow-sm border-0" style="border-radius:16px; overflow:hidden;">
-                        <!-- ✅ Clickable Image -->
                         <a href="<?= htmlspecialchars($p['image_url'] ?: 'https://via.placeholder.com/300x200') ?>" target="_blank">
                             <img src="<?= htmlspecialchars($p['image_url'] ?: 'https://via.placeholder.com/300x200') ?>" style="height:150px; width:100%; object-fit:cover; cursor:pointer;">
                         </a>
