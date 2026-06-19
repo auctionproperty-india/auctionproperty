@@ -5,7 +5,6 @@ require_once 'functions.php';
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'];
 
-// Admin Actions
 if($role == 'admin') {
     if(isset($_GET['toggle_status'])) {
         $id = $_GET['toggle_status'];
@@ -44,6 +43,7 @@ if($role == 'admin'):
         <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div><div><h5><?= $total_users ?></h5><small>Total Users</small></div></div></div>
         <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div><div><h5><?= $total_sold ?></h5><small>Sold</small></div></div></div>
     </div>
+    <?php if(hasPermission('users', $pdo)): ?>
     <div id="users-section" class="mt-4">
         <div class="card-premium"><h4>👥 Manage Users</h4>
             <div class="table-responsive"><table class="table table-hover">
@@ -65,11 +65,9 @@ if($role == 'admin'):
             </table></div>
         </div>
     </div>
+    <?php endif; ?>
 
 <?php else: 
-    // =============================================
-    // =============== USER VIEW ===================
-    // =============================================
     $user_stmt = $pdo->prepare("SELECT *, created_at as reg_date FROM users WHERE id = ?");
     $user_stmt->execute([$user_id]);
     $user = $user_stmt->fetch();
@@ -116,11 +114,6 @@ if($role == 'admin'):
                         <span class="badge bg-warning text-dark p-2 fs-5 w-100 w-md-auto">
                             ⏳ <?= $days_left ?> Days Remaining
                         </span>
-                        <?php if($days_left <= 7 && $days_left > 0): ?>
-                            <span class="badge bg-danger ms-2">⚠️ Expiring Soon!</span>
-                        <?php elseif($days_left <= 0): ?>
-                            <span class="badge bg-danger ms-2">❌ Expired!</span>
-                        <?php endif; ?>
                     </div>
                 <?php else: ?>
                     <span class="badge bg-secondary p-2 fs-6 w-100 w-md-auto">🔴 No Active Subscription</span>
@@ -130,7 +123,7 @@ if($role == 'admin'):
         </div>
     </div>
 
-    <!-- ===== BUY SEARCH ENGINE ===== -->
+    <!-- ===== BUY SEARCH ENGINE WITH STYLISH OFFER ===== -->
     <div id="packages" class="card-premium mb-4" style="border: 2px solid #fbbf24; background: #fffbeb;">
         <h4><i class="fas fa-search-dollar me-2" style="color: #f59e0b;"></i>Buy Search Engine Access</h4>
         <p class="text-muted">Subscribe to view full details of all auction properties. Choose your plan:</p>
@@ -139,7 +132,6 @@ if($role == 'admin'):
             $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
             foreach($packages as $pkg) {
                 $is_active = ($is_subscribed && $sub_info['package_id'] == $pkg['id']);
-                // ✅ Check discount
                 $discount_price = $pkg['discount_price'] ?? null;
                 $regular_price = $pkg['price'];
                 $show_discount = $discount_price && $discount_price < $regular_price;
@@ -148,11 +140,20 @@ if($role == 'admin'):
                     <div class="card h-100 text-center shadow-sm" style="border-radius: 16px; <?= $is_active ? 'border: 2px solid #10b981; background: #f0fdf4;' : '' ?>">
                         <div class="card-body">
                             <h5 class="fw-bold"><?= htmlspecialchars($pkg['name']) ?></h5>
-                            <div>
+                            <div class="my-2">
                                 <?php if($show_discount): ?>
-                                    <span style="text-decoration:line-through; color:#999; font-size:14px;">₹ <?= indianCurrencyFormat($regular_price) ?></span>
-                                    <h4 class="text-success fw-bold">₹ <?= indianCurrencyFormat($discount_price) ?></h4>
-                                    <span class="badge bg-danger">🔥 Offer</span>
+                                    <!-- ✅ शानदार Offer Design -->
+                                    <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">
+                                        <span style="font-size: 22px; font-weight: 700; color: #dc3545; text-decoration: line-through; background: #fee2e2; padding: 0 12px; border-radius: 8px;">
+                                            ₹ <?= indianCurrencyFormat($regular_price) ?>
+                                        </span>
+                                        <span style="font-size: 18px; font-weight: 800; color: #10b981; background: #d1fae5; padding: 2px 10px; border-radius: 8px;">
+                                            🔥 Offer
+                                        </span>
+                                        <span style="font-size: 32px; font-weight: 800; color: #0f172a;">
+                                            ₹ <?= indianCurrencyFormat($discount_price) ?>
+                                        </span>
+                                    </div>
                                 <?php else: ?>
                                     <h4 class="text-success">₹ <?= indianCurrencyFormat($regular_price) ?></h4>
                                 <?php endif; ?>
@@ -175,20 +176,12 @@ if($role == 'admin'):
     <div class="card-premium mb-3">
         <form method="GET" class="row g-3">
             <div class="col-md-4"><input type="text" name="city" placeholder="City" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>"></div>
-            <div class="col-md-3">
-                <select name="type" class="form-control">
-                    <option value="">All Types</option>
-                    <option value="Flat" <?= ($_GET['type']??'')=='Flat'?'selected':'' ?>>Flat</option>
-                    <option value="Plot" <?= ($_GET['type']??'')=='Plot'?'selected':'' ?>>Plot</option>
-                    <option value="Shop" <?= ($_GET['type']??'')=='Shop'?'selected':'' ?>>Shop</option>
-                </select>
-            </div>
+            <div class="col-md-3"><select name="type" class="form-control"><option value="">All Types</option><option value="Flat" <?= ($_GET['type']??'')=='Flat'?'selected':'' ?>>Flat</option><option value="Plot" <?= ($_GET['type']??'')=='Plot'?'selected':'' ?>>Plot</option><option value="Shop" <?= ($_GET['type']??'')=='Shop'?'selected':'' ?>>Shop</option></select></div>
             <div class="col-md-3"><input type="number" name="max_price" placeholder="Max Price" class="form-control" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>"></div>
             <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button></div>
         </form>
     </div>
 
-    <!-- Property Cards -->
     <div class="row">
         <?php
         $sql = "SELECT * FROM properties WHERE status = 'available'";
