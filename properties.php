@@ -272,7 +272,8 @@ include 'header.php';
 <!-- ========== MODAL POPUP (Add / Edit) ========= -->
 <!-- ============================================= -->
 
-<div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
+<!-- ✅ Modal with static backdrop (closes only on X button) -->
+<div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content" style="border-radius: 20px;">
             <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #334155); color: white; border-radius: 20px 20px 0 0;">
@@ -402,10 +403,11 @@ include 'header.php';
 
 <!-- Google Maps Autocomplete Script -->
 <script>
-    // Google Maps Autocomplete
+    // Function to initialize autocomplete
     function initAutocomplete() {
         var input = document.getElementById('edit_location');
         if (input) {
+            // Remove previous listeners to avoid duplicate events
             var autocomplete = new google.maps.places.Autocomplete(input);
             autocomplete.addListener('place_changed', function() {
                 var place = autocomplete.getPlace();
@@ -428,10 +430,9 @@ include 'header.php';
         document.getElementById('submitBtn').innerHTML = 'Add Property';
         document.getElementById('currentImagePreview').style.display = 'none';
         document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
-        // Clear hidden fields
         document.getElementById('edit_google_location').value = '';
-        // Reset form
-        document.getElementById('propertyForm').reset();
+        // Clear any previous autocomplete selection
+        document.getElementById('edit_location').value = '';
     }
 
     // Open Edit Modal (AJAX)
@@ -441,7 +442,6 @@ include 'header.php';
         document.getElementById('submitBtn').innerHTML = 'Update Property';
         document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
 
-        // Fetch property data via AJAX
         fetch('get_property.php?id=' + id)
             .then(response => response.json())
             .then(data => {
@@ -468,7 +468,6 @@ include 'header.php';
                 document.getElementById('edit_google_location').value = data.google_location || '';
                 document.getElementById('existing_image').value = data.image_url || '';
 
-                // Show current image if exists
                 if (data.image_url) {
                     document.getElementById('currentImage').src = data.image_url;
                     document.getElementById('currentImagePreview').style.display = 'block';
@@ -476,7 +475,7 @@ include 'header.php';
                     document.getElementById('currentImagePreview').style.display = 'none';
                 }
 
-                // Trigger modal show
+                // Show modal via Bootstrap
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
             })
@@ -485,8 +484,10 @@ include 'header.php';
             });
     }
 
-    // Close modal after submit (handled via redirect)
-    // The page will reload after submit, which closes the modal automatically.
+    // Reinitialize autocomplete when modal is fully shown (to ensure it binds)
+    document.getElementById('propertyModal').addEventListener('shown.bs.modal', function () {
+        initAutocomplete();
+    });
 </script>
 <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&callback=initAutocomplete" async defer></script>
 
