@@ -1,8 +1,10 @@
 <?php
 if(session_status() == PHP_SESSION_NONE) session_start();
 if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+require_once 'db.php';
+require_once 'functions.php'; // ✅ functions.php Include करना जरूरी है
+
 $role = $_SESSION['role'] ?? 'user';
-require_once 'db.php'; // Permission functions के लिए
 ?>
 <!DOCTYPE html>
 <html>
@@ -100,8 +102,6 @@ require_once 'db.php'; // Permission functions के लिए
         <?php endif; ?>
         <?php if(hasPermission('users', $pdo)): ?>
             <a href="dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
-        <?php endif; ?>
-        <?php if(hasPermission('users', $pdo)): ?>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
         <?php if(hasPermission('packages', $pdo)): ?>
