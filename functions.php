@@ -22,7 +22,7 @@ function hasActiveSubscription($pdo, $user_id, $property_id = null) {
     return $stmt->rowCount() > 0;
 }
 
-// ---- Safe Permission Functions ----
+// ---- Permission Helpers (Safe) ----
 function getUserPermissions($user_id, $pdo) {
     try {
         $stmt = $pdo->prepare("SELECT permissions, is_super_admin FROM users WHERE id = ?");
@@ -30,25 +30,21 @@ function getUserPermissions($user_id, $pdo) {
         $user = $stmt->fetch();
         if(!$user) return [];
 
-        // अगर Super Admin है तो सब कुछ True
-        if(isset($user['is_super_admin']) && $user['is_super_admin']) {
-            return ['properties' => true, 'users' => true, 'packages' => true, 'subscriptions' => true, 'settings' => true];
+        if(!empty($user['is_super_admin']) && $user['is_super_admin']) {
+            return ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true];
         }
 
-        // Permissions को JSON से Array में बदलें
         $perms = [];
         if(!empty($user['permissions'])) {
             $perms = json_decode($user['permissions'], true);
             if(!is_array($perms)) $perms = [];
         }
-        // अगर खाली है तो डिफॉल्ट (सुरक्षा के लिए)
         if(empty($perms)) {
-            $perms = ['properties' => true, 'users' => true, 'packages' => true, 'subscriptions' => true, 'settings' => true];
+            $perms = ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true];
         }
         return $perms;
     } catch (Exception $e) {
-        // अगर कॉलम missing हो तो सब True return करें (ताकि साइट चले)
-        return ['properties' => true, 'users' => true, 'packages' => true, 'subscriptions' => true, 'settings' => true];
+        return ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true];
     }
 }
 
@@ -58,11 +54,9 @@ function hasPermission($permission, $pdo) {
     return isset($perms[$permission]) && $perms[$permission] === true;
 }
 
-// ---- Social Image Generator (Short Version) ----
+// ---- Social Image Generator (Full working code) ----
 function generateSocialCard($property) {
-    if (!extension_loaded('gd')) {
-        return $property['image_url'] ?? '';
-    }
+    if (!extension_loaded('gd')) return $property['image_url'] ?? '';
     $font_path = __DIR__ . '/fonts/Inter.ttf';
     $font_exists = file_exists($font_path);
     try {
@@ -96,11 +90,65 @@ function generateSocialCard($property) {
             imagestring($img, $f_size, $px, 450, $price, $gold);
             return saveImage($img);
         }
-        // ... Full Premium layout (already there, but we'll keep it short)
-        // For brevity, I'm including only essential parts – your existing full code can be kept.
-        // Since we already had the full code in previous functions.php, I'll copy it.
-        // But to avoid duplication, I'll just say replace with the previous full version.
-        // I'll provide the full code in the answer.
+        // Premium layout with TrueType
+        $bank = strtoupper($property['bank_name'] ?? 'BANK AUCTION');
+        $bank_size = 34;
+        $bank_box = imagettfbbox($bank_size, 0, $font_path, $bank);
+        $bank_w = ($bank_box[2] - $bank_box[0]) + 60;
+        $bank_h = 70;
+        $bank_x = (int)(($width - $bank_w) / 2);
+        imagefilledrectangle($img, $bank_x, 120, $bank_x + $bank_w, 120 + $bank_h, $gold);
+        $txt_x = $bank_x + 30;
+        $txt_y = 120 + 48;
+        imagettftext($img, $bank_size, 0, $txt_x, $txt_y, $dark_bg, $font_path, $bank);
+        $title = strtoupper($property['title'] ?? 'PRIME PROPERTY');
+        $title_size = 72;
+        $title_box = imagettfbbox($title_size, 0, $font_path, $title);
+        $title_width = $title_box[2] - $title_box[0];
+        $x = (int)(($width - $title_width) / 2);
+        imagettftext($img, $title_size, 0, $x, 280, $white, $font_path, $title);
+        $city = strtoupper($property['city'] ?? '');
+        if (!empty($city)) {
+            $city_size = 38;
+            $city_box = imagettfbbox($city_size, 0, $font_path, $city);
+            $city_w = $city_box[2] - $city_box[0];
+            $x = (int)(($width - $city_w) / 2);
+            imagettftext($img, $city_size, 0, $x, 350, $light_gray, $font_path, $city);
+        }
+        $price_label = "RESERVE PRICE";
+        $price_val = "₹ " . indianCurrencyFormat($property['price'] ?? 0);
+        $label_size = 32;
+        $label_box = imagettfbbox($label_size, 0, $font_path, $price_label);
+        $label_w = $label_box[2] - $label_box[0];
+        $x = (int)(($width - $label_w) / 2);
+        imagettftext($img, $label_size, 0, $x, 480, $light_gray, $font_path, $price_label);
+        $val_size = 72;
+        $val_box = imagettfbbox($val_size, 0, $font_path, $price_val);
+        $val_w = $val_box[2] - $val_box[0];
+        $x = (int)(($width - $val_w) / 2);
+        imagettftext($img, $val_size, 0, $x, 600, $gold, $font_path, $price_val);
+        $per_sqft = "₹ " . indianCurrencyFormat($property['reserve_price_per_sqft'] ?? 0) . " PER SQ FT";
+        $ps_size = 26;
+        $ps_box = imagettfbbox($ps_size, 0, $font_path, $per_sqft);
+        $ps_w = $ps_box[2] - $ps_box[0];
+        $x = (int)(($width - $ps_w) / 2);
+        imagettftext($img, $ps_size, 0, $x, 660, $white, $font_path, $per_sqft);
+        $borrower = "BORROWER: " . ($property['borrower_name'] ?? 'N/A');
+        $contact = "CONTACT: " . ($property['contact_number'] ?? 'N/A');
+        $info_size = 26;
+        imagettftext($img, $info_size, 0, 80, 780, $light_gray, $font_path, $borrower);
+        imagettftext($img, $info_size, 0, 80, 830, $light_gray, $font_path, $contact);
+        $emd = "EMD: ₹ " . indianCurrencyFormat($property['emd_amount'] ?? 0);
+        $possession = "POSSESSION: " . ($property['possession_type'] ?? 'Physical');
+        imagettftext($img, $info_size, 0, 680, 780, $light_gray, $font_path, $emd);
+        imagettftext($img, $info_size, 0, 680, 830, $light_gray, $font_path, $possession);
+        $brand = "🔹 PRIME PROPERTY";
+        $brand_size = 28;
+        imagettftext($img, $brand_size, 0, 80, 980, $gold, $font_path, $brand);
+        $auction = "AUCTION: " . ($property['auction_start_time'] ?? 'N/A') . " - " . ($property['auction_end_time'] ?? 'N/A');
+        $auction_size = 22;
+        imagettftext($img, $auction_size, 0, 600, 980, $white, $font_path, $auction);
+        return saveImage($img);
     } catch (Exception $e) {
         return $property['image_url'] ?? '';
     }
