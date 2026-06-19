@@ -198,7 +198,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 include 'header.php'; 
 ?>
 
-<!-- Success Messages -->
 <?php if(isset($_GET['added'])): ?>
     <div class="alert alert-success">✅ Property Added Successfully!</div>
 <?php endif; ?>
@@ -214,7 +213,6 @@ include 'header.php';
         </button>
     </div>
 
-    <!-- Filters -->
     <form method="GET" class="row g-2 mb-3">
         <div class="col-md-3">
             <input type="text" name="filter_city" class="form-control" placeholder="🏙️ City" value="<?= htmlspecialchars($filter_city) ?>">
@@ -233,7 +231,6 @@ include 'header.php';
         </div>
     </form>
 
-    <!-- Table -->
     <div class="table-responsive">
         <table class="table table-hover">
             <thead class="table-light">
@@ -264,7 +261,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- ===== MODAL ===== -->
+<!-- ===== MODAL (Static Backdrop) ===== -->
 <div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content" style="border-radius: 20px;">
@@ -284,9 +281,9 @@ include 'header.php';
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Address *</label>
-                            <!-- ✅ Address field: fully editable, autocomplete enabled -->
-                            <input type="text" name="location" id="edit_location" class="form-control" required placeholder="Type address or select from suggestions">
-                            <small class="text-muted">You can type manually or choose from Google suggestions.</small>
+                            <!-- ✅ पूरी तरह Editable – बिना किसी रोक-टोक के -->
+                            <input type="text" name="location" id="edit_location" class="form-control" required placeholder="Type address... (Google suggestions will appear)">
+                            <small class="text-muted">आप मैन्युअल टाइप कर सकते हैं या Google Suggestion से चुन सकते हैं।</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">City *</label>
@@ -374,6 +371,7 @@ include 'header.php';
                         <div class="col-12">
                             <label class="form-label fw-semibold">Google Map Link (Auto)</label>
                             <input type="text" name="google_location" id="edit_google_location" class="form-control" readonly style="background:#f1f5f9;">
+                            <small class="text-muted">Address टाइप करने पर Map Link अपने आप जनरेट हो जाएगा।</small>
                         </div>
 
                         <div class="col-12">
@@ -395,21 +393,38 @@ include 'header.php';
     </div>
 </div>
 
-<!-- Google Maps Autocomplete Script -->
+<!-- ✅ नया Autocomplete Script – कोई Lock नहीं -->
 <script>
+    let autocompleteInstance = null;
+
     function initAutocomplete() {
         var input = document.getElementById('edit_location');
-        if (input) {
-            var autocomplete = new google.maps.places.Autocomplete(input);
-            autocomplete.addListener('place_changed', function() {
-                var place = autocomplete.getPlace();
-                if (place.geometry) {
-                    var lat = place.geometry.location.lat();
-                    var lng = place.geometry.location.lng();
-                    document.getElementById('edit_google_location').value = 'https://www.google.com/maps?q=' + lat + ',' + lng;
-                }
-            });
+        if (!input) return;
+
+        // अगर पहले से Autocomplete है तो उसे हटाएँ
+        if (autocompleteInstance) {
+            google.maps.event.clearInstanceListeners(autocompleteInstance);
+            autocompleteInstance = null;
         }
+
+        // नया Autocomplete बनाएँ
+        autocompleteInstance = new google.maps.places.Autocomplete(input, {
+            types: ['geocode'],
+            componentRestrictions: { country: 'in' }
+        });
+
+        // ✅ `place_changed` – Map Link Auto-Generate करे, Input को Lock न करे
+        autocompleteInstance.addListener('place_changed', function() {
+            var place = autocompleteInstance.getPlace();
+            if (place && place.geometry) {
+                var lat = place.geometry.location.lat();
+                var lng = place.geometry.location.lng();
+                document.getElementById('edit_google_location').value = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+            }
+        });
+
+        // ✅ Input को पूरी तरह Editable रखने के लिए – कोई अतिरिक्त Event नहीं
+        input.removeEventListener('keydown', function(e) {});
     }
 
     function openAddModal() {
@@ -423,6 +438,7 @@ include 'header.php';
         document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
         document.getElementById('edit_google_location').value = '';
         document.getElementById('edit_location').value = '';
+        document.getElementById('edit_location').removeAttribute('readonly');
     }
 
     function openEditModal(id) {
@@ -464,6 +480,7 @@ include 'header.php';
                     document.getElementById('currentImagePreview').style.display = 'none';
                 }
 
+                document.getElementById('edit_location').removeAttribute('readonly');
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
             })
@@ -472,9 +489,9 @@ include 'header.php';
             });
     }
 
-    // Re-init autocomplete on modal show
+    // Modal खुलने पर Autocomplete सेट करें
     document.getElementById('propertyModal').addEventListener('shown.bs.modal', function () {
-        initAutocomplete();
+        setTimeout(initAutocomplete, 300);
     });
 </script>
 <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&callback=initAutocomplete" async defer></script>
