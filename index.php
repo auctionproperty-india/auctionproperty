@@ -14,13 +14,14 @@ require_once 'functions.php';
         body { background: #f4f7fc; }
         .property-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.03); transition: 0.3s; border: 1px solid #e9edf4; height: 100%; }
         .property-card:hover { transform: translateY(-8px); box-shadow: 0 20px 35px rgba(0,0,0,0.08); }
-        .property-card img { height: 220px; object-fit: cover; width: 100%; }
+        .property-card img { height: 220px; object-fit: cover; width: 100%; cursor: pointer; }
         .property-card .card-body { padding: 20px; }
         .bank-badge { font-size: 12px; font-weight: 600; color: #1e3a8a; background: #e0e7ff; padding: 4px 12px; border-radius: 30px; }
         .price { font-size: 22px; font-weight: 800; color: #0b1120; }
         .btn-auction { background: #1e3a8a; border: none; color: white; font-weight: 700; padding: 10px; border-radius: 12px; width: 100%; transition: 0.3s; display: block; text-align: center; text-decoration: none; }
         .btn-auction:hover { background: #0b1d4a; color: #fff; }
         .search-box { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.03); border: 1px solid #e9edf4; margin-bottom: 30px; }
+        .image-link { display: block; overflow: hidden; }
     </style>
 </head>
 <body>
@@ -43,24 +44,10 @@ require_once 'functions.php';
     <!-- Search Bar -->
     <div class="search-box">
         <form method="GET" class="row g-3">
-            <div class="col-md-4">
-                <input type="text" name="city" placeholder="Search by City" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>">
-            </div>
-            <div class="col-md-3">
-                <select name="type" class="form-control">
-                    <option value="">All Types</option>
-                    <option value="Flat" <?= ($_GET['type']??'')=='Flat'?'selected':'' ?>>Flat</option>
-                    <option value="Plot" <?= ($_GET['type']??'')=='Plot'?'selected':'' ?>>Plot</option>
-                    <option value="Shop" <?= ($_GET['type']??'')=='Shop'?'selected':'' ?>>Shop</option>
-                    <option value="Land" <?= ($_GET['type']??'')=='Land'?'selected':'' ?>>Land</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <input type="number" name="max_price" placeholder="Max Price" class="form-control" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>">
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button>
-            </div>
+            <div class="col-md-4"><input type="text" name="city" placeholder="Search by City" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>"></div>
+            <div class="col-md-3"><select name="type" class="form-control"><option value="">All Types</option><option value="Flat" <?= ($_GET['type']??'')=='Flat'?'selected':'' ?>>Flat</option><option value="Plot" <?= ($_GET['type']??'')=='Plot'?'selected':'' ?>>Plot</option><option value="Shop" <?= ($_GET['type']??'')=='Shop'?'selected':'' ?>>Shop</option><option value="Land" <?= ($_GET['type']??'')=='Land'?'selected':'' ?>>Land</option></select></div>
+            <div class="col-md-3"><input type="number" name="max_price" placeholder="Max Price" class="form-control" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>"></div>
+            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button></div>
         </form>
     </div>
 
@@ -80,7 +67,10 @@ require_once 'functions.php';
             foreach($properties as $prop) { ?>
                 <div class="col-md-4 mb-4">
                     <div class="property-card">
-                        <img src="<?= htmlspecialchars($prop['image_url'] ?: 'https://via.placeholder.com/600x400?text=Property') ?>">
+                        <!-- ✅ Image Click to Open -->
+                        <a href="<?= htmlspecialchars($prop['image_url'] ?: 'https://via.placeholder.com/600x400?text=Property') ?>" target="_blank" class="image-link">
+                            <img src="<?= htmlspecialchars($prop['image_url'] ?: 'https://via.placeholder.com/600x400?text=Property') ?>">
+                        </a>
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <span class="bank-badge">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
