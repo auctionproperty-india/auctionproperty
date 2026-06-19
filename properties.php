@@ -20,14 +20,40 @@ if($edit_id) {
     if(!$edit_data) { $edit_id = 0; $edit_data = null; }
 }
 
-// ---- SEARCH ----
-$search = $_GET['search'] ?? '';
-$search_condition = '';
-$search_params = [];
-if(!empty($search)) {
-    $search_condition = "WHERE title ILIKE ? OR city ILIKE ? OR bank_name ILIKE ?";
-    $search_params = ['%'.$search.'%', '%'.$search.'%', '%'.$search.'%'];
+// ---- FILTERS (Admin) ----
+$filter_city = $_GET['filter_city'] ?? '';
+$filter_bank = $_GET['filter_bank'] ?? '';
+$filter_price_min = $_GET['filter_price_min'] ?? '';
+$filter_price_max = $_GET['filter_price_max'] ?? '';
+
+$where = [];
+$params = [];
+
+if(!empty($filter_city)) {
+    $where[] = "city ILIKE ?";
+    $params[] = '%'.$filter_city.'%';
 }
+if(!empty($filter_bank)) {
+    $where[] = "bank_name ILIKE ?";
+    $params[] = '%'.$filter_bank.'%';
+}
+if(!empty($filter_price_min)) {
+    $where[] = "price >= ?";
+    $params[] = (float)$filter_price_min;
+}
+if(!empty($filter_price_max)) {
+    $where[] = "price <= ?";
+    $params[] = (float)$filter_price_max;
+}
+
+$sql = "SELECT * FROM properties";
+if(count($where) > 0) {
+    $sql .= " WHERE " . implode(" AND ", $where);
+}
+$sql .= " ORDER BY id DESC";
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$rows = $stmt->fetchAll();
 
 // ---- ADD / UPDATE LOGIC ----
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -63,7 +89,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $sql = "UPDATE properties SET 
-            title=?, description='', price=?, location=?, city=?, type=?, google_location=?, image_url=?, 
+            title=?, description='', price=?, location=?, city=?, state=?, type=?, google_location=?, image_url=?, 
             bank_name=?, sqft=?, possession_type=?, auction_date=?, 
             borrower_name=?, emd_amount=?, bid_increment=?, emd_deadline=?, 
             auction_start_time=?, auction_end_time=?, locality=?, reserve_price_per_sqft=?, contact_number=? 
@@ -74,6 +100,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeNumeric($_POST['price'] ?? 0),
             safeString($_POST['location'] ?? ''),
             safeString($_POST['city'] ?? ''),
+            safeString($_POST['state'] ?? ''),
             safeString($_POST['type'] ?? 'Flat'),
             safeString($_POST['google_location'] ?? ''),
             $image_path,
@@ -129,11 +156,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $sql = "INSERT INTO properties (
-            title, description, price, location, city, type, google_location, image_url, 
+            title, description, price, location, city, state, type, google_location, image_url, 
             bank_name, sqft, possession_type, auction_date, 
             borrower_name, emd_amount, bid_increment, emd_deadline, 
             auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number
-        ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
@@ -141,6 +168,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeNumeric($_POST['price'] ?? 0),
             safeString($_POST['location'] ?? ''),
             safeString($_POST['city'] ?? ''),
+            safeString($_POST['state'] ?? ''),
             safeString($_POST['type'] ?? 'Flat'),
             safeString($_POST['google_location'] ?? ''),
             $image_path,
@@ -181,10 +209,10 @@ include 'header.php';
 
 <!-- Success Messages -->
 <?php if(isset($_GET['added'])): ?>
-    <div class="alert alert-success alert-dismissible fade show">✅ Property Added Successfully!</div>
+    <div class="alert alert-success">✅ Property Added Successfully!</div>
 <?php endif; ?>
 <?php if(isset($_GET['updated'])): ?>
-    <div class="alert alert-success alert-dismissible fade show">✅ Property Updated Successfully!</div>
+    <div class="alert alert-success">✅ Property Updated Successfully!</div>
 <?php endif; ?>
 
 <!-- ============================================= -->
@@ -194,48 +222,38 @@ include 'header.php';
 <div class="card-premium">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Properties</h5>
-        <div>
-            <a href="?add=1" class="btn btn-primary btn-sm">
-                <i class="fas fa-plus-circle me-1"></i> Add New Property
-            </a>
-        </div>
+        <a href="?add=1" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus-circle me-1"></i> Add New Property
+        </a>
     </div>
 
-    <!-- Search Bar -->
+    <!-- Search Filters (3 separate fields) -->
     <form method="GET" class="row g-2 mb-3">
-        <div class="col-md-10">
-            <input type="text" name="search" class="form-control" placeholder="🔍 Search by Title, City, or Bank..." value="<?= htmlspecialchars($search) ?>">
+        <div class="col-md-3">
+            <input type="text" name="filter_city" class="form-control" placeholder="🏙️ City" value="<?= htmlspecialchars($filter_city) ?>">
+        </div>
+        <div class="col-md-3">
+            <input type="text" name="filter_bank" class="form-control" placeholder="🏦 Bank Name" value="<?= htmlspecialchars($filter_bank) ?>">
         </div>
         <div class="col-md-2">
-            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button>
+            <input type="number" name="filter_price_min" class="form-control" placeholder="Min Price" value="<?= htmlspecialchars($filter_price_min) ?>">
+        </div>
+        <div class="col-md-2">
+            <input type="number" name="filter_price_max" class="form-control" placeholder="Max Price" value="<?= htmlspecialchars($filter_price_max) ?>">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button>
         </div>
     </form>
 
     <!-- Properties Table -->
     <div class="table-responsive">
-        <table class="table table-hover mt-2">
+        <table class="table table-hover">
             <thead class="table-light">
-                <tr>
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Bank</th>
-                    <th>City</th>
-                    <th>Price</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
+                <tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
                 <?php 
-                $sql = "SELECT * FROM properties";
-                if(!empty($search)) {
-                    $sql .= " WHERE title ILIKE ? OR city ILIKE ? OR bank_name ILIKE ?";
-                    $stmt = $pdo->prepare($sql . " ORDER BY id DESC");
-                    $stmt->execute(['%'.$search.'%', '%'.$search.'%', '%'.$search.'%']);
-                } else {
-                    $stmt = $pdo->query("SELECT * FROM properties ORDER BY id DESC");
-                }
-                $rows = $stmt->fetchAll();
                 if(count($rows) > 0) {
                     foreach($rows as $row) { ?>
                         <tr>
@@ -247,12 +265,12 @@ include 'header.php';
                             <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
                             <td>
                                 <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary">✏️</a>
-                                <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this property?')">🗑️</a>
+                                <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
                             </td>
                         </tr>
                     <?php }
                 } else { ?>
-                    <tr><td colspan="7" class="text-center text-muted py-3">No properties found. <?= empty($search) ? 'Click "Add New Property" to create one.' : 'Try a different search term.' ?></td></tr>
+                    <tr><td colspan="7" class="text-center text-muted">No properties match your filters.</td></tr>
                 <?php } ?>
             </tbody>
         </table>
@@ -280,11 +298,15 @@ include 'header.php';
                 <label class="form-label fw-semibold">Address *</label>
                 <input type="text" name="location" id="location_input" class="form-control" required value="<?= htmlspecialchars($edit_data['location'] ?? '') ?>">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label fw-semibold">City *</label>
                 <input type="text" name="city" class="form-control" required value="<?= htmlspecialchars($edit_data['city'] ?? '') ?>">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">State</label>
+                <input type="text" name="state" class="form-control" value="<?= htmlspecialchars($edit_data['state'] ?? '') ?>">
+            </div>
+            <div class="col-md-4">
                 <label class="form-label fw-semibold">Locality</label>
                 <input type="text" name="locality" class="form-control" value="<?= htmlspecialchars($edit_data['locality'] ?? '') ?>">
             </div>
