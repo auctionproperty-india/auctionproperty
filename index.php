@@ -40,23 +40,48 @@ require_once 'functions.php';
 </nav>
 
 <div class="container mt-4">
-    <!-- Search Bar -->
+    <!-- Search Bar (4 filters) -->
     <div class="search-box">
         <form method="GET" class="row g-3">
-            <div class="col-md-4"><input type="text" name="city" placeholder="Search by City" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>"></div>
-            <div class="col-md-3"><select name="type" class="form-control"><option value="">All Types</option><option value="Flat" <?= ($_GET['type']??'')=='Flat'?'selected':'' ?>>Flat</option><option value="Plot" <?= ($_GET['type']??'')=='Plot'?'selected':'' ?>>Plot</option><option value="Shop" <?= ($_GET['type']??'')=='Shop'?'selected':'' ?>>Shop</option><option value="Land" <?= ($_GET['type']??'')=='Land'?'selected':'' ?>>Land</option></select></div>
-            <div class="col-md-3"><input type="number" name="max_price" placeholder="Max Price" class="form-control" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>"></div>
-            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button></div>
+            <div class="col-md-3">
+                <input type="text" name="state" class="form-control" placeholder="State" value="<?= htmlspecialchars($_GET['state'] ?? '') ?>">
+            </div>
+            <div class="col-md-3">
+                <input type="text" name="city" class="form-control" placeholder="City" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>">
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="area" class="form-control" placeholder="Area / Locality" value="<?= htmlspecialchars($_GET['area'] ?? '') ?>">
+            </div>
+            <div class="col-md-2">
+                <input type="number" name="max_price" class="form-control" placeholder="Max Price" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button>
+            </div>
         </form>
     </div>
 
     <div class="row">
         <?php
+        // Build query
         $sql = "SELECT * FROM properties WHERE status = 'available'";
         $params = [];
-        if(!empty($_GET['city'])) { $sql .= " AND city ILIKE ?"; $params[] = '%'.$_GET['city'].'%'; }
-        if(!empty($_GET['type'])) { $sql .= " AND type = ?"; $params[] = $_GET['type']; }
-        if(!empty($_GET['max_price'])) { $sql .= " AND price <= ?"; $params[] = $_GET['max_price']; }
+        if(!empty($_GET['state'])) {
+            $sql .= " AND state ILIKE ?";
+            $params[] = '%'.$_GET['state'].'%';
+        }
+        if(!empty($_GET['city'])) {
+            $sql .= " AND city ILIKE ?";
+            $params[] = '%'.$_GET['city'].'%';
+        }
+        if(!empty($_GET['area'])) {
+            $sql .= " AND locality ILIKE ?";
+            $params[] = '%'.$_GET['area'].'%';
+        }
+        if(!empty($_GET['max_price'])) {
+            $sql .= " AND price <= ?";
+            $params[] = (float)$_GET['max_price'];
+        }
         $sql .= " ORDER BY id DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -75,7 +100,9 @@ require_once 'functions.php';
                             </div>
                             <h6 class="fw-bold mt-2"><?= htmlspecialchars($prop['title']) ?></h6>
                             <div class="price">₹ <?= indianCurrencyFormat($prop['price']) ?> <span class="fs-6 fw-normal text-muted">Reserve Price</span></div>
-                            <p class="text-muted small mt-1"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></p>
+                            <p class="text-muted small mt-1">
+                                <i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?>, <?= htmlspecialchars($prop['state'] ?? '') ?>
+                            </p>
                             
                             <?php if(isset($_SESSION['user_id'])): ?>
                                 <a href="property_detail.php?id=<?= $prop['id'] ?>" class="btn-auction"><i class="fas fa-eye"></i> View Details</a>
