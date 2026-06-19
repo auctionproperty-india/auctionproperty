@@ -1,5 +1,4 @@
 <?php
-
 function indianCurrencyFormat($number) {
     if ($number === null || $number === '') return '0';
     $number = (float) $number;
@@ -44,7 +43,6 @@ function generateSocialCard($property) {
 
         // Colors
         $dark_blue = imagecolorallocate($img, 15, 23, 42);
-        $light_blue = imagecolorallocate($img, 30, 58, 138);
         $white = imagecolorallocate($img, 255, 255, 255);
         $gold = imagecolorallocate($img, 251, 191, 36);
         $light_gray = imagecolorallocate($img, 200, 210, 220);
@@ -54,21 +52,24 @@ function generateSocialCard($property) {
         imagefilledrectangle($img, 0, 0, $width, $height, $dark_blue);
         for ($i = 0; $i < $height; $i += 10) {
             $ratio = $i / $height;
-            $r = 15 + (30 - 15) * $ratio;
-            $g = 23 + (58 - 23) * $ratio;
-            $b = 42 + (138 - 42) * $ratio;
-            $col = imagecolorallocate($img, (int)$r, (int)$g, (int)$b);
+            // ✅ Fix: Convert float to int explicitly
+            $r = (int)(15 + (30 - 15) * $ratio);
+            $g = (int)(23 + (58 - 23) * $ratio);
+            $b = (int)(42 + (138 - 42) * $ratio);
+            $col = imagecolorallocate($img, $r, $g, $b);
             imagefilledrectangle($img, 0, $i, $width, $i+10, $col);
         }
 
-        // Fallback (built-in font)
+        // Fallback (built-in font) - No warnings now
         $font_size = 5;
         $title = strtoupper($property['title'] ?? 'PROPERTY');
-        $x = ($width - (strlen($title) * imagefontwidth($font_size))) / 2;
+        // ✅ Fix: Convert to int
+        $x = (int)(($width - (strlen($title) * imagefontwidth($font_size))) / 2);
         imagestring($img, $font_size, $x, 180, $title, $gold);
 
         $sub = $property['locality'] ?? $property['city'] ?? '';
-        $sx = ($width - (strlen($sub) * imagefontwidth($font_size))) / 2;
+        // ✅ Fix: Convert to int
+        $sx = (int)(($width - (strlen($sub) * imagefontwidth($font_size))) / 2);
         imagestring($img, $font_size, $sx, 240, $sub, $light_gray);
 
         $detail_y = 400;
@@ -80,7 +81,8 @@ function generateSocialCard($property) {
         ];
         foreach ($lines as $i => $line) {
             $y = $detail_y + ($i * 40);
-            $x = ($width - (strlen($line) * imagefontwidth($font_size))) / 2;
+            // ✅ Fix: Convert to int
+            $x = (int)(($width - (strlen($line) * imagefontwidth($font_size))) / 2);
             imagestring($img, $font_size, $x, $y, $line, $white);
         }
 
@@ -104,5 +106,4 @@ function generateSocialCard($property) {
         return $property['image_url'] ?? '';
     }
 }
-
 ?>
