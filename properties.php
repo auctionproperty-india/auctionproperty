@@ -200,19 +200,15 @@ include 'header.php';
 
 <!-- Success Messages -->
 <?php if(isset($_GET['added'])): ?>
-    <div class="alert alert-success alert-dismissible fade show">✅ Property Added Successfully!</div>
+    <div class="alert alert-success">✅ Property Added Successfully!</div>
 <?php endif; ?>
 <?php if(isset($_GET['updated'])): ?>
-    <div class="alert alert-success alert-dismissible fade show">✅ Property Updated Successfully!</div>
+    <div class="alert alert-success">✅ Property Updated Successfully!</div>
 <?php endif; ?>
-
-<!-- ============================================= -->
-<!-- ========== PROPERTY LIST ===================== -->
-<!-- ============================================= -->
 
 <div class="card-premium">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Properties</h5>
+        <h5><i class="fas fa-list me-2"></i>All Properties</h5>
         <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#propertyModal" onclick="openAddModal()">
             <i class="fas fa-plus-circle me-1"></i> Add New Property
         </button>
@@ -243,7 +239,7 @@ include 'header.php';
             <thead class="table-light">
                 <tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr>
             </thead>
-            <tbody id="propertyTableBody">
+            <tbody>
                 <?php 
                 if(count($rows) > 0) {
                     foreach($rows as $row) { ?>
@@ -268,11 +264,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- ============================================= -->
-<!-- ========== MODAL POPUP (Add / Edit) ========= -->
-<!-- ============================================= -->
-
-<!-- ✅ Modal with static backdrop (closes only on X button) -->
+<!-- ===== MODAL ===== -->
 <div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content" style="border-radius: 20px;">
@@ -292,7 +284,9 @@ include 'header.php';
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Address *</label>
-                            <input type="text" name="location" id="edit_location" class="form-control" required>
+                            <!-- ✅ Address field: fully editable, autocomplete enabled -->
+                            <input type="text" name="location" id="edit_location" class="form-control" required placeholder="Type address or select from suggestions">
+                            <small class="text-muted">You can type manually or choose from Google suggestions.</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">City *</label>
@@ -403,11 +397,9 @@ include 'header.php';
 
 <!-- Google Maps Autocomplete Script -->
 <script>
-    // Function to initialize autocomplete
     function initAutocomplete() {
         var input = document.getElementById('edit_location');
         if (input) {
-            // Remove previous listeners to avoid duplicate events
             var autocomplete = new google.maps.places.Autocomplete(input);
             autocomplete.addListener('place_changed', function() {
                 var place = autocomplete.getPlace();
@@ -420,7 +412,6 @@ include 'header.php';
         }
     }
 
-    // Open Add Modal
     function openAddModal() {
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Add New Property';
         document.getElementById('propertyForm').reset();
@@ -431,11 +422,9 @@ include 'header.php';
         document.getElementById('currentImagePreview').style.display = 'none';
         document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
         document.getElementById('edit_google_location').value = '';
-        // Clear any previous autocomplete selection
         document.getElementById('edit_location').value = '';
     }
 
-    // Open Edit Modal (AJAX)
     function openEditModal(id) {
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + id;
         document.getElementById('submitBtn').name = 'update_property';
@@ -475,7 +464,6 @@ include 'header.php';
                     document.getElementById('currentImagePreview').style.display = 'none';
                 }
 
-                // Show modal via Bootstrap
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
             })
@@ -484,7 +472,7 @@ include 'header.php';
             });
     }
 
-    // Reinitialize autocomplete when modal is fully shown (to ensure it binds)
+    // Re-init autocomplete on modal show
     document.getElementById('propertyModal').addEventListener('shown.bs.modal', function () {
         initAutocomplete();
     });
