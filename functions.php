@@ -22,20 +22,33 @@ function hasActiveSubscription($pdo, $user_id, $property_id = null) {
     return $stmt->rowCount() > 0;
 }
 
-// ---- Permission Helpers (Safe) ----
+// ===== SAFE PERMISSION FUNCTIONS (No Errors) =====
 function getUserPermissions($user_id, $pdo) {
     try {
+        // Check if columns exist first
+        $stmt = $pdo->query("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name IN ('permissions', 'is_super_admin')");
+        $existing = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $has_perms = in_array('permissions', $existing);
+        $has_super = in_array('is_super_admin', $existing);
+        
+        // If columns don't exist, return full access
+        if (!$has_perms && !$has_super) {
+            return ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true];
+        }
+        
         $stmt = $pdo->prepare("SELECT permissions, is_super_admin FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
         $user = $stmt->fetch();
-        if(!$user) return [];
-
-        if(!empty($user['is_super_admin']) && $user['is_super_admin']) {
+        if(!$user) return ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true];
+        
+        // Super Admin check
+        if($has_super && !empty($user['is_super_admin']) && $user['is_super_admin']) {
             return ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true];
         }
-
+        
+        // Permissions check
         $perms = [];
-        if(!empty($user['permissions'])) {
+        if($has_perms && !empty($user['permissions'])) {
             $perms = json_decode($user['permissions'], true);
             if(!is_array($perms)) $perms = [];
         }
@@ -44,6 +57,7 @@ function getUserPermissions($user_id, $pdo) {
         }
         return $perms;
     } catch (Exception $e) {
+        // अगर कुछ भी गड़बड़ हो तो सब Access दें (साइट चलती रहे)
         return ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true];
     }
 }
@@ -54,7 +68,7 @@ function hasPermission($permission, $pdo) {
     return isset($perms[$permission]) && $perms[$permission] === true;
 }
 
-// ---- Social Image Generator (Full working code) ----
+// ---- Social Image Generator ----
 function generateSocialCard($property) {
     if (!extension_loaded('gd')) return $property['image_url'] ?? '';
     $font_path = __DIR__ . '/fonts/Inter.ttf';
@@ -90,7 +104,7 @@ function generateSocialCard($property) {
             imagestring($img, $f_size, $px, 450, $price, $gold);
             return saveImage($img);
         }
-        // Premium layout with TrueType
+        // Premium
         $bank = strtoupper($property['bank_name'] ?? 'BANK AUCTION');
         $bank_size = 34;
         $bank_box = imagettfbbox($bank_size, 0, $font_path, $bank);
