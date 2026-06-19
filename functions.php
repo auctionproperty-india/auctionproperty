@@ -54,70 +54,57 @@ function generateSocialCard($property) {
         $light_gray = imagecolorallocate($img, 200, 210, 220);
         $dark_bg = imagecolorallocate($img, 15, 23, 42);
 
-        // If font missing, use built-in but still large enough
+        // अगर Font नहीं है तो Fallback
         if (!$font_exists) {
             $f_size = 5;
             $title = strtoupper($property['title'] ?? 'PROPERTY');
             $x = (int)(($width - (strlen($title) * imagefontwidth($f_size))) / 2);
             imagestring($img, $f_size, $x, 180, $title, $gold);
-            // fallback details
-            $lines = [
-                "BANK: " . ($property['bank_name'] ?? 'N/A'),
-                "PRICE: ₹ " . indianCurrencyFormat($property['price'] ?? 0),
-                "AREA: " . ($property['sqft'] ?? 0) . " Sq Ft",
-                "CONTACT: " . ($property['contact_number'] ?? 'N/A')
-            ];
-            $y = 400;
-            foreach ($lines as $line) {
-                $x = (int)(($width - (strlen($line) * imagefontwidth($f_size))) / 2);
-                imagestring($img, $f_size, $x, $y, $line, $white);
-                $y += 50;
-            }
             return saveImage($img);
         }
 
-        // ===== PREMIUM LAYOUT WITH BIG FONTS =====
-        // 1. Main Title (very big)
+        // ---------- Premium Layout with TrueType Font (BIG TEXT) ----------
+        // 1. Main Title (Biggest)
         $title = strtoupper($property['title'] ?? 'PRIME PROPERTY');
         $title_size = 80;
         $title_box = imagettfbbox($title_size, 0, $font_path, $title);
         $title_width = $title_box[2] - $title_box[0];
         $x = (int)(($width - $title_width) / 2);
-        imagettftext($img, $title_size, 0, $x, 180, $gold, $font_path, $title);
+        imagettftext($img, $title_size, 0, $x, 200, $gold, $font_path, $title);
 
-        // 2. Subtitle (locality / city)
+        // 2. Subtitle (Locality / City) - Big
         $sub = strtoupper($property['locality'] ?? $property['city'] ?? 'PREMIUM LOCATION');
-        $sub_size = 45;
+        $sub_size = 48;
         $sub_box = imagettfbbox($sub_size, 0, $font_path, $sub);
         $sub_w = $sub_box[2] - $sub_box[0];
         $x = (int)(($width - $sub_w) / 2);
-        imagettftext($img, $sub_size, 0, $x, 260, $white, $font_path, $sub);
+        imagettftext($img, $sub_size, 0, $x, 280, $white, $font_path, $sub);
 
-        // 3. Badge (Type)
+        // 3. Property Type Badge - Big
         $type = $property['type'] ?? 'PROPERTY';
-        $type_str = strtoupper($type) . ' / ' . (strlen($property['title']) > 20 ? substr($property['title'], 0, 20) : $property['title']);
+        $type_str = strtoupper($type);
         $badge_y = 340;
-        $badge_size = 36;
+        $badge_size = 40;
         $badge_box = imagettfbbox($badge_size, 0, $font_path, $type_str);
-        $badge_w = ($badge_box[2] - $badge_box[0]) + 60;
+        $badge_w = ($badge_box[2] - $badge_box[0]) + 80;
         $badge_h = 80;
         $badge_x = (int)(($width - $badge_w) / 2);
         imagefilledrectangle($img, $badge_x, $badge_y - 50, $badge_x + $badge_w, $badge_y + 40, $gold);
-        $txt_x = $badge_x + 30;
-        $txt_y = $badge_y + 12;
+        $txt_x = $badge_x + 40;
+        $txt_y = $badge_y + 10;
         imagettftext($img, $badge_size, 0, $txt_x, $txt_y, $dark_bg, $font_path, $type_str);
 
-        // 4. 4 Details Boxes (Area, Sqft, Price, Price/sqft)
-        $box_y = 470;
-        $box_width = 220;
+        // 4. Four Detail Boxes - Big Text
+        $box_y = 460;
+        $box_width = 240;
         $box_height = 130;
         $gap = 30;
         $start_x = (int)(($width - ($box_width * 4 + $gap * 3)) / 2);
         $details = [
-            ['label' => 'AREA', 'value' => $property['city'] ?? 'INDORE'],
-            ['label' => 'SQ.FT.', 'value' => ($property['sqft'] ?? 0) . ' Sq Ft'],
-            ['label' => 'RESERVED PRICE', 'value' => '₹ ' . indianCurrencyFormat($property['price'] ?? 0)],
-            ['label' => 'PRICE (PER SQ FT)', 'value' => '₹ ' . indianCurrencyFormat($property['reserve_price_per_sqft'] ?? 0)],
+            ['label' => 'AREA', 'value' => ($property['sqft'] ?? 0) . ' Sq Ft'],
+            ['label' => 'CITY', 'value' => $property['city'] ?? 'N/A'],
+            ['label' => 'RESERVE PRICE', 'value' => '₹ ' . indianCurrencyFormat($property['price'] ?? 0)],
+            ['label' => 'PER SQ FT', 'value' => '₹ ' . indianCurrencyFormat($property['reserve_price_per_sqft'] ?? 0)],
         ];
 
         foreach ($details as $index => $item) {
@@ -126,14 +113,14 @@ function generateSocialCard($property) {
             imagefilledrectangle($img, $x_pos, $box_y, $x_pos + $box_width, $box_y + $box_height, $box_color);
             imagerectangle($img, $x_pos, $box_y, $x_pos + $box_width, $box_y + $box_height, $gold);
 
-            // Label
+            // Label - Big
             $label_size = 24;
             $label_box = imagettfbbox($label_size, 0, $font_path, $item['label']);
             $label_w = $label_box[2] - $label_box[0];
             $lx = (int)($x_pos + ($box_width - $label_w) / 2);
-            imagettftext($img, $label_size, 0, $lx, $box_y + 40, $light_gray, $font_path, $item['label']);
+            imagettftext($img, $label_size, 0, $lx, $box_y + 35, $light_gray, $font_path, $item['label']);
 
-            // Value
+            // Value - Even Bigger
             $val_size = 36;
             $val_box = imagettfbbox($val_size, 0, $font_path, $item['value']);
             $val_w = $val_box[2] - $val_box[0];
@@ -141,34 +128,34 @@ function generateSocialCard($property) {
             imagettftext($img, $val_size, 0, $vx, $box_y + 100, $white, $font_path, $item['value']);
         }
 
-        // 5. Bottom details (Bank, Borrower, Auction)
-        $bottom_y = 710;
+        // 5. Bottom Details (Bank, Borrower, Auction) - Big
+        $bottom_y = 700;
         $line_height = 60;
-        $left_x = 100;
-        $right_x = 600;
-        $text_size = 28;
+        $left_col_x = 80;
+        $right_col_x = 580;
+        $text_size = 30;
 
         // Bank
-        imagettftext($img, $text_size, 0, $left_x, $bottom_y, $gold, $font_path, "🏦 BANK");
-        imagettftext($img, $text_size, 0, $left_x + 160, $bottom_y, $white, $font_path, $property['bank_name'] ?? 'N/A');
+        imagettftext($img, $text_size, 0, $left_col_x, $bottom_y, $gold, $font_path, "🏦 BANK");
+        imagettftext($img, $text_size, 0, $left_col_x + 180, $bottom_y, $white, $font_path, $property['bank_name'] ?? 'N/A');
 
         // Borrower
-        imagettftext($img, $text_size, 0, $left_x, $bottom_y + $line_height, $gold, $font_path, "👤 BORROWER");
-        imagettftext($img, $text_size, 0, $left_x + 160, $bottom_y + $line_height, $white, $font_path, $property['borrower_name'] ?? 'N/A');
+        imagettftext($img, $text_size, 0, $left_col_x, $bottom_y + $line_height, $gold, $font_path, "👤 BORROWER");
+        imagettftext($img, $text_size, 0, $left_col_x + 180, $bottom_y + $line_height, $white, $font_path, $property['borrower_name'] ?? 'N/A');
 
         // Auction Start
-        imagettftext($img, $text_size, 0, $right_x, $bottom_y, $gold, $font_path, "📅 START");
-        imagettftext($img, $text_size, 0, $right_x + 140, $bottom_y, $white, $font_path, $property['auction_start_time'] ?? 'N/A');
+        imagettftext($img, $text_size, 0, $right_col_x, $bottom_y, $gold, $font_path, "📅 START");
+        imagettftext($img, $text_size, 0, $right_col_x + 160, $bottom_y, $white, $font_path, $property['auction_start_time'] ?? 'N/A');
 
         // Auction End
-        imagettftext($img, $text_size, 0, $right_x, $bottom_y + $line_height, $gold, $font_path, "⏳ END");
-        imagettftext($img, $text_size, 0, $right_x + 140, $bottom_y + $line_height, $white, $font_path, $property['auction_end_time'] ?? 'N/A');
+        imagettftext($img, $text_size, 0, $right_col_x, $bottom_y + $line_height, $gold, $font_path, "⏳ END");
+        imagettftext($img, $text_size, 0, $right_col_x + 160, $bottom_y + $line_height, $white, $font_path, $property['auction_end_time'] ?? 'N/A');
 
-        // 6. Footer
+        // 6. Footer Contact & Brand - Big
         $contact = "📞 CONTACT: " . ($property['contact_number'] ?? 'N/A');
         $brand = "🔹 PRIME PROPERTY";
-        $foot_size = 30;
-        imagettftext($img, $foot_size, 0, 100, 1000, $gold, $font_path, $contact);
+        $foot_size = 32;
+        imagettftext($img, $foot_size, 0, 80, 1000, $gold, $font_path, $contact);
         imagettftext($img, $foot_size, 0, 700, 1000, $light_gray, $font_path, $brand);
 
         return saveImage($img);
@@ -179,6 +166,7 @@ function generateSocialCard($property) {
     }
 }
 
+// Helper function to save image
 function saveImage($img) {
     $upload_dir = 'uploads/';
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
