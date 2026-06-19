@@ -35,6 +35,9 @@ if($role == 'admin') {
 include 'header.php'; 
 $total_props = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
 
+// ---- USER SUBSCRIPTION CHECK FOR IMAGES ----
+$show_images = userHasActiveSubscription($pdo, $user_id);
+
 if($role == 'admin'): 
     $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
@@ -172,6 +175,7 @@ if($role == 'admin'):
         <small class="text-muted">* After payment, admin will activate your subscription.</small>
     </div>
 
+    <!-- Search Bar -->
     <div class="card-premium mb-3">
         <form method="GET" class="row g-3">
             <div class="col-md-4"><input type="text" name="city" placeholder="City" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>"></div>
@@ -181,6 +185,7 @@ if($role == 'admin'):
         </form>
     </div>
 
+    <!-- Property Cards (Image Placeholder for non-subscribers) -->
     <div class="row">
         <?php
         $sql = "SELECT * FROM properties WHERE status = 'available'";
@@ -196,9 +201,16 @@ if($role == 'admin'):
             foreach($props as $p) { ?>
                 <div class="col-md-4 mb-3">
                     <div class="card h-100 shadow-sm border-0" style="border-radius:16px; overflow:hidden;">
-                        <a href="<?= htmlspecialchars($p['image_url'] ?: 'https://via.placeholder.com/300x200') ?>" target="_blank">
-                            <img src="<?= htmlspecialchars($p['image_url'] ?: 'https://via.placeholder.com/300x200') ?>" style="height:150px; width:100%; object-fit:cover; cursor:pointer;">
-                        </a>
+                        <?php if($show_images && !empty($p['image_url'])): ?>
+                            <a href="<?= htmlspecialchars($p['image_url']) ?>" target="_blank">
+                                <img src="<?= htmlspecialchars($p['image_url']) ?>" style="height:150px; width:100%; object-fit:cover; cursor:pointer;">
+                            </a>
+                        <?php else: ?>
+                            <div style="height:150px; background: linear-gradient(145deg, #f8fafc, #e2e8f0); display: flex; align-items: center; justify-content: center; border-radius: 16px 16px 0 0; flex-direction: column;">
+                                <i class="fas fa-home" style="font-size: 30px; color: #94a3b8;"></i>
+                                <span class="badge bg-warning mt-1" style="font-size: 11px;">🔒 Subscribe</span>
+                            </div>
+                        <?php endif; ?>
                         <div class="p-3">
                             <span class="badge bg-light text-dark">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
                             <h6 class="fw-bold mt-1"><?= htmlspecialchars($p['title']) ?></h6>
