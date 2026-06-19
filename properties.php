@@ -20,6 +20,15 @@ if($edit_id) {
     if(!$edit_data) { $edit_id = 0; $edit_data = null; }
 }
 
+// ---- SEARCH ----
+$search = $_GET['search'] ?? '';
+$search_condition = '';
+$search_params = [];
+if(!empty($search)) {
+    $search_condition = "WHERE title ILIKE ? OR city ILIKE ? OR bank_name ILIKE ?";
+    $search_params = ['%'.$search.'%', '%'.$search.'%', '%'.$search.'%'];
+}
+
 // ---- ADD / UPDATE LOGIC ----
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
@@ -84,7 +93,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $edit_id
         ]);
 
-        // Generate Social Image if no image uploaded
         if (!$use_uploaded_image) {
             $updated_prop = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
             $updated_prop->execute([$edit_id]);
@@ -163,7 +171,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
 
-        header("Location: properties.php?added=1#add-form");
+        header("Location: properties.php?added=1");
         exit;
     }
 }
@@ -171,17 +179,96 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 include 'header.php'; 
 ?>
 
+<!-- Success Messages -->
 <?php if(isset($_GET['added'])): ?>
-    <div class="alert alert-success">✅ Property Added Successfully!</div>
+    <div class="alert alert-success alert-dismissible fade show">✅ Property Added Successfully!</div>
 <?php endif; ?>
 <?php if(isset($_GET['updated'])): ?>
-    <div class="alert alert-success">✅ Property Updated Successfully!</div>
+    <div class="alert alert-success alert-dismissible fade show">✅ Property Updated Successfully!</div>
 <?php endif; ?>
 
-<!-- ===== FORM ===== -->
-<div class="card-premium" id="add-form" style="border-left: 4px solid #fbbf24;">
-    <h5><i class="fas fa-<?= $edit_id ? 'edit' : 'plus-circle' ?> me-2" style="color: #fbbf24;"></i>
+<!-- ============================================= -->
+<!-- ========== PROPERTY LIST (MAIN VIEW) ========== -->
+<!-- ============================================= -->
+
+<div class="card-premium">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Properties</h5>
+        <div>
+            <a href="?add=1" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus-circle me-1"></i> Add New Property
+            </a>
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <form method="GET" class="row g-2 mb-3">
+        <div class="col-md-10">
+            <input type="text" name="search" class="form-control" placeholder="🔍 Search by Title, City, or Bank..." value="<?= htmlspecialchars($search) ?>">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button>
+        </div>
+    </form>
+
+    <!-- Properties Table -->
+    <div class="table-responsive">
+        <table class="table table-hover mt-2">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Bank</th>
+                    <th>City</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php 
+                $sql = "SELECT * FROM properties";
+                if(!empty($search)) {
+                    $sql .= " WHERE title ILIKE ? OR city ILIKE ? OR bank_name ILIKE ?";
+                    $stmt = $pdo->prepare($sql . " ORDER BY id DESC");
+                    $stmt->execute(['%'.$search.'%', '%'.$search.'%', '%'.$search.'%']);
+                } else {
+                    $stmt = $pdo->query("SELECT * FROM properties ORDER BY id DESC");
+                }
+                $rows = $stmt->fetchAll();
+                if(count($rows) > 0) {
+                    foreach($rows as $row) { ?>
+                        <tr>
+                            <td><?= $row['id'] ?></td>
+                            <td><?= htmlspecialchars($row['title']) ?></td>
+                            <td><?= htmlspecialchars($row['bank_name'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
+                            <td>₹<?= number_format($row['price'], 2) ?></td>
+                            <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
+                            <td>
+                                <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary">✏️</a>
+                                <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this property?')">🗑️</a>
+                            </td>
+                        </tr>
+                    <?php }
+                } else { ?>
+                    <tr><td colspan="7" class="text-center text-muted py-3">No properties found. <?= empty($search) ? 'Click "Add New Property" to create one.' : 'Try a different search term.' ?></td></tr>
+                <?php } ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================= -->
+<!-- ========== ADD / EDIT FORM (BELOW LIST) ===== -->
+<!-- ============================================= -->
+
+<?php if(isset($_GET['add']) || $edit_id): ?>
+<div class="card-premium mt-4" id="add-form" style="border-left: 4px solid #fbbf24;">
+    <h5>
+        <i class="fas fa-<?= $edit_id ? 'edit' : 'plus-circle' ?> me-2" style="color: #fbbf24;"></i>
         <?= $edit_id ? 'Edit Property #'.$edit_id : 'Add New Property' ?>
+        <a href="properties.php" class="btn btn-sm btn-outline-secondary float-end">✕ Close</a>
     </h5>
     <form method="POST" class="mt-3" enctype="multipart/form-data">
         <div class="row g-3">
@@ -298,35 +385,9 @@ include 'header.php';
         </div>
     </form>
 </div>
+<?php endif; ?>
 
-<!-- Property List -->
-<div class="card-premium mt-4">
-    <div class="d-flex justify-content-between"><h5>📋 All Properties</h5><a href="properties.php" class="btn btn-sm btn-outline-primary">+ Add New</a></div>
-    <div class="table-responsive">
-        <table class="table table-hover">
-            <thead><tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            <?php 
-            $stmt = $pdo->query("SELECT * FROM properties ORDER BY id DESC");
-            while($row = $stmt->fetch()) { ?>
-                <tr>
-                    <td><?= $row['id'] ?></td>
-                    <td><?= htmlspecialchars($row['title']) ?></td>
-                    <td><?= htmlspecialchars($row['bank_name'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
-                    <td>₹<?= number_format($row['price'], 2) ?></td>
-                    <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
-                    <td>
-                        <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary">✏️</a>
-                        <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
-                    </td>
-                </tr>
-            <?php } ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
+<!-- Google Maps Autocomplete -->
 <script>
     function initAutocomplete() {
         var input = document.getElementById('location_input');
