@@ -35,42 +35,76 @@ if($role == 'admin') {
 include 'header.php'; 
 $total_props = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
 
+// =============================================
+// =============== ADMIN VIEW ==================
+// =============================================
 if($role == 'admin'): 
-    // --- Admin View (Keep as is, or update later) ---
     $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
 ?>
     <div class="row g-4">
-        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-primary me-3"><i class="fas fa-building"></i></div><div><h5><?= $total_props ?></h5><small>Total Properties</small></div></div></div>
-        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div><div><h5><?= $total_users ?></h5><small>Total Users</small></div></div></div>
-        <div class="col-md-4"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div><div><h5><?= $total_sold ?></h5><small>Sold</small></div></div></div>
-    </div>
-    <div id="users-section" class="mt-4">
-        <div class="card-premium"><h4>👥 Manage Users</h4>
-            <div class="table-responsive"><table class="table table-hover">
-                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody>
-                <?php 
-                $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
-                foreach($users as $u) { 
-                    $is_self = ($u['id'] == $_SESSION['user_id']);
-                    echo "<tr><td><a href='dashboard.php?view_user=".$u['id']."' target='_blank'>".htmlspecialchars($u['name'])."</a></td><td>".$u['email']."</td>";
-                    echo "<td><span class='badge bg-".($u['role']=='admin'?'danger':'info')."'>".$u['role']."</span></td>";
-                    echo "<td><span class='badge bg-".($u['status']=='active'?'success':'secondary')."'>".$u['status']."</span></td>";
-                    if(!$is_self) {
-                        echo "<td><a href='?toggle_status=".$u['id']."' class='btn btn-sm btn-warning'>Toggle</a> <a href='change_password.php?user_id=".$u['id']."' class='btn btn-sm btn-info'>Pass</a> <a href='?delete_user=".$u['id']."' class='btn btn-sm btn-danger' onclick='return confirm(\"Delete?\")'>Del</a></td>";
-                    } else { echo "<td>You</td>"; }
-                    echo "</tr>";
-                } ?>
-                </tbody>
-            </table></div>
+        <div class="col-md-4">
+            <div class="card-premium d-flex align-items-center">
+                <div class="stat-icon bg-soft-primary me-3"><i class="fas fa-building"></i></div>
+                <div><h5 class="mb-0"><?= $total_props ?></h5><small class="text-muted">Total Properties</small></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-premium d-flex align-items-center">
+                <div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div>
+                <div><h5 class="mb-0"><?= $total_users ?></h5><small class="text-muted">Total Users</small></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-premium d-flex align-items-center">
+                <div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div>
+                <div><h5 class="mb-0"><?= $total_sold ?></h5><small class="text-muted">Sold Properties</small></div>
+            </div>
         </div>
     </div>
 
-<?php else: 
-    // =============================================
-    // =============== USER VIEW (SHINING GLOSSY) ===================
-    // =============================================
+    <?php if(isset($_SESSION['new_pass_display'])): ?>
+        <div class="alert alert-success mt-4"><?= $_SESSION['new_pass_display']; unset($_SESSION['new_pass_display']); ?></div>
+    <?php endif; ?>
+
+    <div id="users-section" class="mt-4">
+        <div class="card-premium">
+            <h4><i class="fas fa-users-cog me-2"></i>Manage Users & Admins</h4>
+            <div class="table-responsive">
+                <table class="table table-hover mt-3">
+                    <thead class="table-light"><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody>
+                    <?php 
+                    $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
+                    foreach($users as $u) { 
+                        $is_self = ($u['id'] == $_SESSION['user_id']);
+                        echo "<tr>";
+                        echo "<td><a href='dashboard.php?view_user=".$u['id']."' target='_blank'>".htmlspecialchars($u['name'])."</a></td>";
+                        echo "<td>".$u['email']."</td>";
+                        echo "<td><span class='badge bg-".($u['role']=='admin'?'danger':'info')."'>".$u['role']."</span></td>";
+                        echo "<td><span class='badge bg-".($u['status']=='active'?'success':'secondary')."'>".$u['status']."</span></td>";
+                        if(!$is_self) {
+                            echo "<td>
+                                <a href='?toggle_status=".$u['id']."' class='btn btn-sm btn-warning'>Toggle</a>
+                                <a href='change_password.php?user_id=".$u['id']."' class='btn btn-sm btn-info'>Pass</a>
+                                <a href='?delete_user=".$u['id']."' class='btn btn-sm btn-danger' onclick='return confirm(\"Delete?\")'>Del</a>
+                            </td>";
+                        } else {
+                            echo "<td><span class='text-muted'><i class='fas fa-lock'></i> You</span></td>";
+                        }
+                        echo "</tr>";
+                    } ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<?php 
+// =============================================
+// =============== USER VIEW ===================
+// =============================================
+else: 
     $user_stmt = $pdo->prepare("SELECT *, created_at as reg_date FROM users WHERE id = ?");
     $user_stmt->execute([$user_id]);
     $user = $user_stmt->fetch();
@@ -94,72 +128,68 @@ if($role == 'admin'):
     try { $purchases = $pdo->prepare("SELECT COUNT(*) FROM purchases WHERE user_id = ?"); $purchases->execute([$user_id]); $purchase_count = $purchases->fetchColumn(); } catch(Exception $e) { $purchase_count = 0; }
 ?>
 
-    <!-- 🌟 SHINING HERO BANNER -->
-    <div class="position-relative p-5 mb-4 rounded-4 text-white" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #2563eb 100%); box-shadow: 0 20px 40px -10px rgba(37, 99, 235, 0.3); overflow: hidden;">
-        <div class="position-absolute top-0 end-0 opacity-10" style="font-size: 200px; right: 20px; top: -20px;"><i class="fas fa-building"></i></div>
-        <div class="position-relative" style="z-index: 2;">
-            <h1 class="display-4 fw-bold">🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h1>
-            <p class="fs-5 opacity-75">Find your dream property and unlock exclusive auction details.</p>
-            <a href="index.php" class="btn btn-light btn-lg shadow-lg mt-2 text-primary fw-bold px-5">
-                Explore All Properties <i class="fas fa-arrow-right ms-2"></i>
-            </a>
-        </div>
+    <!-- Welcome Banner -->
+    <div class="user-welcome-banner">
+        <div><h2>🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h2><p>Find your dream property today.</p></div>
+        <div><a href="index.php" class="btn btn-light text-success fw-bold">Explore All →</a></div>
     </div>
 
-    <!-- 🪞 GLOSSY STATUS CARD -->
-    <div class="card border-0 shadow-lg p-4 mb-4 rounded-4" style="background: rgba(255,255,255,0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.3);">
-        <div class="row g-4 align-items-center">
-            <div class="col-md-7">
-                <h5 class="fw-bold"><i class="fas fa-crown text-warning me-2"></i> My Subscription Status</h5>
-                <div class="row g-2 mt-2">
-                    <div class="col-sm-4"><span class="text-muted">📅 Registered:</span><br><strong><?= $reg_date_formatted ?></strong></div>
-                    <div class="col-sm-4"><span class="text-muted">🚀 Activated:</span><br><strong><?= $activation_date_formatted ?></strong></div>
-                    <div class="col-sm-4"><span class="text-muted">⏳ Expires:</span><br><strong><?= $expiry_date_formatted ?></strong></div>
-                </div>
+    <!-- Subscription Status -->
+    <div class="card-premium mb-4" style="border-left: 5px solid <?= $is_subscribed ? '#10b981' : '#f59e0b' ?>; background: <?= $is_subscribed ? '#f0fdf4' : '#fffbeb' ?>;">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h5><i class="fas fa-user-clock me-2"></i>My Subscription Status</h5>
+                <table class="table table-sm table-borderless mb-0">
+                    <tr><td class="fw-bold">📅 Registered On:</td><td><?= $reg_date_formatted ?></td></tr>
+                    <?php if($is_subscribed): ?>
+                        <tr><td class="fw-bold">🚀 Activated On:</td><td><?= $activation_date_formatted ?></td></tr>
+                        <tr><td class="fw-bold">⏳ Expires On:</td><td><?= $expiry_date_formatted ?></td></tr>
+                    <?php endif; ?>
+                </table>
             </div>
-            <div class="col-md-5 text-md-end">
+            <div class="col-md-6 text-md-end mt-3 mt-md-0">
                 <?php if($is_subscribed): ?>
-                    <span class="badge bg-success p-3 fs-6 rounded-pill"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($sub_info['pkg_name']) ?> Active</span>
+                    <span class="badge bg-success p-2 fs-6 w-100 w-md-auto"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($sub_info['pkg_name']) ?> Active</span>
                     <div class="mt-2">
-                        <span class="badge bg-warning text-dark p-3 fs-5 rounded-pill">
-                            ⏳ <?= $days_left ?> Days Left
+                        <span class="badge bg-warning text-dark p-2 fs-5 w-100 w-md-auto">
+                            ⏳ <?= $days_left ?> Days Remaining
                         </span>
                         <?php if($days_left <= 7 && $days_left > 0): ?>
-                            <span class="badge bg-danger ms-2 p-2">⚠️ Expiring Soon!</span>
+                            <span class="badge bg-danger ms-2">⚠️ Expiring Soon!</span>
+                        <?php elseif($days_left <= 0): ?>
+                            <span class="badge bg-danger ms-2">❌ Expired!</span>
                         <?php endif; ?>
                     </div>
                 <?php else: ?>
-                    <span class="badge bg-secondary p-3 fs-6 rounded-pill">🔴 No Active Plan</span>
+                    <span class="badge bg-secondary p-2 fs-6 w-100 w-md-auto">🔴 No Active Subscription</span>
                     <div class="mt-2 text-muted">Buy a plan to unlock full details.</div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 
-    <!-- 💎 BUY SEARCH ENGINE (GLOSSY CARDS) -->
-    <div id="packages" class="card border-0 shadow-lg p-4 mb-4 rounded-4" style="background: #ffffff;">
-        <h3 class="fw-bold mb-3"><i class="fas fa-rocket text-primary me-2"></i> Buy Search Engine Access</h3>
-        <p class="text-muted">Choose your premium plan and unlock every property detail.</p>
-        <div class="row g-4">
+    <!-- Packages Section -->
+    <div id="packages" class="card-premium mb-4" style="border: 2px solid #fbbf24; background: #fffbeb;">
+        <h4><i class="fas fa-search-dollar me-2" style="color: #f59e0b;"></i>Buy Search Engine Access</h4>
+        <p class="text-muted">Subscribe to view full details of all auction properties. Choose your plan:</p>
+        <div class="row">
             <?php
             $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
             foreach($packages as $pkg) {
                 $is_active = ($is_subscribed && $sub_info['package_id'] == $pkg['id']);
-                $card_border = $is_active ? 'border-2 border-success' : 'border-0';
-                $bg_style = $is_active ? 'background: #f0fdf4;' : 'background: #f8fafc;';
             ?>
-                <div class="col-md-3">
-                    <div class="card h-100 text-center shadow-sm rounded-4 <?= $card_border ?>" style="<?= $bg_style ?> transition: all 0.3s ease; hover:shadow-xl;">
-                        <div class="card-body p-4">
-                            <h4 class="fw-bold"><?= htmlspecialchars($pkg['name']) ?></h4>
-                            <h2 class="text-success fw-bold">₹ <?= indianCurrencyFormat($pkg['price']) ?></h2>
-                            <span class="badge bg-dark"><?= $pkg['duration_months'] ?> Months</span>
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100 text-center shadow-sm" style="border-radius: 16px; <?= $is_active ? 'border: 2px solid #10b981; background: #f0fdf4;' : '' ?>">
+                        <div class="card-body">
+                            <h5 class="fw-bold"><?= htmlspecialchars($pkg['name']) ?></h5>
+                            <h4 class="text-success">₹ <?= indianCurrencyFormat($pkg['price']) ?></h4>
+                            <small><?= $pkg['duration_months'] ?> Months</small>
                             <?php if($is_active): ?>
-                                <div class="mt-3"><span class="badge bg-success w-100 p-2">✅ Active</span></div>
+                                <div class="badge bg-success w-100 mt-2">✅ Active (<?= $days_left ?> days left)</div>
                             <?php else: ?>
-                                <form method="POST" action="buy_subscription.php" class="mt-3">
+                                <form method="POST" action="buy_subscription.php" class="mt-2">
                                     <input type="hidden" name="package_id" value="<?= $pkg['id'] ?>">
-                                    <button type="submit" class="btn btn-primary w-100 rounded-pill shadow-sm">Buy Now</button>
+                                    <button type="submit" class="btn btn-primary w-100 btn-sm">Buy Now</button>
                                 </form>
                             <?php endif; ?>
                         </div>
@@ -167,28 +197,28 @@ if($role == 'admin'):
                 </div>
             <?php } ?>
         </div>
-        <small class="text-muted mt-3 d-block">* Admin will activate your subscription after payment confirmation.</small>
+        <small class="text-muted">* After payment, admin will activate your subscription.</small>
     </div>
 
-    <!-- 🔍 Search Bar (Sleek) -->
-    <div class="card border-0 shadow-sm p-3 mb-4 rounded-4" style="background: #ffffff;">
-        <form method="GET" class="row g-2">
-            <div class="col-md-4"><input type="text" name="city" placeholder="City" class="form-control border-0 bg-light" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>"></div>
+    <!-- Search Bar -->
+    <div class="card-premium mb-3">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4"><input type="text" name="city" placeholder="City" class="form-control" value="<?= htmlspecialchars($_GET['city'] ?? '') ?>"></div>
             <div class="col-md-3">
-                <select name="type" class="form-select border-0 bg-light">
+                <select name="type" class="form-control">
                     <option value="">All Types</option>
                     <option value="Flat" <?= ($_GET['type']??'')=='Flat'?'selected':'' ?>>Flat</option>
                     <option value="Plot" <?= ($_GET['type']??'')=='Plot'?'selected':'' ?>>Plot</option>
                     <option value="Shop" <?= ($_GET['type']??'')=='Shop'?'selected':'' ?>>Shop</option>
                 </select>
             </div>
-            <div class="col-md-3"><input type="number" name="max_price" placeholder="Max Price" class="form-control border-0 bg-light" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>"></div>
-            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 rounded-pill"><i class="fas fa-search"></i> Search</button></div>
+            <div class="col-md-3"><input type="number" name="max_price" placeholder="Max Price" class="form-control" value="<?= htmlspecialchars($_GET['max_price'] ?? '') ?>"></div>
+            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button></div>
         </form>
     </div>
 
-    <!-- 🏠 Property Cards Grid -->
-    <div class="row g-4">
+    <!-- Property Cards (with clickable image) -->
+    <div class="row">
         <?php
         $sql = "SELECT * FROM properties WHERE status = 'available'";
         $params = [];
@@ -201,14 +231,17 @@ if($role == 'admin'):
         $props = $stmt->fetchAll();
         if(count($props) > 0) {
             foreach($props as $p) { ?>
-                <div class="col-md-4">
-                    <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden hover-lift">
-                        <img src="<?= htmlspecialchars($p['image_url'] ?: 'https://via.placeholder.com/300x200') ?>" style="height:180px; width:100%; object-fit:cover;">
-                        <div class="card-body p-3">
-                            <span class="badge bg-light text-dark mb-1">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
-                            <h6 class="fw-bold"><?= htmlspecialchars($p['title']) ?></h6>
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100 shadow-sm border-0" style="border-radius:16px; overflow:hidden;">
+                        <!-- ✅ Clickable Image -->
+                        <a href="<?= htmlspecialchars($p['image_url'] ?: 'https://via.placeholder.com/300x200') ?>" target="_blank">
+                            <img src="<?= htmlspecialchars($p['image_url'] ?: 'https://via.placeholder.com/300x200') ?>" style="height:150px; width:100%; object-fit:cover; cursor:pointer;">
+                        </a>
+                        <div class="p-3">
+                            <span class="badge bg-light text-dark">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
+                            <h6 class="fw-bold mt-1"><?= htmlspecialchars($p['title']) ?></h6>
                             <div class="fw-bold text-success">₹ <?= indianCurrencyFormat($p['price']) ?></div>
-                            <a href="property_detail.php?id=<?= $p['id'] ?>" class="btn btn-outline-primary btn-sm w-100 mt-2 rounded-pill">View Details</a>
+                            <a href="property_detail.php?id=<?= $p['id'] ?>" class="btn btn-primary btn-sm w-100 mt-2">View Details</a>
                         </div>
                     </div>
                 </div>
@@ -216,11 +249,6 @@ if($role == 'admin'):
         } else { echo "<p class='text-muted'>No properties match your search.</p>"; }
         ?>
     </div>
-
-    <style>
-        .hover-lift { transition: all 0.2s ease; }
-        .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 15px 30px -10px rgba(0,0,0,0.1) !important; }
-    </style>
 
 <?php endif; ?>
 <?php include 'footer.php'; ?>
