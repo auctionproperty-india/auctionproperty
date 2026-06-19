@@ -261,7 +261,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- ===== MODAL (Static Backdrop) ===== -->
+<!-- ===== MODAL ===== -->
 <div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content" style="border-radius: 20px;">
@@ -280,10 +280,10 @@ include 'header.php';
                             <input type="text" name="title" id="edit_title" class="form-control" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Address *</label>
-                            <!-- ✅ पूरी तरह Editable – बिना किसी रोक-टोक के -->
-                            <input type="text" name="location" id="edit_location" class="form-control" required placeholder="Type address... (Google suggestions will appear)">
-                            <small class="text-muted">आप मैन्युअल टाइप कर सकते हैं या Google Suggestion से चुन सकते हैं।</small>
+                            <label class="form-label fw-semibold">Address / Location *</label>
+                            <!-- ✅ साधारण Text Input – बिना किसी Autocomplete के -->
+                            <input type="text" name="location" id="edit_location" class="form-control" required placeholder="Enter full address here...">
+                            <small class="text-muted">यहाँ आप मैन्युअल पूरा Address डाल सकते हैं।</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">City *</label>
@@ -369,9 +369,9 @@ include 'header.php';
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Google Map Link (Auto)</label>
-                            <input type="text" name="google_location" id="edit_google_location" class="form-control" readonly style="background:#f1f5f9;">
-                            <small class="text-muted">Address टाइप करने पर Map Link अपने आप जनरेट हो जाएगा।</small>
+                            <label class="form-label fw-semibold">Google Map Link</label>
+                            <input type="text" name="google_location" id="edit_google_location" class="form-control" placeholder="https://www.google.com/maps?q=..." value="<?= htmlspecialchars($edit_data['google_location'] ?? '') ?>">
+                            <small class="text-muted">आप चाहें तो Map Link मैन्युअल डाल सकते हैं।</small>
                         </div>
 
                         <div class="col-12">
@@ -393,40 +393,8 @@ include 'header.php';
     </div>
 </div>
 
-<!-- ✅ नया Autocomplete Script – कोई Lock नहीं -->
+<!-- ✅ सरल JavaScript – कोई Autocomplete नहीं -->
 <script>
-    let autocompleteInstance = null;
-
-    function initAutocomplete() {
-        var input = document.getElementById('edit_location');
-        if (!input) return;
-
-        // अगर पहले से Autocomplete है तो उसे हटाएँ
-        if (autocompleteInstance) {
-            google.maps.event.clearInstanceListeners(autocompleteInstance);
-            autocompleteInstance = null;
-        }
-
-        // नया Autocomplete बनाएँ
-        autocompleteInstance = new google.maps.places.Autocomplete(input, {
-            types: ['geocode'],
-            componentRestrictions: { country: 'in' }
-        });
-
-        // ✅ `place_changed` – Map Link Auto-Generate करे, Input को Lock न करे
-        autocompleteInstance.addListener('place_changed', function() {
-            var place = autocompleteInstance.getPlace();
-            if (place && place.geometry) {
-                var lat = place.geometry.location.lat();
-                var lng = place.geometry.location.lng();
-                document.getElementById('edit_google_location').value = 'https://www.google.com/maps?q=' + lat + ',' + lng;
-            }
-        });
-
-        // ✅ Input को पूरी तरह Editable रखने के लिए – कोई अतिरिक्त Event नहीं
-        input.removeEventListener('keydown', function(e) {});
-    }
-
     function openAddModal() {
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Add New Property';
         document.getElementById('propertyForm').reset();
@@ -436,9 +404,7 @@ include 'header.php';
         document.getElementById('submitBtn').innerHTML = 'Add Property';
         document.getElementById('currentImagePreview').style.display = 'none';
         document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
-        document.getElementById('edit_google_location').value = '';
         document.getElementById('edit_location').value = '';
-        document.getElementById('edit_location').removeAttribute('readonly');
     }
 
     function openEditModal(id) {
@@ -480,7 +446,6 @@ include 'header.php';
                     document.getElementById('currentImagePreview').style.display = 'none';
                 }
 
-                document.getElementById('edit_location').removeAttribute('readonly');
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
             })
@@ -488,12 +453,7 @@ include 'header.php';
                 alert('Error loading property data: ' + error);
             });
     }
-
-    // Modal खुलने पर Autocomplete सेट करें
-    document.getElementById('propertyModal').addEventListener('shown.bs.modal', function () {
-        setTimeout(initAutocomplete, 300);
-    });
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&callback=initAutocomplete" async defer></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <?php include 'footer.php'; ?>
