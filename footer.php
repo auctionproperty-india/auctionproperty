@@ -1,4 +1,4 @@
-</div> <!-- main-content end -->
+</div> <!-- .main-content end -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -17,10 +17,10 @@
         }
     });
 
-    // बैकग्राउंड Overlay क्लिक करने पर Sidebar बंद करें
+    // Overlay क्लिक पर Sidebar बंद करें
     document.addEventListener('DOMContentLoaded', function() {
         let overlay = document.getElementById('sidebarOverlay');
-        if(overlay) {
+        if (overlay) {
             overlay.addEventListener('click', function() {
                 toggleSidebar();
             });
