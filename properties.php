@@ -20,13 +20,20 @@ if($edit_id) {
     if(!$edit_data) { $edit_id = 0; $edit_data = null; }
 }
 
-// ---- ADD / UPDATE LOGIC (सबसे ऊपर, ताकि कोई Output न हो) ----
-$message = '';
-$is_updated = false;
-
+// ---- ADD / UPDATE LOGIC ----
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
-    // अगर Update है तो
+    // ✅ Helper: Safe numeric value
+    function safeNumeric($val) {
+        if ($val === '' || $val === null) return 0;
+        return (float) $val;
+    }
+
+    // ✅ Helper: Safe string
+    function safeString($val) {
+        return trim($val ?? '');
+    }
+
     if(isset($_POST['update_property']) && $edit_id) {
         $image_path = $_POST['existing_image'] ?? '';
         $use_uploaded_image = false;
@@ -55,15 +62,29 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             WHERE id=?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            $_POST['title'] ?? '', $_POST['price'] ?? 0, $_POST['location'] ?? '', 
-            $_POST['city'] ?? '', $_POST['type'] ?? '', $_POST['google_location'] ?? '', $image_path,
-            $_POST['bank_name'] ?? '', $_POST['sqft'] ?? 0, $_POST['possession_type'] ?? 'Physical', $auction_date_db,
-            $_POST['borrower_name'] ?? '', $_POST['emd_amount'] ?? 0, $_POST['bid_increment'] ?? 0, $_POST['emd_deadline'] ?? '',
-            $_POST['auction_start_time'] ?? '', $_POST['auction_end_time'] ?? '', $_POST['locality'] ?? '', 
-            $_POST['reserve_price_per_sqft'] ?? 0, $_POST['contact_number'] ?? $default_contact, $edit_id
+            safeString($_POST['title'] ?? ''),
+            safeNumeric($_POST['price'] ?? 0),
+            safeString($_POST['location'] ?? ''),
+            safeString($_POST['city'] ?? ''),
+            safeString($_POST['type'] ?? 'Flat'),
+            safeString($_POST['google_location'] ?? ''),
+            $image_path,
+            safeString($_POST['bank_name'] ?? ''),
+            safeNumeric($_POST['sqft'] ?? 0),
+            safeString($_POST['possession_type'] ?? 'Physical'),
+            $auction_date_db,
+            safeString($_POST['borrower_name'] ?? ''),
+            safeNumeric($_POST['emd_amount'] ?? 0),
+            safeNumeric($_POST['bid_increment'] ?? 0),
+            safeString($_POST['emd_deadline'] ?? ''),
+            safeString($_POST['auction_start_time'] ?? ''),
+            safeString($_POST['auction_end_time'] ?? ''),
+            safeString($_POST['locality'] ?? ''),
+            safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
+            safeString($_POST['contact_number'] ?? $default_contact),
+            $edit_id
         ]);
 
-        // अगर User ने Image नहीं बदली, तो Social Card फिर से Generate करें
         if (!$use_uploaded_image) {
             $updated_prop = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
             $updated_prop->execute([$edit_id]);
@@ -78,7 +99,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // अगर Add है
     if(isset($_POST['add_property'])) {
         $image_path = '';
         $use_uploaded_image = false;
@@ -108,17 +128,30 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            $_POST['title'] ?? '', $_POST['price'] ?? 0, $_POST['location'] ?? '', 
-            $_POST['city'] ?? '', $_POST['type'] ?? '', $_POST['google_location'] ?? '', $image_path,
-            $_POST['bank_name'] ?? '', $_POST['sqft'] ?? 0, $_POST['possession_type'] ?? 'Physical', $auction_date_db,
-            $_POST['borrower_name'] ?? '', $_POST['emd_amount'] ?? 0, $_POST['bid_increment'] ?? 0, $_POST['emd_deadline'] ?? '',
-            $_POST['auction_start_time'] ?? '', $_POST['auction_end_time'] ?? '', $_POST['locality'] ?? '', 
-            $_POST['reserve_price_per_sqft'] ?? 0, $_POST['contact_number'] ?? $default_contact
+            safeString($_POST['title'] ?? ''),
+            safeNumeric($_POST['price'] ?? 0),
+            safeString($_POST['location'] ?? ''),
+            safeString($_POST['city'] ?? ''),
+            safeString($_POST['type'] ?? 'Flat'),
+            safeString($_POST['google_location'] ?? ''),
+            $image_path,
+            safeString($_POST['bank_name'] ?? ''),
+            safeNumeric($_POST['sqft'] ?? 0),
+            safeString($_POST['possession_type'] ?? 'Physical'),
+            $auction_date_db,
+            safeString($_POST['borrower_name'] ?? ''),
+            safeNumeric($_POST['emd_amount'] ?? 0),
+            safeNumeric($_POST['bid_increment'] ?? 0),
+            safeString($_POST['emd_deadline'] ?? ''),
+            safeString($_POST['auction_start_time'] ?? ''),
+            safeString($_POST['auction_end_time'] ?? ''),
+            safeString($_POST['locality'] ?? ''),
+            safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
+            safeString($_POST['contact_number'] ?? $default_contact)
         ]);
         
         $new_id = $pdo->lastInsertId();
 
-        // अगर User ने Image Upload नहीं की, तो Social Card Generate करें
         if (!$use_uploaded_image) {
             $new_prop = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
             $new_prop->execute([$new_id]);
@@ -134,31 +167,29 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// ---- अब Header Include करें ----
 include 'header.php'; 
 ?>
 
 <?php if(isset($_GET['added'])): ?>
-    <div class="alert alert-success alert-dismissible fade show">✅ Property Added Successfully!</div>
+    <div class="alert alert-success">✅ Property Added Successfully!</div>
 <?php endif; ?>
 <?php if(isset($_GET['updated'])): ?>
-    <div class="alert alert-success alert-dismissible fade show">✅ Property Updated Successfully!</div>
+    <div class="alert alert-success">✅ Property Updated Successfully!</div>
 <?php endif; ?>
 
-<!-- ===== ADD / EDIT FORM ===== -->
+<!-- ===== FORM ===== -->
 <div class="card-premium" id="add-form" style="border-left: 4px solid #fbbf24;">
     <h5><i class="fas fa-<?= $edit_id ? 'edit' : 'plus-circle' ?> me-2" style="color: #fbbf24;"></i>
         <?= $edit_id ? 'Edit Property #'.$edit_id : 'Add New Property' ?>
     </h5>
     <form method="POST" class="mt-3" enctype="multipart/form-data">
         <div class="row g-3">
-            <!-- Basic Info -->
             <div class="col-md-6">
                 <label class="form-label fw-semibold">Title *</label>
                 <input type="text" name="title" class="form-control" required value="<?= htmlspecialchars($edit_data['title'] ?? '') ?>">
             </div>
             <div class="col-md-6">
-                <label class="form-label fw-semibold">Address / Location *</label>
+                <label class="form-label fw-semibold">Address *</label>
                 <input type="text" name="location" id="location_input" class="form-control" required value="<?= htmlspecialchars($edit_data['location'] ?? '') ?>">
             </div>
             <div class="col-md-3">
@@ -167,7 +198,7 @@ include 'header.php';
             </div>
             <div class="col-md-3">
                 <label class="form-label fw-semibold">Locality</label>
-                <input type="text" name="locality" class="form-control" placeholder="e.g. Sapna Sangeeta" value="<?= htmlspecialchars($edit_data['locality'] ?? '') ?>">
+                <input type="text" name="locality" class="form-control" value="<?= htmlspecialchars($edit_data['locality'] ?? '') ?>">
             </div>
             <div class="col-md-3">
                 <label class="form-label fw-semibold">Reserve Price (₹) *</label>
@@ -178,14 +209,13 @@ include 'header.php';
                 <input type="number" step="0.01" name="reserve_price_per_sqft" class="form-control" value="<?= htmlspecialchars($edit_data['reserve_price_per_sqft'] ?? '') ?>">
             </div>
 
-            <!-- Bank & Borrower -->
             <div class="col-md-4">
                 <label class="form-label fw-semibold">Bank Name</label>
-                <input type="text" name="bank_name" class="form-control" placeholder="e.g. Union Bank" value="<?= htmlspecialchars($edit_data['bank_name'] ?? '') ?>">
+                <input type="text" name="bank_name" class="form-control" value="<?= htmlspecialchars($edit_data['bank_name'] ?? '') ?>">
             </div>
             <div class="col-md-4">
                 <label class="form-label fw-semibold">Borrower Name</label>
-                <input type="text" name="borrower_name" class="form-control" placeholder="e.g. Alka Agarwal" value="<?= htmlspecialchars($edit_data['borrower_name'] ?? '') ?>">
+                <input type="text" name="borrower_name" class="form-control" value="<?= htmlspecialchars($edit_data['borrower_name'] ?? '') ?>">
             </div>
             <div class="col-md-4">
                 <label class="form-label fw-semibold">Property Type</label>
@@ -199,7 +229,6 @@ include 'header.php';
                 </select>
             </div>
 
-            <!-- Area & Possession -->
             <div class="col-md-3">
                 <label class="form-label fw-semibold">Area (Sq Ft)</label>
                 <input type="number" step="0.01" name="sqft" class="form-control" value="<?= htmlspecialchars($edit_data['sqft'] ?? '') ?>">
@@ -220,13 +249,12 @@ include 'header.php';
                 <input type="number" step="0.01" name="bid_increment" class="form-control" value="<?= htmlspecialchars($edit_data['bid_increment'] ?? '') ?>">
             </div>
 
-            <!-- Auction Timings -->
             <div class="col-md-4">
-                <label class="form-label fw-semibold">Auction Start (Date & Time)</label>
+                <label class="form-label fw-semibold">Auction Start</label>
                 <input type="text" name="auction_start_time" class="form-control" placeholder="Wed, 24 Jun 2026 12:00 PM" value="<?= htmlspecialchars($edit_data['auction_start_time'] ?? '') ?>">
             </div>
             <div class="col-md-4">
-                <label class="form-label fw-semibold">Auction End (Date & Time)</label>
+                <label class="form-label fw-semibold">Auction End</label>
                 <input type="text" name="auction_end_time" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM" value="<?= htmlspecialchars($edit_data['auction_end_time'] ?? '') ?>">
             </div>
             <div class="col-md-4">
@@ -234,7 +262,6 @@ include 'header.php';
                 <input type="text" name="emd_deadline" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM" value="<?= htmlspecialchars($edit_data['emd_deadline'] ?? '') ?>">
             </div>
 
-            <!-- Auction Date (DD/MM/YYYY) -->
             <div class="col-md-6">
                 <label class="form-label fw-semibold">Auction Date (DD/MM/YYYY)</label>
                 <input type="text" name="auction_date" class="form-control" placeholder="e.g. 24/06/2026" value="<?= htmlspecialchars($edit_data['auction_date'] ?? '') ?>">
@@ -242,49 +269,41 @@ include 'header.php';
             <div class="col-md-6">
                 <label class="form-label fw-semibold">Contact Number</label>
                 <input type="text" name="contact_number" class="form-control" value="<?= htmlspecialchars($edit_data['contact_number'] ?? $default_contact) ?>" required>
-                <small class="text-muted">Default from Settings.</small>
             </div>
 
-            <!-- Google Map Link (Auto-filled) -->
             <div class="col-12">
-                <label class="form-label fw-semibold">Google Map Link (Auto-generated from Address)</label>
+                <label class="form-label fw-semibold">Google Map Link (Auto)</label>
                 <input type="text" name="google_location" id="google_location" class="form-control" readonly style="background:#f1f5f9;" value="<?= htmlspecialchars($edit_data['google_location'] ?? '') ?>">
             </div>
 
-            <!-- Image Upload -->
             <div class="col-12">
-                <label class="form-label fw-semibold">Upload Property Image</label>
+                <label class="form-label fw-semibold">Upload Image</label>
                 <?php if($edit_id && !empty($edit_data['image_url']) && file_exists($edit_data['image_url'])): ?>
-                    <div class="mb-2">
-                        <img src="<?= $edit_data['image_url'] ?>" style="max-height:120px; border-radius:10px; border:1px solid #ddd;">
-                    </div>
+                    <div class="mb-2"><img src="<?= $edit_data['image_url'] ?>" style="max-height:120px; border-radius:10px;"></div>
                     <input type="hidden" name="existing_image" value="<?= htmlspecialchars($edit_data['image_url']) ?>">
                 <?php endif; ?>
                 <input type="file" name="image_file" class="form-control" accept="image/*">
-                <small class="text-muted"><?= $edit_id ? 'Leave empty to keep current image (or auto-generate social card).' : 'Leave empty to auto-generate a premium social media card.' ?></small>
+                <small><?= $edit_id ? 'Leave empty to keep/auto-generate.' : 'Leave empty to auto-generate premium social card.' ?></small>
             </div>
 
             <div class="col-12">
                 <?php if($edit_id): ?>
                     <input type="hidden" name="property_id" value="<?= $edit_id ?>">
-                    <button type="submit" name="update_property" class="btn btn-success btn-lg w-100"><i class="fas fa-save me-2"></i>Update Property</button>
+                    <button type="submit" name="update_property" class="btn btn-success btn-lg w-100">Update Property</button>
                 <?php else: ?>
-                    <button type="submit" name="add_property" class="btn btn-primary btn-lg w-100"><i class="fas fa-save me-2"></i>Add Property</button>
+                    <button type="submit" name="add_property" class="btn btn-primary btn-lg w-100">Add Property</button>
                 <?php endif; ?>
             </div>
         </div>
     </form>
 </div>
 
-<!-- ===== PROPERTY LIST TABLE ===== -->
+<!-- Property List -->
 <div class="card-premium mt-4">
-    <div class="d-flex justify-content-between align-items-center">
-        <h5><i class="fas fa-list me-2"></i>All Properties</h5>
-        <a href="properties.php" class="btn btn-sm btn-outline-primary">+ Add New</a>
-    </div>
+    <div class="d-flex justify-content-between"><h5>📋 All Properties</h5><a href="properties.php" class="btn btn-sm btn-outline-primary">+ Add New</a></div>
     <div class="table-responsive">
-        <table class="table table-hover mt-2">
-            <thead class="table-light"><tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
+        <table class="table table-hover">
+            <thead><tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
             <?php 
             $stmt = $pdo->query("SELECT * FROM properties ORDER BY id DESC");
@@ -298,7 +317,7 @@ include 'header.php';
                     <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
                     <td>
                         <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary">✏️</a>
-                        <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this property?')">🗑️</a>
+                        <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
                     </td>
                 </tr>
             <?php } ?>
@@ -307,7 +326,6 @@ include 'header.php';
     </div>
 </div>
 
-<!-- Google Maps Autocomplete -->
 <script>
     function initAutocomplete() {
         var input = document.getElementById('location_input');
