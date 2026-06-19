@@ -21,7 +21,6 @@ require_once 'functions.php';
         .btn-auction { background: #1e3a8a; border: none; color: white; font-weight: 700; padding: 10px; border-radius: 12px; width: 100%; transition: 0.3s; display: block; text-align: center; text-decoration: none; }
         .btn-auction:hover { background: #0b1d4a; color: #fff; }
         .search-box { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.03); border: 1px solid #e9edf4; margin-bottom: 30px; }
-        .image-link { display: block; overflow: hidden; }
     </style>
 </head>
 <body>
@@ -67,17 +66,15 @@ require_once 'functions.php';
             foreach($properties as $prop) { ?>
                 <div class="col-md-4 mb-4">
                     <div class="property-card">
-                        <!-- ✅ Image Click to Open -->
-                        <a href="<?= htmlspecialchars($prop['image_url'] ?: 'https://via.placeholder.com/600x400?text=Property') ?>" target="_blank" class="image-link">
+                        <a href="<?= htmlspecialchars($prop['image_url'] ?: 'https://via.placeholder.com/600x400?text=Property') ?>" target="_blank">
                             <img src="<?= htmlspecialchars($prop['image_url'] ?: 'https://via.placeholder.com/600x400?text=Property') ?>">
                         </a>
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <span class="bank-badge">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
-                                <span class="text-muted small"><i class="far fa-calendar"></i> <?= date('d M Y', strtotime($prop['auction_date'] ?? 'now')) ?></span>
                             </div>
                             <h6 class="fw-bold mt-2"><?= htmlspecialchars($prop['title']) ?></h6>
-                            <div class="price">₹ <?= indianCurrencyFormat($prop['price']) ?> <span class="fs-6 fw-normal text-muted">Starting</span></div>
+                            <div class="price">₹ <?= indianCurrencyFormat($prop['price']) ?> <span class="fs-6 fw-normal text-muted">Reserve Price</span></div>
                             <p class="text-muted small mt-1"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></p>
                             
                             <?php if(isset($_SESSION['user_id'])): ?>
