@@ -1,18 +1,29 @@
 <?php
-require_once 'db.php';
-require_once 'functions.php';
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { header("Location: dashboard.php"); exit; }
-if(!hasPermission('packages', $pdo)) { die("Permission denied."); }
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/functions.php';
+
+if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { 
+    header("Location: dashboard.php"); 
+    exit; 
+}
+
+if(!hasViewPermission('packages', $pdo)) {
+    die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page.</div>");
+}
 
 $error = '';
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_prices'])) {
+    // Only allow if user has edit permission
+    if(!hasEditPermission('packages', $pdo)) {
+        die("<div class='alert alert-danger m-5'>❌ You do not have permission to edit packages.</div>");
+    }
     $password_attempt = $_POST['admin_password'] ?? '';
     $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $admin = $stmt->fetch();
     
     if(!$admin || !password_verify($password_attempt, $admin['password'])) {
-        $error = "❌ Incorrect Admin Password!";
+        $error = "❌ Incorrect Admin Password! Please try again.";
     } else {
         foreach($_POST['price'] as $id => $price) {
             $discount = $_POST['discount'][$id] ?? null;
@@ -28,7 +39,7 @@ include 'header.php';
 $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
 ?>
 <div class="card-premium">
-    <h4><i class="fas fa-tags me-2"></i>Manage Packages (Price, Discount, Referral Bonus)</h4>
+    <h4><i class="fas fa-tags me-2"></i>Manage Package Prices, Discounts & Referral Bonus</h4>
     <?php if(isset($_GET['updated'])) echo "<div class='alert alert-success'>✅ Updated!</div>"; ?>
     <?php if($error) echo "<div class='alert alert-danger'>$error</div>"; ?>
     <form method="POST">
@@ -48,13 +59,17 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                 </tbody>
             </table>
         </div>
-        <div class="row mt-3">
-            <div class="col-md-4">
-                <label class="fw-bold">Verify Admin Password *</label>
-                <input type="password" name="admin_password" class="form-control" placeholder="Enter password to save" required>
+        <?php if(hasEditPermission('packages', $pdo)): ?>
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <label class="fw-bold">Verify Admin Password *</label>
+                    <input type="password" name="admin_password" class="form-control" placeholder="Enter password to save" required>
+                </div>
             </div>
-        </div>
-        <button type="submit" name="update_prices" class="btn btn-primary mt-3">Save Changes</button>
+            <button type="submit" name="update_prices" class="btn btn-primary mt-3">Save Changes</button>
+        <?php else: ?>
+            <p class="text-muted">You have view‑only access. Cannot edit.</p>
+        <?php endif; ?>
     </form>
 </div>
 <?php include 'footer.php'; ?>
