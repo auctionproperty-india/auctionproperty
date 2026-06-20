@@ -10,9 +10,9 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit; 
 }
 
-// ✅ Permission Check – अगर Permission नहीं है तो Message दिखाएँ, White Screen नहीं
-if(!hasPermission('properties', $pdo)) {
-    die("<div class='alert alert-danger m-5'>❌ You do not have permission to access this page. Contact Super Admin.</div>");
+// ✅ Permission Check – 'properties' module के लिए View Permission
+if(!hasViewPermission('properties', $pdo)) {
+    die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page. Contact Super Admin.</div>");
 }
 
 $default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
@@ -67,6 +67,10 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // UPDATE
     if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
+        // Check Edit Permission
+        if(!hasEditPermission('properties', $pdo)) {
+            die("<div class='alert alert-danger'>❌ You don't have permission to edit properties.</div>");
+        }
         $id = $_POST['property_id'];
         $image_path = $_POST['existing_image'] ?? '';
         $use_uploaded_image = false;
@@ -135,6 +139,10 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // ADD
     if(isset($_POST['add_property'])) {
+        // Check Edit Permission
+        if(!hasEditPermission('properties', $pdo)) {
+            die("<div class='alert alert-danger'>❌ You don't have permission to add properties.</div>");
+        }
         $image_path = '';
         $use_uploaded_image = false;
 
@@ -216,9 +224,13 @@ include 'header.php';
 <div class="card-premium">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <h5><i class="fas fa-list me-2"></i>All Properties</h5>
-        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#propertyModal" onclick="openAddModal()">
-            <i class="fas fa-plus-circle me-1"></i> Add New Property
-        </button>
+        <?php if(hasEditPermission('properties', $pdo)): ?>
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#propertyModal" onclick="openAddModal()">
+                <i class="fas fa-plus-circle me-1"></i> Add New Property
+            </button>
+        <?php else: ?>
+            <span class="text-muted">(View Only Mode)</span>
+        <?php endif; ?>
     </div>
 
     <form method="GET" class="row g-2 mb-3">
@@ -256,8 +268,12 @@ include 'header.php';
                             <td>₹<?= number_format($row['price'], 2) ?></td>
                             <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
                             <td>
-                                <button class="btn btn-sm btn-primary" onclick="openEditModal(<?= $row['id'] ?>)">✏️</button>
-                                <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
+                                <?php if(hasEditPermission('properties', $pdo)): ?>
+                                    <button class="btn btn-sm btn-primary" onclick="openEditModal(<?= $row['id'] ?>)">✏️</button>
+                                    <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
+                                <?php else: ?>
+                                    <span class="text-muted">View Only</span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php }
