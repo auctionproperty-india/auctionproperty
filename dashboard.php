@@ -5,7 +5,7 @@ require_once __DIR__ . '/functions.php';
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'];
 
-// ---- Super Admin Check ----
+// Super Admin Check
 $is_super_admin = false;
 $stmt = $pdo->prepare("SELECT is_super_admin FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
@@ -79,7 +79,7 @@ $total_props = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
 if($role == 'admin'): 
-    $total_users = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'user'")->fetchColumn();
+    $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
     $balance = getAccountBalance($pdo);
     
@@ -118,10 +118,9 @@ if($role == 'admin'):
                     <thead><tr><th>Name</th><th>Email</th><th>Referred By</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody>
                     <?php 
-                    // ✅ ONLY USERS (role = 'user'), Admin/Sub-Admin नहीं
-                    $sql_users = "SELECT u.*, r.name as referrer_name FROM users u LEFT JOIN users r ON u.referred_by = r.id WHERE u.role = 'user'";
+                    $sql_users = "SELECT u.*, r.name as referrer_name FROM users u LEFT JOIN users r ON u.referred_by = r.id";
                     if(!empty($user_search)) {
-                        $sql_users .= " AND (u.name ILIKE ? OR u.email ILIKE ?)";
+                        $sql_users .= " WHERE u.name ILIKE ? OR u.email ILIKE ?";
                         $stmt = $pdo->prepare($sql_users . " ORDER BY u.id DESC");
                         $stmt->execute(['%'.$user_search.'%', '%'.$user_search.'%']);
                     } else {
@@ -149,7 +148,7 @@ if($role == 'admin'):
                                     <a href='?delete_user=".$u['id']."' class='btn btn-sm btn-danger' onclick='return confirm(\"Delete?\")'>Del</a>
                                 </td>";
                             } else if($is_self) { echo "<td><span class='text-muted'>You</span></td>"; } 
-                            else { echo "<td><span class='text-muted'>View Only</span></td>"; }
+                            else { echo "<td><span class='text-muted'>View Only (Sub-Admin)</span></td>"; }
                             echo "</tr>";
                         }
                     } else {
@@ -189,7 +188,7 @@ if($role == 'admin'):
                     <select name="new_referrer_id" id="refSelect" class="form-control" size="6" required>
                         <option value="">None (Direct)</option>
                         <?php 
-                        $all_users = $pdo->query("SELECT id, name, email FROM users WHERE role = 'user' ORDER BY name")->fetchAll();
+                        $all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
                         foreach($all_users as $usr) {
                             echo "<option value='".$usr['id']."'>".htmlspecialchars($usr['name'])." (".htmlspecialchars($usr['email']).")</option>";
                         }
@@ -229,33 +228,10 @@ if($role == 'admin'):
     <?php endif; ?>
     <!-- ====== END SUPER ADMIN ONLY ====== -->
 
-    <!-- Subscription History -->
-    <div class="mt-4 card-premium">
-        <h4>📋 Subscription History</h4>
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead><tr><th>User</th><th>Package</th><th>Amount</th><th>Status</th><th>Payment Method</th><th>UTR</th><th>Request Date</th><th>Activation/Reject Date</th></tr></thead>
-                <tbody>
-                <?php 
-                $subs = $pdo->query("SELECT s.*, u.name as uname, p.name as pkg_name FROM subscriptions s JOIN users u ON s.user_id = u.id JOIN packages p ON s.package_id = p.id ORDER BY s.created_at DESC LIMIT 50")->fetchAll();
-                if(count($subs)>0) {
-                    foreach($subs as $s) {
-                        $status_badge = $s['status']=='active' ? 'success' : ($s['status']=='pending' ? 'warning' : 'danger');
-                        echo "<tr><td>".htmlspecialchars($s['uname'])."</td><td>".htmlspecialchars($s['pkg_name'])."</td><td>₹".$s['amount']."</td>
-                              <td><span class='badge bg-$status_badge'>".$s['status']."</span></td>
-                              <td>".$s['payment_method']."</td><td>".htmlspecialchars($s['utr']??'N/A')."</td>
-                              <td>".date('d M Y', strtotime($s['created_at']))."</td>
-                              <td>".($s['start_date'] ? date('d M Y', strtotime($s['start_date'])) : '—')."</td></tr>";
-                    }
-                } else echo "<tr><td colspan='8' class='text-center'>No subscriptions found.</td></tr>";
-                ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <!-- ====== Subscription History Section HATAA (Now in sidebar) ====== -->
 
 <?php else: 
-    // ---- USER VIEW (ONLY NORMAL USERS SEE THIS) ----
+    // ---- USER VIEW ----
     $user_stmt = $pdo->prepare("SELECT *, created_at as reg_date, city FROM users WHERE id = ?");
     $user_stmt->execute([$user_id]);
     $user = $user_stmt->fetch();
