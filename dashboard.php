@@ -5,6 +5,18 @@ require_once __DIR__ . '/functions.php';
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'];
 
+// ---- Super Admin Check ----
+$is_super_admin = false;
+$stmt = $pdo->prepare("SELECT is_super_admin FROM users WHERE id = ?");
+$stmt->execute([$user_id]);
+$user_data = $stmt->fetch();
+if($user_data && $user_data['is_super_admin']) {
+    $is_super_admin = true;
+    $_SESSION['is_super_admin'] = true;
+} else {
+    $_SESSION['is_super_admin'] = false;
+}
+
 // ---- Admin Actions ----
 if($role == 'admin') {
     // Toggle Status
@@ -37,8 +49,9 @@ if($role == 'admin') {
     if(isset($_POST['set_password']) && isset($_POST['user_id'])) {
         $uid = $_POST['user_id'];
         $new_pass = $_POST['new_password'];
-        if(strlen($new_pass) < 4) { $_SESSION['new_pass_display'] = "❌ Password must be at least 4 characters."; }
-        else {
+        if(strlen($new_pass) < 4) { 
+            $_SESSION['new_pass_display'] = "❌ Password must be at least 4 characters."; 
+        } else {
             $hashed = password_hash($new_pass, PASSWORD_BCRYPT);
             $pdo->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed, $uid]);
             $_SESSION['new_pass_display'] = "✅ Password for User ID $uid set to: <strong>$new_pass</strong>";
@@ -85,7 +98,8 @@ if($role == 'admin'):
         <div class="alert alert-success mt-3"><?= $_SESSION['new_pass_display']; unset($_SESSION['new_pass_display']); ?></div>
     <?php endif; ?>
 
-    <?php if(hasViewPermission('users', $pdo)): ?>
+    <!-- ====== MANAGE USERS SECTION - ONLY FOR SUPER ADMIN ====== -->
+    <?php if($is_super_admin): ?>
     <div id="users-section" class="mt-4">
         <div class="card-premium">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -125,7 +139,7 @@ if($role == 'admin'):
                                 <td><span class='badge bg-".($u['role']=='admin'?'danger':'info')."'>".$u['role']."</span></td>
                                 <td><span class='badge bg-".($u['status']=='active'?'success':'secondary')."'>".$u['status']."</span></td>";
                             
-                            if(!$is_self && hasEditPermission('users', $pdo)) {
+                            if(!$is_self && $is_super_admin) {
                                 echo "<td>
                                     <a href='?toggle_status=".$u['id']."' class='btn btn-sm btn-warning'>Toggle</a>
                                     <button class='btn btn-sm btn-info' onclick=\"document.getElementById('pass_user_id').value='".$u['id']."'; document.getElementById('passModal').style.display='block';\">Pass</button>
@@ -134,7 +148,7 @@ if($role == 'admin'):
                                     <a href='?delete_user=".$u['id']."' class='btn btn-sm btn-danger' onclick='return confirm(\"Delete?\")'>Del</a>
                                 </td>";
                             } else if($is_self) { echo "<td><span class='text-muted'>You</span></td>"; } 
-                            else { echo "<td><span class='text-muted'>View Only</span></td>"; }
+                            else { echo "<td><span class='text-muted'>View Only (Sub-Admin)</span></td>"; }
                             echo "</tr>";
                         }
                     } else {
@@ -146,9 +160,8 @@ if($role == 'admin'):
             </div>
         </div>
     </div>
-    <?php endif; ?>
 
-    <!-- Modal: Change Password -->
+    <!-- Password Modal -->
     <div id="passModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
         <div style="background:#fff; padding:30px; border-radius:20px; max-width:400px; width:90%;">
             <h5>Set New Password</h5>
@@ -161,7 +174,7 @@ if($role == 'admin'):
         </div>
     </div>
 
-    <!-- Modal: Change Referrer -->
+    <!-- Referrer Modal -->
     <div id="refModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
         <div style="background:#fff; padding:30px; border-radius:20px; max-width:500px; width:95%; max-height:90vh; overflow-y:auto;">
             <h5>🔄 Change Referrer</h5>
@@ -212,6 +225,8 @@ if($role == 'admin'):
             }
         }
     </script>
+    <?php endif; ?>
+    <!-- ====== END SUPER ADMIN ONLY ====== -->
 
     <!-- Subscription History -->
     <div class="mt-4 card-premium">
@@ -255,7 +270,7 @@ if($role == 'admin'):
     $expiry_date_formatted = ($is_subscribed && !empty($sub_info['end_date'])) ? date('d M Y', strtotime($sub_info['end_date'])) : 'N/A';
     $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 
-    // ---- Referral Data (User) ----
+    // ---- Referral Data ----
     $referral_link = getReferralLink($user_id);
     $earnings = getReferralEarnings($pdo, $user_id, 'pending');
     $paid_earnings = getReferralEarnings($pdo, $user_id, 'paid');
@@ -312,7 +327,7 @@ if($role == 'admin'):
         </div>
     </div>
 
-    <!-- ===== REFERRAL LINK (यहाँ गायब था, अब डाल दिया) ===== -->
+    <!-- Referral Link -->
     <div class="card-premium mb-4" style="border:1px solid #10b981; background:#f0fdf4;">
         <h5><i class="fas fa-link me-2" style="color:#10b981;"></i>Your Referral Link</h5>
         <div class="input-group">
