@@ -1,10 +1,21 @@
 <?php
-require_once 'db.php';
-require_once 'functions.php';
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { header("Location: dashboard.php"); exit; }
-if(!hasPermission('subscriptions', $pdo)) { die("Permission denied."); }
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/functions.php';
 
+if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { 
+    header("Location: dashboard.php"); 
+    exit; 
+}
+
+if(!hasViewPermission('subscriptions', $pdo)) {
+    die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page.</div>");
+}
+
+// Approve (Activate)
 if(isset($_GET['activate'])) {
+    if(!hasEditPermission('subscriptions', $pdo)) {
+        die("<div class='alert alert-danger m-5'>❌ You do not have permission to approve subscriptions.</div>");
+    }
     $sub_id = $_GET['activate'];
     $sub = $pdo->prepare("SELECT s.*, p.duration_months, p.referral_bonus, u.referred_by FROM subscriptions s 
                           JOIN packages p ON s.package_id = p.id 
@@ -16,9 +27,8 @@ if(isset($_GET['activate'])) {
         $end = date('Y-m-d', strtotime("+{$data['duration_months']} months"));
         $pdo->prepare("UPDATE subscriptions SET status = 'active', start_date = CURRENT_DATE, end_date = ? WHERE id = ?")->execute([$end, $sub_id]);
         
-        // Referral Bonus: अगर इस User को किसी ने Refer किया है
+        // Referral Bonus
         if($data['referred_by'] && $data['referral_bonus'] > 0) {
-            // Check if already credited for this subscription
             $check = $pdo->prepare("SELECT id FROM user_referral_earnings WHERE user_id = ? AND referred_user_id = ? AND package_id = ?");
             $check->execute([$data['referred_by'], $data['user_id'], $data['package_id']]);
             if($check->rowCount() == 0) {
@@ -31,7 +41,11 @@ if(isset($_GET['activate'])) {
     exit;
 }
 
+// Reject
 if(isset($_GET['reject'])) {
+    if(!hasEditPermission('subscriptions', $pdo)) {
+        die("<div class='alert alert-danger m-5'>❌ You do not have permission to reject subscriptions.</div>");
+    }
     $sub_id = $_GET['reject'];
     $pdo->prepare("UPDATE subscriptions SET status = 'rejected' WHERE id = ?")->execute([$sub_id]);
     header("Location: admin_subscriptions.php?done=2");
@@ -55,7 +69,8 @@ $pendings = $pdo->query("SELECT s.*, u.name as uname, p.title as ptitle, pk.name
     <?php if(count($pendings) > 0): ?>
         <div class="table-responsive">
             <table class="table table-bordered">
-                <thead><tr><th>User</th><th>Package</th><th>Amount</th><th>UTR</th><th>Slip</th><th>Actions</th></tr></thead>
+                <thead><tr><th>User</th><th>Package</th><th>Amount</th><th>UTR</th><th>Slip</th>
+                <?php if(hasEditPermission('subscriptions', $pdo)): ?><th>Actions</th><?php endif; ?></tr></thead>
                 <tbody>
                 <?php foreach($pendings as $p): ?>
                     <tr>
@@ -70,10 +85,12 @@ $pendings = $pdo->query("SELECT s.*, u.name as uname, p.title as ptitle, pk.name
                                 <span class="text-muted">No slip</span>
                             <?php endif; ?>
                         </td>
+                        <?php if(hasEditPermission('subscriptions', $pdo)): ?>
                         <td>
                             <a href="?activate=<?= $p['id'] ?>" class="btn btn-sm btn-success" onclick="return confirm('Activate this subscription?')">✅ Approve</a>
                             <a href="?reject=<?= $p['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Reject this subscription?')">❌ Reject</a>
                         </td>
+                        <?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
