@@ -5,7 +5,6 @@ if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
 $user_id = $_SESSION['user_id'];
 $package_id = $_GET['package_id'] ?? $_POST['package_id'] ?? 0;
-
 if(!$package_id) { header("Location: dashboard.php"); exit; }
 
 $pkg = $pdo->prepare("SELECT * FROM packages WHERE id = ?");
@@ -13,13 +12,19 @@ $pkg->execute([$package_id]);
 $pkg = $pkg->fetch();
 if(!$pkg) { die("Invalid package"); }
 
-// Check if user already has active subscription for this package
 $existing = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND package_id = ? AND status = 'active'");
 $existing->execute([$user_id, $package_id]);
 if($existing->rowCount() > 0) {
     header("Location: dashboard.php?msg=already_active");
     exit;
 }
+
+// ---- Fetch Company Bank Details ----
+$bank_name = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='company_bank_name'")->fetchColumn();
+$account = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='company_account_number'")->fetchColumn();
+$ifsc = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='company_ifsc'")->fetchColumn();
+$branch = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='company_branch'")->fetchColumn();
+$qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='company_qr_code'")->fetchColumn();
 
 $message = '';
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_payment'])) {
@@ -59,7 +64,7 @@ $show_discount = $display_price && $display_price < $regular_price;
 <head>
     <title>Buy Subscription</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>body{background:#f4f7fc;}.container{max-width:600px;margin-top:80px;}.card{border-radius:20px;border:none;box-shadow:0 10px 30px rgba(0,0,0,0.05);}</style>
+    <style>body{background:#f4f7fc;}.container{max-width:700px;margin-top:80px;}.card{border-radius:20px;border:none;box-shadow:0 10px 30px rgba(0,0,0,0.05);}</style>
 </head>
 <body>
 <div class="container">
@@ -77,6 +82,26 @@ $show_discount = $display_price && $display_price < $regular_price;
             <?php endif; ?>
         </p>
         <hr>
+
+        <!-- Bank Details & QR Code -->
+        <div class="row g-3 mb-3">
+            <?php if($bank_name && $account && $ifsc): ?>
+            <div class="col-md-6">
+                <h6>🏦 Bank Transfer Details</h6>
+                <p class="small mb-0"><strong>Bank:</strong> <?= htmlspecialchars($bank_name) ?></p>
+                <p class="small mb-0"><strong>A/c No.:</strong> <?= htmlspecialchars($account) ?></p>
+                <p class="small mb-0"><strong>IFSC:</strong> <?= htmlspecialchars($ifsc) ?></p>
+                <p class="small"><strong>Branch:</strong> <?= htmlspecialchars($branch) ?></p>
+            </div>
+            <?php endif; ?>
+            <?php if($qr && file_exists($qr)): ?>
+            <div class="col-md-6 text-center">
+                <h6>📱 Scan to Pay (UPI)</h6>
+                <img src="<?= $qr ?>" style="max-height:200px; border:1px solid #ddd; border-radius:10px;">
+            </div>
+            <?php endif; ?>
+        </div>
+
         <?= $message ?>
         <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="package_id" value="<?= $package_id ?>">
