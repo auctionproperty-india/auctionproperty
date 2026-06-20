@@ -79,7 +79,7 @@ $total_props = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
 if($role == 'admin'): 
-    $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+    $total_users = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'user'")->fetchColumn();
     $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
     $balance = getAccountBalance($pdo);
     
@@ -118,9 +118,10 @@ if($role == 'admin'):
                     <thead><tr><th>Name</th><th>Email</th><th>Referred By</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody>
                     <?php 
-                    $sql_users = "SELECT u.*, r.name as referrer_name FROM users u LEFT JOIN users r ON u.referred_by = r.id";
+                    // ✅ ONLY USERS (role = 'user'), Admin/Sub-Admin नहीं
+                    $sql_users = "SELECT u.*, r.name as referrer_name FROM users u LEFT JOIN users r ON u.referred_by = r.id WHERE u.role = 'user'";
                     if(!empty($user_search)) {
-                        $sql_users .= " WHERE u.name ILIKE ? OR u.email ILIKE ?";
+                        $sql_users .= " AND (u.name ILIKE ? OR u.email ILIKE ?)";
                         $stmt = $pdo->prepare($sql_users . " ORDER BY u.id DESC");
                         $stmt->execute(['%'.$user_search.'%', '%'.$user_search.'%']);
                     } else {
@@ -148,7 +149,7 @@ if($role == 'admin'):
                                     <a href='?delete_user=".$u['id']."' class='btn btn-sm btn-danger' onclick='return confirm(\"Delete?\")'>Del</a>
                                 </td>";
                             } else if($is_self) { echo "<td><span class='text-muted'>You</span></td>"; } 
-                            else { echo "<td><span class='text-muted'>View Only (Sub-Admin)</span></td>"; }
+                            else { echo "<td><span class='text-muted'>View Only</span></td>"; }
                             echo "</tr>";
                         }
                     } else {
@@ -188,7 +189,7 @@ if($role == 'admin'):
                     <select name="new_referrer_id" id="refSelect" class="form-control" size="6" required>
                         <option value="">None (Direct)</option>
                         <?php 
-                        $all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
+                        $all_users = $pdo->query("SELECT id, name, email FROM users WHERE role = 'user' ORDER BY name")->fetchAll();
                         foreach($all_users as $usr) {
                             echo "<option value='".$usr['id']."'>".htmlspecialchars($usr['name'])." (".htmlspecialchars($usr['email']).")</option>";
                         }
@@ -254,7 +255,7 @@ if($role == 'admin'):
     </div>
 
 <?php else: 
-    // ---- USER VIEW ----
+    // ---- USER VIEW (ONLY NORMAL USERS SEE THIS) ----
     $user_stmt = $pdo->prepare("SELECT *, created_at as reg_date, city FROM users WHERE id = ?");
     $user_stmt->execute([$user_id]);
     $user = $user_stmt->fetch();
