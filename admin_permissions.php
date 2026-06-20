@@ -1,14 +1,25 @@
 <?php
-require_once 'db.php';
-require_once 'functions.php';
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { header("Location: dashboard.php"); exit; }
-if(!hasViewPermission('users', $pdo)) { die("Permission denied."); }
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/functions.php';
 
+if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { 
+    header("Location: dashboard.php"); 
+    exit; 
+}
+
+// ✅ सिर्फ Super Admin ही इस पेज को देख/इस्तेमाल कर सकता है
+if(!isset($_SESSION['is_super_admin']) || !$_SESSION['is_super_admin']) {
+    die("<div class='alert alert-danger m-5' style='background:white; padding:20px; border-radius:10px;'>❌ Access Denied. <br> Only Super Admin can manage Sub-Admins.</div>");
+}
+
+$error = '';
+// ---- Create Sub-Admin ----
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_subadmin'])) {
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
     $ref_code = generateReferralCode();
+    
     $perms = [];
     $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting'];
     foreach($modules as $mod) {
@@ -16,14 +27,18 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_subadmin'])) {
         $edit = isset($_POST['edit_' . $mod]);
         $perms[$mod] = ['view' => $view, 'edit' => $edit];
     }
+    
     try {
         $sql = "INSERT INTO users (name, email, password, referral_code, role, permissions, status, is_super_admin) VALUES (?,?,?,?, 'admin', ?, 'active', FALSE)";
         $pdo->prepare($sql)->execute([$name, $email, $password, $ref_code, json_encode($perms)]);
         header("Location: admin_permissions.php?created=1");
         exit;
-    } catch(PDOException $e) { $error = "❌ Error: " . $e->getMessage(); }
+    } catch(PDOException $e) {
+        $error = "❌ Error: " . $e->getMessage();
+    }
 }
 
+// ---- Update Permissions ----
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_permissions'])) {
     $user_id = $_POST['user_id'];
     $perms = [];
