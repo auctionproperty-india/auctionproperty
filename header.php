@@ -5,6 +5,20 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
 $role = $_SESSION['role'] ?? 'user';
+
+// ✅ Super Admin Check (इसी का उपयोग Sidebar में करेंगे)
+$is_super_admin = false;
+if(isset($_SESSION['user_id'])) {
+    $stmt = $pdo->prepare("SELECT is_super_admin FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $row = $stmt->fetch();
+    if($row && $row['is_super_admin']) {
+        $is_super_admin = true;
+        $_SESSION['is_super_admin'] = true;
+    } else {
+        $_SESSION['is_super_admin'] = false;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -97,13 +111,18 @@ $role = $_SESSION['role'] ?? 'user';
     <a href="dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
     
     <?php if($role == 'admin'): ?>
+        <!-- Properties: All Admins (Super + Sub) -->
         <?php if(hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
         <?php endif; ?>
-        <?php if(hasViewPermission('users', $pdo)): ?>
+        
+        <!-- ✅ Users & Sub-Admins: सिर्फ Super Admin (is_super_admin) को दिखे -->
+        <?php if($is_super_admin): ?>
             <a href="dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
+        
+        <!-- Packages, Subscriptions, Referrals, Accounting, Settings -->
         <?php if(hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
         <?php endif; ?>
@@ -119,8 +138,9 @@ $role = $_SESSION['role'] ?? 'user';
         <?php if(hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
+        
     <?php else: ?>
-        <!-- ✅ User Sidebar (All features shifted here) -->
+        <!-- User Sidebar -->
         <a href="index.php"><i class="fas fa-home"></i> <span>Explore Properties</span></a>
         <a href="#"><i class="fas fa-heart"></i> <span>My Favorites</span></a>
         <a href="dashboard.php#packages"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
