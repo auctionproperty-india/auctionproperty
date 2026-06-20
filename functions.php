@@ -1,5 +1,5 @@
 <?php
-// ---- Currency Format ----
+// ---- Currency ----
 function indianCurrencyFormat($number) {
     if ($number === null || $number === '') return '0';
     $number = (float) $number;
@@ -12,7 +12,7 @@ function indianCurrencyFormat($number) {
     return $rest . ',' . $last;
 }
 
-// ---- Subscription Check ----
+// ---- Subscription ----
 function hasActiveSubscription($pdo, $user_id, $property_id = null) {
     if($property_id) {
         $stmt = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND property_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
@@ -31,7 +31,7 @@ function userHasActiveSubscription($pdo, $user_id) {
     return $stmt->rowCount() > 0;
 }
 
-// ---- Permission Functions ----
+// ---- Permission Helpers (New Read/Write System) ----
 function getUserPermissions($user_id, $pdo) {
     try {
         $stmt = $pdo->prepare("SELECT permissions, is_super_admin FROM users WHERE id = ?");
@@ -40,30 +40,43 @@ function getUserPermissions($user_id, $pdo) {
         if(!$user) return [];
 
         if(!empty($user['is_super_admin']) && $user['is_super_admin']) {
-            return ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true, 'referrals'=>true];
+            $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals'];
+            $full = [];
+            foreach($modules as $m) $full[$m] = ['view' => true, 'edit' => true];
+            return $full;
         }
 
-        $perms = [];
-        if(!empty($user['permissions'])) {
-            $perms = json_decode($user['permissions'], true);
-            if(!is_array($perms)) $perms = [];
-        }
-        if(empty($perms)) {
-            $perms = ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true, 'referrals'=>true];
+        $perms = json_decode($user['permissions'], true);
+        if(!is_array($perms)) $perms = [];
+        
+        // Ensure all modules exist with default false
+        $default_modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals'];
+        foreach($default_modules as $mod) {
+            if(!isset($perms[$mod])) $perms[$mod] = ['view' => false, 'edit' => false];
+            if(!isset($perms[$mod]['view'])) $perms[$mod]['view'] = false;
+            if(!isset($perms[$mod]['edit'])) $perms[$mod]['edit'] = false;
         }
         return $perms;
     } catch (Exception $e) {
-        return ['properties'=>true, 'users'=>true, 'packages'=>true, 'subscriptions'=>true, 'settings'=>true, 'referrals'=>true];
+        return [];
     }
 }
 
-function hasPermission($permission, $pdo) {
+function hasPermission($permission, $pdo, $type = 'view') {
     if(!isset($_SESSION['user_id'])) return false;
     $perms = getUserPermissions($_SESSION['user_id'], $pdo);
-    return isset($perms[$permission]) && $perms[$permission] === true;
+    return isset($perms[$permission][$type]) && $perms[$permission][$type] === true;
 }
 
-// ---- Referral System Functions ----
+function hasEditPermission($permission, $pdo) {
+    return hasPermission($permission, $pdo, 'edit');
+}
+
+function hasViewPermission($permission, $pdo) {
+    return hasPermission($permission, $pdo, 'view');
+}
+
+// ---- Referral System ----
 function generateReferralCode() {
     return strtoupper(substr(md5(uniqid()), 0, 8));
 }
@@ -82,7 +95,6 @@ function getReferralLink($user_id) {
     $stmt->execute([$user_id]);
     $code = $stmt->fetchColumn();
     if(!$code) {
-        // अगर कोड नहीं है तो नया जनरेट करें
         $new_code = generateReferralCode();
         $pdo->prepare("UPDATE users SET referral_code = ? WHERE id = ?")->execute([$new_code, $user_id]);
         $code = $new_code;
@@ -104,6 +116,23 @@ function getReferralEarnings($pdo, $user_id, $status = null) {
     return $stmt->fetchAll();
 }
 
+function getReferredUsers($pdo, $user_id) {
+    $sql = "SELECT u.id, u.name, u.email, u.created_at as reg_date, 
+            (SELECT s.start_date FROM subscriptions s WHERE s.user_id = u.id AND s.status = 'active' ORDER BY s.id LIMIT 1) as activation_date
+            FROM users u 
+            WHERE u.referred_by = ? 
+            ORDER BY u.created_at DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$user_id]);
+    return $stmt->fetchAll();
+}
+
+function getReferrerName($pdo, $user_id) {
+    $stmt = $pdo->prepare("SELECT u.name FROM users u JOIN users r ON u.id = r.referred_by WHERE r.id = ?");
+    $stmt->execute([$user_id]);
+    return $stmt->fetchColumn() ?: 'N/A';
+}
+
 function calculateReferralNet($amount, $tds_percent, $admin_charge_percent) {
     $tds = ($amount * $tds_percent) / 100;
     $admin_charge = ($amount * $admin_charge_percent) / 100;
@@ -111,7 +140,7 @@ function calculateReferralNet($amount, $tds_percent, $admin_charge_percent) {
     return ['tds' => $tds, 'admin_charge' => $admin_charge, 'net' => $net];
 }
 
-// ---- Social Image Generator ----
+// ---- Social Image ----
 function generateSocialCard($property) {
     if (!extension_loaded('gd')) return $property['image_url'] ?? '';
     $font_path = __DIR__ . '/fonts/Inter.ttf';
@@ -147,7 +176,7 @@ function generateSocialCard($property) {
             imagestring($img, $f_size, $px, 450, $price, $gold);
             return saveImage($img);
         }
-        // Premium layout with TrueType
+        // Premium layout
         $bank = strtoupper($property['bank_name'] ?? 'BANK AUCTION');
         $bank_size = 34;
         $bank_box = imagettfbbox($bank_size, 0, $font_path, $bank);
