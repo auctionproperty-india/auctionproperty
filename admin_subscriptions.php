@@ -1,22 +1,36 @@
 <?php
 require_once 'db.php';
+require_once 'functions.php';
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { header("Location: dashboard.php"); exit; }
+if(!hasPermission('subscriptions', $pdo)) { die("Permission denied."); }
 
-// Activate (Approve)
 if(isset($_GET['activate'])) {
     $sub_id = $_GET['activate'];
-    $sub = $pdo->prepare("SELECT s.*, p.duration_months FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.id = ?");
+    $sub = $pdo->prepare("SELECT s.*, p.duration_months, p.referral_bonus, u.referred_by FROM subscriptions s 
+                          JOIN packages p ON s.package_id = p.id 
+                          JOIN users u ON s.user_id = u.id 
+                          WHERE s.id = ?");
     $sub->execute([$sub_id]);
     $data = $sub->fetch();
     if($data) {
         $end = date('Y-m-d', strtotime("+{$data['duration_months']} months"));
         $pdo->prepare("UPDATE subscriptions SET status = 'active', start_date = CURRENT_DATE, end_date = ? WHERE id = ?")->execute([$end, $sub_id]);
+        
+        // Referral Bonus: अगर इस User को किसी ने Refer किया है
+        if($data['referred_by'] && $data['referral_bonus'] > 0) {
+            // Check if already credited for this subscription
+            $check = $pdo->prepare("SELECT id FROM user_referral_earnings WHERE user_id = ? AND referred_user_id = ? AND package_id = ?");
+            $check->execute([$data['referred_by'], $data['user_id'], $data['package_id']]);
+            if($check->rowCount() == 0) {
+                $pdo->prepare("INSERT INTO user_referral_earnings (user_id, referred_user_id, package_id, amount, status) VALUES (?, ?, ?, ?, 'pending')")
+                    ->execute([$data['referred_by'], $data['user_id'], $data['package_id'], $data['referral_bonus']]);
+            }
+        }
     }
     header("Location: admin_subscriptions.php?done=1");
     exit;
 }
 
-// Reject
 if(isset($_GET['reject'])) {
     $sub_id = $_GET['reject'];
     $pdo->prepare("UPDATE subscriptions SET status = 'rejected' WHERE id = ?")->execute([$sub_id]);
@@ -35,8 +49,8 @@ $pendings = $pdo->query("SELECT s.*, u.name as uname, p.title as ptitle, pk.name
 <div class="card-premium">
     <h4><i class="fas fa-clock me-2"></i>Pending Subscriptions</h4>
     <?php if(isset($_GET['done'])): 
-        if($_GET['done'] == 1) echo "<div class='alert alert-success'>✅ Subscription Activated!</div>";
-        if($_GET['done'] == 2) echo "<div class='alert alert-warning'>⛔ Subscription Rejected!</div>";
+        if($_GET['done'] == 1) echo "<div class='alert alert-success'>✅ Activated! Referral bonus credited (if any).</div>";
+        if($_GET['done'] == 2) echo "<div class='alert alert-warning'>⛔ Rejected!</div>";
     endif; ?>
     <?php if(count($pendings) > 0): ?>
         <div class="table-responsive">
