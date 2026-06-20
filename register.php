@@ -1,20 +1,33 @@
-<?php require_once 'db.php';
+<?php
+require_once 'db.php';
+require_once 'functions.php';
 if(isset($_SESSION['user_id'])) header("Location: dashboard.php");
+
 $error = '';
+$referral_code = isset($_GET['ref']) ? trim($_GET['ref']) : '';
+
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     $phone = trim($_POST['phone']);
     $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
-    $ref_code = strtoupper(substr(md5(uniqid()), 0, 8));
+    $ref_code = generateReferralCode();
+    $ref_by = null;
+    
+    // अगर Referral Code मिला तो Referrer ID फेच करें
+    $input_ref = trim($_POST['referral_code'] ?? '');
+    if(!empty($input_ref)) {
+        $ref_by = getReferrerIdByCode($pdo, $input_ref);
+    }
+    
     try {
-        $stmt = $pdo->prepare("INSERT INTO users (name, email, password, phone, referral_code, role, status) VALUES (?,?,?,?,?, 'user', 'active')");
-        $stmt->execute([$name, $email, $password, $phone, $ref_code]);
+        $stmt = $pdo->prepare("INSERT INTO users (name, email, password, phone, referral_code, referred_by, role, status) VALUES (?,?,?,?,?,?, 'user', 'active')");
+        $stmt->execute([$name, $email, $password, $phone, $ref_code, $ref_by]);
         header("Location: login.php?msg=Registered");
         exit;
     } catch(PDOException $e) {
-        if(str_contains($e->getMessage(), 'email')) $error = "Email already exists!";
-        else $error = "Error: ".$e->getMessage();
+        if(str_contains($e->getMessage(), 'email')) $error = "❌ Email already exists!";
+        else $error = "❌ Error: ".$e->getMessage();
     }
 }
 ?>
@@ -30,6 +43,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
         <input type="password" name="password" placeholder="Password" class="form-control mb-2" required>
         <input type="text" name="phone" placeholder="Phone" class="form-control mb-2">
+        <input type="text" name="referral_code" placeholder="Referral Code (optional)" class="form-control mb-2" value="<?= htmlspecialchars($referral_code) ?>">
         <button class="btn btn-primary w-100">Register</button>
         <p class="mt-2">Already have account? <a href="login.php">Login</a></p>
     </form>
