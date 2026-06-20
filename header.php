@@ -1,8 +1,11 @@
 <?php
-if(session_status() == PHP_SESSION_NONE) session_start();
-if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
+
+if(!isset($_SESSION['user_id'])) { 
+    header("Location: login.php"); 
+    exit; 
+}
 
 $role = $_SESSION['role'] ?? 'user';
 
@@ -124,7 +127,7 @@ if(isset($_SESSION['user_id'])) {
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
         <?php endif; ?>
         <?php if(hasViewPermission('subscriptions', $pdo)): ?>
-            <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Subscriptions</span></a>
+            <a href="subscription_history.php"><i class="fas fa-list-alt"></i> <span>Subscription History</span></a>
         <?php endif; ?>
         <?php if(hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
