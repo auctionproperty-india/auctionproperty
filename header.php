@@ -159,31 +159,29 @@ $role = $_SESSION['role'] ?? 'user';
     <a href="dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
     
     <?php if($role == 'admin'): ?>
-        <?php if(hasPermission('properties', $pdo)): ?>
+        <?php if(hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
         <?php endif; ?>
-        <?php if(hasPermission('users', $pdo)): ?>
+        <?php if(hasViewPermission('users', $pdo)): ?>
             <a href="dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
-        <?php if(hasPermission('packages', $pdo)): ?>
+        <?php if(hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
         <?php endif; ?>
-        <?php if(hasPermission('subscriptions', $pdo)): ?>
+        <?php if(hasViewPermission('subscriptions', $pdo)): ?>
             <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Subscriptions</span></a>
         <?php endif; ?>
-        <!-- ✅ Referral Payouts Link (Admin Sidebar) -->
-        <?php if(hasPermission('referrals', $pdo)): ?>
+        <?php if(hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
-        <?php if(hasPermission('settings', $pdo)): ?>
+        <?php if(hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
     <?php else: ?>
         <a href="index.php"><i class="fas fa-home"></i> <span>Explore Properties</span></a>
         <a href="#"><i class="fas fa-heart"></i> <span>My Favorites</span></a>
-        <!-- ✅ User Sidebar में Referrals Link (वैकल्पिक) -->
-        <a href="dashboard.php#referralHistory"><i class="fas fa-link"></i> <span>Referrals</span></a>
+        <a href="dashboard.php#teamSection"><i class="fas fa-users"></i> <span>My Team</span></a>
     <?php endif; ?>
     
     <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
