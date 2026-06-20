@@ -11,6 +11,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     $phone = trim($_POST['phone']);
+    $city = trim($_POST['city']);
     $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
     $ref_code = generateReferralCode();
     $ref_by = null;
@@ -21,8 +22,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     try {
-        $stmt = $pdo->prepare("INSERT INTO users (name, email, password, phone, referral_code, referred_by, role, status) VALUES (?,?,?,?,?,?, 'user', 'active')");
-        $stmt->execute([$name, $email, $password, $phone, $ref_code, $ref_by]);
+        $stmt = $pdo->prepare("INSERT INTO users (name, email, password, phone, city, referral_code, referred_by, role, status) VALUES (?,?,?,?,?,?,?, 'user', 'active')");
+        $stmt->execute([$name, $email, $password, $phone, $city, $ref_code, $ref_by]);
         header("Location: login.php?msg=Registered");
         exit;
     } catch(PDOException $e) {
@@ -41,6 +42,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <form method="POST">
         <input type="text" name="name" placeholder="Full Name" class="form-control mb-2" required>
         <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
+        <input type="text" name="city" placeholder="Your City (e.g. Indore)" class="form-control mb-2" required>
         <input type="password" name="password" placeholder="Password" class="form-control mb-2" required>
         <input type="text" name="phone" placeholder="Phone" class="form-control mb-2">
         <div class="input-group mb-2">
