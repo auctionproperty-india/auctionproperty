@@ -1,5 +1,5 @@
 <?php
-// ---- Currency ----
+// ---- Currency Format ----
 function indianCurrencyFormat($number) {
     if ($number === null || $number === '') return '0';
     $number = (float) $number;
@@ -31,7 +31,7 @@ function userHasActiveSubscription($pdo, $user_id) {
     return $stmt->rowCount() > 0;
 }
 
-// ---- Permission Helpers (New Read/Write System) ----
+// ---- Permission Helpers (Read/Write) ----
 function getUserPermissions($user_id, $pdo) {
     try {
         $stmt = $pdo->prepare("SELECT permissions, is_super_admin FROM users WHERE id = ?");
@@ -40,7 +40,7 @@ function getUserPermissions($user_id, $pdo) {
         if(!$user) return [];
 
         if(!empty($user['is_super_admin']) && $user['is_super_admin']) {
-            $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals'];
+            $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting'];
             $full = [];
             foreach($modules as $m) $full[$m] = ['view' => true, 'edit' => true];
             return $full;
@@ -48,9 +48,7 @@ function getUserPermissions($user_id, $pdo) {
 
         $perms = json_decode($user['permissions'], true);
         if(!is_array($perms)) $perms = [];
-        
-        // Ensure all modules exist with default false
-        $default_modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals'];
+        $default_modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting'];
         foreach($default_modules as $mod) {
             if(!isset($perms[$mod])) $perms[$mod] = ['view' => false, 'edit' => false];
             if(!isset($perms[$mod]['view'])) $perms[$mod]['view'] = false;
@@ -140,7 +138,31 @@ function calculateReferralNet($amount, $tds_percent, $admin_charge_percent) {
     return ['tds' => $tds, 'admin_charge' => $admin_charge, 'net' => $net];
 }
 
-// ---- Social Image ----
+function changeReferrer($pdo, $user_id, $new_referrer_id) {
+    if($user_id == $new_referrer_id) return false;
+    $pdo->prepare("UPDATE users SET referred_by = ?, manual_referral_updated = TRUE WHERE id = ?")->execute([$new_referrer_id, $user_id]);
+    return true;
+}
+
+// ---- Accounting System ----
+function addAccountEntry($pdo, $type, $amount, $description, $category, $entry_date = null) {
+    if($entry_date === null) $entry_date = date('Y-m-d');
+    $stmt = $pdo->prepare("INSERT INTO account_entries (type, amount, description, category, entry_date) VALUES (?, ?, ?, ?, ?)");
+    return $stmt->execute([$type, $amount, $description, $category, $entry_date]);
+}
+
+function getAccountBalance($pdo) {
+    $income = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM account_entries WHERE type = 'income'")->fetchColumn();
+    $expense = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM account_entries WHERE type = 'expense'")->fetchColumn();
+    return ['income' => $income, 'expense' => $expense, 'balance' => $income - $expense];
+}
+
+function getAccountEntries($pdo, $limit = 100) {
+    $stmt = $pdo->query("SELECT * FROM account_entries ORDER BY entry_date DESC, id DESC LIMIT $limit");
+    return $stmt->fetchAll();
+}
+
+// ---- Social Image Generator (Shortened for space) ----
 function generateSocialCard($property) {
     if (!extension_loaded('gd')) return $property['image_url'] ?? '';
     $font_path = __DIR__ . '/fonts/Inter.ttf';
@@ -176,7 +198,6 @@ function generateSocialCard($property) {
             imagestring($img, $f_size, $px, 450, $price, $gold);
             return saveImage($img);
         }
-        // Premium layout
         $bank = strtoupper($property['bank_name'] ?? 'BANK AUCTION');
         $bank_size = 34;
         $bank_box = imagettfbbox($bank_size, 0, $font_path, $bank);
