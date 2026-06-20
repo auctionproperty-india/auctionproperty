@@ -120,9 +120,13 @@ $role = $_SESSION['role'] ?? 'user';
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
     <?php else: ?>
+        <!-- ✅ User Sidebar (All features shifted here) -->
         <a href="index.php"><i class="fas fa-home"></i> <span>Explore Properties</span></a>
         <a href="#"><i class="fas fa-heart"></i> <span>My Favorites</span></a>
+        <a href="dashboard.php#packages"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="dashboard.php#teamSection"><i class="fas fa-users"></i> <span>My Team</span></a>
+        <a href="dashboard.php#subHistoryUser"><i class="fas fa-history"></i> <span>Payment History</span></a>
+        <a href="dashboard.php#referralHistory"><i class="fas fa-link"></i> <span>Referrals</span></a>
     <?php endif; ?>
     
     <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
