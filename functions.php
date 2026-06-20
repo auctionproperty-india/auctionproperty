@@ -1,5 +1,5 @@
 <?php
-// ---- Currency ----
+// ---- Currency Format ----
 function indianCurrencyFormat($number) {
     if ($number === null || $number === '') return '0';
     $number = (float) $number;
@@ -12,7 +12,7 @@ function indianCurrencyFormat($number) {
     return $rest . ',' . $last;
 }
 
-// ---- Subscription ----
+// ---- Subscription Check ----
 function hasActiveSubscription($pdo, $user_id, $property_id = null) {
     if($property_id) {
         $stmt = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND property_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
@@ -31,7 +31,7 @@ function userHasActiveSubscription($pdo, $user_id) {
     return $stmt->rowCount() > 0;
 }
 
-// ---- Permissions ----
+// ---- Permission Functions ----
 function getUserPermissions($user_id, $pdo) {
     try {
         $stmt = $pdo->prepare("SELECT permissions, is_super_admin FROM users WHERE id = ?");
@@ -63,7 +63,7 @@ function hasPermission($permission, $pdo) {
     return isset($perms[$permission]) && $perms[$permission] === true;
 }
 
-// ---- Referral ----
+// ---- Referral System Functions ----
 function generateReferralCode() {
     return strtoupper(substr(md5(uniqid()), 0, 8));
 }
@@ -81,6 +81,12 @@ function getReferralLink($user_id) {
     $stmt = $pdo->prepare("SELECT referral_code FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $code = $stmt->fetchColumn();
+    if(!$code) {
+        // अगर कोड नहीं है तो नया जनरेट करें
+        $new_code = generateReferralCode();
+        $pdo->prepare("UPDATE users SET referral_code = ? WHERE id = ?")->execute([$new_code, $user_id]);
+        $code = $new_code;
+    }
     return $_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'] . '/register.php?ref=' . $code;
 }
 
@@ -105,7 +111,7 @@ function calculateReferralNet($amount, $tds_percent, $admin_charge_percent) {
     return ['tds' => $tds, 'admin_charge' => $admin_charge, 'net' => $net];
 }
 
-// ---- Social Image ----
+// ---- Social Image Generator ----
 function generateSocialCard($property) {
     if (!extension_loaded('gd')) return $property['image_url'] ?? '';
     $font_path = __DIR__ . '/fonts/Inter.ttf';
