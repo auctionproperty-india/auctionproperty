@@ -1,11 +1,21 @@
 <?php
-require_once 'db.php';
-require_once 'functions.php';
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { header("Location: dashboard.php"); exit; }
-if(!hasPermission('referrals', $pdo)) { die("Permission denied."); }
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/functions.php';
+
+if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { 
+    header("Location: dashboard.php"); 
+    exit; 
+}
+
+if(!hasViewPermission('referrals', $pdo)) {
+    die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page.</div>");
+}
 
 // Mark as Paid
 if(isset($_GET['pay']) && isset($_GET['id'])) {
+    if(!hasEditPermission('referrals', $pdo)) {
+        die("<div class='alert alert-danger m-5'>❌ You do not have permission to edit referrals.</div>");
+    }
     $id = $_GET['pay'];
     $tds_percent = $_POST['tds_percent'] ?? 10;
     $admin_charge_percent = $_POST['admin_charge_percent'] ?? 5;
@@ -13,7 +23,6 @@ if(isset($_GET['pay']) && isset($_GET['id'])) {
     $account_number = $_POST['account_number'] ?? '';
     $ifsc = $_POST['ifsc'] ?? '';
     
-    // Get earning amount
     $earn = $pdo->prepare("SELECT amount FROM user_referral_earnings WHERE id = ?");
     $earn->execute([$id]);
     $amount = $earn->fetchColumn();
@@ -61,7 +70,8 @@ $paid = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_nam
     <?php if(count($pending) > 0): ?>
         <div class="table-responsive">
             <table class="table table-bordered">
-                <thead><tr><th>Referrer</th><th>Referred User</th><th>Package</th><th>Amount (₹)</th><th>Action</th></tr></thead>
+                <thead><tr><th>Referrer</th><th>Referred User</th><th>Package</th><th>Amount (₹)</th>
+                <?php if(hasEditPermission('referrals', $pdo)): ?><th>Action</th><?php endif; ?></tr></thead>
                 <tbody>
                 <?php foreach($pending as $p): ?>
                     <tr>
@@ -69,16 +79,18 @@ $paid = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_nam
                         <td><?= htmlspecialchars($p['referred_name']) ?></td>
                         <td><?= htmlspecialchars($p['package_name']) ?></td>
                         <td>₹<?= indianCurrencyFormat($p['amount']) ?></td>
+                        <?php if(hasEditPermission('referrals', $pdo)): ?>
                         <td>
                             <form method="POST" action="?pay=1&id=<?= $p['id'] ?>" class="row g-2">
-                                <div class="col-md-3"><input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="10" placeholder="TDS %"></div>
-                                <div class="col-md-3"><input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="5" placeholder="Admin %"></div>
-                                <div class="col-md-2"><input type="text" name="bank_name" class="form-control form-control-sm" placeholder="Bank"></div>
+                                <div class="col-md-2"><input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="10" placeholder="TDS %"></div>
+                                <div class="col-md-2"><input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="5" placeholder="Admin %"></div>
+                                <div class="col-md-3"><input type="text" name="bank_name" class="form-control form-control-sm" placeholder="Bank"></div>
                                 <div class="col-md-2"><input type="text" name="account_number" class="form-control form-control-sm" placeholder="A/c No."></div>
                                 <div class="col-md-2"><input type="text" name="ifsc" class="form-control form-control-sm" placeholder="IFSC"></div>
                                 <div class="col-md-12"><button type="submit" class="btn btn-sm btn-success w-100">Mark Paid</button></div>
                             </form>
                         </td>
+                        <?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -110,7 +122,6 @@ $paid = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_nam
                 </tbody>
             </table>
         </div>
-        <!-- Download Excel Button -->
         <a href="download_referral_excel.php" class="btn btn-success mt-3"><i class="fas fa-file-excel"></i> Download Excel</a>
     <?php else: echo "<p class='text-muted'>No paid payouts yet.</p>"; endif; ?>
 </div>
