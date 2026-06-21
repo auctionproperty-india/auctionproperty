@@ -16,35 +16,53 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $ref_code = generateReferralCode();
     $ref_by = null;
     
-    $input_ref = trim($_POST['referral_code'] ?? '');
-    if(!empty($input_ref)) {
-        $ref_by = getReferrerIdByCode($pdo, $input_ref);
-    }
-    
-    try {
-        $stmt = $pdo->prepare("INSERT INTO users (name, email, password, phone, city, referral_code, referred_by, role, status) VALUES (?,?,?,?,?,?,?, 'user', 'active')");
-        $stmt->execute([$name, $email, $password, $phone, $city, $ref_code, $ref_by]);
-        header("Location: login.php?msg=Registered");
-        exit;
-    } catch(PDOException $e) {
-        if(str_contains($e->getMessage(), 'email')) $error = "❌ Email already exists!";
-        else $error = "❌ Error: ".$e->getMessage();
+    // ✅ Phone Validation: Must be exactly 10 digits
+    if(!preg_match('/^[0-9]{10}$/', $phone)) {
+        $error = "❌ Phone number must be exactly 10 digits!";
+    } else {
+        $input_ref = trim($_POST['referral_code'] ?? '');
+        if(!empty($input_ref)) {
+            $ref_by = getReferrerIdByCode($pdo, $input_ref);
+        }
+        
+        try {
+            $stmt = $pdo->prepare("INSERT INTO users (name, email, password, phone, city, referral_code, referred_by, role, status) VALUES (?,?,?,?,?,?,?, 'user', 'active')");
+            $stmt->execute([$name, $email, $password, $phone, $city, $ref_code, $ref_by]);
+            header("Location: login.php?msg=Registered");
+            exit;
+        } catch(PDOException $e) {
+            if(str_contains($e->getMessage(), 'email')) $error = "❌ Email already exists!";
+            else $error = "❌ Error: ".$e->getMessage();
+        }
     }
 }
 ?>
 <!DOCTYPE html>
 <html>
-<head><title>Register</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"></head>
+<head><title>Register</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<script>
+function validateForm() {
+    var phone = document.getElementById('phone').value;
+    var phoneRegex = /^[0-9]{10}$/;
+    if(!phoneRegex.test(phone)) {
+        alert('Phone number must be exactly 10 digits!');
+        return false;
+    }
+    return true;
+}
+</script>
+</head>
 <body>
 <div class="container mt-5" style="max-width:500px;">
     <h2>Register</h2>
     <?php if($error) echo "<div class='alert alert-danger'>$error</div>"; ?>
-    <form method="POST">
+    <form method="POST" onsubmit="return validateForm()">
         <input type="text" name="name" placeholder="Full Name" class="form-control mb-2" required>
         <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
         <input type="text" name="city" placeholder="Your City (e.g. Indore)" class="form-control mb-2" required>
-        <input type="password" name="password" placeholder="Password" class="form-control mb-2" required>
-        <input type="text" name="phone" placeholder="Phone" class="form-control mb-2">
+        <input type="password" name="password" placeholder="Password" class="form-control mb-2" required minlength="4">
+        <input type="text" name="phone" id="phone" placeholder="Phone (10 digits)" class="form-control mb-2" required maxlength="10" pattern="[0-9]{10}" title="Must be exactly 10 digits">
         <div class="input-group mb-2">
             <span class="input-group-text bg-light"><i class="fas fa-link"></i></span>
             <input type="text" name="referral_code" placeholder="Referral Code" class="form-control" value="<?= htmlspecialchars($referral_code) ?>" <?= $readonly ?>>
