@@ -11,7 +11,6 @@ if(!hasViewPermission('accounting', $pdo)) {
 }
 
 $message = '';
-// Add Entry
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_entry'])) {
     if(!hasEditPermission('accounting', $pdo)) {
         die("<div class='alert alert-danger m-5'>❌ You do not have permission to add entries.</div>");
@@ -28,7 +27,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_entry'])) {
     } else { $message = "<div class='alert alert-danger'>❌ Please fill all fields correctly.</div>"; }
 }
 
-// Delete Entry
 if(isset($_GET['delete'])) {
     if(!hasEditPermission('accounting', $pdo)) {
         die("<div class='alert alert-danger m-5'>❌ You do not have permission to delete entries.</div>");
@@ -45,7 +43,7 @@ $entries = getAccountEntries($pdo, 200);
 <div class="row g-3 mb-4">
     <div class="col-md-4"><div class="card p-3 bg-success text-white text-center rounded-4"><h5>Total Income</h5><h2>₹ <?= indianCurrencyFormat($balance['income']) ?></h2></div></div>
     <div class="col-md-4"><div class="card p-3 bg-danger text-white text-center rounded-4"><h5>Total Expense</h5><h2>₹ <?= indianCurrencyFormat($balance['expense']) ?></h2></div></div>
-    <div class="col-md-4"><div class="card p-3 bg-primary text-white text-center rounded-4"><h5>Net Balance</h5><h2>₹ <?= indianCurrencyFormat($balance['balance']) ?></h2></div></div>
+    <div class="col-md-4"><div class="card p-3 bg-primary text-white text-center rounded-4"><h5>💰 Available Balance</h5><h2>₹ <?= indianCurrencyFormat($balance['balance']) ?></h2></div></div>
 </div>
 
 <div class="card-premium mb-4">
