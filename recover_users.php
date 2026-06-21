@@ -2,7 +2,7 @@
 // ============================================================
 // ✅ यह फाइल TEST URL (auctionproperty-1) पर चलाएँ
 // ✅ Live से सारे Users को Test में Copy करेगी (Admin सहित)
-// ✅ Truncate से पहले Backup नहीं है – ध्यान से चलाएँ
+// ✅ Boolean और JSON Errors को Handle करेगी
 // ============================================================
 
 // ---- Error Reporting On ----
@@ -65,7 +65,7 @@ try {
 }
 
 // ============================================================
-// 3. Insert into Test
+// 3. Insert into Test (with proper data type conversion)
 // ============================================================
 echo "<h4>📥 Inserting users into Test...</h4>";
 $success_count = 0;
@@ -73,6 +73,29 @@ $error_count = 0;
 
 foreach ($live_users as $row) {
     try {
+        // Safe conversion for boolean columns
+        $is_super_admin = false;
+        if (isset($row['is_super_admin'])) {
+            $val = $row['is_super_admin'];
+            if ($val === 't' || $val === 'true' || $val === '1' || $val === 1 || $val === true) {
+                $is_super_admin = true;
+            } else {
+                $is_super_admin = false;
+            }
+        }
+
+        // Ensure permissions is valid JSON (if empty, use '{}')
+        $permissions = $row['permissions'] ?? '{}';
+        if (empty($permissions) || $permissions === '') {
+            $permissions = '{}';
+        }
+
+        // Wallet balance
+        $wallet_balance = isset($row['wallet_balance']) ? (float) $row['wallet_balance'] : 0;
+
+        // Referred_by can be null
+        $referred_by = !empty($row['referred_by']) ? (int) $row['referred_by'] : null;
+
         $stmt = $test_pdo->prepare("INSERT INTO users (
             id, name, email, password, phone, city, referral_code, 
             referred_by, role, status, permissions, is_super_admin, 
@@ -81,16 +104,16 @@ foreach ($live_users as $row) {
         $stmt->execute([
             $row['id'], $row['name'], $row['email'], $row['password'],
             $row['phone'] ?? '', $row['city'] ?? '', $row['referral_code'] ?? '',
-            $row['referred_by'] ?? null, $row['role'] ?? 'user', 
-            $row['status'] ?? 'active', $row['permissions'] ?? '{}',
-            $row['is_super_admin'] ?? false,
+            $referred_by, $row['role'] ?? 'user', 
+            $row['status'] ?? 'active', $permissions,
+            $is_super_admin,
             $row['otp_code'] ?? null, $row['otp_expiry'] ?? null,
-            $row['wallet_balance'] ?? 0, $row['created_at'] ?? date('Y-m-d H:i:s')
+            $wallet_balance, $row['created_at'] ?? date('Y-m-d H:i:s')
         ]);
         $success_count++;
     } catch (PDOException $e) {
         $error_count++;
-        echo "❌ Failed to insert user ID {$row['id']}: " . $e->getMessage() . "<br>";
+        echo "❌ Failed to insert user ID {$row['id']} (email: {$row['email']}): " . $e->getMessage() . "<br>";
     }
 }
 
