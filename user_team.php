@@ -10,7 +10,13 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php'; 
 
-$team_members = getReferredUsers($pdo, $user_id);
+// Explicit columns in query
+$sql = "SELECT u.id, u.name, u.email, u.created_at as reg_date, 
+        (SELECT s.start_date FROM subscriptions s WHERE s.user_id = u.id AND s.status = 'active' ORDER BY s.id LIMIT 1) as activation_date 
+        FROM users u WHERE u.referred_by = ? ORDER BY u.created_at DESC";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$user_id]);
+$team_members = $stmt->fetchAll();
 ?>
 <div class="card-premium">
     <h4><i class="fas fa-users me-2"></i>My Team (Referred Users)</h4>
