@@ -126,9 +126,12 @@ if(isset($_SESSION['user_id'])) {
         <?php if(hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
         <?php endif; ?>
+        
         <?php if(hasViewPermission('subscriptions', $pdo)): ?>
-            <a href="subscription_history.php"><i class="fas fa-list-alt"></i> <span>Subscription History</span></a>
+            <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
+            <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
         <?php endif; ?>
+        
         <?php if(hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
