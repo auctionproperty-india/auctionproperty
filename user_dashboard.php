@@ -11,8 +11,8 @@ $user_id = $_SESSION['user_id'];
 
 include 'header.php'; 
 
-// ---- User Data ----
-$user_stmt = $pdo->prepare("SELECT *, created_at as reg_date FROM users WHERE id = ?");
+// ---- User Data with Explicit Columns ----
+$user_stmt = $pdo->prepare("SELECT id, name, email, phone, city, referral_code, referred_by, role, status, created_at as reg_date, wallet_balance FROM users WHERE id = ?");
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch();
 
@@ -30,7 +30,7 @@ $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 // ---- Wallet Balance ----
 $wallet_balance = getUserWalletBalance($pdo, $user_id);
 
-// ---- Referral Earnings Summary (for info) ----
+// ---- Referral Earnings Summary ----
 $pending = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'pending'");
 $pending->execute([$user_id]);
 $pending_amt = $pending->fetchColumn();
@@ -53,7 +53,7 @@ $referral_link = getReferralLink($user_id);
     </div>
 </div>
 
-<!-- Wallet Cards (Now "Wallet" instead of "Available Balance") -->
+<!-- Wallet Cards -->
 <div class="row g-4 mb-4">
     <div class="col-md-4">
         <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #fef3c7, #fde68a);">
