@@ -5,7 +5,7 @@ if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
 $user_id = $_SESSION['user_id'];
 $package_id = $_GET['package_id'] ?? $_POST['package_id'] ?? 0;
-if(!$package_id) { header("Location: dashboard.php"); exit; }
+if(!$package_id) { header("Location: user_dashboard.php"); exit; }
 
 $pkg = $pdo->prepare("SELECT * FROM packages WHERE id = ?");
 $pkg->execute([$package_id]);
@@ -15,7 +15,7 @@ if(!$pkg) { die("Invalid package"); }
 $existing = $pdo->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND package_id = ? AND status = 'active'");
 $existing->execute([$user_id, $package_id]);
 if($existing->rowCount() > 0) {
-    header("Location: dashboard.php?msg=already_active");
+    header("Location: user_dashboard.php?msg=already_active");
     exit;
 }
 
@@ -26,32 +26,64 @@ $ifsc = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='compa
 $branch = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='company_branch'")->fetchColumn();
 $qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='company_qr_code'")->fetchColumn();
 
+// ---- User Wallet Balance ----
+$wallet_balance = getUserWalletBalance($pdo, $user_id);
+
 $message = '';
+$payment_success = false;
+
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_payment'])) {
     $payment_method = $_POST['payment_method'] ?? 'bank';
     $utr = trim($_POST['utr'] ?? '');
     $slip_path = '';
 
-    if($payment_method == 'bank') {
-        if(empty($utr)) {
-            $message = "<div class='alert alert-danger'>❌ Please enter UTR number.</div>";
-        } elseif(!isset($_FILES['slip']) || $_FILES['slip']['error'] != 0) {
-            $message = "<div class='alert alert-danger'>❌ Please upload a payment slip image.</div>";
+    // ---- WALLET PAYMENT (NEW) ----
+    if($payment_method == 'wallet') {
+        // Check balance
+        if($wallet_balance < $pkg['price']) {
+            $message = "<div class='alert alert-danger'>❌ Insufficient wallet balance. Your balance: ₹" . indianCurrencyFormat($wallet_balance) . "</div>";
         } else {
-            $upload_dir = 'uploads/';
-            if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $ext = pathinfo($_FILES['slip']['name'], PATHINFO_EXTENSION);
-            $filename = 'slip_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
-            move_uploaded_file($_FILES['slip']['tmp_name'], $upload_dir . $filename);
-            $slip_path = $upload_dir . $filename;
-        }
-    }
+            // Deduct from wallet
+            $deducted = debitWallet($pdo, $user_id, $pkg['price'], "Subscription to " . $pkg['name'], $package_id);
+            if($deducted) {
+                // Activate subscription directly (wallet payment is instant)
+                $end_date = date('Y-m-d', strtotime("+{$pkg['duration_months']} months"));
+                $stmt = $pdo->prepare("INSERT INTO subscriptions (user_id, package_id, property_id, amount, payment_method, utr, slip_path, status, start_date, end_date) VALUES (?, ?, NULL, ?, 'wallet', '', '', 'active', CURRENT_DATE, ?)");
+                $stmt->execute([$user_id, $package_id, $pkg['price'], $end_date]);
 
-    if(empty($message)) {
-        $stmt = $pdo->prepare("INSERT INTO subscriptions (user_id, package_id, property_id, amount, payment_method, utr, slip_path, status) VALUES (?, ?, NULL, ?, ?, ?, ?, 'pending')");
-        $stmt->execute([$user_id, $package_id, $pkg['price'], $payment_method, $utr, $slip_path]);
-        header("Location: dashboard.php?msg=request_sent");
-        exit;
+                // Add income to accounting
+                addAccountEntry($pdo, 'income', $pkg['price'], "Wallet payment for subscription from user ID $user_id", 'Subscription');
+
+                // Redirect to dashboard with success
+                header("Location: user_dashboard.php?msg=wallet_paid");
+                exit;
+            } else {
+                $message = "<div class='alert alert-danger'>❌ Wallet deduction failed. Please try again.</div>";
+            }
+        }
+    } else {
+        // ---- BANK/UPI PAYMENT (Existing) ----
+        if($payment_method == 'bank') {
+            if(empty($utr)) {
+                $message = "<div class='alert alert-danger'>❌ Please enter UTR number.</div>";
+            } elseif(!isset($_FILES['slip']) || $_FILES['slip']['error'] != 0) {
+                $message = "<div class='alert alert-danger'>❌ Please upload a payment slip image.</div>";
+            } else {
+                $upload_dir = 'uploads/';
+                if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+                $ext = pathinfo($_FILES['slip']['name'], PATHINFO_EXTENSION);
+                $filename = 'slip_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                move_uploaded_file($_FILES['slip']['tmp_name'], $upload_dir . $filename);
+                $slip_path = $upload_dir . $filename;
+            }
+        }
+
+        if(empty($message)) {
+            $stmt = $pdo->prepare("INSERT INTO subscriptions (user_id, package_id, property_id, amount, payment_method, utr, slip_path, status) VALUES (?, ?, NULL, ?, ?, ?, ?, 'pending')");
+            $stmt->execute([$user_id, $package_id, $pkg['price'], $payment_method, $utr, $slip_path]);
+            header("Location: user_dashboard.php?msg=request_sent");
+            exit;
+        }
     }
 }
 
@@ -64,7 +96,12 @@ $show_discount = $display_price && $display_price < $regular_price;
 <head>
     <title>Buy Subscription</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>body{background:#f4f7fc;}.container{max-width:700px;margin-top:80px;}.card{border-radius:20px;border:none;box-shadow:0 10px 30px rgba(0,0,0,0.05);}</style>
+    <style>
+        body{background:#f4f7fc;}
+        .container{max-width:700px;margin-top:80px;}
+        .card{border-radius:20px;border:none;box-shadow:0 10px 30px rgba(0,0,0,0.05);}
+        .wallet-box{background:#f0fdf4;border:2px solid #10b981;border-radius:12px;padding:15px;}
+    </style>
 </head>
 <body>
 <div class="container">
@@ -81,9 +118,16 @@ $show_discount = $display_price && $display_price < $regular_price;
                 <span class="fw-bold fs-4">₹ <?= indianCurrencyFormat($regular_price) ?></span>
             <?php endif; ?>
         </p>
+
+        <!-- Wallet Balance Display -->
+        <div class="wallet-box mb-3 d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-wallet"></i> Your Wallet Balance:</span>
+            <span class="fw-bold fs-5 text-success">₹ <?= indianCurrencyFormat($wallet_balance) ?></span>
+        </div>
+
         <hr>
 
-        <!-- Bank Details & QR Code -->
+        <!-- Bank Details & QR -->
         <div class="row g-3 mb-3">
             <?php if($bank_name && $account && $ifsc): ?>
             <div class="col-md-6">
@@ -109,24 +153,25 @@ $show_discount = $display_price && $display_price < $regular_price;
                 <label class="form-label fw-semibold">Payment Method</label>
                 <select name="payment_method" id="payment_method" class="form-control" onchange="toggleFields()">
                     <option value="bank">🏦 Bank Transfer (Upload Slip)</option>
+                    <option value="wallet">💰 Pay from Wallet (Instant)</option>
                     <option value="online">💳 Online Payment (Coming Soon)</option>
                 </select>
             </div>
             <div id="bank_fields">
                 <div class="mb-3">
                     <label class="form-label fw-semibold">UTR Number *</label>
-                    <input type="text" name="utr" class="form-control" placeholder="e.g. 123456789012" required>
+                    <input type="text" name="utr" class="form-control" placeholder="e.g. 123456789012">
                     <small class="text-muted">Your bank transaction reference number.</small>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Payment Slip (Screenshot) *</label>
-                    <input type="file" name="slip" class="form-control" accept="image/*" required>
+                    <input type="file" name="slip" class="form-control" accept="image/*">
                     <small class="text-muted">Upload screenshot of your bank payment.</small>
                 </div>
             </div>
             <button type="submit" name="submit_payment" class="btn btn-primary w-100">Submit Request</button>
         </form>
-        <a href="dashboard.php" class="btn btn-link mt-2 text-center">⬅ Cancel</a>
+        <a href="user_dashboard.php" class="btn btn-link mt-2 text-center">⬅ Cancel</a>
     </div>
 </div>
 <script>
