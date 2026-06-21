@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // ✅ यह फाइल TEST URL (auctionproperty-1) पर चलाएँ
-// ✅ Live से सारे Users को Test में Copy करेगी (Admin सहित)
+// ✅ Live से सारे Users को Test में Copy करेगी
 // ✅ Boolean और JSON Errors को Handle करेगी
 // ============================================================
 
@@ -73,27 +73,26 @@ $error_count = 0;
 
 foreach ($live_users as $row) {
     try {
-        // Safe conversion for boolean columns
-        $is_super_admin = false;
+        // ---- Safe conversion for boolean columns ----
+        // is_super_admin को String 'true' या 'false' में बदलें
+        $is_super_admin = 'false';
         if (isset($row['is_super_admin'])) {
             $val = $row['is_super_admin'];
             if ($val === 't' || $val === 'true' || $val === '1' || $val === 1 || $val === true) {
-                $is_super_admin = true;
-            } else {
-                $is_super_admin = false;
+                $is_super_admin = 'true';
             }
         }
 
-        // Ensure permissions is valid JSON (if empty, use '{}')
+        // Permissions – अगर खाली है तो '{}' डालें
         $permissions = $row['permissions'] ?? '{}';
         if (empty($permissions) || $permissions === '') {
             $permissions = '{}';
         }
 
-        // Wallet balance
+        // Wallet balance – 0 डिफॉल्ट
         $wallet_balance = isset($row['wallet_balance']) ? (float) $row['wallet_balance'] : 0;
 
-        // Referred_by can be null
+        // Referred_by – खाली हो तो NULL
         $referred_by = !empty($row['referred_by']) ? (int) $row['referred_by'] : null;
 
         $stmt = $test_pdo->prepare("INSERT INTO users (
@@ -106,7 +105,7 @@ foreach ($live_users as $row) {
             $row['phone'] ?? '', $row['city'] ?? '', $row['referral_code'] ?? '',
             $referred_by, $row['role'] ?? 'user', 
             $row['status'] ?? 'active', $permissions,
-            $is_super_admin,
+            $is_super_admin, // ✅ String 'true' या 'false'
             $row['otp_code'] ?? null, $row['otp_expiry'] ?? null,
             $wallet_balance, $row['created_at'] ?? date('Y-m-d H:i:s')
         ]);
