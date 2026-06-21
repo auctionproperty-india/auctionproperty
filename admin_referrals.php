@@ -6,7 +6,6 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: dashboard.php"); 
     exit; 
 }
-
 if(!hasViewPermission('referrals', $pdo)) {
     die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page.</div>");
 }
@@ -23,9 +22,11 @@ if(isset($_GET['pay']) && isset($_GET['id'])) {
     $account_number = $_POST['account_number'] ?? '';
     $ifsc = $_POST['ifsc'] ?? '';
     
-    $earn = $pdo->prepare("SELECT amount FROM user_referral_earnings WHERE id = ?");
+    $earn = $pdo->prepare("SELECT amount, user_id FROM user_referral_earnings WHERE id = ?");
     $earn->execute([$id]);
-    $amount = $earn->fetchColumn();
+    $data = $earn->fetch();
+    $amount = $data['amount'];
+    $user_id = $data['user_id'];
     if($amount) {
         $calc = calculateReferralNet($amount, $tds_percent, $admin_charge_percent);
         $pdo->prepare("UPDATE user_referral_earnings SET 
@@ -39,6 +40,11 @@ if(isset($_GET['pay']) && isset($_GET['id'])) {
                         ifsc_code = ?
                     WHERE id = ?")
             ->execute([$calc['tds'], $calc['admin_charge'], $calc['net'], $bank_name, $account_number, $ifsc, $id]);
+        
+        // ---- 🆕 Credit to Wallet ----
+        $description = "Referral bonus (net) for earning ID $id";
+        creditWallet($pdo, $user_id, $calc['net'], $description, $id);
+        
         header("Location: admin_referrals.php?paid=1");
         exit;
     }
@@ -64,7 +70,7 @@ $paid = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_nam
 ?>
 <div class="card-premium">
     <h4><i class="fas fa-hand-holding-usd me-2"></i>Referral Payouts</h4>
-    <?php if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout Marked as Paid!</div>"; ?>
+    <?php if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout Marked as Paid & Wallet Credited!</div>"; ?>
     
     <h5 class="mt-4">Pending Payouts</h5>
     <?php if(count($pending) > 0): ?>
