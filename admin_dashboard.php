@@ -21,7 +21,7 @@ if($user_data && $user_data['is_super_admin']) {
     $_SESSION['is_super_admin'] = false;
 }
 
-// ---- Admin Actions (unchanged) ----
+// ---- Admin Actions ----
 if(isset($_GET['toggle_status'])) {
     if(!$is_super_admin) { die("Access Denied"); }
     $id = $_GET['toggle_status'];
@@ -112,11 +112,10 @@ $user_search = $_GET['user_search'] ?? '';
         </div>
         <div class="table-responsive">
             <table class="table table-hover">
-                <thead><tr><th>Name</th><th>Email</th><th>Referred By</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Referred By</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
                 <?php 
-                // Use explicit columns for users
-                $sql_users = "SELECT u.id, u.name, u.email, u.referred_by, u.role, u.status, r.name as referrer_name FROM users u LEFT JOIN users r ON u.referred_by = r.id";
+                $sql_users = "SELECT u.id, u.name, u.email, u.phone, u.referred_by, u.role, u.status, r.name as referrer_name FROM users u LEFT JOIN users r ON u.referred_by = r.id";
                 if(!empty($user_search)) {
                     $sql_users .= " WHERE u.name ILIKE ? OR u.email ILIKE ?";
                     $stmt = $pdo->prepare($sql_users . " ORDER BY u.id DESC");
@@ -133,6 +132,7 @@ $user_search = $_GET['user_search'] ?? '';
                         echo "<tr>
                             <td><a href='admin_dashboard.php?view_user=".$u['id']."' target='_blank'>".htmlspecialchars($u['name'])."</a></td>
                             <td>".$u['email']."</td>
+                            <td>".htmlspecialchars($u['phone'] ?? 'N/A')."</td>
                             <td>".($u['referrer_name'] ? htmlspecialchars($u['referrer_name']) : '<span class="text-muted">Direct</span>')."</td>
                             <td><span class='badge bg-".($u['role']=='admin'?'danger':'info')."'>".$u['role']."</span></td>
                             <td><span class='badge bg-".($u['status']=='active'?'success':'secondary')."'>".$u['status']."</span></td>";
@@ -150,7 +150,7 @@ $user_search = $_GET['user_search'] ?? '';
                         echo "</tr>";
                     }
                 } else {
-                    echo "<tr><td colspan='6' class='text-center text-muted'>No users found.</td></tr>";
+                    echo "<tr><td colspan='7' class='text-center text-muted'>No users found.</td></tr>";
                 }
                 ?>
                 </tbody>
@@ -159,7 +159,7 @@ $user_search = $_GET['user_search'] ?? '';
     </div>
 </div>
 
-<!-- Modals (same as before) -->
+<!-- Modals -->
 <div id="passModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
     <div style="background:#fff; padding:30px; border-radius:20px; max-width:400px; width:90%;">
         <h5>Set New Password</h5>
