@@ -21,7 +21,7 @@ try {
 }
 
 // ---- TEST Database (Neon.tech – जहाँ से Data लेना है) ----
-// 🔴 अपने Test (Neon.tech) Database के Credentials डालें
+// ✅ आपके Test (Neon.tech) Database के Credentials (पहले से Set)
 $test_host = 'ep-raspy-mud-aox1lbpn-pooler.c-2.ap-southeast-1.aws.neon.tech';
 $test_port = '5432';
 $test_dbname = 'neondb';
