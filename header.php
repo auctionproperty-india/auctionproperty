@@ -144,11 +144,12 @@ if(isset($_SESSION['user_id'])) {
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
         <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
-        <!-- ✅ New Referrals Link -->
         <a href="user_referrals.php"><i class="fas fa-link"></i> <span>Referrals</span></a>
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
-        <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
     <?php endif; ?>
+    
+    <!-- ✅ Logout Link for ALL Users -->
+    <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
 
 <div class="main-content">
