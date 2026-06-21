@@ -12,8 +12,9 @@ $prop = $stmt->fetch();
 if(!$prop) { die("Property not found!"); }
 
 $has_subscription = userHasActiveSubscription($pdo, $user_id);
+$show_image = $has_subscription;
 
-// ---- IF NOT SUBSCRIBED: Show Beautiful Prompt ----
+// ---- IF NOT SUBSCRIBED: Show Limited 5 Fields (No Address) ----
 if(!$has_subscription) {
     include 'header.php'; 
     ?>
@@ -23,46 +24,54 @@ if(!$has_subscription) {
                 <div class="card border-0 shadow-lg" style="border-radius: 30px; overflow: hidden;">
                     <div class="card-header text-white text-center p-4" style="background: linear-gradient(135deg, #1e293b, #3b82f6);">
                         <h2><i class="fas fa-lock me-2"></i>🔒 Access Restricted</h2>
+                        <p class="mb-0 opacity-75">Subscribe to view full property details including images and complete information.</p>
                     </div>
                     <div class="card-body p-5" style="background: #f8fafc;">
                         <div class="text-center mb-4">
-                            <i class="fas fa-image" style="font-size: 80px; color: #94a3b8;"></i>
-                            <h4 class="mt-3">Subscribe to View Full Property Details</h4>
-                            <p class="text-muted">This property contains images and complete information that are only available to our premium members.</p>
+                            <i class="fas fa-image" style="font-size: 60px; color: #94a3b8;"></i>
+                            <h5 class="mt-2"><?= htmlspecialchars($prop['title']) ?></h5>
                         </div>
-                        <!-- Colorful Laravel Style Boxes -->
+                        
+                        <!-- ✅ शानदार 5 Fields (Address Hidden) -->
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm" style="background: #dbeafe; border-left: 5px solid #2563eb;">
-                                    <strong>🏦 Bank:</strong> <?= htmlspecialchars($prop['bank_name'] ?? 'N/A') ?>
+                                    <small class="text-muted text-uppercase fw-bold">🏦 Bank</small>
+                                    <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['bank_name'] ?? 'N/A') ?></h6>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm" style="background: #fef3c7; border-left: 5px solid #f59e0b;">
-                                    <strong>📍 City:</strong> <?= htmlspecialchars($prop['city'] ?? 'N/A') ?>
+                                    <small class="text-muted text-uppercase fw-bold">📍 City</small>
+                                    <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h6>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm" style="background: #dcfce7; border-left: 5px solid #22c55e;">
-                                    <strong>💰 Reserve Price:</strong> ₹ <?= indianCurrencyFormat($prop['price']) ?>
+                                    <small class="text-muted text-uppercase fw-bold">💰 Reserve Price</small>
+                                    <h6 class="fw-bold mb-0 text-success">₹ <?= indianCurrencyFormat($prop['price']) ?></h6>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm" style="background: #fce7f3; border-left: 5px solid #ec4899;">
-                                    <strong>📐 Area:</strong> <?= $prop['sqft'] ?? 0 ?> Sq Ft
+                                    <small class="text-muted text-uppercase fw-bold">📐 Area</small>
+                                    <h6 class="fw-bold mb-0"><?= $prop['sqft'] ?? 0 ?> Sq Ft</h6>
                                 </div>
                             </div>
-                            <div class="col-12">
+                            <div class="col-md-12">
                                 <div class="p-3 rounded-4 shadow-sm" style="background: #e0e7ff; border-left: 5px solid #6366f1;">
-                                    <strong>📍 Address:</strong> <?= htmlspecialchars($prop['location'] ?? 'Not Provided') ?>
+                                    <small class="text-muted text-uppercase fw-bold">📅 Auction Date</small>
+                                    <h6 class="fw-bold mb-0"><?= !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A' ?></h6>
                                 </div>
                             </div>
                         </div>
+                        <!-- ✅ 5 Fields End -->
+
                         <div class="text-center mt-4">
-                            <a href="dashboard.php#packages" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow">
+                            <a href="user_packages.php" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow">
                                 <i class="fas fa-rocket me-2"></i> Buy Subscription Now
                             </a>
-                            <a href="index.php" class="btn btn-outline-secondary btn-lg px-4 ms-2 rounded-pill">⬅ Go Back</a>
+                            <a href="user_dashboard.php" class="btn btn-outline-secondary btn-lg px-4 ms-2 rounded-pill">⬅ Go Back</a>
                         </div>
                     </div>
                 </div>
@@ -72,13 +81,13 @@ if(!$has_subscription) {
     <?php include 'footer.php'; exit;
 }
 
-// ---- SUBSCRIBED USER: Full Detail with Image ----
+// ----- SUBSCRIBED USER: Full Detail with Image and Address -----
 include 'header.php'; 
 ?>
 <div class="container-fluid px-4 mt-4">
     <div class="row">
         <div class="col-12">
-            <a href="dashboard.php" class="btn btn-outline-secondary mb-4 shadow-sm">
+            <a href="user_dashboard.php" class="btn btn-outline-secondary mb-4 shadow-sm">
                 <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
             </a>
 
@@ -93,11 +102,13 @@ include 'header.php';
                 <div class="card-body p-0">
                     <div class="row g-0">
                         <div class="col-lg-8 p-4">
+                            <!-- Full Details for Subscribed Users -->
                             <div class="row g-3 mb-4">
                                 <div class="col-md-6"><div class="bg-light p-3 rounded-4 h-100"><small class="text-muted text-uppercase fw-bold">Borrower</small><h5 class="fw-bold"><?= htmlspecialchars($prop['borrower_name'] ?? 'N/A') ?></h5></div></div>
                                 <div class="col-md-6"><div class="bg-light p-3 rounded-4 h-100"><small class="text-muted text-uppercase fw-bold">Property Type</small><h5 class="fw-bold"><?= htmlspecialchars($prop['type'] ?? 'N/A') ?></h5></div></div>
                             </div>
 
+                            <!-- Address (यह सिर्फ Subscribed Users को दिखेगा) -->
                             <div class="mb-4 p-3 rounded-4" style="background: #f1f5f9; border-left: 4px solid #2563eb;">
                                 <i class="fas fa-home me-2" style="color: #2563eb;"></i>
                                 <strong>Address:</strong> <?= htmlspecialchars($prop['location'] ?? 'Not Provided') ?>
@@ -131,9 +142,9 @@ include 'header.php';
                             </div>
                         </div>
 
-                        <!-- IMAGE (Only for Subscribed Users) -->
+                        <!-- Image Section -->
                         <div class="col-lg-4 p-4" style="background: #f8fafc;">
-                            <?php if(!empty($prop['image_url'])): ?>
+                            <?php if($show_image && !empty($prop['image_url'])): ?>
                                 <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
                                     <a href="<?= htmlspecialchars($prop['image_url']) ?>" target="_blank">
                                         <img src="<?= htmlspecialchars($prop['image_url']) ?>" class="img-fluid" style="height: 280px; width: 100%; object-fit: cover; cursor: pointer;">
