@@ -5,7 +5,7 @@ require_once __DIR__ . '/functions.php';
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'];
 
-// Super Admin Check
+// ---- Super Admin Check ----
 $is_super_admin = false;
 $stmt = $pdo->prepare("SELECT is_super_admin FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
@@ -19,14 +19,12 @@ if($user_data && $user_data['is_super_admin']) {
 
 // ---- Admin Actions ----
 if($role == 'admin') {
-    // Toggle Status
     if(isset($_GET['toggle_status'])) {
         $id = $_GET['toggle_status'];
         $pdo->prepare("UPDATE users SET status = CASE WHEN status='active' THEN 'inactive' ELSE 'active' END WHERE id = ?")->execute([$id]);
         header("Location: dashboard.php");
         exit;
     }
-    // Delete User
     if(isset($_GET['delete_user'])) {
         $id = $_GET['delete_user'];
         if($id != $_SESSION['user_id']) { 
@@ -35,7 +33,6 @@ if($role == 'admin') {
         header("Location: dashboard.php");
         exit;
     }
-    // Reset & Show Password
     if(isset($_GET['reset_pass_show'])) {
         $id = $_GET['reset_pass_show'];
         $new_pass = bin2hex(random_bytes(4)); 
@@ -45,7 +42,6 @@ if($role == 'admin') {
         header("Location: dashboard.php");
         exit;
     }
-    // Manual Set Password
     if(isset($_POST['set_password']) && isset($_POST['user_id'])) {
         $uid = $_POST['user_id'];
         $new_pass = $_POST['new_password'];
@@ -59,7 +55,6 @@ if($role == 'admin') {
         header("Location: dashboard.php");
         exit;
     }
-    // Change Referrer
     if(isset($_POST['change_referrer']) && isset($_POST['user_id']) && isset($_POST['new_referrer_id'])) {
         $uid = $_POST['user_id'];
         $new_ref = $_POST['new_referrer_id'];
@@ -82,8 +77,6 @@ if($role == 'admin'):
     $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
     $balance = getAccountBalance($pdo);
-    
-    // ---- User Search ----
     $user_search = $_GET['user_search'] ?? '';
 ?>
     <!-- Stats -->
@@ -91,14 +84,14 @@ if($role == 'admin'):
         <div class="col-md-3"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-primary me-3"><i class="fas fa-building"></i></div><div><h5><?= $total_props ?></h5><small>Properties</small></div></div></div>
         <div class="col-md-3"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div><div><h5><?= $total_users ?></h5><small>Total Users</small></div></div></div>
         <div class="col-md-3"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div><div><h5><?= $total_sold ?></h5><small>Sold</small></div></div></div>
-        <div class="col-md-3"><div class="card-premium d-flex align-items-center" style="border-left:4px solid #2563eb;"><div class="stat-icon bg-soft-info me-3"><i class="fas fa-wallet"></i></div><div><h5>₹ <?= indianCurrencyFormat($balance['balance']) ?></h5><small>Balance</small></div></div></div>
+        <div class="col-md-3"><div class="card-premium d-flex align-items-center" style="border-left:4px solid #2563eb;"><div class="stat-icon bg-soft-info me-3"><i class="fas fa-wallet"></i></div><div><h5>₹ <?= indianCurrencyFormat($balance['balance']) ?></h5><small>Available Balance</small></div></div></div>
     </div>
 
     <?php if(isset($_SESSION['new_pass_display'])): ?>
         <div class="alert alert-success mt-3"><?= $_SESSION['new_pass_display']; unset($_SESSION['new_pass_display']); ?></div>
     <?php endif; ?>
 
-    <!-- ====== MANAGE USERS SECTION - ONLY FOR SUPER ADMIN ====== -->
+    <!-- ====== MANAGE USERS - ONLY SUPER ADMIN ====== -->
     <?php if($is_super_admin): ?>
     <div id="users-section" class="mt-4">
         <div class="card-premium">
@@ -161,7 +154,7 @@ if($role == 'admin'):
         </div>
     </div>
 
-    <!-- Password Modal -->
+    <!-- Modals -->
     <div id="passModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
         <div style="background:#fff; padding:30px; border-radius:20px; max-width:400px; width:90%;">
             <h5>Set New Password</h5>
@@ -174,7 +167,6 @@ if($role == 'admin'):
         </div>
     </div>
 
-    <!-- Referrer Modal -->
     <div id="refModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
         <div style="background:#fff; padding:30px; border-radius:20px; max-width:500px; width:95%; max-height:90vh; overflow-y:auto;">
             <h5>🔄 Change Referrer</h5>
@@ -228,8 +220,6 @@ if($role == 'admin'):
     <?php endif; ?>
     <!-- ====== END SUPER ADMIN ONLY ====== -->
 
-    <!-- ====== Subscription History Section HATAA (Now in sidebar) ====== -->
-
 <?php else: 
     // ---- USER VIEW ----
     $user_stmt = $pdo->prepare("SELECT *, created_at as reg_date, city FROM users WHERE id = ?");
@@ -247,7 +237,6 @@ if($role == 'admin'):
     $expiry_date_formatted = ($is_subscribed && !empty($sub_info['end_date'])) ? date('d M Y', strtotime($sub_info['end_date'])) : 'N/A';
     $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 
-    // ---- Referral Data ----
     $referral_link = getReferralLink($user_id);
     $earnings = getReferralEarnings($pdo, $user_id, 'pending');
     $paid_earnings = getReferralEarnings($pdo, $user_id, 'paid');
@@ -259,7 +248,6 @@ if($role == 'admin'):
     $user_subs->execute([$user_id]);
     $user_subs = $user_subs->fetchAll();
 
-    // ---- 6 Lowest Price Properties from User's City ----
     $sql = "SELECT * FROM properties WHERE status = 'available'";
     $params = [];
     if(!empty($user_city)) {
@@ -271,7 +259,7 @@ if($role == 'admin'):
     $stmt->execute($params);
     $props = $stmt->fetchAll();
 ?>
-    <!-- Welcome Banner -->
+    <!-- User Welcome -->
     <div class="user-welcome-banner">
         <div><h2>🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h2>
             <p>Showing best deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'your area' ?></p>
@@ -279,7 +267,6 @@ if($role == 'admin'):
         <div><a href="index.php" class="btn btn-light text-success fw-bold">Explore All →</a></div>
     </div>
 
-    <!-- Subscription Status -->
     <div class="card-premium mb-4" style="border-left: 5px solid <?= $is_subscribed ? '#10b981' : '#f59e0b' ?>;">
         <div class="row align-items-center">
             <div class="col-md-6">
@@ -321,7 +308,6 @@ if($role == 'admin'):
                 <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#subHistoryUser">📜 Subscription History</button>
             </div>
         </div>
-        
         <div class="collapse mt-3" id="teamSection">
             <h6>My Team (Referred Users)</h6>
             <?php if(count($team_members) > 0): ?>
@@ -344,7 +330,6 @@ if($role == 'admin'):
                 <p class="text-muted">You haven't referred anyone yet.</p>
             <?php endif; ?>
         </div>
-
         <div class="collapse mt-3" id="subHistoryUser">
             <h6>Your Subscription Requests</h6>
             <?php if(count($user_subs) > 0): ?>
@@ -369,7 +354,7 @@ if($role == 'admin'):
         </div>
     </div>
 
-    <!-- Packages Section (Buy) -->
+    <!-- Buy Packages -->
     <div id="packages" class="card-premium mb-4" style="border:2px solid #fbbf24; background:#fffbeb;">
         <h4><i class="fas fa-search-dollar me-2" style="color: #f59e0b;"></i>Buy Search Engine Access</h4>
         <p class="text-muted">Subscribe to view full details of all auction properties.</p>
@@ -417,7 +402,7 @@ if($role == 'admin'):
         <small class="text-muted">* After payment, admin will activate your subscription.</small>
     </div>
 
-    <!-- 6 Lowest Price Properties -->
+    <!-- Best Deals -->
     <div class="card-premium">
         <h5><i class="fas fa-fire me-2" style="color:#f97316;"></i>Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?></h5>
         <div class="row">
@@ -445,7 +430,7 @@ if($role == 'admin'):
                 </div>
                 <?php endforeach; ?>
             <?php else: ?>
-                <p class="text-muted">No properties available in your city yet. Explore all properties.</p>
+                <p class="text-muted">No properties available in your city yet.</p>
             <?php endif; ?>
         </div>
     </div>
