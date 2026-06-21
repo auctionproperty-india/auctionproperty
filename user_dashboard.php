@@ -11,10 +11,11 @@ $user_id = $_SESSION['user_id'];
 
 include 'header.php'; 
 
-// ---- User Data with Explicit Columns ----
+// ---- User Data ----
 $user_stmt = $pdo->prepare("SELECT id, name, email, phone, city, referral_code, referred_by, role, status, created_at as reg_date, wallet_balance FROM users WHERE id = ?");
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch();
+$user_city = $user['city'] ?? '';
 
 // ---- Subscription Status ----
 $active_sub = $pdo->prepare("SELECT s.*, p.name as pkg_name, s.start_date, s.end_date, (s.end_date - CURRENT_DATE) as days_left FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE ORDER BY s.id DESC LIMIT 1");
@@ -41,12 +42,27 @@ $paid_amt = $paid->fetchColumn();
 
 // ---- Referral Link ----
 $referral_link = getReferralLink($user_id);
+
+// ---- Show images only if subscribed ----
+$show_images = userHasActiveSubscription($pdo, $user_id);
+
+// ---- 6 Lowest Price Properties from User's City ----
+$sql = "SELECT * FROM properties WHERE status = 'available'";
+$params = [];
+if(!empty($user_city)) {
+    $sql .= " AND city ILIKE ?";
+    $params[] = '%'.$user_city.'%';
+}
+$sql .= " ORDER BY price ASC LIMIT 6";
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$props = $stmt->fetchAll();
 ?>
 <!-- Welcome Banner -->
 <div class="user-welcome-banner">
     <div>
         <h2>🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h2>
-        <p>Your referral earnings at a glance</p>
+        <p>Showing best deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'your area' ?></p>
     </div>
     <div>
         <a href="user_packages.php" class="btn btn-light text-success fw-bold">Buy Subscription →</a>
@@ -110,6 +126,40 @@ $referral_link = getReferralLink($user_id);
     <div class="mt-2">
         <span class="badge bg-warning text-dark">⏳ Pending: ₹ <?= indianCurrencyFormat($pending_amt) ?></span>
         <span class="badge bg-success ms-2">✅ Paid: ₹ <?= indianCurrencyFormat($paid_amt) ?></span>
+    </div>
+</div>
+
+<!-- ===== BEST DEALS ===== -->
+<div class="card-premium">
+    <h5><i class="fas fa-fire me-2" style="color:#f97316;"></i>Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?></h5>
+    <div class="row">
+        <?php if(count($props) > 0): ?>
+            <?php foreach($props as $p): ?>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 shadow-sm border-0" style="border-radius:16px; overflow:hidden;">
+                    <?php if($show_images && !empty($p['image_url'])): ?>
+                        <a href="<?= htmlspecialchars($p['image_url']) ?>" target="_blank">
+                            <img src="<?= htmlspecialchars($p['image_url']) ?>" style="height:150px; width:100%; object-fit:cover; cursor:pointer;">
+                        </a>
+                    <?php else: ?>
+                        <div style="height:150px; background: linear-gradient(145deg, #f8fafc, #e2e8f0); display: flex; align-items: center; justify-content: center; border-radius: 16px 16px 0 0; flex-direction: column;">
+                            <i class="fas fa-home" style="font-size: 30px; color: #94a3b8;"></i>
+                            <span class="badge bg-warning mt-1" style="font-size: 11px;">🔒 Subscribe</span>
+                        </div>
+                    <?php endif; ?>
+                    <div class="p-3">
+                        <span class="badge bg-light text-dark">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
+                        <h6 class="fw-bold mt-1"><?= htmlspecialchars($p['title']) ?></h6>
+                        <div class="fw-bold text-success">₹ <?= indianCurrencyFormat($p['price']) ?></div>
+                        <!-- ✅ View Details Button -->
+                        <a href="property_detail.php?id=<?= $p['id'] ?>" class="btn btn-primary btn-sm w-100 mt-2">View Details</a>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <p class="text-muted">No properties available in your city yet. <a href="index.php">Explore all properties</a></p>
+        <?php endif; ?>
     </div>
 </div>
 
