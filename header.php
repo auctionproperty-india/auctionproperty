@@ -111,7 +111,12 @@ if(isset($_SESSION['user_id'])) {
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property</span></div>
-    <a href="dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+    
+    <?php if($role == 'admin'): ?>
+        <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+    <?php else: ?>
+        <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+    <?php endif; ?>
     
     <?php if($role == 'admin'): ?>
         <?php if(hasViewPermission('properties', $pdo)): ?>
@@ -119,7 +124,7 @@ if(isset($_SESSION['user_id'])) {
         <?php endif; ?>
         
         <?php if($is_super_admin): ?>
-            <a href="dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
+            <a href="admin_dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
         
@@ -145,10 +150,10 @@ if(isset($_SESSION['user_id'])) {
     <?php else: ?>
         <a href="index.php"><i class="fas fa-home"></i> <span>Explore Properties</span></a>
         <a href="#"><i class="fas fa-heart"></i> <span>My Favorites</span></a>
-        <a href="dashboard.php#packages"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
-        <a href="dashboard.php#teamSection"><i class="fas fa-users"></i> <span>My Team</span></a>
-        <a href="dashboard.php#subHistoryUser"><i class="fas fa-history"></i> <span>Payment History</span></a>
-        <a href="dashboard.php#referralHistory"><i class="fas fa-link"></i> <span>Referrals</span></a>
+        <a href="user_dashboard.php#packages"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
+        <a href="user_dashboard.php#teamSection"><i class="fas fa-users"></i> <span>My Team</span></a>
+        <a href="user_dashboard.php#subHistoryUser"><i class="fas fa-history"></i> <span>Payment History</span></a>
+        <a href="user_dashboard.php#referralHistory"><i class="fas fa-link"></i> <span>Referrals</span></a>
     <?php endif; ?>
     
     <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
