@@ -91,9 +91,15 @@ $props = $stmt->fetchAll();
     </div>
 </div>
 
-<!-- ===== BEST DEALS (10 Properties) ===== -->
+<!-- ===== BEST DEALS WITH "VIEW ALL" BUTTON ===== -->
 <div class="card-premium">
-    <h5><i class="fas fa-fire me-2" style="color:#f97316;"></i>Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?></h5>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5><i class="fas fa-fire me-2" style="color:#f97316;"></i>Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?></h5>
+        <!-- ✅ View All Properties Button -->
+        <a href="index.php" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-arrow-right me-1"></i> View All Properties
+        </a>
+    </div>
     <div class="row">
         <?php if(count($props) > 0): ?>
             <?php foreach($props as $p): ?>
@@ -113,7 +119,6 @@ $props = $stmt->fetchAll();
                         <span class="badge bg-light text-dark">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
                         <h6 class="fw-bold mt-1"><?= htmlspecialchars($p['title']) ?></h6>
                         <div class="fw-bold text-success">₹ <?= indianCurrencyFormat($p['price']) ?></div>
-                        <!-- ✅ Auction Date Display -->
                         <?php if(!empty($p['auction_date'])): ?>
                             <div class="text-muted small"><i class="far fa-calendar-alt me-1"></i> Auction: <?= date('d M Y', strtotime($p['auction_date'])) ?></div>
                         <?php endif; ?>
