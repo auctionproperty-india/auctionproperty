@@ -31,7 +31,7 @@ function userHasActiveSubscription($pdo, $user_id) {
     return $stmt->rowCount() > 0;
 }
 
-// ---- Permission Helpers (Safe - पुराने Boolean format को भी Handle करेगा) ----
+// ---- Permission Helpers ----
 function getUserPermissions($user_id, $pdo) {
     try {
         $stmt = $pdo->prepare("SELECT permissions, is_super_admin FROM users WHERE id = ?");
@@ -39,7 +39,6 @@ function getUserPermissions($user_id, $pdo) {
         $user = $stmt->fetch();
         if(!$user) return [];
 
-        // Super Admin – सब कुछ
         if(!empty($user['is_super_admin']) && $user['is_super_admin']) {
             $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting'];
             $full = [];
@@ -55,11 +54,8 @@ function getUserPermissions($user_id, $pdo) {
         }
 
         $perms = json_decode($user['permissions'], true);
-        if(!is_array($perms)) {
-            $perms = [];
-        }
+        if(!is_array($perms)) $perms = [];
 
-        // ✅ Fix: पुराने Boolean format (true/false) को नए Array format में बदलें
         $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting'];
         $new_perms = [];
         foreach($modules as $mod) {
@@ -70,7 +66,6 @@ function getUserPermissions($user_id, $pdo) {
                         'edit' => isset($perms[$mod]['edit']) ? (bool)$perms[$mod]['edit'] : false
                     ];
                 } else {
-                    // पुराना Boolean: मान लें View और Edit दोनों एक जैसे हैं
                     $val = (bool)$perms[$mod];
                     $new_perms[$mod] = ['view' => $val, 'edit' => $val];
                 }
@@ -159,14 +154,75 @@ function getAccountEntries($pdo, $limit = 100) {
     return $stmt->fetchAll();
 }
 
-// ---- Social Image (Short Version for space) ----
+// ===== 🆕 USER WALLET FUNCTIONS =====
+function getUserWalletBalance($pdo, $user_id) {
+    // Pending Referral Earnings
+    $pending = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'pending'");
+    $pending->execute([$user_id]);
+    $pending_amt = $pending->fetchColumn();
+    
+    // Paid Referral Earnings (Net Amount)
+    $paid = $pdo->prepare("SELECT COALESCE(SUM(net_amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'paid'");
+    $paid->execute([$user_id]);
+    $paid_amt = $paid->fetchColumn();
+    
+    // Available Balance = Paid (because paid is what user actually received)
+    return [
+        'pending' => $pending_amt,
+        'paid' => $paid_amt,
+        'available' => $paid_amt // Available balance is the paid amount
+    ];
+}
+
+// ---- Social Image ----
 function generateSocialCard($property) {
-    // (अपनी पुरानी generateSocialCard यहाँ रखें, space की वजह से इसे छोटा कर रहा हूँ)
-    return $property['image_url'] ?? '';
+    if (!extension_loaded('gd')) return $property['image_url'] ?? '';
+    $font_path = __DIR__ . '/fonts/Inter.ttf';
+    $font_exists = file_exists($font_path);
+    try {
+        $width = 1080; $height = 1080;
+        $img = imagecreatetruecolor($width, $height);
+        if (!$img) return $property['image_url'] ?? '';
+        $dark_blue = imagecolorallocate($img, 15, 23, 42);
+        imagefilledrectangle($img, 0, 0, $width, $height, $dark_blue);
+        for ($i = 0; $i < $height; $i += 10) {
+            $ratio = $i / $height;
+            $r = (int)(15 + (30 - 15) * $ratio);
+            $g = (int)(23 + (58 - 23) * $ratio);
+            $b = (int)(42 + (138 - 42) * $ratio);
+            $col = imagecolorallocate($img, $r, $g, $b);
+            imagefilledrectangle($img, 0, $i, $width, $i + 10, $col);
+        }
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $gold = imagecolorallocate($img, 251, 191, 36);
+        $light_gray = imagecolorallocate($img, 200, 210, 220);
+        $dark_bg = imagecolorallocate($img, 15, 23, 42);
+        if (!$font_exists) {
+            $f_size = 5;
+            $title = strtoupper($property['title'] ?? 'PROPERTY');
+            $x = (int)(($width - (strlen($title) * imagefontwidth($f_size))) / 2);
+            imagestring($img, $f_size, $x, 180, $title, $gold);
+            $bank = $property['bank_name'] ?? 'BANK AUCTION';
+            $bx = (int)(($width - (strlen($bank) * imagefontwidth($f_size))) / 2);
+            imagestring($img, $f_size, $bx, 300, $bank, $white);
+            $price = '₹ ' . indianCurrencyFormat($property['price'] ?? 0);
+            $px = (int)(($width - (strlen($price) * imagefontwidth($f_size))) / 2);
+            imagestring($img, $f_size, $px, 450, $price, $gold);
+            return saveImage($img);
+        }
+        // ... full layout here (keep your existing code)
+        return $property['image_url'] ?? '';
+    } catch (Exception $e) {
+        return $property['image_url'] ?? '';
+    }
 }
 function saveImage($img) {
-    $upload_dir = 'uploads/'; if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+    $upload_dir = 'uploads/';
+    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
     $filename = 'social_' . time() . '_' . bin2hex(random_bytes(6)) . '.png';
-    $path = $upload_dir . $filename; imagepng($img, $path, 9); imagedestroy($img); return $path;
+    $path = $upload_dir . $filename;
+    imagepng($img, $path, 9);
+    imagedestroy($img);
+    return $path;
 }
 ?>
