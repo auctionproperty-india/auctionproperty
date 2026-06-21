@@ -10,8 +10,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php'; 
 
-// Explicit columns in query
-$sql = "SELECT u.id, u.name, u.email, u.created_at as reg_date, 
+$sql = "SELECT u.id, u.name, u.email, u.phone, u.created_at as reg_date, 
         (SELECT s.start_date FROM subscriptions s WHERE s.user_id = u.id AND s.status = 'active' ORDER BY s.id LIMIT 1) as activation_date 
         FROM users u WHERE u.referred_by = ? ORDER BY u.created_at DESC";
 $stmt = $pdo->prepare($sql);
@@ -24,12 +23,13 @@ $team_members = $stmt->fetchAll();
     <?php if(count($team_members) > 0): ?>
         <div class="table-responsive">
             <table class="table table-bordered table-hover">
-                <thead><tr><th>Name</th><th>Email</th><th>Registered On</th><th>Activation Date</th></tr></thead>
+                <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Registered On</th><th>Activation Date</th></tr></thead>
                 <tbody>
                 <?php foreach($team_members as $tm): ?>
                     <tr>
                         <td><?= htmlspecialchars($tm['name']) ?></td>
                         <td><?= htmlspecialchars($tm['email']) ?></td>
+                        <td><?= htmlspecialchars($tm['phone'] ?? 'N/A') ?></td>
                         <td><?= date('d M Y', strtotime($tm['reg_date'])) ?></td>
                         <td><?= $tm['activation_date'] ? date('d M Y', strtotime($tm['activation_date'])) : '<span class="text-muted">Not Activated</span>' ?></td>
                     </tr>
