@@ -3,7 +3,6 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
 if(isset($_SESSION['user_id'])) {
-    // Already logged in - redirect based on role
     if($_SESSION['role'] == 'admin') {
         header("Location: admin_dashboard.php");
     } else {
@@ -23,13 +22,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['user_name'] = $user['name'];
         $_SESSION['role'] = $user['role'];
-        // Set super admin flag
         if(!empty($user['is_super_admin']) && $user['is_super_admin']) {
             $_SESSION['is_super_admin'] = true;
         } else {
             $_SESSION['is_super_admin'] = false;
         }
-        // Redirect based on role
         if($user['role'] == 'admin') {
             header("Location: admin_dashboard.php");
         } else {
