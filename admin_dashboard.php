@@ -21,7 +21,7 @@ if($user_data && $user_data['is_super_admin']) {
     $_SESSION['is_super_admin'] = false;
 }
 
-// ---- Admin Actions ----
+// ---- Admin Actions (unchanged) ----
 if(isset($_GET['toggle_status'])) {
     if(!$is_super_admin) { die("Access Denied"); }
     $id = $_GET['toggle_status'];
@@ -115,7 +115,8 @@ $user_search = $_GET['user_search'] ?? '';
                 <thead><tr><th>Name</th><th>Email</th><th>Referred By</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
                 <?php 
-                $sql_users = "SELECT u.*, r.name as referrer_name FROM users u LEFT JOIN users r ON u.referred_by = r.id";
+                // Use explicit columns for users
+                $sql_users = "SELECT u.id, u.name, u.email, u.referred_by, u.role, u.status, r.name as referrer_name FROM users u LEFT JOIN users r ON u.referred_by = r.id";
                 if(!empty($user_search)) {
                     $sql_users .= " WHERE u.name ILIKE ? OR u.email ILIKE ?";
                     $stmt = $pdo->prepare($sql_users . " ORDER BY u.id DESC");
@@ -158,7 +159,7 @@ $user_search = $_GET['user_search'] ?? '';
     </div>
 </div>
 
-<!-- Modals -->
+<!-- Modals (same as before) -->
 <div id="passModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
     <div style="background:#fff; padding:30px; border-radius:20px; max-width:400px; width:90%;">
         <h5>Set New Password</h5>
