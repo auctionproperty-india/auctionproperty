@@ -28,7 +28,16 @@ $expiry_date_formatted = ($is_subscribed && !empty($sub_info['end_date'])) ? dat
 $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 
 // ---- Wallet Balance ----
-$wallet = getUserWalletBalance($pdo, $user_id);
+$wallet_balance = getUserWalletBalance($pdo, $user_id);
+
+// ---- Referral Earnings Summary (for info) ----
+$pending = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'pending'");
+$pending->execute([$user_id]);
+$pending_amt = $pending->fetchColumn();
+
+$paid = $pdo->prepare("SELECT COALESCE(SUM(net_amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'paid'");
+$paid->execute([$user_id]);
+$paid_amt = $paid->fetchColumn();
 
 // ---- Referral Link ----
 $referral_link = getReferralLink($user_id);
@@ -44,29 +53,29 @@ $referral_link = getReferralLink($user_id);
     </div>
 </div>
 
-<!-- Wallet Cards -->
+<!-- Wallet Cards (Now "Wallet" instead of "Available Balance") -->
 <div class="row g-4 mb-4">
     <div class="col-md-4">
         <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #fef3c7, #fde68a);">
             <h6 class="text-muted">⏳ Pending</h6>
-            <h2 class="fw-bold text-dark">₹ <?= indianCurrencyFormat($wallet['pending']) ?></h2>
+            <h2 class="fw-bold text-dark">₹ <?= indianCurrencyFormat($pending_amt) ?></h2>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #d1fae5, #a7f3d0);">
             <h6 class="text-muted">✅ Paid</h6>
-            <h2 class="fw-bold text-success">₹ <?= indianCurrencyFormat($wallet['paid']) ?></h2>
+            <h2 class="fw-bold text-success">₹ <?= indianCurrencyFormat($paid_amt) ?></h2>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #dbeafe, #bfdbfe);">
-            <h6 class="text-muted">💰 Available Balance</h6>
-            <h2 class="fw-bold text-primary">₹ <?= indianCurrencyFormat($wallet['available']) ?></h2>
+            <h6 class="text-muted">💰 Wallet Balance</h6>
+            <h2 class="fw-bold text-primary">₹ <?= indianCurrencyFormat($wallet_balance) ?></h2>
         </div>
     </div>
 </div>
 
-<!-- Subscription Status (Compact) -->
+<!-- Subscription Status -->
 <div class="card-premium mb-4" style="border-left: 5px solid <?= $is_subscribed ? '#10b981' : '#f59e0b' ?>;">
     <div class="row align-items-center">
         <div class="col-md-6">
@@ -99,8 +108,8 @@ $referral_link = getReferralLink($user_id);
         <button class="btn btn-success" onclick="copyRef()"><i class="fas fa-copy"></i> Copy</button>
     </div>
     <div class="mt-2">
-        <span class="badge bg-warning text-dark">⏳ Pending: ₹ <?= indianCurrencyFormat($wallet['pending']) ?></span>
-        <span class="badge bg-success ms-2">✅ Paid: ₹ <?= indianCurrencyFormat($wallet['paid']) ?></span>
+        <span class="badge bg-warning text-dark">⏳ Pending: ₹ <?= indianCurrencyFormat($pending_amt) ?></span>
+        <span class="badge bg-success ms-2">✅ Paid: ₹ <?= indianCurrencyFormat($paid_amt) ?></span>
     </div>
 </div>
 
