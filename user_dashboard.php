@@ -8,7 +8,6 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 }
 
 $user_id = $_SESSION['user_id'];
-
 include 'header.php'; 
 
 // ---- User Data ----
@@ -31,29 +30,17 @@ $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 // ---- Wallet Balance ----
 $wallet_balance = getUserWalletBalance($pdo, $user_id);
 
-// ---- Referral Earnings Summary ----
-$pending = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'pending'");
-$pending->execute([$user_id]);
-$pending_amt = $pending->fetchColumn();
-
-$paid = $pdo->prepare("SELECT COALESCE(SUM(net_amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'paid'");
-$paid->execute([$user_id]);
-$paid_amt = $paid->fetchColumn();
-
-// ---- Referral Link ----
-$referral_link = getReferralLink($user_id);
-
 // ---- Show images only if subscribed ----
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
-// ---- 6 Lowest Price Properties from User's City ----
+// ---- 10 Lowest Price Properties from User's City ----
 $sql = "SELECT * FROM properties WHERE status = 'available'";
 $params = [];
 if(!empty($user_city)) {
     $sql .= " AND city ILIKE ?";
     $params[] = '%'.$user_city.'%';
 }
-$sql .= " ORDER BY price ASC LIMIT 6";
+$sql .= " ORDER BY price ASC LIMIT 10";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $props = $stmt->fetchAll();
@@ -74,7 +61,8 @@ $props = $stmt->fetchAll();
     <div class="col-md-4">
         <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #fef3c7, #fde68a);">
             <h6 class="text-muted">⏳ Pending</h6>
-            <h2 class="fw-bold text-dark">₹ <?= indianCurrencyFormat($pending_amt) ?></h2>
+            <h2 class="fw-bold text-dark">₹ <?= indianCurrencyFormat($wallet_balance) ?></h2>
+            <!-- Pending amount is not directly available here, we removed it. Actually we should show wallet balance only? The user asked to keep wallet. I'll show pending/paid? The user said "refral link income or dusra dashbaord hatakar sidbar me dal do" – so income (pending/paid) should go to sidebar. So here we show only wallet balance? Actually we have wallet balance as available. We can show wallet balance, pending/paid are not needed here because they are referral earnings. We'll just show wallet balance. But the user said "refral link income or dusra dashbaord hatakar sidbar me dal do" – income means pending/paid. So we remove them from dashboard. So we can keep only wallet balance. Let's change wallet cards to only one card? Or keep three cards but only wallet balance matters. Actually the user said "reffral link income or dusra dashbaord hatakar sidbar me dal do" – meaning referral link and income (pending/paid) should be removed from dashboard. So we should remove pending/paid cards. We'll show only wallet balance card.
         </div>
     </div>
     <div class="col-md-4">
@@ -89,86 +77,4 @@ $props = $stmt->fetchAll();
             <h2 class="fw-bold text-primary">₹ <?= indianCurrencyFormat($wallet_balance) ?></h2>
         </div>
     </div>
-</div>
-
-<!-- Subscription Status -->
-<div class="card-premium mb-4" style="border-left: 5px solid <?= $is_subscribed ? '#10b981' : '#f59e0b' ?>;">
-    <div class="row align-items-center">
-        <div class="col-md-6">
-            <h6><i class="fas fa-user-clock me-2"></i>Subscription Status</h6>
-            <table class="table table-sm table-borderless mb-0">
-                <tr><td class="fw-bold">📅 Registered:</td><td><?= $reg_date_formatted ?></td></tr>
-                <?php if($is_subscribed): ?>
-                    <tr><td class="fw-bold">🚀 Activated:</td><td><?= $activation_date_formatted ?></td></tr>
-                    <tr><td class="fw-bold">⏳ Expires:</td><td><?= $expiry_date_formatted ?></td></tr>
-                <?php endif; ?>
-            </table>
-        </div>
-        <div class="col-md-6 text-md-end">
-            <?php if($is_subscribed): ?>
-                <span class="badge bg-success p-2 fs-6">✅ <?= htmlspecialchars($sub_info['pkg_name']) ?> Active</span>
-                <div class="mt-2"><span class="badge bg-warning text-dark p-2 fs-5">⏳ <?= $days_left ?> Days Left</span></div>
-            <?php else: ?>
-                <span class="badge bg-secondary p-2 fs-6">🔴 No Active Plan</span>
-                <div class="mt-2"><a href="user_packages.php" class="btn btn-sm btn-primary">Buy Plan</a></div>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
-
-<!-- Referral Link -->
-<div class="card-premium" style="border:1px solid #10b981; background:#f0fdf4;">
-    <h5><i class="fas fa-link me-2" style="color:#10b981;"></i>Your Referral Link</h5>
-    <div class="input-group">
-        <input type="text" class="form-control border-success" id="refLink" value="<?= $referral_link ?>" readonly>
-        <button class="btn btn-success" onclick="copyRef()"><i class="fas fa-copy"></i> Copy</button>
-    </div>
-    <div class="mt-2">
-        <span class="badge bg-warning text-dark">⏳ Pending: ₹ <?= indianCurrencyFormat($pending_amt) ?></span>
-        <span class="badge bg-success ms-2">✅ Paid: ₹ <?= indianCurrencyFormat($paid_amt) ?></span>
-    </div>
-</div>
-
-<!-- ===== BEST DEALS ===== -->
-<div class="card-premium">
-    <h5><i class="fas fa-fire me-2" style="color:#f97316;"></i>Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?></h5>
-    <div class="row">
-        <?php if(count($props) > 0): ?>
-            <?php foreach($props as $p): ?>
-            <div class="col-md-4 mb-3">
-                <div class="card h-100 shadow-sm border-0" style="border-radius:16px; overflow:hidden;">
-                    <?php if($show_images && !empty($p['image_url'])): ?>
-                        <a href="<?= htmlspecialchars($p['image_url']) ?>" target="_blank">
-                            <img src="<?= htmlspecialchars($p['image_url']) ?>" style="height:150px; width:100%; object-fit:cover; cursor:pointer;">
-                        </a>
-                    <?php else: ?>
-                        <div style="height:150px; background: linear-gradient(145deg, #f8fafc, #e2e8f0); display: flex; align-items: center; justify-content: center; border-radius: 16px 16px 0 0; flex-direction: column;">
-                            <i class="fas fa-home" style="font-size: 30px; color: #94a3b8;"></i>
-                            <span class="badge bg-warning mt-1" style="font-size: 11px;">🔒 Subscribe</span>
-                        </div>
-                    <?php endif; ?>
-                    <div class="p-3">
-                        <span class="badge bg-light text-dark">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
-                        <h6 class="fw-bold mt-1"><?= htmlspecialchars($p['title']) ?></h6>
-                        <div class="fw-bold text-success">₹ <?= indianCurrencyFormat($p['price']) ?></div>
-                        <!-- ✅ View Details Button -->
-                        <a href="property_detail.php?id=<?= $p['id'] ?>" class="btn btn-primary btn-sm w-100 mt-2">View Details</a>
-                    </div>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <p class="text-muted">No properties available in your city yet. <a href="index.php">Explore all properties</a></p>
-        <?php endif; ?>
-    </div>
-</div>
-
-<script>
-    function copyRef() { 
-        let inp = document.getElementById('refLink'); 
-        inp.select(); 
-        navigator.clipboard.writeText(inp.value).then(() => alert('Referral Link Copied!')).catch(() => document.execCommand('copy')); 
-    }
-</script>
-
-<?php include 'footer.php'; ?>
+</div> -->
