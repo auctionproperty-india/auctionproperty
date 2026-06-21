@@ -15,7 +15,8 @@ $error = '';
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND status = 'active'");
+    // ✅ Explicit columns to avoid cached plan mismatch after schema changes
+    $stmt = $pdo->prepare("SELECT id, name, email, password, role, is_super_admin, status, wallet_balance FROM users WHERE email = ? AND status = 'active'");
     $stmt->execute([$email]);
     $user = $stmt->fetch();
     if($user && password_verify($password, $user['password'])){
