@@ -132,7 +132,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // ADD (Status fixed, all fields optional)
+    // ADD
     if(isset($_POST['add_property'])) {
         if(!hasEditPermission('properties', $pdo)) {
             die("<div class='alert alert-danger'>❌ You don't have permission to add properties.</div>");
@@ -156,7 +156,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             if($date_obj) $auction_date_db = $date_obj->format('Y-m-d');
         }
 
-        // ✅ All fields are optional – only title, price, location, city are required (kept for data sanity)
         $sql = "INSERT INTO properties (
             title, description, price, location, city, state, type, google_location, image_url, 
             bank_name, sqft, possession_type, auction_date, 
@@ -261,7 +260,7 @@ include 'header.php';
                             <td><?= htmlspecialchars($row['title']) ?></td>
                             <td><?= htmlspecialchars($row['bank_name'] ?? '') ?></td>
                             <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
-                            <td>₹<?= number_format($row['price'], 2) ?></td>
+                            <td><?= indianCurrencyFormat($row['price']) ?></td> <!-- ✅ Price Format Fixed -->
                             <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
                             <td>
                                 <?php if(hasEditPermission('properties', $pdo)): ?>
@@ -281,7 +280,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- ===== MODAL WITH NEW LAYOUT ===== -->
+<!-- ===== MODAL ===== -->
 <div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content" style="border-radius: 20px;">
@@ -294,129 +293,8 @@ include 'header.php';
                     <input type="hidden" name="property_id" id="property_id" value="">
                     <input type="hidden" name="existing_image" id="existing_image" value="">
 
-                    <div class="row g-3">
-
-                        <!-- ===== BASIC INFO (Required) ===== -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Title *</label>
-                            <input type="text" name="title" id="edit_title" class="form-control" required>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Reserve Price (₹) *</label>
-                            <input type="number" step="0.01" name="price" id="edit_price" class="form-control" required>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Price per Sq Ft</label>
-                            <input type="number" step="0.01" name="reserve_price_per_sqft" id="edit_reserve_price_per_sqft" class="form-control">
-                        </div>
-
-                        <!-- ===== BORROWER & BANK ===== -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Borrower Name</label>
-                            <input type="text" name="borrower_name" id="edit_borrower_name" class="form-control" placeholder="Krishna Yuvraj">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Bank Name</label>
-                            <input type="text" name="bank_name" id="edit_bank_name" class="form-control" placeholder="HomeFirst Finance">
-                        </div>
-
-                        <!-- ===== PROPERTY TYPE & LOCATION ===== -->
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Property Type</label>
-                            <select name="type" id="edit_type" class="form-control">
-                                <option value="Flat">Flat</option>
-                                <option value="Plot">Plot</option>
-                                <option value="Shop">Shop</option>
-                                <option value="Land">Land</option>
-                                <option value="House">House</option>
-                                <option value="Row House">Row House</option>
-                                <option value="Bungalow">Bungalow</option>
-                            </select>
-                        </div>
-                        <div class="col-md-8">
-                            <label class="form-label fw-semibold">Address / Location *</label>
-                            <input type="text" name="location" id="edit_location" class="form-control" required placeholder="House-11, Survey no. 642...">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Possession</label>
-                            <select name="possession_type" id="edit_possession_type" class="form-control">
-                                <option value="Physical">Physical</option>
-                                <option value="Symbolic">Symbolic</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Locality</label>
-                            <input type="text" name="locality" id="edit_locality" class="form-control" placeholder="Rau, Indore">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">City *</label>
-                            <input type="text" name="city" id="edit_city" class="form-control" required placeholder="Indore">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">State</label>
-                            <input type="text" name="state" id="edit_state" class="form-control" placeholder="Madhya Pradesh">
-                        </div>
-
-                        <!-- ===== AUCTION DETAILS ===== -->
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">EMD Amount (₹)</label>
-                            <input type="number" step="0.01" name="emd_amount" id="edit_emd_amount" class="form-control" placeholder="108000">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Bid Increment (₹)</label>
-                            <input type="number" step="0.01" name="bid_increment" id="edit_bid_increment" class="form-control" placeholder="10000">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Area (Sq Ft)</label>
-                            <input type="number" step="0.01" name="sqft" id="edit_sqft" class="form-control" placeholder="e.g. 1200">
-                        </div>
-
-                        <!-- ===== DATES & TIMES ===== -->
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">EMD Submission Deadline</label>
-                            <input type="text" name="emd_deadline" id="edit_emd_deadline" class="form-control" placeholder="Thu, 25 Jun 2026 05:00 PM">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Auction Start Date & Time</label>
-                            <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control" placeholder="Sat, 27 Jun 2026 11:00 AM">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Auction End Date & Time</label>
-                            <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control" placeholder="Sat, 27 Jun 2026 02:00 PM">
-                        </div>
-
-                        <!-- ===== AUCTION DATE (for display) ===== -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Auction Date (DD/MM/YYYY)</label>
-                            <input type="text" name="auction_date" id="edit_auction_date" class="form-control" placeholder="e.g. 27/06/2026">
-                        </div>
-
-                        <!-- ===== CONTACT & MEDIA ===== -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Contact Number</label>
-                            <input type="text" name="contact_number" id="edit_contact_number" class="form-control" value="<?= $default_contact ?>">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Google Map Link</label>
-                            <input type="text" name="google_location" id="edit_google_location" class="form-control" placeholder="https://maps.google.com/...">
-                        </div>
-
-                        <!-- ===== DESCRIPTION ===== -->
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Description (Optional)</label>
-                            <textarea name="description" id="edit_description" class="form-control" rows="3" placeholder="Any additional details about the property..."></textarea>
-                        </div>
-
-                        <!-- ===== IMAGE UPLOAD ===== -->
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Upload Image</label>
-                            <div id="currentImagePreview" style="display:none; margin-bottom:10px;">
-                                <img id="currentImage" src="" style="max-height:120px; border-radius:10px; border:1px solid #ddd;">
-                            </div>
-                            <input type="file" name="image_file" id="edit_image_file" class="form-control" accept="image/*">
-                            <small id="imageHelpText">Leave empty to auto-generate a social card.</small>
-                        </div>
-                    </div>
+                    <!-- ✅ Form Content Include -->
+                    <?php include 'property_form.php'; ?>
 
                     <div class="mt-4">
                         <button type="submit" name="add_property" id="submitBtn" class="btn btn-primary btn-lg w-100">Add Property</button>
@@ -439,7 +317,6 @@ include 'header.php';
         document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
         document.getElementById('edit_google_location').value = '';
         document.getElementById('edit_location').value = '';
-        // Reset additional fields
         document.getElementById('edit_description').value = '';
     }
 
@@ -472,7 +349,6 @@ include 'header.php';
                 document.getElementById('edit_emd_deadline').value = data.emd_deadline || '';
                 document.getElementById('edit_auction_date').value = data.auction_date || '';
                 document.getElementById('edit_contact_number').value = data.contact_number || '';
-                document.getElementById('edit_google_location').value = data.google_location || '';
                 document.getElementById('existing_image').value = data.image_url || '';
                 document.getElementById('edit_description').value = data.description || '';
 
