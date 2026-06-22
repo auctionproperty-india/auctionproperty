@@ -31,11 +31,11 @@
             <div class="row g-3 mt-2">
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Borrower Name</label>
-                    <input type="text" name="borrower_name" id="edit_borrower_name" class="form-control" placeholder="e.g. Krishna Yuvraj">
+                    <input type="text" name="borrower_name" id="edit_borrower_name" class="form-control" placeholder=>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Bank Name</label>
-                    <input type="text" name="bank_name" id="edit_bank_name" class="form-control" placeholder="e.g. HomeFirst Finance">
+                    <input type="text" name="bank_name" id="edit_bank_name" class="form-control" placeholder=>
                 </div>
             </div>
         </div>
