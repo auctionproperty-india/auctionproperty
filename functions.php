@@ -154,13 +154,12 @@ function getAccountEntries($pdo, $limit = 100) {
     return $stmt->fetchAll();
 }
 
-// ===== 🆕 WALLET FUNCTIONS =====
+// ---- Wallet ----
 function getUserWalletBalance($pdo, $user_id) {
     $stmt = $pdo->prepare("SELECT wallet_balance FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     return (float) $stmt->fetchColumn();
 }
-
 function creditWallet($pdo, $user_id, $amount, $description, $reference_id = null) {
     if($amount <= 0) return false;
     $stmt = $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?");
@@ -168,7 +167,6 @@ function creditWallet($pdo, $user_id, $amount, $description, $reference_id = nul
     $stmt = $pdo->prepare("INSERT INTO wallet_transactions (user_id, amount, type, description, reference_id) VALUES (?, ?, 'credit', ?, ?)");
     return $stmt->execute([$user_id, $amount, $description, $reference_id]);
 }
-
 function debitWallet($pdo, $user_id, $amount, $description, $reference_id = null) {
     if($amount <= 0) return false;
     $balance = getUserWalletBalance($pdo, $user_id);
@@ -179,15 +177,20 @@ function debitWallet($pdo, $user_id, $amount, $description, $reference_id = null
     return $stmt->execute([$user_id, $amount, $description, $reference_id]);
 }
 
-// ---- Social Image Generator ----
+// ===== 🔥 4K Social Image Generator (All Details) =====
 function generateSocialCard($property) {
     if (!extension_loaded('gd')) return $property['image_url'] ?? '';
     $font_path = __DIR__ . '/fonts/Inter.ttf';
     $font_exists = file_exists($font_path);
+
     try {
-        $width = 1080; $height = 1080;
+        // 4K Resolution: 3840 x 2160 (Ultra HD)
+        $width = 3840;
+        $height = 2160;
         $img = imagecreatetruecolor($width, $height);
         if (!$img) return $property['image_url'] ?? '';
+
+        // Background Gradient (Dark Blue)
         $dark_blue = imagecolorallocate($img, 15, 23, 42);
         imagefilledrectangle($img, 0, 0, $width, $height, $dark_blue);
         for ($i = 0; $i < $height; $i += 10) {
@@ -198,91 +201,182 @@ function generateSocialCard($property) {
             $col = imagecolorallocate($img, $r, $g, $b);
             imagefilledrectangle($img, 0, $i, $width, $i + 10, $col);
         }
+
         $white = imagecolorallocate($img, 255, 255, 255);
         $gold = imagecolorallocate($img, 251, 191, 36);
         $light_gray = imagecolorallocate($img, 200, 210, 220);
         $dark_bg = imagecolorallocate($img, 15, 23, 42);
+
+        // Fallback if font missing
         if (!$font_exists) {
             $f_size = 5;
-            $title = strtoupper($property['title'] ?? 'PROPERTY');
-            $x = (int)(($width - (strlen($title) * imagefontwidth($f_size))) / 2);
-            imagestring($img, $f_size, $x, 180, $title, $gold);
-            $bank = $property['bank_name'] ?? 'BANK AUCTION';
-            $bx = (int)(($width - (strlen($bank) * imagefontwidth($f_size))) / 2);
-            imagestring($img, $f_size, $bx, 300, $bank, $white);
-            $price = '₹ ' . indianCurrencyFormat($property['price'] ?? 0);
-            $px = (int)(($width - (strlen($price) * imagefontwidth($f_size))) / 2);
-            imagestring($img, $f_size, $px, 450, $price, $gold);
+            $lines = [
+                strtoupper($property['title'] ?? 'PROPERTY'),
+                "BANK: " . ($property['bank_name'] ?? 'N/A'),
+                "PRICE: ₹ " . indianCurrencyFormat($property['price'] ?? 0),
+                "CITY: " . ($property['city'] ?? ''),
+                "CONTACT: " . ($property['contact_number'] ?? 'N/A')
+            ];
+            $y = 200;
+            foreach ($lines as $line) {
+                $x = (int)(($width - (strlen($line) * imagefontwidth($f_size))) / 2);
+                imagestring($img, $f_size, $x, $y, $line, $white);
+                $y += 100;
+            }
             return saveImage($img);
         }
-        $bank = strtoupper($property['bank_name'] ?? 'BANK AUCTION');
-        $bank_size = 34;
-        $bank_box = imagettfbbox($bank_size, 0, $font_path, $bank);
-        $bank_w = ($bank_box[2] - $bank_box[0]) + 60;
-        $bank_h = 70;
-        $bank_x = (int)(($width - $bank_w) / 2);
-        imagefilledrectangle($img, $bank_x, 120, $bank_x + $bank_w, 120 + $bank_h, $gold);
-        $txt_x = $bank_x + 30;
-        $txt_y = 120 + 48;
-        imagettftext($img, $bank_size, 0, $txt_x, $txt_y, $dark_bg, $font_path, $bank);
+
+        // ---- Premium Layout with All Details ----
+        $font_regular = $font_path;
+        $font_bold = $font_path; // If we had separate bold font, we'd use it.
+
+        // 1. Title (Big)
         $title = strtoupper($property['title'] ?? 'PRIME PROPERTY');
-        $title_size = 72;
-        $title_box = imagettfbbox($title_size, 0, $font_path, $title);
+        $title_size = 120;
+        $title_box = imagettfbbox($title_size, 0, $font_regular, $title);
         $title_width = $title_box[2] - $title_box[0];
         $x = (int)(($width - $title_width) / 2);
-        imagettftext($img, $title_size, 0, $x, 280, $white, $font_path, $title);
-        $city = strtoupper($property['city'] ?? '');
-        if (!empty($city)) {
-            $city_size = 38;
-            $city_box = imagettfbbox($city_size, 0, $font_path, $city);
-            $city_w = $city_box[2] - $city_box[0];
-            $x = (int)(($width - $city_w) / 2);
-            imagettftext($img, $city_size, 0, $x, 350, $light_gray, $font_path, $city);
+        imagettftext($img, $title_size, 0, $x, 250, $gold, $font_regular, $title);
+
+        // 2. Subtitle (Bank Name)
+        $bank = strtoupper($property['bank_name'] ?? 'BANK AUCTION');
+        $bank_size = 70;
+        $bank_box = imagettfbbox($bank_size, 0, $font_regular, $bank);
+        $bank_w = ($bank_box[2] - $bank_box[0]) + 120;
+        $bank_h = 100;
+        $bank_x = (int)(($width - $bank_w) / 2);
+        imagefilledrectangle($img, $bank_x, 320, $bank_x + $bank_w, 320 + $bank_h, $gold);
+        $txt_x = $bank_x + 60;
+        $txt_y = 320 + 80;
+        imagettftext($img, $bank_size, 0, $txt_x, $txt_y, $dark_bg, $font_regular, $bank);
+
+        // 3. Property Type & Possession
+        $type = $property['type'] ?? 'N/A';
+        $possession = $property['possession_type'] ?? 'N/A';
+        $info_line = "TYPE: $type   |   POSSESSION: $possession";
+        $info_size = 50;
+        $info_box = imagettfbbox($info_size, 0, $font_regular, $info_line);
+        $info_w = $info_box[2] - $info_box[0];
+        $x = (int)(($width - $info_w) / 2);
+        imagettftext($img, $info_size, 0, $x, 520, $white, $font_regular, $info_line);
+
+        // 4. Location Details (City, Locality, State)
+        $city = $property['city'] ?? '';
+        $locality = $property['locality'] ?? '';
+        $state = $property['state'] ?? '';
+        $loc_str = "$city, $locality, $state";
+        $loc_size = 44;
+        $loc_box = imagettfbbox($loc_size, 0, $font_regular, $loc_str);
+        $loc_w = $loc_box[2] - $loc_box[0];
+        $x = (int)(($width - $loc_w) / 2);
+        imagettftext($img, $loc_size, 0, $x, 620, $light_gray, $font_regular, $loc_str);
+
+        // 5. Address (full)
+        $address = $property['location'] ?? '';
+        $addr_size = 40;
+        $addr_box = imagettfbbox($addr_size, 0, $font_regular, $address);
+        $addr_w = $addr_box[2] - $addr_box[0];
+        if ($addr_w > $width - 200) {
+            // wrap long address? for simplicity, just truncate
+            $address = substr($address, 0, 80) . '...';
+            $addr_box = imagettfbbox($addr_size, 0, $font_regular, $address);
+            $addr_w = $addr_box[2] - $addr_box[0];
         }
-        $price_label = "RESERVE PRICE";
-        $price_val = "₹ " . indianCurrencyFormat($property['price'] ?? 0);
-        $label_size = 32;
-        $label_box = imagettfbbox($label_size, 0, $font_path, $price_label);
-        $label_w = $label_box[2] - $label_box[0];
-        $x = (int)(($width - $label_w) / 2);
-        imagettftext($img, $label_size, 0, $x, 480, $light_gray, $font_path, $price_label);
-        $val_size = 72;
-        $val_box = imagettfbbox($val_size, 0, $font_path, $price_val);
-        $val_w = $val_box[2] - $val_box[0];
-        $x = (int)(($width - $val_w) / 2);
-        imagettftext($img, $val_size, 0, $x, 600, $gold, $font_path, $price_val);
-        $per_sqft = "₹ " . indianCurrencyFormat($property['reserve_price_per_sqft'] ?? 0) . " PER SQ FT";
-        $ps_size = 26;
-        $ps_box = imagettfbbox($ps_size, 0, $font_path, $per_sqft);
-        $ps_w = $ps_box[2] - $ps_box[0];
-        $x = (int)(($width - $ps_w) / 2);
-        imagettftext($img, $ps_size, 0, $x, 660, $white, $font_path, $per_sqft);
+        $x = (int)(($width - $addr_w) / 2);
+        imagettftext($img, $addr_size, 0, $x, 720, $white, $font_regular, $address);
+
+        // 6. Price & EMD / Bid / Area (4 columns)
+        $price = "RESERVE PRICE: ₹ " . indianCurrencyFormat($property['price'] ?? 0);
+        $emd = "EMD: ₹ " . indianCurrencyFormat($property['emd_amount'] ?? 0);
+        $bid = "BID INCREMENT: ₹ " . indianCurrencyFormat($property['bid_increment'] ?? 0);
+        $area = "AREA: " . ($property['sqft'] ?? 0) . " Sq Ft";
+
+        $items = [$price, $emd, $bid, $area];
+        $cols = 4;
+        $box_w = 700;
+        $box_h = 150;
+        $gap = 40;
+        $start_x = (int)(($width - ($box_w * $cols + $gap * ($cols - 1))) / 2);
+        $box_y = 800;
+
+        foreach ($items as $i => $text) {
+            $x_pos = $start_x + ($i * ($box_w + $gap));
+            $box_color = imagecolorallocate($img, 30, 50, 80);
+            imagefilledrectangle($img, $x_pos, $box_y, $x_pos + $box_w, $box_y + $box_h, $box_color);
+            imagerectangle($img, $x_pos, $box_y, $x_pos + $box_w, $box_y + $box_h, $gold);
+
+            // Label (first part before colon)
+            $parts = explode(':', $text);
+            $label = $parts[0] . ':';
+            $value = isset($parts[1]) ? trim($parts[1]) : '';
+            $label_size = 32;
+            $value_size = 44;
+            $label_box = imagettfbbox($label_size, 0, $font_regular, $label);
+            $label_w = $label_box[2] - $label_box[0];
+            $lx = (int)($x_pos + ($box_w - $label_w) / 2);
+            imagettftext($img, $label_size, 0, $lx, $box_y + 50, $light_gray, $font_regular, $label);
+
+            $value_box = imagettfbbox($value_size, 0, $font_regular, $value);
+            $value_w = $value_box[2] - $value_box[0];
+            $vx = (int)($x_pos + ($box_w - $value_w) / 2);
+            imagettftext($img, $value_size, 0, $vx, $box_y + 120, $white, $font_regular, $value);
+        }
+
+        // 7. Auction Dates (Start, End, Deadline)
+        $start = $property['auction_start_time'] ?? 'N/A';
+        $end = $property['auction_end_time'] ?? 'N/A';
+        $deadline = $property['emd_deadline'] ?? 'N/A';
+        $auction_date = $property['auction_date'] ?? '';
+        if (!empty($auction_date)) {
+            $auction_date = date('d M Y', strtotime($auction_date));
+        }
+        $date_line = "START: $start   |   END: $end   |   EMD DEADLINE: $deadline   |   AUCTION DATE: $auction_date";
+        $date_size = 40;
+        $date_box = imagettfbbox($date_size, 0, $font_regular, $date_line);
+        $date_w = $date_box[2] - $date_box[0];
+        if ($date_w > $width - 100) {
+            $date_line = "START: $start   |   END: $end";
+            $date_box = imagettfbbox($date_size, 0, $font_regular, $date_line);
+            $date_w = $date_box[2] - $date_box[0];
+        }
+        $x = (int)(($width - $date_w) / 2);
+        imagettftext($img, $date_size, 0, $x, 1050, $white, $font_regular, $date_line);
+
+        // 8. Borrower & Contact
         $borrower = "BORROWER: " . ($property['borrower_name'] ?? 'N/A');
         $contact = "CONTACT: " . ($property['contact_number'] ?? 'N/A');
-        $info_size = 26;
-        imagettftext($img, $info_size, 0, 80, 780, $light_gray, $font_path, $borrower);
-        imagettftext($img, $info_size, 0, 80, 830, $light_gray, $font_path, $contact);
-        $emd = "EMD: ₹ " . indianCurrencyFormat($property['emd_amount'] ?? 0);
-        $possession = "POSSESSION: " . ($property['possession_type'] ?? 'Physical');
-        imagettftext($img, $info_size, 0, 680, 780, $light_gray, $font_path, $emd);
-        imagettftext($img, $info_size, 0, 680, 830, $light_gray, $font_path, $possession);
+        $info_size2 = 44;
+        $borrower_box = imagettfbbox($info_size2, 0, $font_regular, $borrower);
+        $borrower_w = $borrower_box[2] - $borrower_box[0];
+        $x = (int)(($width - $borrower_w) / 2);
+        imagettftext($img, $info_size2, 0, $x, 1200, $gold, $font_regular, $borrower);
+        $contact_box = imagettfbbox($info_size2, 0, $font_regular, $contact);
+        $contact_w = $contact_box[2] - $contact_box[0];
+        $x = (int)(($width - $contact_w) / 2);
+        imagettftext($img, $info_size2, 0, $x, 1280, $white, $font_regular, $contact);
+
+        // 9. Footer Brand
         $brand = "🔹 PRIME PROPERTY";
-        $brand_size = 28;
-        imagettftext($img, $brand_size, 0, 80, 980, $gold, $font_path, $brand);
-        $auction = "AUCTION: " . ($property['auction_start_time'] ?? 'N/A') . " - " . ($property['auction_end_time'] ?? 'N/A');
-        $auction_size = 22;
-        imagettftext($img, $auction_size, 0, 600, 980, $white, $font_path, $auction);
+        $brand_size = 50;
+        $brand_box = imagettfbbox($brand_size, 0, $font_regular, $brand);
+        $brand_w = $brand_box[2] - $brand_box[0];
+        $x = (int)(($width - $brand_w) / 2);
+        imagettftext($img, $brand_size, 0, $x, 1900, $gold, $font_regular, $brand);
+
         return saveImage($img);
+
     } catch (Exception $e) {
         return $property['image_url'] ?? '';
     }
 }
+
 function saveImage($img) {
     $upload_dir = 'uploads/';
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
     $filename = 'social_' . time() . '_' . bin2hex(random_bytes(6)) . '.png';
     $path = $upload_dir . $filename;
-    imagepng($img, $path, 9);
+    // ✅ High Quality (Compression Level 0 = best quality)
+    imagepng($img, $path, 0);
     imagedestroy($img);
     return $path;
 }
