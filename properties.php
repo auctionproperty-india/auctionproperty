@@ -1,7 +1,4 @@
 <?php 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -10,9 +7,8 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit; 
 }
 
-// ✅ Permission Check – 'properties' module के लिए View Permission
 if(!hasViewPermission('properties', $pdo)) {
-    die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page. Contact Super Admin.</div>");
+    die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page.</div>");
 }
 
 $default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
@@ -67,7 +63,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // UPDATE
     if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
-        // Check Edit Permission
         if(!hasEditPermission('properties', $pdo)) {
             die("<div class='alert alert-danger'>❌ You don't have permission to edit properties.</div>");
         }
@@ -137,9 +132,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // ADD
+    // ADD (✅ FIXED: status = 'available' included)
     if(isset($_POST['add_property'])) {
-        // Check Edit Permission
         if(!hasEditPermission('properties', $pdo)) {
             die("<div class='alert alert-danger'>❌ You don't have permission to add properties.</div>");
         }
@@ -162,12 +156,14 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             if($date_obj) $auction_date_db = $date_obj->format('Y-m-d');
         }
 
+        // ✅ status = 'available' added
         $sql = "INSERT INTO properties (
             title, description, price, location, city, state, type, google_location, image_url, 
             bank_name, sqft, possession_type, auction_date, 
             borrower_name, emd_amount, bid_increment, emd_deadline, 
-            auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number
-        ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number,
+            status
+        ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
