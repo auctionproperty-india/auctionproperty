@@ -62,7 +62,7 @@
                 </div>
                 <div class="col-md-8">
                     <label class="form-label fw-semibold">Address / Location <span class="text-danger">*</span></label>
-                    <input type="text" name="location" id="edit_location" class="form-control" required placeholder="Full address...">
+                    <input type="text" name="location" id="edit_location" class="form-control" required placeholder=>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Possession</label>
@@ -73,15 +73,15 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Locality</label>
-                    <input type="text" name="locality" id="edit_locality" class="form-control" placeholder="Rau, Indore">
+                    <input type="text" name="locality" id="edit_locality" class="form-control" placeholder=>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">City <span class="text-danger">*</span></label>
-                    <input type="text" name="city" id="edit_city" class="form-control" required placeholder="Indore">
+                    <input type="text" name="city" id="edit_city" class="form-control" required placeholder=>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">State</label>
-                    <input type="text" name="state" id="edit_state" class="form-control" placeholder="Madhya Pradesh">
+                    <input type="text" name="state" id="edit_state" class="form-control" placeholder=">
                 </div>
             </div>
         </div>
@@ -96,15 +96,15 @@
             <div class="row g-3 mt-2">
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">EMD Amount (₹)</label>
-                    <input type="number" step="0.01" name="emd_amount" id="edit_emd_amount" class="form-control" placeholder="108000">
+                    <input type="number" step="0.01" name="emd_amount" id="edit_emd_amount" class="form-control" placeholder=>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Bid Increment (₹)</label>
-                    <input type="number" step="0.01" name="bid_increment" id="edit_bid_increment" class="form-control" placeholder="10000">
+                    <input type="number" step="0.01" name="bid_increment" id="edit_bid_increment" class="form-control" placeholder=>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Area (Sq Ft)</label>
-                    <input type="number" step="0.01" name="sqft" id="edit_sqft" class="form-control" placeholder="e.g. 1200">
+                    <input type="number" step="0.01" name="sqft" id="edit_sqft" class="form-control" placeholder="">
                 </div>
             </div>
         </div>
@@ -119,19 +119,19 @@
             <div class="row g-3 mt-2">
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">EMD Submission Deadline</label>
-                    <input type="text" name="emd_deadline" id="edit_emd_deadline" class="form-control" placeholder="Thu, 25 Jun 2026 05:00 PM">
+                    <input type="text" name="emd_deadline" id="edit_emd_deadline" class="form-control" placeholder=>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Auction Start Date & Time</label>
-                    <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control" placeholder="Sat, 27 Jun 2026 11:00 AM">
+                    <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control" placeholder=>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Auction End Date & Time</label>
-                    <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control" placeholder="Sat, 27 Jun 2026 02:00 PM">
+                    <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control" placeholder=>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold">Auction Date (DD/MM/YYYY)</label>
-                    <input type="text" name="auction_date" id="edit_auction_date" class="form-control" placeholder="e.g. 27/06/2026">
+                    <label class="form-label fw-semibold">Inspection Date & Time (DD/MM/YYYY)</label>
+                    <input type="text" name="auction_date" id="edit_auction_date" class="form-control" placeholder=>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Contact Number</label>
