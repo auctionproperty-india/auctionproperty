@@ -67,11 +67,26 @@ $show_images = userHasActiveSubscription($pdo, $user_id);
 
     <div class="row">
         <?php
-        $sql = "SELECT * FROM properties WHERE status = 'available'";
+        // ✅ Explicit Columns – No SELECT *
+        $sql = "SELECT id, title, description, price, location, city, state, type, google_location, image_url, 
+                       bank_name, sqft, possession_type, inspection_date, borrower_name, emd_amount, bid_increment, 
+                       emd_deadline, auction_start_time, auction_end_time, locality, reserve_price_per_sqft, 
+                       contact_number, status, created_at 
+                FROM properties 
+                WHERE status = 'available'";
         $params = [];
-        if(!empty($_GET['city'])) { $sql .= " AND city ILIKE ?"; $params[] = '%'.$_GET['city'].'%'; }
-        if(!empty($_GET['type'])) { $sql .= " AND type = ?"; $params[] = $_GET['type']; }
-        if(!empty($_GET['max_price'])) { $sql .= " AND price <= ?"; $params[] = $_GET['max_price']; }
+        if(!empty($_GET['city'])) {
+            $sql .= " AND city ILIKE ?";
+            $params[] = '%'.$_GET['city'].'%';
+        }
+        if(!empty($_GET['type'])) {
+            $sql .= " AND type = ?";
+            $params[] = $_GET['type'];
+        }
+        if(!empty($_GET['max_price'])) {
+            $sql .= " AND price <= ?";
+            $params[] = $_GET['max_price'];
+        }
         $sql .= " ORDER BY id DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -99,7 +114,6 @@ $show_images = userHasActiveSubscription($pdo, $user_id);
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <span class="bank-badge">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
-                                <!-- ✅ Auction Date = auction_start_time -->
                                 <?php if(!empty($prop['auction_start_time'])): ?>
                                     <span class="text-muted small"><i class="far fa-calendar"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                                 <?php endif; ?>
