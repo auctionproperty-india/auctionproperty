@@ -185,8 +185,8 @@ function generateSocialCard($property) {
 
     try {
         // 4K Resolution: 3840 x 2160 (Ultra HD)
-        $width = 3840;
-        $height = 2160;
+        $width = 1920;
+        $height = 1080;
         $img = imagecreatetruecolor($width, $height);
         if (!$img) return $property['image_url'] ?? '';
 
