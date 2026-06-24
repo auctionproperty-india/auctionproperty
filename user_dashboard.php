@@ -18,7 +18,11 @@ $user = $user_stmt->fetch();
 $user_city = $user['city'] ?? '';
 
 // ---- Subscription Status ----
-$active_sub = $pdo->prepare("SELECT s.*, p.name as pkg_name, s.start_date, s.end_date, (s.end_date - CURRENT_DATE) as days_left FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE ORDER BY s.id DESC LIMIT 1");
+$active_sub = $pdo->prepare("SELECT s.id, s.user_id, s.package_id, s.property_id, s.amount, s.payment_method, s.utr, s.slip_path, s.status, s.start_date, s.end_date, s.created_at, p.name as pkg_name, (s.end_date - CURRENT_DATE) as days_left 
+                            FROM subscriptions s 
+                            JOIN packages p ON s.package_id = p.id 
+                            WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE 
+                            ORDER BY s.id DESC LIMIT 1");
 $active_sub->execute([$user_id]);
 $sub_info = $active_sub->fetch();
 $is_subscribed = $sub_info ? true : false;
@@ -46,8 +50,13 @@ $wallet_balance = getUserWalletBalance($pdo, $user_id);
 // ---- Show images only if subscribed ----
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
-// ---- 10 Lowest Price Properties from User's City ----
-$sql = "SELECT * FROM properties WHERE status = 'available'";
+// ---- 10 Lowest Price Properties (Explicit Columns) ----
+$sql = "SELECT id, title, description, price, location, city, state, type, google_location, image_url, 
+               bank_name, sqft, possession_type, inspection_date, borrower_name, emd_amount, bid_increment, 
+               emd_deadline, auction_start_time, auction_end_time, locality, reserve_price_per_sqft, 
+               contact_number, status, created_at 
+        FROM properties 
+        WHERE status = 'available'";
 $params = [];
 if(!empty($user_city)) {
     $sql .= " AND city ILIKE ?";
@@ -156,7 +165,6 @@ $props = $stmt->fetchAll();
                         <span class="badge bg-light text-dark">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
                         <h6 class="fw-bold mt-1"><?= htmlspecialchars($p['title']) ?></h6>
                         <div class="fw-bold text-success">₹ <?= indianCurrencyFormat($p['price']) ?></div>
-                        <!-- ✅ Auction Date = auction_start_time -->
                         <?php if(!empty($p['auction_start_time'])): ?>
                             <div class="text-muted small"><i class="far fa-calendar-alt me-1"></i> Auction: <?= htmlspecialchars($p['auction_start_time']) ?></div>
                         <?php endif; ?>
