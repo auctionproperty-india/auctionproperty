@@ -1,4 +1,8 @@
 <?php
+// ============================================================
+// ✅ Header – सभी Pages का Common Header
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -148,7 +152,6 @@ if(isset($_SESSION['user_id'])) {
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
     <?php endif; ?>
     
-    <!-- ✅ Logout Link for ALL Users -->
     <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
 
