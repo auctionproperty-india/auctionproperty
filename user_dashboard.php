@@ -8,6 +8,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 }
 
 $user_id = $_SESSION['user_id'];
+
 include 'header.php'; 
 
 // ---- User Data ----
@@ -26,6 +27,18 @@ $reg_date_formatted = !empty($user['reg_date']) ? date('d M Y', strtotime($user[
 $activation_date_formatted = ($is_subscribed && !empty($sub_info['start_date'])) ? date('d M Y', strtotime($sub_info['start_date'])) : 'Not Active';
 $expiry_date_formatted = ($is_subscribed && !empty($sub_info['end_date'])) ? date('d M Y', strtotime($sub_info['end_date'])) : 'N/A';
 $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
+
+// ---- Referral & Earnings ----
+$referral_link = getReferralLink($user_id);
+$earnings = getReferralEarnings($pdo, $user_id, 'pending');
+$paid_earnings = getReferralEarnings($pdo, $user_id, 'paid');
+$total_pending = array_sum(array_column($earnings, 'amount'));
+$total_paid = array_sum(array_column($paid_earnings, 'net_amount'));
+$team_members = getReferredUsers($pdo, $user_id);
+
+$user_subs = $pdo->prepare("SELECT s.*, p.name as pkg_name FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.user_id = ? ORDER BY s.created_at DESC");
+$user_subs->execute([$user_id]);
+$user_subs = $user_subs->fetchAll();
 
 // ---- Wallet Balance ----
 $wallet_balance = getUserWalletBalance($pdo, $user_id);
@@ -56,12 +69,24 @@ $props = $stmt->fetchAll();
     </div>
 </div>
 
-<!-- Wallet Balance Card -->
+<!-- Wallet Cards -->
 <div class="row g-4 mb-4">
-    <div class="col-md-6 mx-auto">
+    <div class="col-md-4">
         <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #dbeafe, #bfdbfe);">
             <h6 class="text-muted">💰 Wallet Balance</h6>
             <h2 class="fw-bold text-primary">₹ <?= indianCurrencyFormat($wallet_balance) ?></h2>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #fef3c7, #fde68a);">
+            <h6 class="text-muted">⏳ Pending</h6>
+            <h2 class="fw-bold text-dark">₹ <?= indianCurrencyFormat($total_pending) ?></h2>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #d1fae5, #a7f3d0);">
+            <h6 class="text-muted">✅ Paid</h6>
+            <h2 class="fw-bold text-success">₹ <?= indianCurrencyFormat($total_paid) ?></h2>
         </div>
     </div>
 </div>
@@ -91,11 +116,23 @@ $props = $stmt->fetchAll();
     </div>
 </div>
 
-<!-- ===== BEST DEALS WITH "VIEW ALL" BUTTON ===== -->
+<!-- Referral Link -->
+<div class="card-premium" style="border:1px solid #10b981; background:#f0fdf4;">
+    <h5><i class="fas fa-link me-2" style="color:#10b981;"></i>Your Referral Link</h5>
+    <div class="input-group">
+        <input type="text" class="form-control border-success" id="refLink" value="<?= $referral_link ?>" readonly>
+        <button class="btn btn-success" onclick="copyRef()"><i class="fas fa-copy"></i> Copy</button>
+    </div>
+    <div class="mt-2">
+        <span class="badge bg-warning text-dark">⏳ Pending: ₹ <?= indianCurrencyFormat($total_pending) ?></span>
+        <span class="badge bg-success ms-2">✅ Paid: ₹ <?= indianCurrencyFormat($total_paid) ?></span>
+    </div>
+</div>
+
+<!-- ===== BEST DEALS ===== -->
 <div class="card-premium">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5><i class="fas fa-fire me-2" style="color:#f97316;"></i>Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?></h5>
-        <!-- ✅ View All Properties Button -->
         <a href="index.php" class="btn btn-outline-primary btn-sm">
             <i class="fas fa-arrow-right me-1"></i> View All Properties
         </a>
@@ -119,8 +156,9 @@ $props = $stmt->fetchAll();
                         <span class="badge bg-light text-dark">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
                         <h6 class="fw-bold mt-1"><?= htmlspecialchars($p['title']) ?></h6>
                         <div class="fw-bold text-success">₹ <?= indianCurrencyFormat($p['price']) ?></div>
-                        <?php if(!empty($p['auction_date'])): ?>
-                            <div class="text-muted small"><i class="far fa-calendar-alt me-1"></i> Auction: <?= date('d M Y', strtotime($p['auction_date'])) ?></div>
+                        <!-- ✅ Auction Date = auction_start_time -->
+                        <?php if(!empty($p['auction_start_time'])): ?>
+                            <div class="text-muted small"><i class="far fa-calendar-alt me-1"></i> Auction: <?= htmlspecialchars($p['auction_start_time']) ?></div>
                         <?php endif; ?>
                         <a href="property_detail.php?id=<?= $p['id'] ?>" class="btn btn-primary btn-sm w-100 mt-2">View Details</a>
                     </div>
@@ -132,5 +170,13 @@ $props = $stmt->fetchAll();
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+    function copyRef() { 
+        let inp = document.getElementById('refLink'); 
+        inp.select(); 
+        navigator.clipboard.writeText(inp.value).then(() => alert('Referral Link Copied!')).catch(() => document.execCommand('copy')); 
+    }
+</script>
 
 <?php include 'footer.php'; ?>
