@@ -73,7 +73,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         return trim($val ?? '');
     }
 
-    // UPDATE
+    // ---- UPDATE ----
     if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
         if(!hasEditPermission('properties', $pdo)) {
             die("<div class='alert alert-danger'>❌ You don't have permission to edit properties.</div>");
@@ -92,15 +92,16 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $use_uploaded_image = true;
         }
 
-        $auction_date_db = null;
-        if(!empty($_POST['auction_date'])) {
-            $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['auction_date']);
-            if($date_obj) $auction_date_db = $date_obj->format('Y-m-d');
+        // ✅ inspection_date convert from DD/MM/YYYY to YYYY-MM-DD
+        $inspection_date_db = null;
+        if(!empty($_POST['inspection_date'])) {
+            $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
+            if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
         }
 
         $sql = "UPDATE properties SET 
             title=?, description='', price=?, location=?, city=?, state=?, type=?, google_location=?, image_url=?, 
-            bank_name=?, sqft=?, possession_type=?, auction_date=?, 
+            bank_name=?, sqft=?, possession_type=?, inspection_date=?, 
             borrower_name=?, emd_amount=?, bid_increment=?, emd_deadline=?, 
             auction_start_time=?, auction_end_time=?, locality=?, reserve_price_per_sqft=?, contact_number=? 
             WHERE id=?";
@@ -117,7 +118,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeString($_POST['bank_name'] ?? ''),
             safeNumeric($_POST['sqft'] ?? 0),
             safeString($_POST['possession_type'] ?? 'Physical'),
-            $auction_date_db,
+            $inspection_date_db,
             safeString($_POST['borrower_name'] ?? ''),
             safeNumeric($_POST['emd_amount'] ?? 0),
             safeNumeric($_POST['bid_increment'] ?? 0),
@@ -144,7 +145,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // ADD
+    // ---- ADD ----
     if(isset($_POST['add_property'])) {
         if(!hasEditPermission('properties', $pdo)) {
             die("<div class='alert alert-danger'>❌ You don't have permission to add properties.</div>");
@@ -162,15 +163,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $use_uploaded_image = true;
         }
 
-        $auction_date_db = null;
-        if(!empty($_POST['auction_date'])) {
-            $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['auction_date']);
-            if($date_obj) $auction_date_db = $date_obj->format('Y-m-d');
+        $inspection_date_db = null;
+        if(!empty($_POST['inspection_date'])) {
+            $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
+            if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
         }
 
         $sql = "INSERT INTO properties (
             title, description, price, location, city, state, type, google_location, image_url, 
-            bank_name, sqft, possession_type, auction_date, 
+            bank_name, sqft, possession_type, inspection_date, 
             borrower_name, emd_amount, bid_increment, emd_deadline, 
             auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number,
             status
@@ -189,7 +190,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeString($_POST['bank_name'] ?? ''),
             safeNumeric($_POST['sqft'] ?? 0),
             safeString($_POST['possession_type'] ?? 'Physical'),
-            $auction_date_db,
+            $inspection_date_db,
             safeString($_POST['borrower_name'] ?? ''),
             safeNumeric($_POST['emd_amount'] ?? 0),
             safeNumeric($_POST['bid_increment'] ?? 0),
@@ -348,7 +349,6 @@ include 'header.php';
         document.getElementById('currentImagePreview').style.display = 'none';
         document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
         
-        // ✅ सारे Input Fields को खाली सेट करें
         document.getElementById('edit_title').value = '';
         document.getElementById('edit_price').value = '';
         document.getElementById('edit_reserve_price_per_sqft').value = '';
@@ -364,12 +364,11 @@ include 'header.php';
         document.getElementById('edit_emd_deadline').value = '';
         document.getElementById('edit_auction_start_time').value = '';
         document.getElementById('edit_auction_end_time').value = '';
-        document.getElementById('edit_auction_date').value = '';
+        document.getElementById('edit_inspection_date').value = '';
         document.getElementById('edit_contact_number').value = '';
         document.getElementById('edit_google_location').value = '';
         document.getElementById('edit_description').value = '';
         
-        // Select Boxes को Default पर Reset करें
         document.getElementById('edit_type').value = 'Flat';
         document.getElementById('edit_possession_type').value = 'Physical';
     }
@@ -401,7 +400,7 @@ include 'header.php';
                 document.getElementById('edit_auction_start_time').value = data.auction_start_time || '';
                 document.getElementById('edit_auction_end_time').value = data.auction_end_time || '';
                 document.getElementById('edit_emd_deadline').value = data.emd_deadline || '';
-                document.getElementById('edit_auction_date').value = data.auction_date || '';
+                document.getElementById('edit_inspection_date').value = data.inspection_date || '';
                 document.getElementById('edit_contact_number').value = data.contact_number || '';
                 document.getElementById('edit_google_location').value = data.google_location || '';
                 document.getElementById('existing_image').value = data.image_url || '';
