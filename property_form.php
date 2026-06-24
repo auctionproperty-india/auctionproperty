@@ -48,6 +48,7 @@
             <option value="House">House</option>
             <option value="Row House">Row House</option>
             <option value="Bungalow">Bungalow</option>
+            <option value="Car">Car</option> <!-- ✅ Car Option Added -->
         </select>
     </div>
     <div class="col-md-3">
@@ -86,24 +87,24 @@
         <input type="number" step="0.01" name="sqft" id="edit_sqft" class="form-control form-control-md" value="">
     </div>
 
-    <!-- AUCTION START / END / DEADLINE (STRING) -->
+    <!-- AUCTION START / END / DEADLINE – Placeholder हटा दिए गए -->
     <div class="col-md-3">
         <label class="form-label-md">EMD Submission Deadline</label>
         <input type="text" name="emd_deadline" id="edit_emd_deadline" class="form-control form-control-md" value="">
     </div>
     <div class="col-md-3">
         <label class="form-label-md">Auction Start Date & Time</label>
-        <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control form-control-md" placeholder="Sat, 27 Jun 2026 11:00 AM" value="">
+        <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control form-control-md" value="">
     </div>
     <div class="col-md-3">
         <label class="form-label-md">Auction End Date & Time</label>
-        <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control form-control-md" placeholder="Sat, 27 Jun 2026 02:00 PM" value="">
+        <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control form-control-md" value="">
     </div>
 
-    <!-- INSPECTION DATE (formerly auction_date) -->
+    <!-- INSPECTION DATE – Placeholder हटा दिया गया -->
     <div class="col-md-3">
         <label class="form-label-md">Inspection Date (DD/MM/YYYY)</label>
-        <input type="text" name="inspection_date" id="edit_inspection_date" class="form-control form-control-md" placeholder="e.g. 27/06/2026" value="">
+        <input type="text" name="inspection_date" id="edit_inspection_date" class="form-control form-control-md" value="">
     </div>
 
     <!-- CONTACT NUMBER HIDDEN -->
