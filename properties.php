@@ -14,7 +14,7 @@ if(!hasViewPermission('properties', $pdo)) {
 $default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
 if(!$default_contact) $default_contact = '9238215516';
 
-// FILTERS & PAGINATION (same as before)
+// FILTERS & PAGINATION
 $filter_city = $_GET['filter_city'] ?? '';
 $filter_bank = $_GET['filter_bank'] ?? '';
 $filter_price_min = $_GET['filter_price_min'] ?? '';
@@ -42,7 +42,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-// ADD / UPDATE LOGIC (same as before)
+// ADD / UPDATE LOGIC
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
     function safeString($val) { return trim($val ?? ''); }
@@ -313,24 +313,33 @@ include 'header.php';
     }
 
     function openEditModal(id) {
+        console.log('🔍 openEditModal called with id:', id);
+
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + id;
         document.getElementById('submitBtn').name = 'update_property';
         document.getElementById('submitBtn').innerHTML = 'Update Property';
         document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
 
-        fetch('get_property.php?id=' + id)
+        // ✅ AJAX Call to get_property.php
+        const url = 'get_property.php?id=' + id;
+        console.log('📡 Fetching URL:', url);
+
+        fetch(url)
             .then(response => {
+                console.log('📥 Response status:', response.status);
                 if (!response.ok) {
                     throw new Error('Network response was not ok: ' + response.status);
                 }
                 return response.json();
             })
             .then(data => {
+                console.log('✅ Data received:', data);
                 if (data.error) {
                     alert('Error: ' + data.error);
                     return;
                 }
                 
+                // Fill form fields
                 document.getElementById('property_id').value = data.id || '';
                 document.getElementById('edit_title').value = data.title || '';
                 document.getElementById('edit_location').value = data.location || '';
@@ -362,12 +371,13 @@ include 'header.php';
                     document.getElementById('currentImagePreview').style.display = 'none';
                 }
 
+                // Show the modal
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
             })
             .catch(error => {
-                alert('Error loading property data: ' + error);
-                console.error('Fetch error:', error);
+                console.error('❌ Fetch error:', error);
+                alert('Error loading property data: ' + error + '\nCheck console for details.');
             });
     }
 </script>
