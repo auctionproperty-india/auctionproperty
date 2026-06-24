@@ -14,7 +14,7 @@ if(!$prop) { die("Property not found!"); }
 $has_subscription = userHasActiveSubscription($pdo, $user_id);
 $show_image = $has_subscription;
 
-// ---- IF NOT SUBSCRIBED: Show Limited 5 Fields (No Address) ----
+// ---- IF NOT SUBSCRIBED: Show ONLY 3 Fields (City, Reserve Price, Auction Date) ----
 if(!$has_subscription) {
     include 'header.php'; 
     ?>
@@ -32,40 +32,28 @@ if(!$has_subscription) {
                             <h5 class="mt-2"><?= htmlspecialchars($prop['title']) ?></h5>
                         </div>
                         
-                        <!-- ✅ शानदार 5 Fields (Address Hidden) -->
+                        <!-- ✅ सिर्फ 3 Boxes (City, Reserve Price, Auction Date) -->
                         <div class="row g-3">
-                            <div class="col-md-6">
-                                <div class="p-3 rounded-4 shadow-sm" style="background: #dbeafe; border-left: 5px solid #2563eb;">
-                                    <small class="text-muted text-uppercase fw-bold">🏦 Bank</small>
-                                    <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['bank_name'] ?? 'N/A') ?></h6>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="p-3 rounded-4 shadow-sm" style="background: #fef3c7; border-left: 5px solid #f59e0b;">
                                     <small class="text-muted text-uppercase fw-bold">📍 City</small>
                                     <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h6>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="p-3 rounded-4 shadow-sm" style="background: #dcfce7; border-left: 5px solid #22c55e;">
                                     <small class="text-muted text-uppercase fw-bold">💰 Reserve Price</small>
                                     <h6 class="fw-bold mb-0 text-success">₹ <?= indianCurrencyFormat($prop['price']) ?></h6>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="p-3 rounded-4 shadow-sm" style="background: #fce7f3; border-left: 5px solid #ec4899;">
-                                    <small class="text-muted text-uppercase fw-bold">📐 Area</small>
-                                    <h6 class="fw-bold mb-0"><?= $prop['sqft'] ?? 0 ?> Sq Ft</h6>
-                                </div>
-                            </div>
-                            <div class="col-md-12">
+                            <div class="col-md-4">
                                 <div class="p-3 rounded-4 shadow-sm" style="background: #e0e7ff; border-left: 5px solid #6366f1;">
                                     <small class="text-muted text-uppercase fw-bold">📅 Auction Date</small>
                                     <h6 class="fw-bold mb-0"><?= !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A' ?></h6>
                                 </div>
                             </div>
                         </div>
-                        <!-- ✅ 5 Fields End -->
+                        <!-- ✅ 3 Fields End -->
 
                         <div class="text-center mt-4">
                             <a href="user_packages.php" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow">
@@ -108,7 +96,7 @@ include 'header.php';
                                 <div class="col-md-6"><div class="bg-light p-3 rounded-4 h-100"><small class="text-muted text-uppercase fw-bold">Property Type</small><h5 class="fw-bold"><?= htmlspecialchars($prop['type'] ?? 'N/A') ?></h5></div></div>
                             </div>
 
-                            <!-- Address (यह सिर्फ Subscribed Users को दिखेगा) -->
+                            <!-- Address (Only for Subscribed Users) -->
                             <div class="mb-4 p-3 rounded-4" style="background: #f1f5f9; border-left: 4px solid #2563eb;">
                                 <i class="fas fa-home me-2" style="color: #2563eb;"></i>
                                 <strong>Address:</strong> <?= htmlspecialchars($prop['location'] ?? 'Not Provided') ?>
@@ -137,8 +125,30 @@ include 'header.php';
                             </div>
 
                             <div class="row g-3">
-                                <div class="col-md-6"><div class="p-3 rounded-4" style="background: #f0fdf4; border: 1px solid #bbf7d0;"><i class="fas fa-phone text-success me-2"></i> <strong>Contact:</strong> <?= htmlspecialchars($prop['contact_number'] ?? 'N/A') ?></div></div>
-                                <div class="col-md-6"><?php if(!empty($prop['google_location'])): ?><a href="<?= $prop['google_location'] ?>" target="_blank" class="btn btn-outline-primary w-100 rounded-4"><i class="fas fa-map-marked-alt me-2"></i> View on Google Maps</a><?php else: ?><span class="text-muted">No Map Link Available</span><?php endif; ?></div>
+                                <!-- WhatsApp Link Contact -->
+                                <div class="col-md-6">
+                                    <div class="p-3 rounded-4" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
+                                        <i class="fas fa-phone text-success me-2"></i> 
+                                        <strong>Contact:</strong>
+                                        <?php if(!empty($prop['contact_number'])): ?>
+                                            <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $prop['contact_number']) ?>" target="_blank" style="text-decoration:none; font-weight:bold; color:#25D366;">
+                                                <?= htmlspecialchars($prop['contact_number']) ?>
+                                                <i class="fab fa-whatsapp ms-1"></i>
+                                            </a>
+                                        <?php else: ?>
+                                            N/A
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <?php if(!empty($prop['google_location'])): ?>
+                                        <a href="<?= $prop['google_location'] ?>" target="_blank" class="btn btn-outline-primary w-100 rounded-4">
+                                            <i class="fas fa-map-marked-alt me-2"></i> View on Google Maps
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="text-muted">No Map Link Available</span>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         </div>
 
