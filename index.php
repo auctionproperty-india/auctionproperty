@@ -99,9 +99,9 @@ $show_images = userHasActiveSubscription($pdo, $user_id);
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <span class="bank-badge">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
-                                <!-- ✅ Auction Date Fix: Only show if set -->
-                                <?php if(!empty($prop['auction_date'])): ?>
-                                    <span class="text-muted small"><i class="far fa-calendar"></i> <?= date('d M Y', strtotime($prop['auction_date'])) ?></span>
+                                <!-- ✅ Auction Date = auction_start_time -->
+                                <?php if(!empty($prop['auction_start_time'])): ?>
+                                    <span class="text-muted small"><i class="far fa-calendar"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                                 <?php endif; ?>
                             </div>
                             <h6 class="fw-bold mt-2"><?= htmlspecialchars($prop['title']) ?></h6>
