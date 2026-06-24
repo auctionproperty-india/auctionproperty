@@ -6,7 +6,6 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// Admin या Sub-Admin ही Access कर सकता है
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     http_response_code(403);
     die(json_encode(['error' => 'Unauthorized']));
@@ -18,7 +17,6 @@ if(!$id) {
     die(json_encode(['error' => 'Property ID required']));
 }
 
-// ✅ Explicit Columns – Cached Plan Error से बचने के लिए
 $sql = "SELECT 
             id, title, description, price, location, city, state, type, 
             google_location, image_url, bank_name, sqft, possession_type, 
@@ -37,7 +35,7 @@ if(!$property) {
     die(json_encode(['error' => 'Property not found']));
 }
 
-// ✅ inspection_date को DD/MM/YYYY Format में Convert करें (अगर Set है)
+// Convert inspection_date to DD/MM/YYYY
 if(!empty($property['inspection_date'])) {
     $date_obj = DateTime::createFromFormat('Y-m-d', $property['inspection_date']);
     if($date_obj) {
@@ -45,7 +43,6 @@ if(!empty($property['inspection_date'])) {
     }
 }
 
-// ✅ Success Response
 header('Content-Type: application/json');
 echo json_encode($property);
 exit;
