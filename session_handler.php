@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Database Session Handler – Session को Database में Store करेगा
+// ✅ Database Session Handler – PHP 8+ Compatible
 // ============================================================
 
 class DatabaseSessionHandler implements SessionHandlerInterface {
@@ -11,14 +11,17 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
         $this->pdo = $pdo;
     }
     
+    #[\ReturnTypeWillChange]
     public function open($savePath, $sessionName) {
         return true;
     }
     
+    #[\ReturnTypeWillChange]
     public function close() {
         return true;
     }
     
+    #[\ReturnTypeWillChange]
     public function read($sessionId) {
         try {
             $stmt = $this->pdo->prepare("SELECT data FROM {$this->table} WHERE id = ?");
@@ -30,6 +33,7 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
         }
     }
     
+    #[\ReturnTypeWillChange]
     public function write($sessionId, $data) {
         try {
             $stmt = $this->pdo->prepare(
@@ -42,6 +46,7 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
         }
     }
     
+    #[\ReturnTypeWillChange]
     public function destroy($sessionId) {
         try {
             $stmt = $this->pdo->prepare("DELETE FROM {$this->table} WHERE id = ?");
@@ -51,6 +56,7 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
         }
     }
     
+    #[\ReturnTypeWillChange]
     public function gc($maxLifetime) {
         try {
             $stmt = $this->pdo->prepare("DELETE FROM {$this->table} WHERE access < NOW() - INTERVAL ? SECOND");
