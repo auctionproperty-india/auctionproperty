@@ -20,6 +20,12 @@ $filter_bank = $_GET['filter_bank'] ?? '';
 $filter_price_min = $_GET['filter_price_min'] ?? '';
 $filter_price_max = $_GET['filter_price_max'] ?? '';
 
+// ---- PAGINATION ----
+$limit = 20; // Per Page
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$offset = ($page - 1) * $limit;
+
+// ---- BUILD QUERY (Only Required Columns) ----
 $where = [];
 $params = [];
 
@@ -40,11 +46,17 @@ if(!empty($filter_price_max)) {
     $params[] = (float)$filter_price_max;
 }
 
-$sql = "SELECT * FROM properties";
-if(count($where) > 0) {
-    $sql .= " WHERE " . implode(" AND ", $where);
-}
-$sql .= " ORDER BY id DESC";
+$where_clause = count($where) > 0 ? "WHERE " . implode(" AND ", $where) : "";
+
+// ---- Count Total (for Pagination) ----
+$count_sql = "SELECT COUNT(*) FROM properties $where_clause";
+$count_stmt = $pdo->prepare($count_sql);
+$count_stmt->execute($params);
+$total_rows = $count_stmt->fetchColumn();
+$total_pages = ceil($total_rows / $limit);
+
+// ---- Fetch Only Required Columns ----
+$sql = "SELECT id, title, bank_name, city, price, status FROM properties $where_clause ORDER BY id DESC LIMIT $limit OFFSET $offset";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
@@ -218,7 +230,7 @@ include 'header.php';
 
 <div class="card-premium">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <h5><i class="fas fa-list me-2"></i>All Properties</h5>
+        <h5><i class="fas fa-list me-2"></i>All Properties (<?= $total_rows ?>)</h5>
         <?php if(hasEditPermission('properties', $pdo)): ?>
             <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#propertyModal" onclick="openAddModal()">
                 <i class="fas fa-plus-circle me-1"></i> Add New Property
@@ -228,6 +240,7 @@ include 'header.php';
         <?php endif; ?>
     </div>
 
+    <!-- Filters -->
     <form method="GET" class="row g-2 mb-3">
         <div class="col-md-3">
             <input type="text" name="filter_city" class="form-control" placeholder="🏙️ City" value="<?= htmlspecialchars($filter_city) ?>">
@@ -246,21 +259,21 @@ include 'header.php';
         </div>
     </form>
 
+    <!-- Table -->
     <div class="table-responsive">
         <table class="table table-hover">
             <thead class="table-light">
                 <tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
-                <?php 
-                if(count($rows) > 0) {
-                    foreach($rows as $row) { ?>
+                <?php if(count($rows) > 0): ?>
+                    <?php foreach($rows as $row): ?>
                         <tr>
                             <td><?= $row['id'] ?></td>
                             <td><?= htmlspecialchars($row['title']) ?></td>
                             <td><?= htmlspecialchars($row['bank_name'] ?? '') ?></td>
                             <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
-                            <td><?= indianCurrencyFormat($row['price']) ?></td> <!-- ✅ Price Format Fixed -->
+                            <td><?= indianCurrencyFormat($row['price']) ?></td>
                             <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
                             <td>
                                 <?php if(hasEditPermission('properties', $pdo)): ?>
@@ -271,13 +284,34 @@ include 'header.php';
                                 <?php endif; ?>
                             </td>
                         </tr>
-                    <?php }
-                } else { ?>
+                    <?php endforeach; ?>
+                <?php else: ?>
                     <tr><td colspan="7" class="text-center text-muted">No properties found.</td></tr>
-                <?php } ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination -->
+    <?php if($total_pages > 1): ?>
+        <nav class="mt-3">
+            <ul class="pagination justify-content-center">
+                <?php if($page > 1): ?>
+                    <li class="page-item"><a class="page-link" href="?page=<?= $page-1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">« Prev</a></li>
+                <?php endif; ?>
+
+                <?php for($i = 1; $i <= $total_pages; $i++): ?>
+                    <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
+                        <a class="page-link" href="?page=<?= $i ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>"><?= $i ?></a>
+                    </li>
+                <?php endfor; ?>
+
+                <?php if($page < $total_pages): ?>
+                    <li class="page-item"><a class="page-link" href="?page=<?= $page+1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">Next »</a></li>
+                <?php endif; ?>
+            </ul>
+        </nav>
+    <?php endif; ?>
 </div>
 
 <!-- ===== MODAL ===== -->
@@ -293,8 +327,114 @@ include 'header.php';
                     <input type="hidden" name="property_id" id="property_id" value="">
                     <input type="hidden" name="existing_image" id="existing_image" value="">
 
-                    <!-- ✅ Form Content Include -->
-                    <?php include 'property_form.php'; ?>
+                    <div class="row g-3">
+                        <!-- ===== BASIC INFO ===== -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Title *</label>
+                            <input type="text" name="title" id="edit_title" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Reserve Price (₹) *</label>
+                            <input type="number" step="0.01" name="price" id="edit_price" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Price per Sq Ft</label>
+                            <input type="number" step="0.01" name="reserve_price_per_sqft" id="edit_reserve_price_per_sqft" class="form-control">
+                        </div>
+
+                        <!-- ===== BORROWER & BANK ===== -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Borrower Name</label>
+                            <input type="text" name="borrower_name" id="edit_borrower_name" class="form-control" placeholder="Krishna Yuvraj">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Bank Name</label>
+                            <input type="text" name="bank_name" id="edit_bank_name" class="form-control" placeholder="HomeFirst Finance">
+                        </div>
+
+                        <!-- ===== PROPERTY DETAILS ===== -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Property Type</label>
+                            <select name="type" id="edit_type" class="form-control">
+                                <option value="Flat">Flat</option>
+                                <option value="Plot">Plot</option>
+                                <option value="Shop">Shop</option>
+                                <option value="Land">Land</option>
+                                <option value="House">House</option>
+                                <option value="Row House">Row House</option>
+                                <option value="Bungalow">Bungalow</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Address / Location *</label>
+                            <input type="text" name="location" id="edit_location" class="form-control" required placeholder="Full address...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Possession</label>
+                            <select name="possession_type" id="edit_possession_type" class="form-control">
+                                <option value="Physical">Physical</option>
+                                <option value="Symbolic">Symbolic</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Locality</label>
+                            <input type="text" name="locality" id="edit_locality" class="form-control" placeholder="Rau, Indore">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">City *</label>
+                            <input type="text" name="city" id="edit_city" class="form-control" required placeholder="Indore">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">State</label>
+                            <input type="text" name="state" id="edit_state" class="form-control" placeholder="Madhya Pradesh">
+                        </div>
+
+                        <!-- ===== AUCTION FINANCIALS ===== -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">EMD Amount (₹)</label>
+                            <input type="number" step="0.01" name="emd_amount" id="edit_emd_amount" class="form-control" placeholder="108000">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Bid Increment (₹)</label>
+                            <input type="number" step="0.01" name="bid_increment" id="edit_bid_increment" class="form-control" placeholder="10000">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Area (Sq Ft)</label>
+                            <input type="number" step="0.01" name="sqft" id="edit_sqft" class="form-control" placeholder="e.g. 1200">
+                        </div>
+
+                        <!-- ===== DATES & TIMES ===== -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">EMD Submission Deadline</label>
+                            <input type="text" name="emd_deadline" id="edit_emd_deadline" class="form-control" placeholder="Thu, 25 Jun 2026 05:00 PM">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Auction Start Date & Time</label>
+                            <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control" placeholder="Sat, 27 Jun 2026 11:00 AM">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Auction End Date & Time</label>
+                            <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control" placeholder="Sat, 27 Jun 2026 02:00 PM">
+                        </div>
+
+                        <!-- ===== CONTACT & IMAGE ===== -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Auction Date (DD/MM/YYYY)</label>
+                            <input type="text" name="auction_date" id="edit_auction_date" class="form-control" placeholder="e.g. 27/06/2026">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Contact Number</label>
+                            <input type="text" name="contact_number" id="edit_contact_number" class="form-control" value="<?= $default_contact ?>">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Upload Image</label>
+                            <div id="currentImagePreview" style="display:none; margin-bottom:10px;">
+                                <img id="currentImage" src="" style="max-height:120px; border-radius:10px; border:1px solid #ddd;">
+                            </div>
+                            <input type="file" name="image_file" id="edit_image_file" class="form-control" accept="image/*">
+                            <small id="imageHelpText">Leave empty to auto-generate a social card.</small>
+                        </div>
+                    </div>
 
                     <div class="mt-4">
                         <button type="submit" name="add_property" id="submitBtn" class="btn btn-primary btn-lg w-100">Add Property</button>
