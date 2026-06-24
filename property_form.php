@@ -130,7 +130,7 @@
         <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control form-control-md" value="">
     </div>
     <div class="col-md-3">
-        <label class="form-label-md">Inspection Date & Time (DD/MM/YYYY)</label>
+        <label class="form-label-md">Inspection Date & Time </label>
         <input type="text" name="auction_date" id="edit_auction_date" class="form-control form-control-md" value="">
     </div>
 
