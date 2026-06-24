@@ -14,74 +14,45 @@ if(!hasViewPermission('properties', $pdo)) {
 $default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
 if(!$default_contact) $default_contact = '9238215516';
 
-// ---- FILTERS ----
+// FILTERS & PAGINATION (same as before)
 $filter_city = $_GET['filter_city'] ?? '';
 $filter_bank = $_GET['filter_bank'] ?? '';
 $filter_price_min = $_GET['filter_price_min'] ?? '';
 $filter_price_max = $_GET['filter_price_max'] ?? '';
-
-// ---- PAGINATION ----
 $limit = 20;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
 
-// ---- BUILD QUERY ----
 $where = [];
 $params = [];
-
-if(!empty($filter_city)) {
-    $where[] = "city ILIKE ?";
-    $params[] = '%'.$filter_city.'%';
-}
-if(!empty($filter_bank)) {
-    $where[] = "bank_name ILIKE ?";
-    $params[] = '%'.$filter_bank.'%';
-}
-if(!empty($filter_price_min)) {
-    $where[] = "price >= ?";
-    $params[] = (float)$filter_price_min;
-}
-if(!empty($filter_price_max)) {
-    $where[] = "price <= ?";
-    $params[] = (float)$filter_price_max;
-}
-
+if(!empty($filter_city)) { $where[] = "city ILIKE ?"; $params[] = '%'.$filter_city.'%'; }
+if(!empty($filter_bank)) { $where[] = "bank_name ILIKE ?"; $params[] = '%'.$filter_bank.'%'; }
+if(!empty($filter_price_min)) { $where[] = "price >= ?"; $params[] = (float)$filter_price_min; }
+if(!empty($filter_price_max)) { $where[] = "price <= ?"; $params[] = (float)$filter_price_max; }
 $where_clause = count($where) > 0 ? "WHERE " . implode(" AND ", $where) : "";
 
-// ---- Count Total ----
 $count_sql = "SELECT COUNT(*) FROM properties $where_clause";
 $count_stmt = $pdo->prepare($count_sql);
 $count_stmt->execute($params);
 $total_rows = $count_stmt->fetchColumn();
 $total_pages = ceil($total_rows / $limit);
 
-// ---- Fetch Only Required Columns ----
 $sql = "SELECT id, title, bank_name, city, price, status FROM properties $where_clause ORDER BY id DESC LIMIT $limit OFFSET $offset";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-// ---- ADD / UPDATE LOGIC ----
+// ADD / UPDATE LOGIC (same as before)
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
-
-    function safeNumeric($val) {
-        if ($val === '' || $val === null) return 0;
-        return (float) $val;
-    }
-
-    function safeString($val) {
-        return trim($val ?? '');
-    }
+    function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
+    function safeString($val) { return trim($val ?? ''); }
 
     // UPDATE
     if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
-        if(!hasEditPermission('properties', $pdo)) {
-            die("<div class='alert alert-danger'>❌ You don't have permission to edit properties.</div>");
-        }
+        if(!hasEditPermission('properties', $pdo)) die("Permission denied.");
         $id = $_POST['property_id'];
         $image_path = $_POST['existing_image'] ?? '';
         $use_uploaded_image = false;
-
         if(isset($_FILES['image_file']) && $_FILES['image_file']['error'] == 0) {
             $upload_dir = 'uploads/';
             if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
@@ -91,13 +62,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $image_path = $upload_dir . $filename;
             $use_uploaded_image = true;
         }
-
         $inspection_date_db = null;
         if(!empty($_POST['inspection_date'])) {
             $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
             if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
         }
-
         $sql = "UPDATE properties SET 
             title=?, description='', price=?, location=?, city=?, state=?, type=?, google_location=?, image_url=?, 
             bank_name=?, sqft=?, possession_type=?, inspection_date=?, 
@@ -129,29 +98,22 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeString($_POST['contact_number'] ?? $default_contact),
             $id
         ]);
-
         if (!$use_uploaded_image) {
             $updated_prop = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
             $updated_prop->execute([$id]);
             $prop_data = $updated_prop->fetch();
             $generated_path = generateSocialCard($prop_data);
-            if ($generated_path) {
-                $pdo->prepare("UPDATE properties SET image_url = ? WHERE id = ?")->execute([$generated_path, $id]);
-            }
+            if ($generated_path) $pdo->prepare("UPDATE properties SET image_url = ? WHERE id = ?")->execute([$generated_path, $id]);
         }
-
         header("Location: properties.php?updated=1");
         exit;
     }
 
     // ADD
     if(isset($_POST['add_property'])) {
-        if(!hasEditPermission('properties', $pdo)) {
-            die("<div class='alert alert-danger'>❌ You don't have permission to add properties.</div>");
-        }
+        if(!hasEditPermission('properties', $pdo)) die("Permission denied.");
         $image_path = '';
         $use_uploaded_image = false;
-
         if(isset($_FILES['image_file']) && $_FILES['image_file']['error'] == 0) {
             $upload_dir = 'uploads/';
             if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
@@ -161,13 +123,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $image_path = $upload_dir . $filename;
             $use_uploaded_image = true;
         }
-
         $inspection_date_db = null;
         if(!empty($_POST['inspection_date'])) {
             $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
             if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
         }
-
         $sql = "INSERT INTO properties (
             title, description, price, location, city, state, type, google_location, image_url, 
             bank_name, sqft, possession_type, inspection_date, 
@@ -175,7 +135,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number,
             status
         ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')";
-        
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             safeString($_POST['title'] ?? ''),
@@ -200,19 +159,14 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
             safeString($_POST['contact_number'] ?? $default_contact)
         ]);
-        
         $new_id = $pdo->lastInsertId();
-
         if (!$use_uploaded_image) {
             $new_prop = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
             $new_prop->execute([$new_id]);
             $prop_data = $new_prop->fetch();
             $generated_path = generateSocialCard($prop_data);
-            if ($generated_path) {
-                $pdo->prepare("UPDATE properties SET image_url = ? WHERE id = ?")->execute([$generated_path, $new_id]);
-            }
+            if ($generated_path) $pdo->prepare("UPDATE properties SET image_url = ? WHERE id = ?")->execute([$generated_path, $new_id]);
         }
-
         header("Location: properties.php?added=1");
         exit;
     }
@@ -240,26 +194,14 @@ include 'header.php';
         <?php endif; ?>
     </div>
 
-    <!-- Filters -->
     <form method="GET" class="row g-2 mb-3">
-        <div class="col-md-3">
-            <input type="text" name="filter_city" class="form-control" placeholder="🏙️ City" value="<?= htmlspecialchars($filter_city) ?>">
-        </div>
-        <div class="col-md-3">
-            <input type="text" name="filter_bank" class="form-control" placeholder="🏦 Bank Name" value="<?= htmlspecialchars($filter_bank) ?>">
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="filter_price_min" class="form-control" placeholder="Min Price" value="<?= htmlspecialchars($filter_price_min) ?>">
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="filter_price_max" class="form-control" placeholder="Max Price" value="<?= htmlspecialchars($filter_price_max) ?>">
-        </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button>
-        </div>
+        <div class="col-md-3"><input type="text" name="filter_city" class="form-control" placeholder="🏙️ City" value="<?= htmlspecialchars($filter_city) ?>"></div>
+        <div class="col-md-3"><input type="text" name="filter_bank" class="form-control" placeholder="🏦 Bank Name" value="<?= htmlspecialchars($filter_bank) ?>"></div>
+        <div class="col-md-2"><input type="number" name="filter_price_min" class="form-control" placeholder="Min Price" value="<?= htmlspecialchars($filter_price_min) ?>"></div>
+        <div class="col-md-2"><input type="number" name="filter_price_max" class="form-control" placeholder="Max Price" value="<?= htmlspecialchars($filter_price_max) ?>"></div>
+        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button></div>
     </form>
 
-    <!-- Table -->
     <div class="table-responsive">
         <table class="table table-hover">
             <thead class="table-light">
@@ -292,20 +234,17 @@ include 'header.php';
         </table>
     </div>
 
-    <!-- Pagination -->
     <?php if($total_pages > 1): ?>
         <nav class="mt-3">
             <ul class="pagination justify-content-center">
                 <?php if($page > 1): ?>
                     <li class="page-item"><a class="page-link" href="?page=<?= $page-1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">« Prev</a></li>
                 <?php endif; ?>
-
                 <?php for($i = 1; $i <= $total_pages; $i++): ?>
                     <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
                         <a class="page-link" href="?page=<?= $i ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>"><?= $i ?></a>
                     </li>
                 <?php endfor; ?>
-
                 <?php if($page < $total_pages): ?>
                     <li class="page-item"><a class="page-link" href="?page=<?= $page+1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">Next »</a></li>
                 <?php endif; ?>
@@ -379,7 +318,6 @@ include 'header.php';
         document.getElementById('submitBtn').innerHTML = 'Update Property';
         document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
 
-        // ✅ AJAX Call to get_property.php
         fetch('get_property.php?id=' + id)
             .then(response => {
                 if (!response.ok) {
@@ -393,7 +331,6 @@ include 'header.php';
                     return;
                 }
                 
-                // Fill form fields
                 document.getElementById('property_id').value = data.id || '';
                 document.getElementById('edit_title').value = data.title || '';
                 document.getElementById('edit_location').value = data.location || '';
@@ -418,7 +355,6 @@ include 'header.php';
                 document.getElementById('existing_image').value = data.image_url || '';
                 document.getElementById('edit_description').value = data.description || '';
 
-                // Show current image if exists
                 if (data.image_url) {
                     document.getElementById('currentImage').src = data.image_url;
                     document.getElementById('currentImagePreview').style.display = 'block';
@@ -426,7 +362,6 @@ include 'header.php';
                     document.getElementById('currentImagePreview').style.display = 'none';
                 }
 
-                // Show the modal
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
             })
