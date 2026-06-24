@@ -37,32 +37,25 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_payment'])) {
     $utr = trim($_POST['utr'] ?? '');
     $slip_path = '';
 
-    // ---- WALLET PAYMENT (NEW) ----
+    // ---- WALLET PAYMENT ----
     if($payment_method == 'wallet') {
-        // Check balance
         if($wallet_balance < $pkg['price']) {
             $message = "<div class='alert alert-danger'>❌ Insufficient wallet balance. Your balance: ₹" . indianCurrencyFormat($wallet_balance) . "</div>";
         } else {
-            // Deduct from wallet
             $deducted = debitWallet($pdo, $user_id, $pkg['price'], "Subscription to " . $pkg['name'], $package_id);
             if($deducted) {
-                // Activate subscription directly (wallet payment is instant)
                 $end_date = date('Y-m-d', strtotime("+{$pkg['duration_months']} months"));
                 $stmt = $pdo->prepare("INSERT INTO subscriptions (user_id, package_id, property_id, amount, payment_method, utr, slip_path, status, start_date, end_date) VALUES (?, ?, NULL, ?, 'wallet', '', '', 'active', CURRENT_DATE, ?)");
                 $stmt->execute([$user_id, $package_id, $pkg['price'], $end_date]);
-
-                // Add income to accounting
                 addAccountEntry($pdo, 'income', $pkg['price'], "Wallet payment for subscription from user ID $user_id", 'Subscription');
-
-                // Redirect to dashboard with success
                 header("Location: user_dashboard.php?msg=wallet_paid");
                 exit;
             } else {
-                $message = "<div class='alert alert-danger'>❌ Wallet deduction failed. Please try again.</div>";
+                $message = "<div class='alert alert-danger'>❌ Wallet deduction failed.</div>";
             }
         }
     } else {
-        // ---- BANK/UPI PAYMENT (Existing) ----
+        // ---- BANK/UPI PAYMENT ----
         if($payment_method == 'bank') {
             if(empty($utr)) {
                 $message = "<div class='alert alert-danger'>❌ Please enter UTR number.</div>";
@@ -96,10 +89,41 @@ $show_discount = $display_price && $display_price < $regular_price;
 <head>
     <title>Buy Subscription</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body{background:#f4f7fc;}
-        .container{max-width:700px;margin-top:80px;}
-        .card{border-radius:20px;border:none;box-shadow:0 10px 30px rgba(0,0,0,0.05);}
+        .container{max-width:750px;margin-top:60px;}
+        .card{border-radius:24px;border:none;box-shadow:0 10px 30px rgba(0,0,0,0.05);}
+        .qr-box {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 2px dashed #d1d5db;
+        }
+        .qr-box img {
+            max-height: 220px;
+            border-radius: 12px;
+            background: white;
+            padding: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .upi-apps {
+            margin-top: 12px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .upi-apps span {
+            background: white;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+        }
         .wallet-box{background:#f0fdf4;border:2px solid #10b981;border-radius:12px;padding:15px;}
     </style>
 </head>
@@ -127,23 +151,37 @@ $show_discount = $display_price && $display_price < $regular_price;
 
         <hr>
 
-        <!-- Bank Details & QR -->
+        <!-- ===== QR CODE & BANK DETAILS ===== -->
         <div class="row g-3 mb-3">
-            <?php if($bank_name && $account && $ifsc): ?>
             <div class="col-md-6">
-                <h6>🏦 Bank Transfer Details</h6>
-                <p class="small mb-0"><strong>Bank:</strong> <?= htmlspecialchars($bank_name) ?></p>
-                <p class="small mb-0"><strong>A/c No.:</strong> <?= htmlspecialchars($account) ?></p>
-                <p class="small mb-0"><strong>IFSC:</strong> <?= htmlspecialchars($ifsc) ?></p>
-                <p class="small"><strong>Branch:</strong> <?= htmlspecialchars($branch) ?></p>
+                <h6><i class="fas fa-qrcode me-2" style="color:#2563eb;"></i>Scan & Pay (UPI)</h6>
+                <div class="qr-box">
+                    <?php if($qr && file_exists($qr)): ?>
+                        <img src="<?= $qr ?>" alt="UPI QR Code">
+                        <div class="upi-apps">
+                            <span><i class="fas fa-google-pay"></i> GPay</span>
+                            <span><i class="fas fa-mobile-alt"></i> PhonePe</span>
+                            <span><i class="fas fa-amazon"></i> Amazon Pay</span>
+                            <span>BHIM</span>
+                            <span>Paytm</span>
+                        </div>
+                        <small class="text-muted d-block mt-2">Scan with any UPI app to pay</small>
+                    <?php else: ?>
+                        <p class="text-muted">QR Code not set. Please contact admin.</p>
+                    <?php endif; ?>
+                </div>
             </div>
-            <?php endif; ?>
-            <?php if($qr && file_exists($qr)): ?>
-            <div class="col-md-6 text-center">
-                <h6>📱 Scan to Pay (UPI)</h6>
-                <img src="<?= $qr ?>" style="max-height:200px; border:1px solid #ddd; border-radius:10px;">
+            <div class="col-md-6">
+                <?php if($bank_name && $account && $ifsc): ?>
+                <h6><i class="fas fa-university me-2" style="color:#2563eb;"></i>Bank Transfer Details</h6>
+                <div class="p-3" style="background:#f8fafc; border-radius:12px;">
+                    <p class="small mb-1"><strong>Bank:</strong> <?= htmlspecialchars($bank_name) ?></p>
+                    <p class="small mb-1"><strong>A/c No.:</strong> <?= htmlspecialchars($account) ?></p>
+                    <p class="small mb-1"><strong>IFSC:</strong> <?= htmlspecialchars($ifsc) ?></p>
+                    <p class="small"><strong>Branch:</strong> <?= htmlspecialchars($branch) ?></p>
+                </div>
+                <?php endif; ?>
             </div>
-            <?php endif; ?>
         </div>
 
         <?= $message ?>
