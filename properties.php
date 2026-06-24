@@ -14,7 +14,7 @@ if(!hasViewPermission('properties', $pdo)) {
 $default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
 if(!$default_contact) $default_contact = '9238215516';
 
-// FILTERS & PAGINATION
+// FILTERS & PAGINATION (same as before)
 $filter_city = $_GET['filter_city'] ?? '';
 $filter_bank = $_GET['filter_bank'] ?? '';
 $filter_price_min = $_GET['filter_price_min'] ?? '';
@@ -42,7 +42,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-// ADD / UPDATE LOGIC
+// ADD / UPDATE LOGIC (unchanged)
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
     function safeString($val) { return trim($val ?? ''); }
@@ -246,7 +246,7 @@ include 'header.php';
                     </li>
                 <?php endfor; ?>
                 <?php if($page < $total_pages): ?>
-                    <li class="page-item"><a class="page-link" href="?page=<?= $page+1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">Next »</a></li>
+                    <li class="page-item"><a class->page-link" href="?page=<?= $page+1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">Next »</a></li>
                 <?php endif; ?>
             </ul>
         </nav>
@@ -320,7 +320,6 @@ include 'header.php';
         document.getElementById('submitBtn').innerHTML = 'Update Property';
         document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
 
-        // ✅ AJAX Call to get_property.php
         const url = 'get_property.php?id=' + id;
         console.log('📡 Fetching URL:', url);
 
@@ -339,7 +338,6 @@ include 'header.php';
                     return;
                 }
                 
-                // Fill form fields
                 document.getElementById('property_id').value = data.id || '';
                 document.getElementById('edit_title').value = data.title || '';
                 document.getElementById('edit_location').value = data.location || '';
@@ -371,7 +369,6 @@ include 'header.php';
                     document.getElementById('currentImagePreview').style.display = 'none';
                 }
 
-                // Show the modal
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
             })
