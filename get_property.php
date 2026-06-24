@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ यह फाइल Edit Modal के लिए Property Data Fetch करती है
+// ✅ get_property.php – Edit Modal के लिए Data Fetch
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -11,7 +11,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     die(json_encode(['error' => 'Unauthorized']));
 }
 
-$id = $_GET['id'] ?? 0;
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if(!$id) {
     http_response_code(400);
     die(json_encode(['error' => 'Property ID required']));
