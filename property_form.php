@@ -88,22 +88,9 @@
         <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control" value="">
     </div>
 
-    <!-- AUCTION DATE (DD/MM/YYYY) -->
-    <div class="col-md-6">
-        <label class="form-label fw-semibold">Auction Date (DD/MM/YYYY)</label>
-        <input type="text" name="auction_date" id="edit_auction_date" class="form-control" value="">
-    </div>
-
     <!-- CONTACT NUMBER HIDDEN -->
     <input type="hidden" name="contact_number" id="edit_contact_number" value="<?= $default_contact ?>">
 
-    <!-- IMAGE UPLOAD -->
-    <div class="col-12">
-        <label class="form-label fw-semibold">Upload Image</label>
-        <div id="currentImagePreview" style="display:none; margin-bottom:10px;">
-            <img id="currentImage" src="" style="max-height:120px; border-radius:10px; border:1px solid #ddd;">
-        </div>
-        <input type="file" name="image_file" id="edit_image_file" class="form-control" accept="image/*">
-        <small id="imageHelpText">Leave empty to auto-generate a social card.</small>
+   
     </div>
 </div>
