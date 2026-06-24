@@ -15,7 +15,6 @@ $settings_keys = ['default_contact', 'company_bank_name', 'company_account_numbe
 
 // Handle QR upload
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
-    // Check edit permission
     if(!hasEditPermission('settings', $pdo)) {
         die("You don't have permission to edit settings.");
     }
@@ -80,12 +79,19 @@ $qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'compa
                 <input type="text" name="default_contact" class="form-control" value="<?= htmlspecialchars($settings['default_contact']) ?>">
             </div>
             <div class="col-12">
-                <label class="fw-bold">QR Code (for UPI / Payment)</label>
+                <label class="fw-bold">UPI QR Code (for Payment Page)</label>
                 <input type="file" name="qr_code" class="form-control" accept="image/*">
                 <?php if($qr && file_exists($qr)): ?>
-                    <div class="mt-2"><img src="<?= $qr ?>" style="max-height:150px; border:1px solid #ddd; border-radius:10px;"></div>
+                    <div class="mt-3 text-center">
+                        <p class="text-muted">Current QR Code:</p>
+                        <img src="<?= $qr ?>" style="max-height:250px; border:1px solid #ddd; border-radius:12px; padding:10px; background:white;">
+                    </div>
+                <?php else: ?>
+                    <div class="mt-3 text-center">
+                        <p class="text-muted">No QR code uploaded yet.</p>
+                    </div>
                 <?php endif; ?>
-                <small class="text-muted">Upload a QR code image (PNG, JPG). This will appear on the payment page.</small>
+                <small class="text-muted">Upload a QR code image (PNG, JPG). This will appear on the subscription payment page.</small>
             </div>
         </div>
         <div class="row mt-3">
