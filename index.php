@@ -14,7 +14,7 @@ $show_images = userHasActiveSubscription($pdo, $user_id);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background: #f4f7fc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f4f7fc; }
         .property-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.03); transition: 0.3s; border: 1px solid #e9edf4; height: 100%; }
         .property-card:hover { transform: translateY(-8px); box-shadow: 0 20px 35px rgba(0,0,0,0.08); }
         .property-card img { height: 220px; object-fit: cover; width: 100%; cursor: pointer; }
@@ -99,7 +99,10 @@ $show_images = userHasActiveSubscription($pdo, $user_id);
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <span class="bank-badge">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
-                                <span class="text-muted small"><i class="far fa-calendar"></i> <?= date('d M Y', strtotime($prop['auction_date'] ?? 'now')) ?></span>
+                                <!-- ✅ Auction Date Fix: Only show if set -->
+                                <?php if(!empty($prop['auction_date'])): ?>
+                                    <span class="text-muted small"><i class="far fa-calendar"></i> <?= date('d M Y', strtotime($prop['auction_date'])) ?></span>
+                                <?php endif; ?>
                             </div>
                             <h6 class="fw-bold mt-2"><?= htmlspecialchars($prop['title']) ?></h6>
                             <div class="price">₹ <?= indianCurrencyFormat($prop['price']) ?> <span class="fs-6 fw-normal text-muted">Reserve Price</span></div>
