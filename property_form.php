@@ -48,7 +48,7 @@
             <option value="House">House</option>
             <option value="Row House">Row House</option>
             <option value="Bungalow">Bungalow</option>
-            <option value="Car">Flat</option>
+            <option value="Car">Car</option>
         </select>
     </div>
     <div class="col-md-3">
