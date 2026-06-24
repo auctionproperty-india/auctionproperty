@@ -73,7 +73,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         return trim($val ?? '');
     }
 
-    // ---- UPDATE ----
+    // UPDATE
     if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
         if(!hasEditPermission('properties', $pdo)) {
             die("<div class='alert alert-danger'>❌ You don't have permission to edit properties.</div>");
@@ -92,7 +92,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $use_uploaded_image = true;
         }
 
-        // ✅ inspection_date convert from DD/MM/YYYY to YYYY-MM-DD
         $inspection_date_db = null;
         if(!empty($_POST['inspection_date'])) {
             $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
@@ -145,7 +144,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // ---- ADD ----
+    // ADD
     if(isset($_POST['add_property'])) {
         if(!hasEditPermission('properties', $pdo)) {
             die("<div class='alert alert-danger'>❌ You don't have permission to add properties.</div>");
@@ -349,6 +348,7 @@ include 'header.php';
         document.getElementById('currentImagePreview').style.display = 'none';
         document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
         
+        // Clear all fields
         document.getElementById('edit_title').value = '';
         document.getElementById('edit_price').value = '';
         document.getElementById('edit_reserve_price_per_sqft').value = '';
@@ -379,10 +379,22 @@ include 'header.php';
         document.getElementById('submitBtn').innerHTML = 'Update Property';
         document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
 
+        // ✅ AJAX Call to get_property.php
         fetch('get_property.php?id=' + id)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.status);
+                }
+                return response.json();
+            })
             .then(data => {
-                document.getElementById('property_id').value = data.id;
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                // Fill form fields
+                document.getElementById('property_id').value = data.id || '';
                 document.getElementById('edit_title').value = data.title || '';
                 document.getElementById('edit_location').value = data.location || '';
                 document.getElementById('edit_city').value = data.city || '';
@@ -406,6 +418,7 @@ include 'header.php';
                 document.getElementById('existing_image').value = data.image_url || '';
                 document.getElementById('edit_description').value = data.description || '';
 
+                // Show current image if exists
                 if (data.image_url) {
                     document.getElementById('currentImage').src = data.image_url;
                     document.getElementById('currentImagePreview').style.display = 'block';
@@ -413,11 +426,13 @@ include 'header.php';
                     document.getElementById('currentImagePreview').style.display = 'none';
                 }
 
+                // Show the modal
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
             })
             .catch(error => {
                 alert('Error loading property data: ' + error);
+                console.error('Fetch error:', error);
             });
     }
 </script>
