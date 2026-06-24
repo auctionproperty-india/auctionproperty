@@ -94,17 +94,17 @@
     </div>
     <div class="col-md-3">
         <label class="form-label-md">Auction Start Date & Time</label>
-        <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control form-control-md" placeholder="Sat, 27 Jun 2026 11:00 AM" value="">
+        <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control form-control-md" value="">
     </div>
     <div class="col-md-3">
         <label class="form-label-md">Auction End Date & Time</label>
-        <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control form-control-md" placeholder="Sat, 27 Jun 2026 02:00 PM" value="">
+        <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control form-control-md" value="">
     </div>
 
     <!-- INSPECTION DATE (formerly auction_date) -->
     <div class="col-md-3">
         <label class="form-label-md">Inspection Date (DD/MM/YYYY)</label>
-        <input type="text" name="inspection_date" id="edit_inspection_date" class="form-control form-control-md" placeholder="e.g. 27/06/2026" value="">
+        <input type="text" name="inspection_date" id="edit_inspection_date" class="form-control form-control-md" value="">
     </div>
 
     <!-- CONTACT NUMBER HIDDEN -->
