@@ -16,7 +16,7 @@
     <!-- BORROWER & BANK -->
     <div class="col-md-6">
         <label class="form-label fw-semibold">Borrower Name</label>
-        <input type="text" name="borrower_name" id="edit_borrower_name" class="form-control">
+        
     </div>
     <div class="col-md-6">
         <label class="form-label fw-semibold">Bank Name</label>
