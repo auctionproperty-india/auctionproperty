@@ -14,14 +14,11 @@ if(!hasViewPermission('properties', $pdo)) {
 $default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
 if(!$default_contact) $default_contact = '9238215516';
 
-// FILTERS & PAGINATION (same as before)
+// FILTERS
 $filter_city = $_GET['filter_city'] ?? '';
 $filter_bank = $_GET['filter_bank'] ?? '';
 $filter_price_min = $_GET['filter_price_min'] ?? '';
 $filter_price_max = $_GET['filter_price_max'] ?? '';
-$limit = 20;
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$offset = ($page - 1) * $limit;
 
 $where = [];
 $params = [];
@@ -29,7 +26,13 @@ if(!empty($filter_city)) { $where[] = "city ILIKE ?"; $params[] = '%'.$filter_ci
 if(!empty($filter_bank)) { $where[] = "bank_name ILIKE ?"; $params[] = '%'.$filter_bank.'%'; }
 if(!empty($filter_price_min)) { $where[] = "price >= ?"; $params[] = (float)$filter_price_min; }
 if(!empty($filter_price_max)) { $where[] = "price <= ?"; $params[] = (float)$filter_price_max; }
+
 $where_clause = count($where) > 0 ? "WHERE " . implode(" AND ", $where) : "";
+
+// PAGINATION
+$limit = 20;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$offset = ($page - 1) * $limit;
 
 $count_sql = "SELECT COUNT(*) FROM properties $where_clause";
 $count_stmt = $pdo->prepare($count_sql);
@@ -42,8 +45,9 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-// ADD / UPDATE LOGIC (unchanged)
+// ---- ADD / UPDATE LOGIC ----
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
+
     function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
     function safeString($val) { return trim($val ?? ''); }
 
@@ -242,11 +246,11 @@ include 'header.php';
                 <?php endif; ?>
                 <?php for($i = 1; $i <= $total_pages; $i++): ?>
                     <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                        <a class="page-link" href="?page=<?= $i ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>"><?= $i ?></a>
+                        <a class->page-link" href="?page=<?= $i ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>"><?= $i ?></a>
                     </li>
                 <?php endfor; ?>
                 <?php if($page < $total_pages): ?>
-                    <li class="page-item"><a class->page-link" href="?page=<?= $page+1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">Next »</a></li>
+                    <li class="page-item"><a class="page-link" href="?page=<?= $page+1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">Next »</a></li>
                 <?php endif; ?>
             </ul>
         </nav>
@@ -287,7 +291,6 @@ include 'header.php';
         document.getElementById('currentImagePreview').style.display = 'none';
         document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
         
-        // Clear all fields
         document.getElementById('edit_title').value = '';
         document.getElementById('edit_price').value = '';
         document.getElementById('edit_reserve_price_per_sqft').value = '';
@@ -313,26 +316,14 @@ include 'header.php';
     }
 
     function openEditModal(id) {
-        console.log('🔍 openEditModal called with id:', id);
-
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + id;
         document.getElementById('submitBtn').name = 'update_property';
         document.getElementById('submitBtn').innerHTML = 'Update Property';
         document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
 
-        const url = 'get_property.php?id=' + id;
-        console.log('📡 Fetching URL:', url);
-
-        fetch(url)
-            .then(response => {
-                console.log('📥 Response status:', response.status);
-                if (!response.ok) {
-                    throw new Error('Network response was not ok: ' + response.status);
-                }
-                return response.json();
-            })
+        fetch('get_property.php?id=' + id)
+            .then(response => response.json())
             .then(data => {
-                console.log('✅ Data received:', data);
                 if (data.error) {
                     alert('Error: ' + data.error);
                     return;
@@ -373,8 +364,8 @@ include 'header.php';
                 modal.show();
             })
             .catch(error => {
-                console.error('❌ Fetch error:', error);
-                alert('Error loading property data: ' + error + '\nCheck console for details.');
+                alert('Error loading property data: ' + error);
+                console.error(error);
             });
     }
 </script>
