@@ -1,36 +1,17 @@
 <?php
-// ============================================================
-// ✅ Debug File – Server पर Files की List दिखाएगी
-// ============================================================
+session_start();
+require_once 'db.php';
 
-echo "<h3>📂 Files in Current Directory</h3>";
+echo "<h3>🔍 Session Debug</h3>";
+echo "<pre>";
+print_r($_SESSION);
+echo "</pre>";
 
-$files = scandir(__DIR__);
-echo "<ul>";
-foreach($files as $file) {
-    if($file !== '.' && $file !== '..') {
-        echo "<li>" . htmlspecialchars($file) . "</li>";
-    }
-}
-echo "</ul>";
-
-echo "<hr>";
-
-// Check if get_property.php exists
-if(file_exists(__DIR__ . '/get_property.php')) {
-    echo "✅ <strong>get_property.php</strong> exists in this directory.<br>";
-    echo "File size: " . filesize(__DIR__ . '/get_property.php') . " bytes.<br>";
+if(isset($_SESSION['user_id']) && $_SESSION['role'] == 'admin') {
+    echo "✅ You are logged in as admin.<br>";
+    echo "Try editing a property now – it should work.<br>";
 } else {
-    echo "❌ <strong>get_property.php</strong> NOT found in this directory.<br>";
-    echo "Make sure the file name is exactly <code>get_property.php</code> (case-sensitive).<br>";
-}
-
-echo "<hr>";
-
-// Check if properties.php exists
-if(file_exists(__DIR__ . '/properties.php')) {
-    echo "✅ <strong>properties.php</strong> exists in this directory.<br>";
-} else {
-    echo "❌ <strong>properties.php</strong> NOT found in this directory.<br>";
+    echo "❌ You are NOT logged in as admin.<br>";
+    echo "Please login again and try.<br>";
 }
 ?>
