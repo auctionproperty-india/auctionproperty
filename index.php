@@ -1,4 +1,6 @@
 <?php
+ob_start();
+<?php
 // सत्र (session) शुरू करें
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
