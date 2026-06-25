@@ -1,6 +1,9 @@
 <?php
-session_start();
-require_once 'db.php';
+// ============================================================
+// ✅ test_edit.php – Session और get_property.php Test
+// ============================================================
+
+require_once __DIR__ . '/db.php';
 
 echo "<h3>🔍 Session Debug</h3>";
 echo "<pre>";
