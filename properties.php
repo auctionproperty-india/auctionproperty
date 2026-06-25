@@ -45,7 +45,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-// ---- ADD / UPDATE LOGIC ----
+// ---- ADD / UPDATE LOGIC (IMAGE HANDLING REMOVED) ----
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
@@ -55,24 +55,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
         if(!hasEditPermission('properties', $pdo)) die("Permission denied.");
         $id = $_POST['property_id'];
-        $image_path = $_POST['existing_image'] ?? '';
-        $use_uploaded_image = false;
-        if(isset($_FILES['image_file']) && $_FILES['image_file']['error'] == 0) {
-            $upload_dir = 'uploads/';
-            if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $ext = pathinfo($_FILES['image_file']['name'], PATHINFO_EXTENSION);
-            $filename = time() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-            move_uploaded_file($_FILES['image_file']['tmp_name'], $upload_dir . $filename);
-            $image_path = $upload_dir . $filename;
-            $use_uploaded_image = true;
-        }
+        
         $inspection_date_db = null;
         if(!empty($_POST['inspection_date'])) {
             $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
             if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
         }
+
         $sql = "UPDATE properties SET 
-            title=?, description='', price=?, location=?, city=?, state=?, type=?, google_location=?, image_url=?, 
+            title=?, description='', price=?, location=?, city=?, state=?, type=?, 
             bank_name=?, sqft=?, possession_type=?, inspection_date=?, 
             borrower_name=?, emd_amount=?, bid_increment=?, emd_deadline=?, 
             auction_start_time=?, auction_end_time=?, locality=?, reserve_price_per_sqft=?, contact_number=? 
@@ -85,8 +76,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeString($_POST['city'] ?? ''),
             safeString($_POST['state'] ?? ''),
             safeString($_POST['type'] ?? 'Flat'),
-            safeString($_POST['google_location'] ?? ''),
-            $image_path,
             safeString($_POST['bank_name'] ?? ''),
             safeNumeric($_POST['sqft'] ?? 0),
             safeString($_POST['possession_type'] ?? 'Physical'),
@@ -102,13 +91,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeString($_POST['contact_number'] ?? $default_contact),
             $id
         ]);
-        if (!$use_uploaded_image) {
-            $updated_prop = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
-            $updated_prop->execute([$id]);
-            $prop_data = $updated_prop->fetch();
-            $generated_path = generateSocialCard($prop_data);
-            if ($generated_path) $pdo->prepare("UPDATE properties SET image_url = ? WHERE id = ?")->execute([$generated_path, $id]);
-        }
         header("Location: properties.php?updated=1");
         exit;
     }
@@ -116,29 +98,21 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     // ADD
     if(isset($_POST['add_property'])) {
         if(!hasEditPermission('properties', $pdo)) die("Permission denied.");
-        $image_path = '';
-        $use_uploaded_image = false;
-        if(isset($_FILES['image_file']) && $_FILES['image_file']['error'] == 0) {
-            $upload_dir = 'uploads/';
-            if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $ext = pathinfo($_FILES['image_file']['name'], PATHINFO_EXTENSION);
-            $filename = time() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-            move_uploaded_file($_FILES['image_file']['tmp_name'], $upload_dir . $filename);
-            $image_path = $upload_dir . $filename;
-            $use_uploaded_image = true;
-        }
+        
         $inspection_date_db = null;
         if(!empty($_POST['inspection_date'])) {
             $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
             if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
         }
+
         $sql = "INSERT INTO properties (
-            title, description, price, location, city, state, type, google_location, image_url, 
+            title, description, price, location, city, state, type, 
             bank_name, sqft, possession_type, inspection_date, 
             borrower_name, emd_amount, bid_increment, emd_deadline, 
             auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number,
             status
-        ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')";
+        ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')";
+        
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             safeString($_POST['title'] ?? ''),
@@ -147,8 +121,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeString($_POST['city'] ?? ''),
             safeString($_POST['state'] ?? ''),
             safeString($_POST['type'] ?? 'Flat'),
-            safeString($_POST['google_location'] ?? ''),
-            $image_path,
             safeString($_POST['bank_name'] ?? ''),
             safeNumeric($_POST['sqft'] ?? 0),
             safeString($_POST['possession_type'] ?? 'Physical'),
@@ -163,14 +135,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
             safeString($_POST['contact_number'] ?? $default_contact)
         ]);
+        
         $new_id = $pdo->lastInsertId();
-        if (!$use_uploaded_image) {
-            $new_prop = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
-            $new_prop->execute([$new_id]);
-            $prop_data = $new_prop->fetch();
-            $generated_path = generateSocialCard($prop_data);
-            if ($generated_path) $pdo->prepare("UPDATE properties SET image_url = ? WHERE id = ?")->execute([$generated_path, $new_id]);
-        }
         header("Location: properties.php?added=1");
         exit;
     }
@@ -246,7 +212,7 @@ include 'header.php';
                 <?php endif; ?>
                 <?php for($i = 1; $i <= $total_pages; $i++): ?>
                     <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                        <a class->page-link" href="?page=<?= $i ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>"><?= $i ?></a>
+                        <a class="page-link" href="?page=<?= $i ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>"><?= $i ?></a>
                     </li>
                 <?php endfor; ?>
                 <?php if($page < $total_pages): ?>
