@@ -48,7 +48,7 @@
             <option value="House">House</option>
             <option value="Row House">Row House</option>
             <option value="Bungalow">Bungalow</option>
-            <option value="Car">Car</option> <!-- ✅ Car Option Added -->
+            <option value="Car">Car</option>
         </select>
     </div>
     <div class="col-md-3">
@@ -87,7 +87,7 @@
         <input type="number" step="0.01" name="sqft" id="edit_sqft" class="form-control form-control-md" value="">
     </div>
 
-    <!-- AUCTION START / END / DEADLINE – Placeholder हटा दिए गए -->
+    <!-- AUCTION START / END / DEADLINE -->
     <div class="col-md-3">
         <label class="form-label-md">EMD Submission Deadline</label>
         <input type="text" name="emd_deadline" id="edit_emd_deadline" class="form-control form-control-md" value="">
@@ -101,14 +101,14 @@
         <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control form-control-md" value="">
     </div>
 
-    <!-- INSPECTION DATE – Placeholder हटा दिया गया -->
+    <!-- INSPECTION DATE -->
     <div class="col-md-3">
         <label class="form-label-md">Inspection Date (DD/MM/YYYY)</label>
         <input type="text" name="inspection_date" id="edit_inspection_date" class="form-control form-control-md" value="">
     </div>
 
     <!-- CONTACT NUMBER HIDDEN -->
-    <input type="hidden" name="contact_number" id="edit_contact_number" value="<?= $default_contact ?>">
+    <input type="hidden" name="contact_number" id="edit_contact_number" value="<?= $default_contact ?? '' ?>">
 
     <!-- IMAGE -->
     <div class="col-12">
