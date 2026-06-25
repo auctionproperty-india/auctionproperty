@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Database Connection + Session Handler Register
+// ✅ Database Connection + Session Handler (कोई Conflict नहीं)
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'localhost';
@@ -20,31 +20,37 @@ try {
         $pdo->exec("SET search_path TO dev, public");
     }
     
-    // ---- ✅ Sessions Table Create (अगर नहीं है) ----
+    // ---- ✅ Sessions Table ----
     $pdo->exec("CREATE TABLE IF NOT EXISTS sessions (
         id VARCHAR(128) NOT NULL PRIMARY KEY,
         data TEXT NOT NULL,
         access TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )");
     
-    // ---- ✅ Database Session Handler Register ----
+    // ---- ✅ Session Handler Register ----
     require_once __DIR__ . '/session_handler.php';
     $handler = new DatabaseSessionHandler($pdo);
-    session_set_save_handler($handler, true);
     
-    // ---- ✅ Session Cookie Parameters (30 Days Lifetime) ----
-    session_set_cookie_params([
-        'lifetime' => 60 * 60 * 24 * 30, // 30 Days
-        'path' => '/',
-        'domain' => '',
-        'secure' => false,
-        'httponly' => true,
-        'samesite' => 'Lax'
-    ]);
-    
-    // ---- ✅ Session Start ----
+    // ---- ✅ Session Settings – सिर्फ तभी Set करें जब Session Active न हो ----
     if (session_status() == PHP_SESSION_NONE) {
+        // Session Handler और Cookie Params Set करें
+        session_set_save_handler($handler, true);
+        session_set_cookie_params([
+            'lifetime' => 60 * 60 * 24 * 30, // 30 Days
+            'path' => '/',
+            'domain' => '',
+            'secure' => false,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+        // Session Start
         session_start();
+    } else {
+        // अगर Session पहले से Active है – तो कुछ न करें (क्योंकि Handler Set नहीं कर सकते)
+        // लेकिन हम यहाँ Handler को Register करना चाहते हैं, लेकिन यह Active Session के साथ काम नहीं करेगा
+        // इसलिए हम Session को फिर से Start करने से रोकेंगे और Error से बचेंगे
+        // ध्यान दें: यदि Session Active है तो Save Handler पहले से ही Set होना चाहिए
+        // इसलिए हम यहाँ कोई कार्रवाई नहीं करेंगे
     }
     
 } catch (PDOException $e) {
