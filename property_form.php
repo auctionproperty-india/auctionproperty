@@ -110,13 +110,5 @@
     <!-- CONTACT NUMBER HIDDEN -->
     <input type="hidden" name="contact_number" id="edit_contact_number" value="<?= $default_contact ?? '' ?>">
 
-    <!-- IMAGE -->
-    <div class="col-12">
-        <label class="form-label-md">Upload Image</label>
-        <div id="currentImagePreview" style="display:none; margin-bottom:5px;">
-            <img id="currentImage" src="" style="max-height:80px; border-radius:8px; border:1px solid #ddd;">
-        </div>
-        <input type="file" name="image_file" id="edit_image_file" class="form-control form-control-md" accept="image/*">
-        <small class="text-muted" style="font-size:0.7rem;">Leave empty to auto-generate a social card.</small>
-    </div>
+    <!-- ✅ IMAGE UPLOAD COMPLETELY REMOVED -->
 </div>
