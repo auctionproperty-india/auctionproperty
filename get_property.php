@@ -3,14 +3,12 @@
 // ✅ get_property.php – Edit Modal के लिए Data Fetch
 // ============================================================
 
-// सारे PHP Errors/Warnings को Suppress करें (JSON को Clean रखने के लिए)
 error_reporting(0);
 ini_set('display_errors', 0);
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// Session Check
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     http_response_code(403);
     die(json_encode(['error' => 'Unauthorized']));
@@ -22,7 +20,6 @@ if(!$id) {
     die(json_encode(['error' => 'Property ID required']));
 }
 
-// ✅ Explicit Columns
 $sql = "SELECT 
             id, title, description, price, location, city, state, type, 
             google_location, image_url, bank_name, sqft, possession_type, 
@@ -32,29 +29,23 @@ $sql = "SELECT
         FROM properties 
         WHERE id = ?";
 
-try {
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$id]);
-    $property = $stmt->fetch();
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$id]);
+$property = $stmt->fetch();
 
-    if(!$property) {
-        http_response_code(404);
-        die(json_encode(['error' => 'Property not found']));
-    }
-
-    // Convert inspection_date to DD/MM/YYYY
-    if(!empty($property['inspection_date'])) {
-        $date_obj = DateTime::createFromFormat('Y-m-d', $property['inspection_date']);
-        if($date_obj) {
-            $property['inspection_date'] = $date_obj->format('d/m/Y');
-        }
-    }
-
-    header('Content-Type: application/json');
-    echo json_encode($property);
-    exit;
-} catch (Exception $e) {
-    http_response_code(500);
-    die(json_encode(['error' => 'Server Error: ' . $e->getMessage()]));
+if(!$property) {
+    http_response_code(404);
+    die(json_encode(['error' => 'Property not found']));
 }
+
+if(!empty($property['inspection_date'])) {
+    $date_obj = DateTime::createFromFormat('Y-m-d', $property['inspection_date']);
+    if($date_obj) {
+        $property['inspection_date'] = $date_obj->format('d/m/Y');
+    }
+}
+
+header('Content-Type: application/json');
+echo json_encode($property);
+exit;
 ?>
