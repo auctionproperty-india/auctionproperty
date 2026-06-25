@@ -54,7 +54,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_permissions'])) {
 }
 
 include 'header.php'; 
-$users = $pdo->query("SELECT * FROM users WHERE is_super_admin = FALSE ORDER BY id DESC")->fetchAll();
+
+// ===== 🔥 FIX: सिर्फ Admin/SubAdmin (role = 'admin') दिखाएँ, बाकी Users नहीं =====
+$users = $pdo->query("SELECT * FROM users WHERE is_super_admin = FALSE AND role = 'admin' ORDER BY id DESC")->fetchAll();
 ?>
 <div class="card-premium mb-4" style="border-left:4px solid #2563eb;">
     <h4><i class="fas fa-user-plus me-2"></i>Create New Sub-Admin</h4>
