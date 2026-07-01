@@ -5,7 +5,7 @@ require_once __DIR__ . '/functions.php';
 $user_id = $_SESSION['user_id'] ?? null;
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
-// Today's date in format "d M Y" (e.g., "25 Jun 2026")
+// Today's date in format "d M Y"
 $today_str = date('d M Y');
 
 // Search parameters
@@ -13,7 +13,7 @@ $search_city = $_GET['city'] ?? '';
 $search_type = $_GET['type'] ?? '';
 $search_max_price = $_GET['max_price'] ?? '';
 
-// Build common WHERE clause for available properties
+// Build common WHERE clause
 $where = ["status = 'available'"];
 $params = [];
 
@@ -33,60 +33,72 @@ if(!empty($search_max_price)) {
 $where_clause = implode(" AND ", $where);
 $base_sql = "SELECT * FROM properties WHERE $where_clause";
 
-// ---- 1. Today's Auctions ----
+// Today's Auctions
 $today_sql = $base_sql . " AND auction_start_time ILIKE ? ORDER BY id DESC";
 $today_params = array_merge($params, ['%'.$today_str.'%']);
 $today_stmt = $pdo->prepare($today_sql);
 $today_stmt->execute($today_params);
 $today_props = $today_stmt->fetchAll();
 
-// ---- 2. Upcoming Auctions (excluding today's) ----
+// Upcoming Auctions
 $upcoming_sql = $base_sql . " AND (auction_start_time NOT ILIKE ? OR auction_start_time IS NULL) ORDER BY id DESC";
 $upcoming_params = array_merge($params, ['%'.$today_str.'%']);
 $upcoming_stmt = $pdo->prepare($upcoming_sql);
 $upcoming_stmt->execute($upcoming_params);
 $upcoming_props = $upcoming_stmt->fetchAll();
 
-// ---- Helper to render property cards ----
+// ---- Render Property Card (New Modern Style) ----
 function renderPropertyCard($prop, $show_images, $is_today = false) {
     $badge_html = '';
     if($is_today) {
-        $badge_html = '<span class="badge bg-danger text-white px-3 py-2" style="border-radius:30px; font-size:0.7rem; position:absolute; top:12px; right:12px; z-index:10; box-shadow:0 4px 12px rgba(220,38,38,0.3);"><i class="fas fa-fire"></i> Today\'s Auction</span>';
+        $badge_html = '<span class="badge bg-danger text-white px-3 py-2" style="border-radius:30px; font-size:0.7rem; position:absolute; top:12px; right:12px; z-index:10; box-shadow:0 4px 12px rgba(220,38,38,0.4);"><i class="fas fa-fire"></i> Today</span>';
     }
+    
+    // Random gradient colors for each card
+    $gradients = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+        'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+        'linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)',
+    ];
+    $gradient = $gradients[array_rand($gradients)];
     ?>
     <div class="col-md-4 mb-4">
-        <div class="property-card" style="position:relative; background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 10px 30px -5px rgba(0,0,0,0.04); transition:all 0.4s; border:1px solid rgba(255,255,255,0.2); height:100%;">
+        <div class="property-card" style="position:relative; border-radius:24px; overflow:hidden; box-shadow:0 15px 40px -10px rgba(0,0,0,0.15); height:100%; transition:all 0.4s; background: <?= $gradient ?>; color:#fff;">
             <?= $badge_html ?>
             
-            <!-- ✅ Image Section – सुंदर प्लेसहोल्डर -->
+            <!-- Image / Placeholder -->
             <?php if($show_images && !empty($prop['image_url'])): ?>
-                <img src="<?= htmlspecialchars($prop['image_url']) ?>" class="card-img-top" style="height:220px; object-fit:cover; background:linear-gradient(145deg, #f1f5f9, #e2e8f0);" alt="<?= htmlspecialchars($prop['title']) ?>">
+                <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="height:200px; width:100%; object-fit:cover; border-bottom:3px solid rgba(255,255,255,0.2);" alt="<?= htmlspecialchars($prop['title']) ?>">
             <?php else: ?>
-                <div style="height:220px; background:linear-gradient(135deg, #1e293b, #334155); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8; position:relative;">
-                    <i class="fas fa-lock" style="font-size:2.5rem; color:#fbbf24; opacity:0.8;"></i>
-                    <span style="font-size:0.9rem; font-weight:600; margin-top:8px; color:#f8fafc;">🔒 Subscribe to unlock</span>
+                <div style="height:200px; background:rgba(255,255,255,0.1); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px); border-bottom:3px solid rgba(255,255,255,0.2);">
+                    <i class="fas fa-lock" style="font-size:2.5rem; opacity:0.8;"></i>
+                    <span style="font-size:0.9rem; font-weight:600; margin-top:8px;">🔒 Subscribe to unlock</span>
                     <?php if(!isset($_SESSION['user_id'])): ?>
-                        <a href="login.php" class="btn btn-sm btn-light mt-2" style="border-radius:30px; font-weight:600;">Login to View</a>
+                        <a href="login.php" class="btn btn-sm btn-light mt-2" style="border-radius:30px; font-weight:600;">Login</a>
                     <?php else: ?>
-                        <a href="user_packages.php" class="btn btn-sm btn-warning mt-2" style="border-radius:30px; font-weight:600;">Subscribe Now</a>
+                        <a href="user_packages.php" class="btn btn-sm btn-warning mt-2" style="border-radius:30px; font-weight:600; color:#1e293b;">Subscribe</a>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
 
-            <div class="card-body" style="padding:22px 24px;">
+            <div class="p-4">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#1e3a8a; background:#e0e7ff; padding:4px 14px; border-radius:30px;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
+                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:rgba(255,255,255,0.2); padding:4px 14px; border-radius:30px;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
                     <?php if(!empty($prop['auction_start_time'])): ?>
-                        <span style="font-size:0.75rem; color:#64748b; font-weight:500;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
+                        <span style="font-size:0.75rem; opacity:0.8;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                     <?php endif; ?>
                 </div>
-                <h5 style="font-size:1.2rem; font-weight:700; color:#0f172a; margin:12px 0 6px;"><?= htmlspecialchars($prop['title']) ?></h5>
-                <div style="font-size:1.6rem; font-weight:800; color:#0b1120;">₹ <?= indianCurrencyFormat($prop['price']) ?> <span style="font-size:0.9rem; font-weight:400; color:#64748b;">Reserve</span></div>
-                <div style="font-size:0.85rem; color:#475569; margin-top:6px;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
+                <h5 style="font-size:1.2rem; font-weight:700; margin:12px 0 6px; color:#fff;"><?= htmlspecialchars($prop['title']) ?></h5>
+                <div style="font-size:1.6rem; font-weight:800; color:#fff;">₹ <?= indianCurrencyFormat($prop['price']) ?> <span style="font-size:0.9rem; font-weight:400; opacity:0.7;">Reserve</span></div>
+                <div style="font-size:0.85rem; opacity:0.8; margin-top:6px;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
                 <?php if(isset($_SESSION['user_id'])): ?>
-                    <a href="property_detail.php?id=<?= $prop['id'] ?>" style="background:linear-gradient(135deg, #1e3a8a, #2563eb); border:none; color:white; font-weight:700; padding:12px; border-radius:16px; width:100%; transition:all 0.3s; margin-top:16px; text-decoration:none; display:block; text-align:center;">View Details</a>
+                    <a href="property_detail.php?id=<?= $prop['id'] ?>" style="display:block; margin-top:16px; background:rgba(255,255,255,0.2); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,0.2); color:#fff; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
                 <?php else: ?>
-                    <a href="login.php" class="btn btn-secondary w-100 mt-3" style="border-radius:16px;">Login to View</a>
+                    <a href="login.php" class="btn btn-light w-100 mt-3" style="border-radius:16px; font-weight:600; color:#1e293b;">Login to View</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -114,9 +126,8 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         .search-box .btn-primary:hover { transform:scale(1.02); box-shadow:0 8px 25px rgba(37,99,235,0.3); }
         .section-title { font-weight:800; color:#0f172a; margin-bottom:20px; position:relative; }
         .section-title i { margin-right:10px; }
-        .property-card { transition:all 0.4s cubic-bezier(0.25,0.46,0.45,0.94); }
-        .property-card:hover { transform:translateY(-10px); box-shadow:0 25px 50px -10px rgba(0,0,0,0.15); border-color:#fbbf24; }
-        @media (max-width:576px) { .search-box { padding:20px; } .property-card img { height:180px; } }
+        .property-card:hover { transform:translateY(-10px); box-shadow:0 30px 60px -15px rgba(0,0,0,0.2) !important; }
+        @media (max-width:576px) { .search-box { padding:20px; } }
     </style>
 </head>
 <body>
@@ -170,7 +181,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         </form>
     </div>
 
-    <!-- ===== TODAY'S AUCTIONS ===== -->
+    <!-- Today's Auctions -->
     <?php if(count($today_props) > 0): ?>
         <div class="section-title">
             <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
@@ -188,7 +199,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         </div>
     <?php endif; ?>
 
-    <!-- ===== UPCOMING AUCTIONS ===== -->
+    <!-- Upcoming Auctions -->
     <div class="section-title">
         <i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions
         <?php if(count($upcoming_props) > 0): ?>
