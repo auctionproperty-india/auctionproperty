@@ -53,39 +53,41 @@ $props = $stmt->fetchAll();
 
 // ---- Render Best Deal Card (Modern Colorful) ----
 function renderBestDealCard($prop, $show_images) {
-    $gradients = [
-        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-        'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
-        'linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)',
+    $styles = [
+        ['bg' => 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 'text' => '#ffffff'],
+        ['bg' => 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', 'text' => '#ffffff'],
+        ['bg' => 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', 'text' => '#1e293b'],
+        ['bg' => 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', 'text' => '#1e293b'],
+        ['bg' => 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', 'text' => '#1e293b'],
+        ['bg' => 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', 'text' => '#1e293b'],
+        ['bg' => 'linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)', 'text' => '#1e293b'],
     ];
-    $gradient = $gradients[array_rand($gradients)];
+    $style = $styles[array_rand($styles)];
+    $gradient = $style['bg'];
+    $textColor = $style['text'];
     ?>
     <div class="col-md-4 mb-4">
-        <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:0 15px 40px -10px rgba(0,0,0,0.12); transition:all 0.4s; background: <?= $gradient ?>; color:#fff;">
+        <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:0 15px 40px -10px rgba(0,0,0,0.12); transition:all 0.4s; background: <?= $gradient ?>; color: <?= $textColor ?>;">
             <?php if($show_images && !empty($prop['image_url'])): ?>
                 <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="height:200px; width:100%; object-fit:cover; border-bottom:3px solid rgba(255,255,255,0.2);" alt="<?= htmlspecialchars($prop['title']) ?>">
             <?php else: ?>
                 <div style="height:200px; background:rgba(255,255,255,0.1); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px); border-bottom:3px solid rgba(255,255,255,0.2);">
-                    <i class="fas fa-lock" style="font-size:2.5rem; opacity:0.8;"></i>
-                    <span style="font-size:0.9rem; font-weight:600; margin-top:8px;">🔒 Subscribe to unlock</span>
-                    <a href="user_packages.php" class="btn btn-sm btn-warning mt-2" style="border-radius:30px; font-weight:600; color:#1e293b;">Subscribe Now</a>
+                    <i class="fas fa-lock" style="font-size:2.5rem; opacity:0.8; color:<?= $textColor ?>;"></i>
+                    <span style="font-size:0.9rem; font-weight:600; margin-top:8px; color:<?= $textColor ?>;">🔒 Subscribe to unlock</span>
+                    <a href="user_packages.php" class="btn btn-sm mt-2" style="border-radius:30px; font-weight:600; background: <?= ($textColor == '#ffffff') ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' ?>; color: <?= $textColor ?>; border:1px solid <?= $textColor ?>;">Subscribe Now</a>
                 </div>
             <?php endif; ?>
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:rgba(255,255,255,0.2); padding:4px 14px; border-radius:30px;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
+                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:rgba(255,255,255,0.2); padding:4px 14px; border-radius:30px; color:<?= $textColor ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
                     <?php if(!empty($prop['auction_start_time'])): ?>
-                        <span style="font-size:0.75rem; opacity:0.8;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
+                        <span style="font-size:0.75rem; opacity:0.8; color:<?= $textColor ?>;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                     <?php endif; ?>
                 </div>
-                <h5 class="fw-bold mt-2" style="color:#fff;"><?= htmlspecialchars($prop['title']) ?></h5>
-                <div style="font-size:1.6rem; font-weight:800; color:#fff;">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
-                <div style="font-size:0.85rem; opacity:0.8;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
-                <a href="property_detail.php?id=<?= $prop['id'] ?>" style="display:block; margin-top:16px; background:rgba(255,255,255,0.2); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,0.2); color:#fff; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
+                <h5 class="fw-bold mt-2" style="color:<?= $textColor ?>;"><?= htmlspecialchars($prop['title']) ?></h5>
+                <div style="font-size:1.6rem; font-weight:800; color:<?= $textColor ?>;">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
+                <div style="font-size:0.85rem; opacity:0.8; color:<?= $textColor ?>;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
+                <a href="property_detail.php?id=<?= $prop['id'] ?>" style="display:block; margin-top:16px; background:rgba(255,255,255,0.2); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,0.2); color:<?= $textColor ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
             </div>
         </div>
     </div>
