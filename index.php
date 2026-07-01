@@ -57,14 +57,22 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     <div class="col-md-4 mb-4">
         <div class="property-card" style="position:relative; background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 10px 30px -5px rgba(0,0,0,0.04); transition:all 0.4s; border:1px solid rgba(255,255,255,0.2); height:100%;">
             <?= $badge_html ?>
+            
+            <!-- ✅ Image Section – सुंदर प्लेसहोल्डर -->
             <?php if($show_images && !empty($prop['image_url'])): ?>
                 <img src="<?= htmlspecialchars($prop['image_url']) ?>" class="card-img-top" style="height:220px; object-fit:cover; background:linear-gradient(145deg, #f1f5f9, #e2e8f0);" alt="<?= htmlspecialchars($prop['title']) ?>">
             <?php else: ?>
-                <div style="height:220px; background:linear-gradient(145deg, #f8fafc, #e2e8f0); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8;">
-                    <i class="fas fa-building" style="font-size:3rem;"></i>
-                    <span class="badge bg-warning mt-2 text-dark" style="font-size:0.7rem;">🔒 Subscribe to see image</span>
+                <div style="height:220px; background:linear-gradient(135deg, #1e293b, #334155); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8; position:relative;">
+                    <i class="fas fa-lock" style="font-size:2.5rem; color:#fbbf24; opacity:0.8;"></i>
+                    <span style="font-size:0.9rem; font-weight:600; margin-top:8px; color:#f8fafc;">🔒 Subscribe to unlock</span>
+                    <?php if(!isset($_SESSION['user_id'])): ?>
+                        <a href="login.php" class="btn btn-sm btn-light mt-2" style="border-radius:30px; font-weight:600;">Login to View</a>
+                    <?php else: ?>
+                        <a href="user_packages.php" class="btn btn-sm btn-warning mt-2" style="border-radius:30px; font-weight:600;">Subscribe Now</a>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
+
             <div class="card-body" style="padding:22px 24px;">
                 <div class="d-flex justify-content-between align-items-center">
                     <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#1e3a8a; background:#e0e7ff; padding:4px 14px; border-radius:30px;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
