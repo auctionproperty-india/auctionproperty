@@ -50,6 +50,47 @@ $sql .= " ORDER BY price ASC LIMIT 10";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $props = $stmt->fetchAll();
+
+// ---- Render Best Deal Card (Modern Colorful) ----
+function renderBestDealCard($prop, $show_images) {
+    $gradients = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+        'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+        'linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)',
+    ];
+    $gradient = $gradients[array_rand($gradients)];
+    ?>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:0 15px 40px -10px rgba(0,0,0,0.12); transition:all 0.4s; background: <?= $gradient ?>; color:#fff;">
+            <?php if($show_images && !empty($prop['image_url'])): ?>
+                <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="height:200px; width:100%; object-fit:cover; border-bottom:3px solid rgba(255,255,255,0.2);" alt="<?= htmlspecialchars($prop['title']) ?>">
+            <?php else: ?>
+                <div style="height:200px; background:rgba(255,255,255,0.1); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px); border-bottom:3px solid rgba(255,255,255,0.2);">
+                    <i class="fas fa-lock" style="font-size:2.5rem; opacity:0.8;"></i>
+                    <span style="font-size:0.9rem; font-weight:600; margin-top:8px;">🔒 Subscribe to unlock</span>
+                    <a href="user_packages.php" class="btn btn-sm btn-warning mt-2" style="border-radius:30px; font-weight:600; color:#1e293b;">Subscribe Now</a>
+                </div>
+            <?php endif; ?>
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:rgba(255,255,255,0.2); padding:4px 14px; border-radius:30px;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
+                    <?php if(!empty($prop['auction_start_time'])): ?>
+                        <span style="font-size:0.75rem; opacity:0.8;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
+                    <?php endif; ?>
+                </div>
+                <h5 class="fw-bold mt-2" style="color:#fff;"><?= htmlspecialchars($prop['title']) ?></h5>
+                <div style="font-size:1.6rem; font-weight:800; color:#fff;">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
+                <div style="font-size:0.85rem; opacity:0.8;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
+                <a href="property_detail.php?id=<?= $prop['id'] ?>" style="display:block; margin-top:16px; background:rgba(255,255,255,0.2); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,0.2); color:#fff; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
+            </div>
+        </div>
+    </div>
+    <?php
+}
 ?>
 <style>
     .user-welcome-banner {
@@ -90,74 +131,19 @@ $props = $stmt->fetchAll();
         transform: translateY(-4px);
         box-shadow: 0 20px 40px -8px rgba(0,0,0,0.08);
     }
-    .wallet-card .icon {
-        font-size: 2rem;
-        margin-bottom: 6px;
-        display: block;
-    }
-    .wallet-card h5 {
-        font-weight: 700;
-        color: #0f172a;
-    }
-    .wallet-card .amount {
-        font-size: 1.8rem;
-        font-weight: 800;
-        color: #2563eb;
-    }
-    .best-deals-section .card {
-        border-radius: 24px;
-        border: none;
-        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
-        transition: 0.3s;
-        height: 100%;
-        overflow: hidden;
-    }
-    .best-deals-section .card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 25px 45px -10px rgba(0,0,0,0.1);
-    }
-    .best-deals-section .card img {
-        height: 180px;
-        object-fit: cover;
-        background: #f1f5f9;
-    }
-    .best-deals-section .card .badge-bank {
-        background: #e0e7ff;
-        color: #1e3a8a;
-        font-weight: 600;
-        font-size: 0.7rem;
-        padding: 4px 12px;
-        border-radius: 30px;
-    }
-    .best-deals-section .card .price {
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: #0f172a;
-    }
-    .best-deals-section .card .auction-date {
-        font-size: 0.75rem;
-        color: #64748b;
-    }
-    .best-deals-section .card .btn-detail {
-        background: linear-gradient(135deg, #1e3a8a, #2563eb);
-        border: none;
-        color: white;
-        font-weight: 600;
-        border-radius: 30px;
-        padding: 8px 16px;
-        width: 100%;
-        transition: 0.3s;
-    }
-    .best-deals-section .card .btn-detail:hover {
-        transform: scale(0.98);
-        box-shadow: 0 8px 20px rgba(37,99,235,0.3);
-    }
+    .wallet-card .icon { font-size: 2rem; margin-bottom: 6px; display: block; }
+    .wallet-card h5 { font-weight: 700; color: #0f172a; }
+    .wallet-card .amount { font-size: 1.8rem; font-weight: 800; color: #2563eb; }
     .subscription-status {
         background: white;
         border-radius: 20px;
         padding: 20px 24px;
         border-left: 6px solid <?= $is_subscribed ? '#10b981' : '#f59e0b' ?>;
         box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
+    }
+    .best-deals-section .card:hover {
+        transform: translateY(-10px) !important;
+        box-shadow: 0 30px 60px -15px rgba(0,0,0,0.2) !important;
     }
 </style>
 
@@ -231,7 +217,7 @@ $props = $stmt->fetchAll();
     </div>
 </div>
 
-<!-- Best Deals -->
+<!-- Best Deals (Modern Colorful) -->
 <div class="best-deals-section">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4><i class="fas fa-fire me-2" style="color:#f97316;"></i> Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?></h4>
@@ -240,30 +226,7 @@ $props = $stmt->fetchAll();
     <div class="row">
         <?php if(count($props) > 0): ?>
             <?php foreach($props as $p): ?>
-            <div class="col-md-4 mb-4">
-                <div class="card">
-                    <?php if($show_images && !empty($p['image_url'])): ?>
-                        <img src="<?= htmlspecialchars($p['image_url']) ?>" class="card-img-top" alt="<?= htmlspecialchars($p['title']) ?>">
-                    <?php else: ?>
-                        <div style="height:180px; background:linear-gradient(145deg,#f8fafc,#e2e8f0); display:flex; align-items:center; justify-content:center; flex-direction:column; color:#94a3b8;">
-                            <i class="fas fa-home" style="font-size:3rem;"></i>
-                            <span class="badge bg-warning mt-2 text-dark">🔒 Subscribe</span>
-                        </div>
-                    <?php endif; ?>
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <span class="badge-bank">🏦 <?= htmlspecialchars($p['bank_name'] ?? 'Bank') ?></span>
-                            <?php if(!empty($p['auction_start_time'])): ?>
-                                <span class="auction-date"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($p['auction_start_time']) ?></span>
-                            <?php endif; ?>
-                        </div>
-                        <h6 class="fw-bold mt-2"><?= htmlspecialchars($p['title']) ?></h6>
-                        <div class="price">₹ <?= indianCurrencyFormat($p['price']) ?></div>
-                        <div class="text-muted small"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($p['city'] ?? '') ?></div>
-                        <a href="property_detail.php?id=<?= $p['id'] ?>" class="btn-detail mt-2 d-block text-center">View Details</a>
-                    </div>
-                </div>
-            </div>
+                <?php renderBestDealCard($p, $show_images); ?>
             <?php endforeach; ?>
         <?php else: ?>
             <div class="col-12 text-center text-muted py-4">
