@@ -5,18 +5,13 @@ require_once __DIR__ . '/functions.php';
 $user_id = $_SESSION['user_id'] ?? null;
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
-// Today's date in format "d M Y"
 $today_str = date('d M Y');
-
-// Search parameters
 $search_city = $_GET['city'] ?? '';
 $search_type = $_GET['type'] ?? '';
 $search_max_price = $_GET['max_price'] ?? '';
 
-// Build common WHERE clause
 $where = ["status = 'available'"];
 $params = [];
-
 if(!empty($search_city)) {
     $where[] = "city ILIKE ?";
     $params[] = '%'.$search_city.'%';
@@ -33,74 +28,68 @@ if(!empty($search_max_price)) {
 $where_clause = implode(" AND ", $where);
 $base_sql = "SELECT * FROM properties WHERE $where_clause";
 
-// Today's Auctions
 $today_sql = $base_sql . " AND auction_start_time ILIKE ? ORDER BY id DESC";
 $today_params = array_merge($params, ['%'.$today_str.'%']);
 $today_stmt = $pdo->prepare($today_sql);
 $today_stmt->execute($today_params);
 $today_props = $today_stmt->fetchAll();
 
-// Upcoming Auctions
 $upcoming_sql = $base_sql . " AND (auction_start_time NOT ILIKE ? OR auction_start_time IS NULL) ORDER BY id DESC";
 $upcoming_params = array_merge($params, ['%'.$today_str.'%']);
 $upcoming_stmt = $pdo->prepare($upcoming_sql);
 $upcoming_stmt->execute($upcoming_params);
 $upcoming_props = $upcoming_stmt->fetchAll();
 
-// ---- Render Property Card (New Modern Style) ----
+// ---- RENDER CARD: World-Class Quality ----
 function renderPropertyCard($prop, $show_images, $is_today = false) {
+    // Premium gradient palette with high contrast
+    $gradients = [
+        ['bg' => 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)', 'text' => '#ffffff', 'accent' => '#ffd700'],
+        ['bg' => 'linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)', 'text' => '#ffffff', 'accent' => '#e94560'],
+        ['bg' => 'linear-gradient(135deg, #1e3c72, #2a5298)', 'text' => '#ffffff', 'accent' => '#f9ca24'],
+        ['bg' => 'linear-gradient(135deg, #0b1a2e, #1b3a4b, #2c5a6e)', 'text' => '#f0f4f8', 'accent' => '#48dbfb'],
+        ['bg' => 'linear-gradient(135deg, #1c1c1c, #2d2d2d, #3d3d3d)', 'text' => '#f5f5f5', 'accent' => '#ff6b6b'],
+        ['bg' => 'linear-gradient(135deg, #0d0d0d, #1a1a2e, #16213e)', 'text' => '#e0e0e0', 'accent' => '#f093fb'],
+    ];
+    $g = $gradients[array_rand($gradients)];
     $badge_html = '';
     if($is_today) {
-        $badge_html = '<span class="badge bg-danger text-white px-3 py-2" style="border-radius:30px; font-size:0.7rem; position:absolute; top:12px; right:12px; z-index:10; box-shadow:0 4px 12px rgba(220,38,38,0.4);"><i class="fas fa-fire"></i> Today</span>';
+        $badge_html = '<span class="badge bg-danger text-white px-3 py-2" style="border-radius:30px; font-size:0.7rem; position:absolute; top:12px; right:12px; z-index:10; box-shadow:0 4px 20px rgba(220,38,38,0.5); letter-spacing:0.5px;"><i class="fas fa-fire"></i> Today</span>';
     }
-    
-    // Define gradient + text color pairs
-    $styles = [
-        ['bg' => 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 'text' => '#ffffff'],
-        ['bg' => 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', 'text' => '#ffffff'],
-        ['bg' => 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', 'text' => '#1e293b'], // light blue -> dark text
-        ['bg' => 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', 'text' => '#1e293b'], // light green -> dark text
-        ['bg' => 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', 'text' => '#1e293b'], // yellow -> dark text
-        ['bg' => 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)', 'text' => '#1e293b'], // light purple -> dark text
-        ['bg' => 'linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)', 'text' => '#1e293b'], // light beige -> dark text
-    ];
-    $style = $styles[array_rand($styles)];
-    $gradient = $style['bg'];
-    $textColor = $style['text'];
     ?>
     <div class="col-md-4 mb-4">
-        <div class="property-card" style="position:relative; border-radius:24px; overflow:hidden; box-shadow:0 15px 40px -10px rgba(0,0,0,0.15); height:100%; transition:all 0.4s; background: <?= $gradient ?>; color: <?= $textColor ?>;">
+        <div class="property-card" style="position:relative; border-radius:28px; overflow:hidden; box-shadow:0 20px 40px -12px rgba(0,0,0,0.25); transition:all 0.4s cubic-bezier(0.25,0.46,0.45,0.94); background: <?= $g['bg'] ?>; color: <?= $g['text'] ?>; height:100%; backdrop-filter:blur(2px); border:1px solid rgba(255,255,255,0.06);">
             <?= $badge_html ?>
             
             <!-- Image / Placeholder -->
             <?php if($show_images && !empty($prop['image_url'])): ?>
-                <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="height:200px; width:100%; object-fit:cover; border-bottom:3px solid rgba(255,255,255,0.2);" alt="<?= htmlspecialchars($prop['title']) ?>">
+                <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="height:220px; width:100%; object-fit:cover; border-bottom:2px solid rgba(255,255,255,0.1);" alt="<?= htmlspecialchars($prop['title']) ?>">
             <?php else: ?>
-                <div style="height:200px; background:rgba(255,255,255,0.1); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px); border-bottom:3px solid rgba(255,255,255,0.2);">
-                    <i class="fas fa-lock" style="font-size:2.5rem; opacity:0.8; color:<?= $textColor ?>;"></i>
-                    <span style="font-size:0.9rem; font-weight:600; margin-top:8px; color:<?= $textColor ?>;">🔒 Subscribe to unlock</span>
+                <div style="height:220px; background:rgba(255,255,255,0.04); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(6px); border-bottom:2px solid rgba(255,255,255,0.05);">
+                    <i class="fas fa-lock" style="font-size:2.8rem; color:<?= $g['accent'] ?>; opacity:0.7;"></i>
+                    <span style="font-size:0.95rem; font-weight:600; margin-top:10px; color:<?= $g['text'] ?>; opacity:0.8;">🔒 Subscribe to unlock</span>
                     <?php if(!isset($_SESSION['user_id'])): ?>
-                        <a href="login.php" class="btn btn-sm btn-light mt-2" style="border-radius:30px; font-weight:600; background: <?= ($textColor == '#ffffff') ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' ?>; color: <?= $textColor ?>; border:1px solid <?= $textColor ?>;">Login</a>
+                        <a href="login.php" class="btn btn-sm btn-light mt-2" style="border-radius:30px; font-weight:600; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:<?= $g['text'] ?>;">Login</a>
                     <?php else: ?>
-                        <a href="user_packages.php" class="btn btn-sm mt-2" style="border-radius:30px; font-weight:600; background: <?= ($textColor == '#ffffff') ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' ?>; color: <?= $textColor ?>; border:1px solid <?= $textColor ?>;">Subscribe</a>
+                        <a href="user_packages.php" class="btn btn-sm mt-2" style="border-radius:30px; font-weight:600; background:<?= $g['accent'] ?>; border:none; color:#1a1a2e;">Subscribe Now</a>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
 
             <div class="p-4">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:rgba(255,255,255,0.2); padding:4px 14px; border-radius:30px; color:<?= $textColor ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
+                    <span style="font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; background:rgba(255,255,255,0.08); padding:4px 14px; border-radius:30px; color:<?= $g['accent'] ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
                     <?php if(!empty($prop['auction_start_time'])): ?>
-                        <span style="font-size:0.75rem; opacity:0.8; color:<?= $textColor ?>;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
+                        <span style="font-size:0.75rem; opacity:0.6;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                     <?php endif; ?>
                 </div>
-                <h5 style="font-size:1.2rem; font-weight:700; margin:12px 0 6px; color:<?= $textColor ?>;"><?= htmlspecialchars($prop['title']) ?></h5>
-                <div style="font-size:1.6rem; font-weight:800; color:<?= $textColor ?>;">₹ <?= indianCurrencyFormat($prop['price']) ?> <span style="font-size:0.9rem; font-weight:400; opacity:0.7;">Reserve</span></div>
-                <div style="font-size:0.85rem; opacity:0.8; margin-top:6px; color:<?= $textColor ?>;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
+                <h5 style="font-size:1.3rem; font-weight:700; margin:12px 0 6px; color:<?= $g['text'] ?>; line-height:1.3;"><?= htmlspecialchars($prop['title']) ?></h5>
+                <div style="font-size:1.8rem; font-weight:800; color:<?= $g['accent'] ?>;">₹ <?= indianCurrencyFormat($prop['price']) ?> <span style="font-size:0.9rem; font-weight:400; opacity:0.5;">Reserve</span></div>
+                <div style="font-size:0.9rem; opacity:0.6; margin-top:6px;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
                 <?php if(isset($_SESSION['user_id'])): ?>
-                    <a href="property_detail.php?id=<?= $prop['id'] ?>" style="display:block; margin-top:16px; background:rgba(255,255,255,0.2); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,0.2); color:<?= $textColor ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
+                    <a href="property_detail.php?id=<?= $prop['id'] ?>" style="display:block; margin-top:18px; background:rgba(255,255,255,0.08); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,0.12); color:<?= $g['text'] ?>; font-weight:600; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
                 <?php else: ?>
-                    <a href="login.php" class="btn w-100 mt-3" style="border-radius:16px; font-weight:600; background: <?= ($textColor == '#ffffff') ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' ?>; color: <?= $textColor ?>; border:1px solid <?= $textColor ?>;">Login to View</a>
+                    <a href="login.php" class="btn btn-light w-100 mt-3" style="border-radius:16px; font-weight:600; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); color:<?= $g['text'] ?>;">Login to View</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -128,7 +117,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         .search-box .btn-primary:hover { transform:scale(1.02); box-shadow:0 8px 25px rgba(37,99,235,0.3); }
         .section-title { font-weight:800; color:#0f172a; margin-bottom:20px; position:relative; }
         .section-title i { margin-right:10px; }
-        .property-card:hover { transform:translateY(-10px); box-shadow:0 30px 60px -15px rgba(0,0,0,0.2) !important; }
+        .property-card:hover { transform:translateY(-12px) scale(1.01); box-shadow:0 30px 60px -15px rgba(0,0,0,0.3) !important; }
         @media (max-width:576px) { .search-box { padding:20px; } }
     </style>
 </head>
@@ -159,7 +148,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
 </nav>
 
 <div class="container mt-4">
-    <!-- Search Box -->
     <div class="search-box">
         <form method="GET" class="row g-3 align-items-center">
             <div class="col-md-4">
@@ -183,7 +171,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         </form>
     </div>
 
-    <!-- Today's Auctions -->
     <?php if(count($today_props) > 0): ?>
         <div class="section-title">
             <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
@@ -201,7 +188,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         </div>
     <?php endif; ?>
 
-    <!-- Upcoming Auctions -->
     <div class="section-title">
         <i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions
         <?php if(count($upcoming_props) > 0): ?>
