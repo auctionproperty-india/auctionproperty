@@ -27,6 +27,15 @@ $activation_date_formatted = ($is_subscribed && !empty($sub_info['start_date']))
 $expiry_date_formatted = ($is_subscribed && !empty($sub_info['end_date'])) ? date('d M Y', strtotime($sub_info['end_date'])) : 'N/A';
 $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 
+// ---- Referral Earnings ----
+$earnings = getReferralEarnings($pdo, $user_id, 'pending');
+$paid_earnings = getReferralEarnings($pdo, $user_id, 'paid');
+$total_pending = array_sum(array_column($earnings, 'amount'));
+$total_paid = array_sum(array_column($paid_earnings, 'net_amount'));
+
+// ---- Wallet ----
+$wallet_balance = getUserWalletBalance($pdo, $user_id);
+
 // ---- Show Images ----
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
@@ -49,7 +58,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $best_props = $stmt->fetchAll();
 
-// ---- Render Card (same as home page style) ----
+// ---- Render Card Function ----
 function renderDashboardCard($prop, $show_images, $is_today = false) {
     $badge_html = '';
     if($is_today) {
@@ -73,7 +82,6 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     <div class="col-md-4 mb-4">
         <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:<?= $shadow ?>; transition:all 0.4s; background: <?= $g['bg'] ?>; color:<?= $text_color ?>;">
             <?= $badge_html ?>
-            <!-- Details TOP -->
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center">
                     <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
@@ -86,7 +94,6 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
                 <div style="font-size:0.85rem; opacity:0.8; color:<?= $text_color ?>;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
                 <a href="property_detail.php?id=<?= $prop['id'] ?>" style="display:block; margin-top:16px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
             </div>
-            <!-- Image / Subscribe BOTTOM (small) -->
             <?php if($show_images && !empty($prop['image_url'])): ?>
                 <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="height:200px; width:100%; object-fit:cover; border-top:3px solid <?= $border ?>;" alt="<?= htmlspecialchars($prop['title']) ?>">
             <?php else: ?>
@@ -105,7 +112,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     .user-welcome-banner {
         background: linear-gradient(135deg, #0f172a, #1e293b);
         border-radius: 30px;
-        padding: 35px 40px;
+        padding: 30px 35px;
         color: white;
         margin-bottom: 30px;
         position: relative;
@@ -119,59 +126,100 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         right: -10%;
         width: 300px;
         height: 300px;
-        background: rgba(251, 191, 36, 0.1);
+        background: rgba(251, 191, 36, 0.08);
         border-radius: 50%;
     }
-    .user-welcome-banner h2 { font-weight: 800; letter-spacing: -0.5px; }
-    .subscription-status {
-        background: white;
-        border-radius: 20px;
-        padding: 20px 24px;
-        border-left: 6px solid <?= $is_subscribed ? '#10b981' : '#f59e0b' ?>;
-        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
-        margin-bottom: 30px;
+    .user-welcome-banner h2 {
+        font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+    .user-welcome-banner .banner-stats {
+        display: flex;
+        gap: 25px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+    .user-welcome-banner .banner-stats .stat-item {
+        font-size: 0.85rem;
+        opacity: 0.85;
+    }
+    .user-welcome-banner .banner-stats .stat-item .value {
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: #fbbf24;
+    }
+    .user-welcome-banner .subscription-status-inline {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .user-welcome-banner .subscription-status-inline .label {
+        opacity: 0.7;
+        font-size: 0.85rem;
+    }
+    .user-welcome-banner .subscription-status-inline .status-badge {
+        font-weight: 600;
+    }
+    .user-welcome-banner .subscription-status-inline .status-badge .icon {
+        font-size: 1.2rem;
+        margin-right: 4px;
     }
     .section-title { font-weight:800; color:#0f172a; margin-bottom:20px; position:relative; }
     .section-title i { margin-right:10px; }
     .card:hover { transform: translateY(-10px) !important; box-shadow: 0 30px 60px -15px rgba(0,0,0,0.2) !important; }
-    @media (max-width:576px) { .user-welcome-banner { padding: 20px; } }
+    @media (max-width:576px) { .user-welcome-banner { padding: 20px; } .user-welcome-banner .banner-stats { gap: 12px; } }
 </style>
 
-<!-- Welcome Banner -->
+<!-- ===== WELCOME BANNER (सब कुछ एक साथ) ===== -->
 <div class="user-welcome-banner">
     <div class="row align-items-center">
-        <div class="col-md-8">
+        <div class="col-md-6">
             <h2>🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h2>
-            <p class="opacity-75">Discover the most affordable properties in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'your city' ?></p>
+            <p class="opacity-75" style="margin-bottom:4px;">Discover the most affordable properties in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'your city' ?></p>
+            
+            <!-- Wallet Stats -->
+            <div class="banner-stats">
+                <div class="stat-item">
+                    💰 Wallet<br>
+                    <span class="value">₹ <?= indianCurrencyFormat($wallet_balance) ?></span>
+                </div>
+                <div class="stat-item">
+                    ⏳ Pending<br>
+                    <span class="value">₹ <?= indianCurrencyFormat($total_pending) ?></span>
+                </div>
+                <div class="stat-item">
+                    ✅ Paid<br>
+                    <span class="value">₹ <?= indianCurrencyFormat($total_paid) ?></span>
+                </div>
+            </div>
         </div>
-        <div class="col-md-4 text-md-end">
+        <div class="col-md-6 text-md-end">
             <a href="user_packages.php" class="btn btn-light btn-lg rounded-pill px-5 fw-bold text-primary shadow-sm">
                 <i class="fas fa-rocket"></i> Subscribe
             </a>
         </div>
     </div>
-</div>
 
-<!-- Subscription Status -->
-<div class="subscription-status">
-    <div class="row align-items-center">
-        <div class="col-md-6">
-            <h6><i class="fas fa-user-clock me-2"></i>Subscription Status</h6>
-            <?php if($is_subscribed): ?>
-                <span class="badge bg-success p-2 fs-6">✅ <?= htmlspecialchars($sub_info['pkg_name']) ?> Active</span>
-                <span class="badge bg-warning text-dark ms-2 p-2">⏳ <?= $days_left ?> Days Left</span>
-            <?php else: ?>
-                <span class="badge bg-secondary p-2 fs-6">🔴 No Active Plan</span>
-                <a href="user_packages.php" class="btn btn-sm btn-primary ms-2">Buy Plan</a>
-            <?php endif; ?>
-        </div>
-        <div class="col-md-6 text-md-end">
-            <?php if($is_subscribed): ?>
-                <small>Activated: <?= $activation_date_formatted ?></small>
-                <span class="ms-2">|</span>
-                <small>Expires: <?= $expiry_date_formatted ?></small>
-            <?php endif; ?>
-        </div>
+    <!-- Subscription Status with Activation Date -->
+    <div class="subscription-status-inline">
+        <span class="label">📋 Subscription Status:</span>
+        <?php if($is_subscribed): ?>
+            <span class="status-badge text-success">
+                <span class="icon">✅</span> Active
+                <span class="badge bg-warning text-dark ms-2">⏳ <?= $days_left ?> Days Left</span>
+                <span class="ms-2" style="font-size:0.8rem; opacity:0.7;">Activated: <?= $activation_date_formatted ?></span>
+            </span>
+        <?php else: ?>
+            <span class="status-badge text-danger">
+                <span class="icon">❌</span> Not Active
+                <a href="user_packages.php" class="btn btn-sm btn-warning ms-2" style="font-weight:600; color:#1e293b;">Buy Plan</a>
+                <span class="ms-2" style="font-size:0.8rem; opacity:0.7;">Activated: Not Active</span>
+            </span>
+        <?php endif; ?>
     </div>
 </div>
 
