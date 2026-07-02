@@ -68,7 +68,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// ---- Handle GET actions (toggle status, reset password show) ----
+// ---- Handle GET actions ----
 if(isset($_GET['toggle_status'])) {
     if(!$is_super_admin) die("Access Denied");
     $id = (int)$_GET['toggle_status'];
@@ -123,10 +123,35 @@ $user_search = $_GET['user_search'] ?? '';
         </div>
         <div class="table-responsive">
             <table class="table table-hover">
-                <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Referred By</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                <thead><tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Referred By</th>
+                    <th>Role</th>
+                    <th>Plan</th> <!-- ✅ NEW PLAN COLUMN -->
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr></thead>
                 <tbody>
                 <?php 
-                $sql_users = "SELECT u.id, u.name, u.email, u.phone, u.referred_by, u.role, u.status, r.name as referrer_name FROM users u LEFT JOIN users r ON u.referred_by = r.id";
+                // ✅ Modified SQL to include active subscription plan
+                $sql_users = "SELECT 
+                                u.id, u.name, u.email, u.phone, u.referred_by, u.role, u.status, 
+                                r.name as referrer_name,
+                                p.name as package_name,
+                                s.start_date as sub_start,
+                                s.end_date as sub_end
+                              FROM users u 
+                              LEFT JOIN users r ON u.referred_by = r.id
+                              LEFT JOIN (
+                                  SELECT DISTINCT ON (user_id) user_id, package_id, start_date, end_date
+                                  FROM subscriptions
+                                  WHERE status = 'active' AND end_date >= CURRENT_DATE
+                                  ORDER BY user_id, id DESC
+                              ) s ON u.id = s.user_id
+                              LEFT JOIN packages p ON s.package_id = p.id";
+                
                 if(!empty($user_search)) {
                     $sql_users .= " WHERE u.name ILIKE ? OR u.email ILIKE ?";
                     $stmt = $pdo->prepare($sql_users . " ORDER BY u.id DESC");
@@ -142,6 +167,8 @@ $user_search = $_GET['user_search'] ?? '';
                         $current_referrer = $u['referrer_name'] ?? 'Direct';
                         $status_badge = ($u['status'] == 'active') ? 'success' : 'secondary';
                         $status_text = ucfirst($u['status']);
+                        // Determine Plan
+                        $plan_display = ($u['package_name']) ? htmlspecialchars($u['package_name']) : 'Free';
                 ?>
                     <tr>
                         <td><?= htmlspecialchars($u['name']) ?></td>
@@ -149,6 +176,13 @@ $user_search = $_GET['user_search'] ?? '';
                         <td><?= htmlspecialchars($u['phone'] ?? 'N/A') ?></td>
                         <td><?= ($u['referrer_name'] ? htmlspecialchars($u['referrer_name']) : '<span class="text-muted">Direct</span>') ?></td>
                         <td><span class='badge bg-<?= ($u['role']=='admin'?'danger':'info') ?>'><?= $u['role'] ?></span></td>
+                        <td>
+                            <?php if($u['package_name']): ?>
+                                <span class="badge bg-success"><?= $plan_display ?></span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary">Free</span>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php if(!$is_self && $is_super_admin): ?>
                                 <a href="?toggle_status=<?= $u['id'] ?>" class="status-toggle" title="Toggle Status">
@@ -163,7 +197,6 @@ $user_search = $_GET['user_search'] ?? '';
                         </td>
                         <td>
                             <?php if(!$is_self && $is_super_admin): ?>
-                                <!-- Settings Button (Modal) -->
                                 <button class="btn btn-sm btn-outline-primary" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#userSettingsModal"
@@ -175,7 +208,6 @@ $user_search = $_GET['user_search'] ?? '';
                                         onclick="populateModal(this)">
                                     <i class="fas fa-cog"></i>
                                 </button>
-                                <!-- NEW: View Profile Button -->
                                 <a href="admin_user_detail.php?id=<?= $u['id'] ?>" class="btn btn-sm btn-info" title="View Profile">
                                     <i class="fas fa-eye"></i>
                                 </a>
@@ -187,7 +219,7 @@ $user_search = $_GET['user_search'] ?? '';
                 <?php 
                     }
                 } else {
-                    echo "<tr><td colspan='7' class='text-center text-muted'>No users found.</td></tr>";
+                    echo "<tr><td colspan='8' class='text-center text-muted'>No users found.</td></tr>";
                 }
                 ?>
                 </tbody>
