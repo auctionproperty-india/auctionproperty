@@ -27,9 +27,11 @@ if(isset($_SESSION['user_id'])) {
     }
 }
 
-// ---- User Data for Top Bar Dates ----
+// ---- User Data for Top Bar ----
 $reg_date = '';
 $activation_date = 'Not Active';
+$expiry_date = null;
+$days_left = 0;
 $user_email = '';
 
 if($role == 'user') {
@@ -41,11 +43,20 @@ if($role == 'user') {
     $user_email = $user_sidebar['email'] ?? '';
     $reg_date = !empty($user_sidebar['reg_date']) ? date('d M Y', strtotime($user_sidebar['reg_date'])) : 'N/A';
 
-    // Activation date (from active subscription)
-    $sub = $pdo->prepare("SELECT start_date FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
+    // Activation date & expiry from active subscription
+    $sub = $pdo->prepare("SELECT start_date, end_date FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
     $sub->execute([$user_id]);
     $sub_info = $sub->fetch();
-    $activation_date = $sub_info ? date('d M Y', strtotime($sub_info['start_date'])) : 'Not Active';
+    if($sub_info) {
+        $activation_date = date('d M Y', strtotime($sub_info['start_date']));
+        $expiry_date = $sub_info['end_date']; // Y-m-d format
+        $days_left = (int) ((strtotime($expiry_date) - time()) / (60 * 60 * 24));
+        $days_left = max(0, $days_left);
+    } else {
+        $activation_date = 'Not Active';
+        $expiry_date = null;
+        $days_left = 0;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -100,7 +111,8 @@ if($role == 'user') {
         body.role-admin .top-bar .user-info .name { color: #f8fafc; }
         body.role-user .top-bar .user-info .name { color: #0f172a; }
         .top-bar .badge-role { padding: 4px 14px; border-radius: 30px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
-        .top-bar .user-dates { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; color: inherit; }
+        .top-bar .user-dates { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; color: inherit; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .top-bar .countdown-timer { font-weight: 600; color: #fbbf24; background: rgba(0,0,0,0.1); padding: 0 8px; border-radius: 4px; }
         .hamburger-btn { background: transparent; border: none; font-size: 28px; padding: 5px 10px; display: none; cursor: pointer; }
         body.role-admin .hamburger-btn { color: #e2e8f0; }
         body.role-user .hamburger-btn { color: #1e293b; }
@@ -164,7 +176,6 @@ if($role == 'user') {
         <?php if(hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
-        <!-- ✅ New Admin Links: KYC and Support -->
         <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         
@@ -175,7 +186,6 @@ if($role == 'user') {
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
         <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
         <a href="user_referrals.php"><i class="fas fa-link"></i> <span>Referrals</span></a>
-        <!-- User Profile & Support -->
         <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
         <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
@@ -198,10 +208,45 @@ if($role == 'user') {
                     </div>
                     <?php if($role == 'user'): ?>
                         <div class="user-dates">
-                            📅 Reg: <?= $reg_date ?> &nbsp;|&nbsp; ✅ Act: <?= $activation_date ?>
+                            <span>📅 Reg: <?= $reg_date ?></span>
+                            <span>✅ Act: 
+                                <?php if($expiry_date): ?>
+                                    <?= $activation_date ?>
+                                    <span class="countdown-timer" id="countdownDisplay" data-expiry="<?= $expiry_date ?>">⏳ Loading...</span>
+                                <?php else: ?>
+                                    Not Active
+                                <?php endif; ?>
+                            </span>
                         </div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
     </div>
+
+<!-- ✅ Countdown Timer JavaScript -->
+<?php if($role == 'user' && $expiry_date): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const expiryStr = document.getElementById('countdownDisplay').getAttribute('data-expiry');
+    const expiry = new Date(expiryStr + 'T23:59:59'); // end of day
+
+    function updateCountdown() {
+        const now = new Date();
+        const diff = expiry - now;
+        if (diff <= 0) {
+            document.getElementById('countdownDisplay').innerHTML = '⏳ Expired';
+            return;
+        }
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        document.getElementById('countdownDisplay').innerHTML = 
+            '⏳ ' + days + 'd ' + hours + 'h ' + minutes + 'm ' + seconds + 's remaining';
+    }
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+});
+</script>
+<?php endif; ?>
