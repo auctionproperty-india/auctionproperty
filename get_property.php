@@ -3,11 +3,9 @@
 // ✅ get_property.php – सिर्फ Data Fetch, Session db.php से
 // ============================================================
 
-// ✅ db.php को Include करें (यह Session हैंडल करेगा)
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// ✅ Session Check – अब db.php ने Session Start कर दिया है
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     http_response_code(403);
     header('Content-Type: application/json');
@@ -23,7 +21,6 @@ if(!$id) {
     exit;
 }
 
-// Explicit Columns
 $sql = "SELECT 
             id, title, description, price, location, city, state, type, 
             google_location, image_url, bank_name, sqft, possession_type, 
@@ -44,12 +41,16 @@ if(!$property) {
     exit;
 }
 
-// Convert inspection_date to DD/MM/YYYY
+// ✅ Inspection Date को DD/MM/YYYY में बदलें
 if(!empty($property['inspection_date'])) {
     $date_obj = DateTime::createFromFormat('Y-m-d', $property['inspection_date']);
     if($date_obj) {
         $property['inspection_date'] = $date_obj->format('d/m/Y');
+    } else {
+        $property['inspection_date'] = '';
     }
+} else {
+    $property['inspection_date'] = '';
 }
 
 header('Content-Type: application/json');
