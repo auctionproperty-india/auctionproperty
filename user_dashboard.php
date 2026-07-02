@@ -58,7 +58,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $best_props = $stmt->fetchAll();
 
-// ---- Render Card Function ----
+// ---- Render Card Function (same as home page) ----
 function renderDashboardCard($prop, $show_images, $is_today = false) {
     $badge_html = '';
     if($is_today) {
@@ -133,22 +133,18 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         font-weight: 800;
         letter-spacing: -0.5px;
     }
-    .user-welcome-banner .banner-stats {
+    .user-welcome-banner .banner-actions {
         display: flex;
-        gap: 25px;
+        gap: 15px;
         flex-wrap: wrap;
-        margin-top: 10px;
+        margin-top: 12px;
     }
-    .user-welcome-banner .banner-stats .stat-item {
-        font-size: 0.85rem;
-        opacity: 0.85;
+    .user-welcome-banner .banner-actions .btn {
+        border-radius: 30px;
+        font-weight: 600;
+        padding: 10px 25px;
     }
-    .user-welcome-banner .banner-stats .stat-item .value {
-        font-weight: 700;
-        font-size: 1.2rem;
-        color: #fbbf24;
-    }
-    .user-welcome-banner .subscription-status-inline {
+    .subscription-status-inline {
         display: flex;
         align-items: center;
         gap: 15px;
@@ -157,54 +153,38 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         padding-top: 12px;
         border-top: 1px solid rgba(255,255,255,0.1);
     }
-    .user-welcome-banner .subscription-status-inline .label {
-        opacity: 0.7;
-        font-size: 0.85rem;
-    }
-    .user-welcome-banner .subscription-status-inline .status-badge {
-        font-weight: 600;
-    }
-    .user-welcome-banner .subscription-status-inline .status-badge .icon {
-        font-size: 1.2rem;
-        margin-right: 4px;
-    }
+    .subscription-status-inline .label { opacity: 0.7; font-size: 0.85rem; }
+    .subscription-status-inline .status-badge { font-weight: 600; }
+    .subscription-status-inline .status-badge .icon { font-size: 1.2rem; margin-right: 4px; }
     .section-title { font-weight:800; color:#0f172a; margin-bottom:20px; position:relative; }
     .section-title i { margin-right:10px; }
     .card:hover { transform: translateY(-10px) !important; box-shadow: 0 30px 60px -15px rgba(0,0,0,0.2) !important; }
-    @media (max-width:576px) { .user-welcome-banner { padding: 20px; } .user-welcome-banner .banner-stats { gap: 12px; } }
+    @media (max-width:576px) { .user-welcome-banner { padding: 20px; } }
 </style>
 
-<!-- ===== WELCOME BANNER (सब कुछ एक साथ) ===== -->
+<!-- ===== WELCOME BANNER (with View All Properties button) ===== -->
 <div class="user-welcome-banner">
     <div class="row align-items-center">
-        <div class="col-md-6">
+        <div class="col-md-7">
             <h2>🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h2>
             <p class="opacity-75" style="margin-bottom:4px;">Discover the most affordable properties in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'your city' ?></p>
-            
-            <!-- Wallet Stats -->
-            <div class="banner-stats">
-                <div class="stat-item">
-                    💰 Wallet<br>
-                    <span class="value">₹ <?= indianCurrencyFormat($wallet_balance) ?></span>
-                </div>
-                <div class="stat-item">
-                    ⏳ Pending<br>
-                    <span class="value">₹ <?= indianCurrencyFormat($total_pending) ?></span>
-                </div>
-                <div class="stat-item">
-                    ✅ Paid<br>
-                    <span class="value">₹ <?= indianCurrencyFormat($total_paid) ?></span>
-                </div>
+            <!-- Action Buttons -->
+            <div class="banner-actions">
+                <a href="index.php" class="btn btn-light"><i class="fas fa-th-list me-2"></i>View All Properties</a>
+                <a href="user_packages.php" class="btn btn-warning"><i class="fas fa-rocket me-2"></i>Subscribe Now</a>
             </div>
         </div>
-        <div class="col-md-6 text-md-end">
-            <a href="user_packages.php" class="btn btn-light btn-lg rounded-pill px-5 fw-bold text-primary shadow-sm">
-                <i class="fas fa-rocket"></i> Subscribe
-            </a>
+        <div class="col-md-5 text-md-end">
+            <!-- Wallet Stats (compact) -->
+            <div style="display:flex; gap:20px; justify-content:flex-end; flex-wrap:wrap; font-size:0.9rem;">
+                <div><span class="opacity-75">💰 Wallet</span><br><strong>₹ <?= indianCurrencyFormat($wallet_balance) ?></strong></div>
+                <div><span class="opacity-75">⏳ Pending</span><br><strong>₹ <?= indianCurrencyFormat($total_pending) ?></strong></div>
+                <div><span class="opacity-75">✅ Paid</span><br><strong>₹ <?= indianCurrencyFormat($total_paid) ?></strong></div>
+            </div>
         </div>
     </div>
 
-    <!-- Subscription Status with Activation Date -->
+    <!-- Subscription Status -->
     <div class="subscription-status-inline">
         <span class="label">📋 Subscription Status:</span>
         <?php if($is_subscribed): ?>
