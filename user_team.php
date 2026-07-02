@@ -10,20 +10,29 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php'; 
 
-// ---- Fetch the entire referral tree using recursive CTE ----
+// ---- Fetch the entire referral tree with package info ----
 $sql = "
 WITH RECURSIVE team_tree AS (
     SELECT 
-        id, 
-        name, 
-        email, 
-        phone,
-        created_at,
-        referred_by,
+        u.id, 
+        u.name, 
+        u.email, 
+        u.phone,
+        u.created_at,
+        u.referred_by,
         0 as level,
-        ARRAY[id] as path
-    FROM users 
-    WHERE referred_by = :user_id
+        ARRAY[u.id] as path,
+        p.name as package_name,
+        s.status as sub_status
+    FROM users u 
+    LEFT JOIN (
+        SELECT DISTINCT ON (user_id) user_id, package_id, status
+        FROM subscriptions
+        WHERE status = 'active' AND end_date >= CURRENT_DATE
+        ORDER BY user_id, id DESC
+    ) s ON u.id = s.user_id
+    LEFT JOIN packages p ON s.package_id = p.id
+    WHERE u.referred_by = :user_id
     
     UNION ALL
     
@@ -35,9 +44,18 @@ WITH RECURSIVE team_tree AS (
         u.created_at,
         u.referred_by,
         t.level + 1,
-        t.path || u.id
+        t.path || u.id,
+        p.name as package_name,
+        s.status as sub_status
     FROM users u
     INNER JOIN team_tree t ON u.referred_by = t.id
+    LEFT JOIN (
+        SELECT DISTINCT ON (user_id) user_id, package_id, status
+        FROM subscriptions
+        WHERE status = 'active' AND end_date >= CURRENT_DATE
+        ORDER BY user_id, id DESC
+    ) s ON u.id = s.user_id
+    LEFT JOIN packages p ON s.package_id = p.id
 )
 SELECT * FROM team_tree ORDER BY path;
 ";
@@ -64,20 +82,57 @@ function buildTree($members, $parentId = null) {
 $tree = buildTree($team_members, $user_id);
 $total_members = count($team_members);
 
+// ---- Function to count total members in a subtree ----
+function countSubtree($node) {
+    $count = 1; // self
+    if (isset($node['children']) && count($node['children']) > 0) {
+        foreach ($node['children'] as $child) {
+            $count += countSubtree($child);
+        }
+    }
+    return $count;
+}
+
 // ---- Function to render tree recursively ----
 function renderTree($nodes, $level = 0) {
     if (empty($nodes)) return '';
     $html = '<ul style="list-style:none; padding-left:' . ($level > 0 ? '25px' : '0') . ';">';
     foreach ($nodes as $node) {
         $hasChildren = isset($node['children']) && count($node['children']) > 0;
+        $totalInSubtree = countSubtree($node);
+        $packageBadge = '';
+        
+        // Package Badge
+        if (!empty($node['package_name']) && $node['sub_status'] == 'active') {
+            $pkgColors = [
+                'Silver' => 'bg-secondary',
+                'Gold' => 'bg-warning text-dark',
+                'Platinum' => 'bg-primary',
+                'Diamond' => 'bg-info'
+            ];
+            $colorClass = $pkgColors[$node['package_name']] ?? 'bg-success';
+            $packageBadge = ' <span class="badge ' . $colorClass . '">' . htmlspecialchars($node['package_name']) . '</span>';
+        } else {
+            $packageBadge = ' <span class="badge bg-secondary">Free</span>';
+        }
+        
         $icon = $hasChildren ? '📂' : '👤';
+        
         $html .= '<li style="margin-bottom:8px; border-left:2px solid #e2e8f0; padding-left:12px;">';
-        $html .= '<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:'.($level==0?'#f1f5f9':'transparent').'; border-radius:8px;">';
+        $html .= '<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:'.($level==0?'#f1f5f9':'transparent').'; border-radius:8px; flex-wrap:wrap;">';
         $html .= '<span style="font-size:1.2rem;">' . $icon . '</span>';
         $html .= '<strong>' . htmlspecialchars($node['name']) . '</strong>';
         $html .= '<span style="font-size:0.8rem; color:#64748b;">(' . htmlspecialchars($node['email']) . ')</span>';
+        $html .= $packageBadge;
+        
+        // Show total members in this subtree (only for direct referrals / level 0)
+        if ($level == 0 && $totalInSubtree > 0) {
+            $html .= ' <span class="badge bg-light text-dark border" style="font-weight:600;">👥 ' . ($totalInSubtree - 1) . ' members</span>';
+        }
+        
         $html .= '<span style="font-size:0.7rem; color:#94a3b8; margin-left:auto;">Joined: ' . date('d M Y', strtotime($node['created_at'])) . '</span>';
         $html .= '</div>';
+        
         if ($hasChildren) {
             $html .= renderTree($node['children'], $level + 1);
         }
@@ -101,6 +156,8 @@ function renderTree($nodes, $level = 0) {
         margin-bottom: 20px;
         padding-bottom: 15px;
         border-bottom: 2px solid #f1f5f9;
+        flex-wrap: wrap;
+        gap: 10px;
     }
     .team-header h4 {
         font-weight: 700;
@@ -118,6 +175,11 @@ function renderTree($nodes, $level = 0) {
     .team-tree li:hover > div {
         background: #f8fafc;
     }
+    .badge-secondary { background-color: #6c757d; color: white; }
+    .badge-warning { background-color: #ffc107; color: #212529; }
+    .badge-primary { background-color: #0d6efd; color: white; }
+    .badge-info { background-color: #0dcaf0; color: #212529; }
+    .badge-success { background-color: #198754; color: white; }
 </style>
 
 <div class="container-fluid">
