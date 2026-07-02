@@ -151,7 +151,6 @@ $user_search = $_GET['user_search'] ?? '';
                         <td><span class='badge bg-<?= ($u['role']=='admin'?'danger':'info') ?>'><?= $u['role'] ?></span></td>
                         <td>
                             <?php if(!$is_self && $is_super_admin): ?>
-                                <!-- Toggle Switch for Status -->
                                 <a href="?toggle_status=<?= $u['id'] ?>" class="status-toggle" title="Toggle Status">
                                     <span class="badge bg-<?= $status_badge ?> p-2" style="cursor:pointer; min-width:60px; display:inline-block; text-align:center;">
                                         <?= $status_text ?>
@@ -164,7 +163,7 @@ $user_search = $_GET['user_search'] ?? '';
                         </td>
                         <td>
                             <?php if(!$is_self && $is_super_admin): ?>
-                                <!-- Single Settings Button -->
+                                <!-- Settings Button (Modal) -->
                                 <button class="btn btn-sm btn-outline-primary" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#userSettingsModal"
@@ -174,8 +173,12 @@ $user_search = $_GET['user_search'] ?? '';
                                         data-userstatus="<?= $u['status'] ?>"
                                         data-currentreferrer="<?= htmlspecialchars($current_referrer) ?>"
                                         onclick="populateModal(this)">
-                                    <i class="fas fa-cog"></i> Settings
+                                    <i class="fas fa-cog"></i>
                                 </button>
+                                <!-- NEW: View Profile Button -->
+                                <a href="admin_user_detail.php?id=<?= $u['id'] ?>" class="btn btn-sm btn-info" title="View Profile">
+                                    <i class="fas fa-eye"></i>
+                                </a>
                             <?php else: ?>
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
@@ -202,7 +205,6 @@ $user_search = $_GET['user_search'] ?? '';
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <!-- Hidden user ID -->
                 <input type="hidden" id="modal_user_id" value="">
 
                 <div class="row mb-4">
@@ -285,7 +287,6 @@ $user_search = $_GET['user_search'] ?? '';
 </div>
 
 <script>
-    // Populate modal with user data when Settings button clicked
     function populateModal(btn) {
         var userId = btn.getAttribute('data-userid');
         var userName = btn.getAttribute('data-username');
@@ -297,45 +298,25 @@ $user_search = $_GET['user_search'] ?? '';
         document.getElementById('modal_user_name').innerText = userName;
         document.getElementById('modal_user_email').innerText = userEmail;
 
-        // Status badge
         var badge = document.getElementById('modal_user_status_badge');
         var statusClass = (userStatus === 'active') ? 'bg-success' : 'bg-secondary';
         badge.className = 'badge ' + statusClass;
         badge.innerText = userStatus.charAt(0).toUpperCase() + userStatus.slice(1);
 
-        // Toggle link
-        var toggleLink = document.getElementById('modal_toggle_link');
-        toggleLink.href = '?toggle_status=' + userId;
-
-        // Set password form
+        document.getElementById('modal_toggle_link').href = '?toggle_status=' + userId;
         document.getElementById('modal_password_user_id').value = userId;
-
-        // Reset link
         document.getElementById('modal_reset_link').href = '?reset_pass_show=' + userId;
-
-        // Change referrer form
         document.getElementById('modal_referrer_user_id').value = userId;
         document.getElementById('modal_current_referrer').innerText = currentReferrer;
-
-        // Delete form
         document.getElementById('modal_delete_user_id').value = userId;
     }
 
-    // On modal close, clear any messages? (optional)
-    document.getElementById('userSettingsModal').addEventListener('hidden.bs.modal', function () {
-        // Optionally reset forms
-    });
+    document.getElementById('userSettingsModal').addEventListener('hidden.bs.modal', function () {});
 </script>
 
-<!-- Extra style for toggle badge -->
 <style>
-    .status-toggle .badge {
-        transition: all 0.2s ease;
-    }
-    .status-toggle .badge:hover {
-        transform: scale(1.05);
-        box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
+    .status-toggle .badge { transition: all 0.2s ease; }
+    .status-toggle .badge:hover { transform: scale(1.05); box-shadow: 0 0 10px rgba(0,0,0,0.1); }
 </style>
 
 <?php endif; ?>
