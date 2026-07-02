@@ -14,6 +14,14 @@ if(!hasViewPermission('properties', $pdo)) {
 $default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
 if(!$default_contact) $default_contact = '9238215516';
 
+// ---- Error Message from Session ----
+if(isset($_SESSION['edit_error'])) {
+    $edit_error = $_SESSION['edit_error'];
+    unset($_SESSION['edit_error']);
+} else {
+    $edit_error = '';
+}
+
 // FILTERS
 $filter_city = $_GET['filter_city'] ?? '';
 $filter_bank = $_GET['filter_bank'] ?? '';
@@ -45,54 +53,67 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-// ---- ADD / UPDATE LOGIC (IMAGE HANDLING REMOVED) ----
-if($_SERVER['REQUEST_METHOD'] == 'POST') {
+// ---- ADD / UPDATE LOGIC ----
+function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
+function safeString($val) { return trim($val ?? ''); }
 
-    function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
-    function safeString($val) { return trim($val ?? ''); }
+if($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // UPDATE
     if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
         if(!hasEditPermission('properties', $pdo)) die("Permission denied.");
         $id = $_POST['property_id'];
         
+        // Inspection Date Conversion
         $inspection_date_db = null;
         if(!empty($_POST['inspection_date'])) {
             $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
-            if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
+            if($date_obj) {
+                $inspection_date_db = $date_obj->format('Y-m-d');
+            } else {
+                $_SESSION['edit_error'] = "❌ Inspection date format must be DD/MM/YYYY";
+                header("Location: properties.php");
+                exit;
+            }
         }
 
-        $sql = "UPDATE properties SET 
-            title=?, description='', price=?, location=?, city=?, state=?, type=?, 
-            bank_name=?, sqft=?, possession_type=?, inspection_date=?, 
-            borrower_name=?, emd_amount=?, bid_increment=?, emd_deadline=?, 
-            auction_start_time=?, auction_end_time=?, locality=?, reserve_price_per_sqft=?, contact_number=? 
-            WHERE id=?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            safeString($_POST['title'] ?? ''),
-            safeNumeric($_POST['price'] ?? 0),
-            safeString($_POST['location'] ?? ''),
-            safeString($_POST['city'] ?? ''),
-            safeString($_POST['state'] ?? ''),
-            safeString($_POST['type'] ?? 'Flat'),
-            safeString($_POST['bank_name'] ?? ''),
-            safeNumeric($_POST['sqft'] ?? 0),
-            safeString($_POST['possession_type'] ?? 'Physical'),
-            $inspection_date_db,
-            safeString($_POST['borrower_name'] ?? ''),
-            safeNumeric($_POST['emd_amount'] ?? 0),
-            safeNumeric($_POST['bid_increment'] ?? 0),
-            safeString($_POST['emd_deadline'] ?? ''),
-            safeString($_POST['auction_start_time'] ?? ''),
-            safeString($_POST['auction_end_time'] ?? ''),
-            safeString($_POST['locality'] ?? ''),
-            safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
-            safeString($_POST['contact_number'] ?? $default_contact),
-            $id
-        ]);
-        header("Location: properties.php?updated=1");
-        exit;
+        try {
+            $sql = "UPDATE properties SET 
+                title=?, description='', price=?, location=?, city=?, state=?, type=?, 
+                bank_name=?, sqft=?, possession_type=?, inspection_date=?, 
+                borrower_name=?, emd_amount=?, bid_increment=?, emd_deadline=?, 
+                auction_start_time=?, auction_end_time=?, locality=?, reserve_price_per_sqft=?, contact_number=? 
+                WHERE id=?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                safeString($_POST['title'] ?? ''),
+                safeNumeric($_POST['price'] ?? 0),
+                safeString($_POST['location'] ?? ''),
+                safeString($_POST['city'] ?? ''),
+                safeString($_POST['state'] ?? ''),
+                safeString($_POST['type'] ?? 'Flat'),
+                safeString($_POST['bank_name'] ?? ''),
+                safeNumeric($_POST['sqft'] ?? 0),
+                safeString($_POST['possession_type'] ?? 'Physical'),
+                $inspection_date_db,
+                safeString($_POST['borrower_name'] ?? ''),
+                safeNumeric($_POST['emd_amount'] ?? 0),
+                safeNumeric($_POST['bid_increment'] ?? 0),
+                safeString($_POST['emd_deadline'] ?? ''),
+                safeString($_POST['auction_start_time'] ?? ''),
+                safeString($_POST['auction_end_time'] ?? ''),
+                safeString($_POST['locality'] ?? ''),
+                safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
+                safeString($_POST['contact_number'] ?? $default_contact),
+                $id
+            ]);
+            header("Location: properties.php?updated=1");
+            exit;
+        } catch (PDOException $e) {
+            $_SESSION['edit_error'] = "❌ Update Failed: " . $e->getMessage();
+            header("Location: properties.php");
+            exit;
+        }
     }
 
     // ADD
@@ -105,45 +126,54 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
         }
 
-        $sql = "INSERT INTO properties (
-            title, description, price, location, city, state, type, 
-            bank_name, sqft, possession_type, inspection_date, 
-            borrower_name, emd_amount, bid_increment, emd_deadline, 
-            auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number,
-            status
-        ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')";
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            safeString($_POST['title'] ?? ''),
-            safeNumeric($_POST['price'] ?? 0),
-            safeString($_POST['location'] ?? ''),
-            safeString($_POST['city'] ?? ''),
-            safeString($_POST['state'] ?? ''),
-            safeString($_POST['type'] ?? 'Flat'),
-            safeString($_POST['bank_name'] ?? ''),
-            safeNumeric($_POST['sqft'] ?? 0),
-            safeString($_POST['possession_type'] ?? 'Physical'),
-            $inspection_date_db,
-            safeString($_POST['borrower_name'] ?? ''),
-            safeNumeric($_POST['emd_amount'] ?? 0),
-            safeNumeric($_POST['bid_increment'] ?? 0),
-            safeString($_POST['emd_deadline'] ?? ''),
-            safeString($_POST['auction_start_time'] ?? ''),
-            safeString($_POST['auction_end_time'] ?? ''),
-            safeString($_POST['locality'] ?? ''),
-            safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
-            safeString($_POST['contact_number'] ?? $default_contact)
-        ]);
-        
-        $new_id = $pdo->lastInsertId();
-        header("Location: properties.php?added=1");
-        exit;
+        try {
+            $sql = "INSERT INTO properties (
+                title, description, price, location, city, state, type, 
+                bank_name, sqft, possession_type, inspection_date, 
+                borrower_name, emd_amount, bid_increment, emd_deadline, 
+                auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number,
+                status
+            ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                safeString($_POST['title'] ?? ''),
+                safeNumeric($_POST['price'] ?? 0),
+                safeString($_POST['location'] ?? ''),
+                safeString($_POST['city'] ?? ''),
+                safeString($_POST['state'] ?? ''),
+                safeString($_POST['type'] ?? 'Flat'),
+                safeString($_POST['bank_name'] ?? ''),
+                safeNumeric($_POST['sqft'] ?? 0),
+                safeString($_POST['possession_type'] ?? 'Physical'),
+                $inspection_date_db,
+                safeString($_POST['borrower_name'] ?? ''),
+                safeNumeric($_POST['emd_amount'] ?? 0),
+                safeNumeric($_POST['bid_increment'] ?? 0),
+                safeString($_POST['emd_deadline'] ?? ''),
+                safeString($_POST['auction_start_time'] ?? ''),
+                safeString($_POST['auction_end_time'] ?? ''),
+                safeString($_POST['locality'] ?? ''),
+                safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
+                safeString($_POST['contact_number'] ?? $default_contact)
+            ]);
+            
+            header("Location: properties.php?added=1");
+            exit;
+        } catch (PDOException $e) {
+            $_SESSION['edit_error'] = "❌ Add Failed: " . $e->getMessage();
+            header("Location: properties.php");
+            exit;
+        }
     }
 }
 
 include 'header.php'; 
 ?>
+
+<?php if($edit_error): ?>
+    <div class="alert alert-danger"><?= $edit_error ?></div>
+<?php endif; ?>
 
 <?php if(isset($_GET['added'])): ?>
     <div class="alert alert-success">✅ Property Added Successfully!</div>
@@ -232,7 +262,7 @@ include 'header.php';
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="propertyForm" method="POST" enctype="multipart/form-data">
+                <form id="propertyForm" method="POST">
                     <input type="hidden" name="property_id" id="property_id" value="">
                     <input type="hidden" name="existing_image" id="existing_image" value="">
 
@@ -254,8 +284,6 @@ include 'header.php';
         document.getElementById('existing_image').value = '';
         document.getElementById('submitBtn').name = 'add_property';
         document.getElementById('submitBtn').innerHTML = 'Add Property';
-        document.getElementById('currentImagePreview').style.display = 'none';
-        document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
         
         document.getElementById('edit_title').value = '';
         document.getElementById('edit_price').value = '';
@@ -274,8 +302,6 @@ include 'header.php';
         document.getElementById('edit_auction_end_time').value = '';
         document.getElementById('edit_inspection_date').value = '';
         document.getElementById('edit_contact_number').value = '';
-        document.getElementById('edit_google_location').value = '';
-        document.getElementById('edit_description').value = '';
         
         document.getElementById('edit_type').value = 'Flat';
         document.getElementById('edit_possession_type').value = 'Physical';
@@ -285,7 +311,6 @@ include 'header.php';
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + id;
         document.getElementById('submitBtn').name = 'update_property';
         document.getElementById('submitBtn').innerHTML = 'Update Property';
-        document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
 
         fetch('get_property.php?id=' + id)
             .then(response => response.json())
@@ -315,16 +340,7 @@ include 'header.php';
                 document.getElementById('edit_emd_deadline').value = data.emd_deadline || '';
                 document.getElementById('edit_inspection_date').value = data.inspection_date || '';
                 document.getElementById('edit_contact_number').value = data.contact_number || '';
-                document.getElementById('edit_google_location').value = data.google_location || '';
                 document.getElementById('existing_image').value = data.image_url || '';
-                document.getElementById('edit_description').value = data.description || '';
-
-                if (data.image_url) {
-                    document.getElementById('currentImage').src = data.image_url;
-                    document.getElementById('currentImagePreview').style.display = 'block';
-                } else {
-                    document.getElementById('currentImagePreview').style.display = 'none';
-                }
 
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
