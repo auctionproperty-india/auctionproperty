@@ -28,7 +28,6 @@ if(isset($_SESSION['user_id'])) {
 }
 
 // ---- User Data for Top Bar Dates ----
-$user_sidebar = null;
 $reg_date = '';
 $activation_date = 'Not Active';
 $user_email = '';
@@ -165,7 +164,8 @@ if($role == 'user') {
         <?php if(hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
-        <!-- Admin Support -->
+        <!-- ✅ New Admin Links: KYC and Support -->
+        <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         
     <?php else: ?>
@@ -175,9 +175,8 @@ if($role == 'user') {
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
         <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
         <a href="user_referrals.php"><i class="fas fa-link"></i> <span>Referrals</span></a>
-        <!-- NEW Profile Link -->
+        <!-- User Profile & Support -->
         <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
-        <!-- NEW Support Link -->
         <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
     <?php endif; ?>
