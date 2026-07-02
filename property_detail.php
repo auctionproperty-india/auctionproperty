@@ -14,60 +14,8 @@ if(!$prop) { die("Property not found!"); }
 $has_subscription = userHasActiveSubscription($pdo, $user_id);
 $show_image = $has_subscription;
 
-// ---- IF NOT SUBSCRIBED: Minimal but Beautiful ----
-if(!$has_subscription) {
-    include 'header.php'; 
-    ?>
-    <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="card border-0 shadow-lg" style="border-radius: 30px; overflow: hidden;">
-                    <div class="card-header text-white text-center p-4" style="background: linear-gradient(135deg, #1e293b, #3b82f6);">
-                        <h3><i class="fas fa-lock me-2"></i>🔒 Access Restricted</h3>
-                        <p class="mb-0 opacity-75">Subscribe to view full property details</p>
-                    </div>
-                    <div class="card-body p-4" style="background: #f8fafc;">
-                        <div class="text-center mb-4">
-                            <i class="fas fa-building" style="font-size: 4rem; color: #94a3b8;"></i>
-                            <h4 class="mt-2"><?= htmlspecialchars($prop['title']) ?></h4>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fef3c7; border-left: 5px solid #f59e0b;">
-                                    <small class="text-muted text-uppercase fw-bold">📍 City</small>
-                                    <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h6>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #dcfce7; border-left: 5px solid #22c55e;">
-                                    <small class="text-muted text-uppercase fw-bold">💰 Price</small>
-                                    <h6 class="fw-bold mb-0 text-success">₹ <?= indianCurrencyFormat($prop['price']) ?></h6>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #e0e7ff; border-left: 5px solid #6366f1;">
-                                    <small class="text-muted text-uppercase fw-bold">📅 Auction</small>
-                                    <h6 class="fw-bold mb-0"><?= !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A' ?></h6>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="text-center mt-4">
-                            <a href="user_packages.php" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow">
-                                <i class="fas fa-rocket me-2"></i> Subscribe Now
-                            </a>
-                            <a href="user_dashboard.php" class="btn btn-outline-secondary btn-lg px-4 ms-2 rounded-pill">⬅ Back</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php include 'footer.php'; exit;
-}
-
-// ----- SUBSCRIBED: Details TOP, Image BOTTOM (Colorful) -----
 include 'header.php'; 
-$gradient = 'linear-gradient(135deg, #1e293b 0%, #334155 100%)';
+$gradient = 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)';
 ?>
 <div class="container-fluid px-4 mt-4">
     <div class="row justify-content-center">
@@ -76,101 +24,94 @@ $gradient = 'linear-gradient(135deg, #1e293b 0%, #334155 100%)';
                 <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
             </a>
 
-            <!-- Main Card -->
-            <div class="card border-0 shadow-xxl" style="border-radius: 28px; overflow: hidden; background: <?= $gradient ?>; color:#fff;">
-                <!-- Header -->
-                <div class="card-header p-4" style="background: rgba(0,0,0,0.2); border: none;">
+            <div class="card border-0 shadow-xxl" style="border-radius: 28px; overflow: hidden; background: <?= $gradient ?>; color: #f0f4f8;">
+                
+                <!-- ===== DETAILS SECTION ===== (TOP) -->
+                <div class="card-header p-4" style="background: rgba(0,0,0,0.25); border: none;">
                     <div class="d-flex justify-content-between align-items-center flex-wrap">
                         <div>
-                            <h2 class="fw-bold mb-1"><i class="fas fa-gavel me-3" style="color: #fbbf24;"></i><?= htmlspecialchars($prop['title']) ?></h2>
-                            <span class="badge bg-warning text-dark px-3 py-2 mt-2">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank Auction') ?></span>
+                            <h2 class="fw-bold mb-1" style="color: #ffffff;"><i class="fas fa-gavel me-3" style="color: #ffd700;"></i><?= htmlspecialchars($prop['title']) ?></h2>
+                            <span class="badge px-3 py-2 mt-2" style="background: #ffd700; color: #1a1a2e; font-weight:700;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank Auction') ?></span>
                         </div>
-                        <span class="badge bg-success px-3 py-2">✅ Subscribed</span>
+                        <?php if($has_subscription): ?>
+                            <span class="badge bg-success px-3 py-2">✅ Subscribed</span>
+                        <?php else: ?>
+                            <span class="badge bg-warning text-dark px-3 py-2">🔒 Unlocked</span>
+                        <?php endif; ?>
                     </div>
                 </div>
 
                 <div class="card-body p-4">
-                    <!-- === DETAILS SECTION (TOP) === -->
+                    <!-- Details Grid -->
                     <div class="row g-4">
-                        <!-- Borrower & Type -->
                         <div class="col-md-6">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08); backdrop-filter:blur(4px);">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.06); backdrop-filter:blur(4px);">
                                 <small class="text-uppercase opacity-75">Borrower</small>
-                                <h5 class="fw-bold"><?= htmlspecialchars($prop['borrower_name'] ?? 'N/A') ?></h5>
+                                <h5 class="fw-bold" style="color:#fff;"><?= htmlspecialchars($prop['borrower_name'] ?? 'N/A') ?></h5>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08); backdrop-filter:blur(4px);">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.06); backdrop-filter:blur(4px);">
                                 <small class="text-uppercase opacity-75">Property Type</small>
-                                <h5 class="fw-bold"><?= htmlspecialchars($prop['type'] ?? 'N/A') ?></h5>
+                                <h5 class="fw-bold" style="color:#fff;"><?= htmlspecialchars($prop['type'] ?? 'N/A') ?></h5>
                             </div>
                         </div>
-
-                        <!-- Address -->
                         <div class="col-12">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08); backdrop-filter:blur(4px); border-left:4px solid #fbbf24;">
-                                <i class="fas fa-home me-2" style="color:#fbbf24;"></i>
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.06); backdrop-filter:blur(4px); border-left:4px solid #ffd700;">
+                                <i class="fas fa-home me-2" style="color:#ffd700;"></i>
                                 <strong>Address:</strong> <?= htmlspecialchars($prop['location'] ?? 'Not Provided') ?>
                             </div>
                         </div>
-
-                        <!-- City, State, Area -->
                         <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
+                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.04);">
                                 <small class="text-uppercase opacity-75"><i class="fas fa-map-pin"></i> City</small>
-                                <h6 class="fw-bold"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h6>
+                                <h6 class="fw-bold" style="color:#fff;"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h6>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
+                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.04);">
                                 <small class="text-uppercase opacity-75"><i class="fas fa-location-dot"></i> State</small>
-                                <h6 class="fw-bold"><?= htmlspecialchars($prop['state'] ?? 'N/A') ?></h6>
+                                <h6 class="fw-bold" style="color:#fff;"><?= htmlspecialchars($prop['state'] ?? 'N/A') ?></h6>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
+                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.04);">
                                 <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
-                                <h6 class="fw-bold"><?= $prop['sqft'] ?? 0 ?> Sq Ft</h6>
+                                <h6 class="fw-bold" style="color:#fff;"><?= $prop['sqft'] ?? 0 ?> Sq Ft</h6>
                             </div>
                         </div>
-
-                        <!-- Schedule -->
                         <div class="col-md-6">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.04);">
                                 <small class="text-uppercase opacity-75">Auction Start</small>
-                                <h6 class="fw-bold"><?= htmlspecialchars($prop['auction_start_time'] ?? 'Not Set') ?></h6>
+                                <h6 class="fw-bold" style="color:#fff;"><?= htmlspecialchars($prop['auction_start_time'] ?? 'Not Set') ?></h6>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.04);">
                                 <small class="text-uppercase opacity-75">Auction End</small>
-                                <h6 class="fw-bold"><?= htmlspecialchars($prop['auction_end_time'] ?? 'Not Set') ?></h6>
+                                <h6 class="fw-bold" style="color:#fff;"><?= htmlspecialchars($prop['auction_end_time'] ?? 'Not Set') ?></h6>
                             </div>
                         </div>
-
-                        <!-- Price, EMD, Bid -->
                         <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3);">
+                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,215,0,0.10); border:1px solid rgba(255,215,0,0.2);">
                                 <small class="text-uppercase opacity-75">Reserve Price</small>
-                                <h4 class="fw-bold" style="color:#fbbf24;">₹ <?= indianCurrencyFormat($prop['price']) ?></h4>
+                                <h4 class="fw-bold" style="color:#ffd700;">₹ <?= indianCurrencyFormat($prop['price']) ?></h4>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3);">
+                            <div class="p-3 rounded-4 text-center" style="background:rgba(100,200,255,0.08); border:1px solid rgba(100,200,255,0.15);">
                                 <small class="text-uppercase opacity-75">EMD Amount</small>
-                                <h4 class="fw-bold" style="color:#818cf8;">₹ <?= indianCurrencyFormat($prop['emd_amount'] ?? 0) ?></h4>
+                                <h4 class="fw-bold" style="color:#64c8ff;">₹ <?= indianCurrencyFormat($prop['emd_amount'] ?? 0) ?></h4>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(52,211,153,0.15); border:1px solid rgba(52,211,153,0.3);">
+                            <div class="p-3 rounded-4 text-center" style="background:rgba(52,211,153,0.08); border:1px solid rgba(52,211,153,0.15);">
                                 <small class="text-uppercase opacity-75">Bid Increment</small>
                                 <h4 class="fw-bold" style="color:#34d399;">₹ <?= indianCurrencyFormat($prop['bid_increment'] ?? 0) ?></h4>
                             </div>
                         </div>
-
-                        <!-- Contact & Map -->
                         <div class="col-md-6">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.04);">
                                 <i class="fas fa-phone text-success me-2"></i> 
                                 <strong>Contact:</strong>
                                 <?php if(!empty($prop['contact_number'])): ?>
@@ -183,7 +124,7 @@ $gradient = 'linear-gradient(135deg, #1e293b 0%, #334155 100%)';
                         </div>
                         <div class="col-md-6">
                             <?php if(!empty($prop['google_location'])): ?>
-                                <a href="<?= $prop['google_location'] ?>" target="_blank" class="btn btn-outline-light w-100 rounded-4">
+                                <a href="<?= $prop['google_location'] ?>" target="_blank" class="btn btn-outline-light w-100 rounded-4" style="border-color:rgba(255,255,255,0.15);">
                                     <i class="fas fa-map-marked-alt me-2"></i> View on Google Maps
                                 </a>
                             <?php else: ?>
@@ -192,23 +133,35 @@ $gradient = 'linear-gradient(135deg, #1e293b 0%, #334155 100%)';
                         </div>
                     </div>
 
-                    <!-- === IMAGE SECTION (BOTTOM) === -->
-                    <div class="mt-5">
+                    <!-- ===== "SUBSCRIBE TO UNLOCK" BANNER ===== (BOTTOM) -->
+                    <?php if(!$has_subscription): ?>
+                        <div class="mt-5 p-4 rounded-4 text-center" style="background:rgba(255,215,0,0.10); border:2px dashed rgba(255,215,0,0.25); backdrop-filter:blur(4px);">
+                            <i class="fas fa-lock" style="font-size:2.5rem; color:#ffd700; opacity:0.7;"></i>
+                            <h4 class="mt-2" style="color:#ffd700;">🔒 Subscribe to Unlock Full Details</h4>
+                            <p class="opacity-75">Get access to all property images and complete information.</p>
+                            <a href="user_packages.php" class="btn btn-lg mt-2" style="background:#ffd700; color:#1a1a2e; font-weight:700; border-radius:30px; padding:12px 40px;">
+                                <i class="fas fa-rocket me-2"></i> Subscribe Now
+                            </a>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- ===== IMAGE SECTION ===== (Still at Bottom, but after the unlock banner) -->
+                    <div class="mt-4">
                         <h5 class="text-warning"><i class="fas fa-image me-2"></i>Property Image</h5>
-                        <?php if($show_image && !empty($prop['image_url'])): ?>
-                            <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.05);">
+                        <?php if($has_subscription && !empty($prop['image_url'])): ?>
+                            <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.04);">
                                 <a href="<?= htmlspecialchars($prop['image_url']) ?>" target="_blank">
                                     <img src="<?= htmlspecialchars($prop['image_url']) ?>" class="img-fluid" style="width:100%; max-height:400px; object-fit:contain; cursor:pointer;">
                                 </a>
-                                <div class="text-center py-2" style="background:rgba(0,0,0,0.2);">
+                                <div class="text-center py-2" style="background:rgba(0,0,0,0.15);">
                                     <small class="opacity-75">Click image to open full size</small>
                                 </div>
                             </div>
                         <?php else: ?>
-                            <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; height:200px;">
+                            <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.03); display:flex; align-items:center; justify-content:center; height:200px;">
                                 <div class="text-center p-4">
-                                    <i class="fas fa-image" style="font-size:60px; opacity:0.3;"></i>
-                                    <p class="mt-2 opacity-75">No Image Available</p>
+                                    <i class="fas fa-image" style="font-size:60px; opacity:0.2;"></i>
+                                    <p class="mt-2 opacity-50">No Image Available</p>
                                 </div>
                             </div>
                         <?php endif; ?>
@@ -219,7 +172,7 @@ $gradient = 'linear-gradient(135deg, #1e293b 0%, #334155 100%)';
     </div>
 </div>
 <style>
-    .shadow-xxl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important; }
+    .shadow-xxl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3) !important; }
     .rounded-4 { border-radius: 1.25rem !important; }
 </style>
 <?php include 'footer.php'; ?>
