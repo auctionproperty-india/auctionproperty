@@ -27,13 +27,14 @@ if(isset($_SESSION['user_id'])) {
     }
 }
 
-// ---- User Data for Sidebar Stats ----
+// ---- User Data for Sidebar Stats & Top Bar Dates ----
 $user_sidebar = null;
 $wallet_balance = 0;
 $total_pending = 0;
 $total_paid = 0;
 $reg_date = '';
 $activation_date = 'Not Active';
+$user_email = '';
 
 if($role == 'user') {
     $user_id = $_SESSION['user_id'];
@@ -41,6 +42,7 @@ if($role == 'user') {
     $stmt = $pdo->prepare("SELECT name, email, created_at as reg_date FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $user_sidebar = $stmt->fetch();
+    $user_email = $user_sidebar['email'] ?? '';
     $reg_date = !empty($user_sidebar['reg_date']) ? date('d M Y', strtotime($user_sidebar['reg_date'])) : 'N/A';
 
     // Wallet balance
@@ -110,6 +112,12 @@ if($role == 'user') {
         body.role-admin .top-bar .user-info .name { color: #f8fafc; }
         body.role-user .top-bar .user-info .name { color: #0f172a; }
         .top-bar .badge-role { padding: 4px 14px; border-radius: 30px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+        .top-bar .user-dates {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 2px;
+            color: inherit;
+        }
         .hamburger-btn { background: transparent; border: none; font-size: 28px; padding: 5px 10px; display: none; cursor: pointer; }
         body.role-admin .hamburger-btn { color: #e2e8f0; }
         body.role-user .hamburger-btn { color: #1e293b; }
@@ -167,20 +175,13 @@ if($role == 'user') {
             font-weight: 700;
             font-size: 1.1rem;
             text-align: center;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
         }
         .sidebar-user-email {
             font-size: 0.75rem;
             opacity: 0.7;
             text-align: center;
             margin-bottom: 10px;
-        }
-        .sidebar-date-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.75rem;
-            padding: 4px 0;
-            opacity: 0.8;
         }
     </style>
 </head>
@@ -225,14 +226,10 @@ if($role == 'user') {
         <a href="user_referrals.php"><i class="fas fa-link"></i> <span>Referrals</span></a>
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
 
-        <!-- ====== Sidebar Stats for User ====== -->
+        <!-- ====== Sidebar Stats (Wallet, Pending, Paid only) ====== -->
         <div class="sidebar-stats">
             <div class="sidebar-user-name"><?= htmlspecialchars($_SESSION['user_name']) ?></div>
-            <div class="sidebar-user-email"><?= htmlspecialchars($_SESSION['user_email'] ?? '') ?></div>
-            <div class="sidebar-date-row">
-                <span>📅 Reg: <?= $reg_date ?></span>
-                <span>✅ Act: <?= $activation_date ?></span>
-            </div>
+            <div class="sidebar-user-email"><?= htmlspecialchars($user_email) ?></div>
             <hr style="margin: 8px 0; opacity:0.2;">
             <div class="stat-item"><span class="label">💰 Wallet</span><span class="value">₹ <?= indianCurrencyFormat($wallet_balance) ?></span></div>
             <div class="stat-item"><span class="label">⏳ Pending</span><span class="value">₹ <?= indianCurrencyFormat($total_pending) ?></span></div>
@@ -253,12 +250,16 @@ if($role == 'user') {
             <div class="user-info">
                 <i class="fas fa-user-circle" style="font-size:32px; <?= ($role=='admin')?'color:#60a5fa;':'color:#10b981;' ?>"></i>
                 <div>
-                    <div class="name"><?= htmlspecialchars($_SESSION['user_name']) ?></div>
-                    <span class="badge-role badge <?= ($role=='admin')?'bg-danger':'bg-success' ?>"><?= strtoupper($role) ?></span>
+                    <div class="name"><?= htmlspecialchars($_SESSION['user_name']) ?>
+                        <span class="badge-role badge <?= ($role=='admin')?'bg-danger':'bg-success' ?>"><?= strtoupper($role) ?></span>
+                    </div>
+                    <?php if($role == 'user'): ?>
+                        <div class="user-dates">
+                            📅 Reg: <?= $reg_date ?> &nbsp;|&nbsp; ✅ Act: <?= $activation_date ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
-        <div class="hide-on-mobile">
-            <i class="far fa-calendar-alt me-2"></i> <?= date('d M Y, h:i A') ?>
-        </div>
+        <!-- Removed the date/time display from here -->
     </div>
