@@ -5,39 +5,54 @@ require_once __DIR__ . '/functions.php';
 $user_id = $_SESSION['user_id'] ?? null;
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
-$today_str = date('d M Y');
+// ---- Search parameters ----
 $search_city = $_GET['city'] ?? '';
 $search_type = $_GET['type'] ?? '';
 $search_max_price = $_GET['max_price'] ?? '';
+$tab = $_GET['tab'] ?? 'auction'; // 'auction' or 'customer'
 
-$where = ["status = 'available'"];
+// ---- Common WHERE for both ----
+$where = [];
 $params = [];
-if(!empty($search_city)) { $where[] = "city ILIKE ?"; $params[] = '%'.$search_city.'%'; }
-if(!empty($search_type)) { $where[] = "type = ?"; $params[] = $search_type; }
-if(!empty($search_max_price)) { $where[] = "price <= ?"; $params[] = (float)$search_max_price; }
+if(!empty($search_city)) {
+    $where[] = "city ILIKE ?";
+    $params[] = '%'.$search_city.'%';
+}
+if(!empty($search_type)) {
+    $where[] = "type = ?";
+    $params[] = $search_type;
+}
+if(!empty($search_max_price)) {
+    $where[] = "price <= ?";
+    $params[] = (float)$search_max_price;
+}
 
-$where_clause = implode(" AND ", $where);
-$base_sql = "SELECT * FROM properties WHERE $where_clause";
+// ---- 1. Auction Properties ----
+$auction_where = "status = 'available'";
+if(!empty($where)) {
+    $auction_where .= " AND " . implode(" AND ", $where);
+}
+$auction_sql = "SELECT *, 'auction' as source FROM properties WHERE $auction_where ORDER BY id DESC";
+$auction_stmt = $pdo->prepare($auction_sql);
+$auction_stmt->execute($params);
+$auction_props = $auction_stmt->fetchAll();
 
-$today_sql = $base_sql . " AND auction_start_time ILIKE ? ORDER BY id DESC";
-$today_params = array_merge($params, ['%'.$today_str.'%']);
-$today_stmt = $pdo->prepare($today_sql);
-$today_stmt->execute($today_params);
-$today_props = $today_stmt->fetchAll();
+// ---- 2. Customer Properties (only approved) ----
+$customer_where = "status = 'approved'";
+if(!empty($where)) {
+    $customer_where .= " AND " . implode(" AND ", $where);
+}
+$customer_sql = "SELECT *, 'customer' as source FROM user_properties WHERE $customer_where ORDER BY created_at DESC";
+$customer_stmt = $pdo->prepare($customer_sql);
+$customer_stmt->execute($params);
+$customer_props = $customer_stmt->fetchAll();
 
-$upcoming_sql = $base_sql . " AND (auction_start_time NOT ILIKE ? OR auction_start_time IS NULL) ORDER BY id DESC";
-$upcoming_params = array_merge($params, ['%'.$today_str.'%']);
-$upcoming_stmt = $pdo->prepare($upcoming_sql);
-$upcoming_stmt->execute($upcoming_params);
-$upcoming_props = $upcoming_stmt->fetchAll();
-
+// ---- Helper function to render cards (both types) ----
 function renderPropertyCard($prop, $show_images, $is_today = false) {
     $badge_html = '';
-    if($is_today) {
+    if($is_today && $prop['source'] == 'auction') {
         $badge_html = '<span class="badge bg-danger text-white px-3 py-2" style="border-radius:30px; font-size:0.7rem; position:absolute; top:12px; right:12px; z-index:10; box-shadow:0 4px 12px rgba(220,38,38,0.4);"><i class="fas fa-fire"></i> Today</span>';
     }
-    
-    // Random gradients with both dark and light options
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
         ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%)', 'text' => 'white'],
@@ -52,30 +67,34 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     $text_color = ($g['text'] == 'white') ? '#ffffff' : '#0f172a';
     $shadow = ($g['text'] == 'white') ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.05)';
     $border = ($g['text'] == 'white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
+    $image_url = ($prop['source'] == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image_url'] ?? '');
     ?>
     <div class="col-md-4 mb-4">
         <div class="property-card" style="position:relative; border-radius:24px; overflow:hidden; box-shadow:<?= $shadow ?>; height:100%; background: <?= $g['bg'] ?>; color:<?= $text_color ?>; transition:all 0.4s; border:1px solid <?= $border ?>;">
             <?= $badge_html ?>
             
-            <!-- ✅ DETAILS SECTION – अब ऊपर -->
             <div class="p-4">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
-                    <?php if(!empty($prop['auction_start_time'])): ?>
+                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Customer') ?></span>
+                    <?php if(!empty($prop['auction_start_time']) && $prop['source'] == 'auction'): ?>
                         <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
+                    <?php elseif($prop['source'] == 'customer'): ?>
+                        <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;">📅 <?= date('d M Y', strtotime($prop['created_at'])) ?></span>
                     <?php endif; ?>
                 </div>
                 <h5 style="font-size:1.2rem; font-weight:700; margin:12px 0 6px; color:<?= $text_color ?>;"><?= htmlspecialchars($prop['title']) ?></h5>
                 <div style="font-size:1.6rem; font-weight:800; color:<?= $text_color ?>;">₹ <?= indianCurrencyFormat($prop['price']) ?> <span style="font-size:0.9rem; font-weight:400; opacity:0.7;">Reserve</span></div>
                 <div style="font-size:0.85rem; opacity:0.8; margin-top:6px; color:<?= $text_color ?>;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
                 <?php if(isset($_SESSION['user_id'])): ?>
-                    <a href="property_detail.php?id=<?= $prop['id'] ?>" style="display:block; margin-top:16px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
+                    <a href="property_detail.php?id=<?= $prop['id'] ?>&source=<?= $prop['source'] ?>" style="display:block; margin-top:16px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
+                <?php else: ?>
+                    <a href="login.php" class="btn btn-light w-100 mt-3" style="border-radius:16px; font-weight:600; color:#1e293b;">Login to View</a>
                 <?php endif; ?>
             </div>
 
-            <!-- ✅ IMAGE / PLACEHOLDER – अब नीचे (छोटा) -->
-            <?php if($show_images && !empty($prop['image_url'])): ?>
-                <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="height:200px; width:100%; object-fit:cover; border-top:3px solid <?= $border ?>;" alt="<?= htmlspecialchars($prop['title']) ?>">
+            <!-- Image section -->
+            <?php if($show_images && !empty($image_url)): ?>
+                <img src="<?= htmlspecialchars($image_url) ?>" style="height:200px; width:100%; object-fit:cover; border-top:3px solid <?= $border ?>;" alt="<?= htmlspecialchars($prop['title']) ?>">
             <?php else: ?>
                 <div style="height:150px; background:rgba(255,255,255,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px); border-top:3px solid <?= $border ?>; padding:10px;">
                     <i class="fas fa-lock" style="font-size:1.8rem; opacity:0.7; color:<?= $text_color ?>;"></i>
@@ -85,13 +104,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                     <?php else: ?>
                         <a href="user_packages.php" class="btn btn-sm btn-warning mt-2" style="border-radius:30px; font-weight:600; color:#1e293b;">Subscribe Now</a>
                     <?php endif; ?>
-                </div>
-            <?php endif; ?>
-
-            <!-- अगर लॉगिन नहीं है तो नीचे Login बटन दिखाएँ (पहले से है) -->
-            <?php if(!isset($_SESSION['user_id'])): ?>
-                <div class="p-3 text-center" style="background:rgba(0,0,0,0.05);">
-                    <a href="login.php" class="btn btn-light w-100" style="border-radius:16px; font-weight:600; color:#1e293b;">Login to View</a>
                 </div>
             <?php endif; ?>
         </div>
@@ -104,7 +116,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prime Property – Luxury Auction</title>
+    <title>Prime Property – Auction & Customer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
@@ -120,6 +132,9 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         .section-title { font-weight:800; color:#0f172a; margin-bottom:20px; position:relative; }
         .section-title i { margin-right:10px; }
         .property-card:hover { transform:translateY(-10px); box-shadow:0 30px 60px -15px rgba(0,0,0,0.2) !important; }
+        .nav-tabs .nav-link { font-weight:600; color:#475569; border: none; padding:12px 20px; }
+        .nav-tabs .nav-link.active { background: transparent; border-bottom: 3px solid #2563eb; color: #2563eb; }
+        .nav-tabs .nav-link:hover { border-bottom: 3px solid #94a3b8; }
         @media (max-width:576px) { .search-box { padding:20px; } body { padding-top: 66px; } }
     </style>
 </head>
@@ -153,6 +168,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     <!-- Search Box -->
     <div class="search-box">
         <form method="GET" class="row g-3 align-items-center">
+            <input type="hidden" name="tab" value="<?= $tab ?>">
             <div class="col-md-4">
                 <input type="text" name="city" class="form-control" placeholder="🔍 Search by City..." value="<?= htmlspecialchars($search_city) ?>">
             </div>
@@ -174,43 +190,60 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         </form>
     </div>
 
-    <!-- Today's Auctions -->
-    <?php if(count($today_props) > 0): ?>
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?tab=auction&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>">
+                <i class="fas fa-gavel me-2"></i>Auction Properties
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?tab=customer&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>">
+                <i class="fas fa-home me-2"></i>Customer Properties
+            </a>
+        </li>
+    </ul>
+
+    <?php if($tab == 'auction'): ?>
+        <!-- Auction Properties -->
         <div class="section-title">
-            <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
+            <i class="fas fa-bolt" style="color:#dc2626;"></i> Auction Properties
+            <span class="badge bg-primary rounded-pill ms-2"><?= count($auction_props) ?></span>
         </div>
         <div class="row">
-            <?php foreach($today_props as $prop): ?>
-                <?php renderPropertyCard($prop, $show_images, true); ?>
-            <?php endforeach; ?>
+            <?php if(count($auction_props) > 0): ?>
+                <?php foreach($auction_props as $prop): ?>
+                    <?php renderPropertyCard($prop, $show_images, true); ?>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="col-12 text-center text-muted py-5">
+                    <i class="fas fa-search" style="font-size:2rem; opacity:0.3;"></i>
+                    <p class="mt-2">No auction properties found matching your criteria.</p>
+                </div>
+            <?php endif; ?>
         </div>
-        <hr class="my-5">
     <?php else: ?>
-        <div class="alert alert-light text-center py-4" style="border-radius:30px; background:#f8fafc;">
-            <i class="fas fa-calendar-day" style="font-size:2rem; opacity:0.3;"></i>
-            <p class="mt-2">No auctions scheduled for today. Check upcoming auctions below.</p>
+        <!-- Customer Properties -->
+        <div class="section-title">
+            <i class="fas fa-home" style="color:#10b981;"></i> Customer Properties
+            <span class="badge bg-primary rounded-pill ms-2"><?= count($customer_props) ?></span>
+        </div>
+        <div class="row">
+            <?php if(count($customer_props) > 0): ?>
+                <?php foreach($customer_props as $prop): ?>
+                    <?php renderPropertyCard($prop, $show_images, false); ?>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="col-12 text-center text-muted py-5">
+                    <i class="fas fa-home" style="font-size:2rem; opacity:0.3;"></i>
+                    <p class="mt-2">No customer properties found. Be the first to list yours!</p>
+                    <?php if(isset($_SESSION['user_id']) && $_SESSION['role'] != 'admin'): ?>
+                        <a href="add_user_property.php" class="btn btn-primary">Add Your Property</a>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
     <?php endif; ?>
-
-    <!-- Upcoming Auctions -->
-    <div class="section-title">
-        <i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions
-        <?php if(count($upcoming_props) > 0): ?>
-            <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span>
-        <?php endif; ?>
-    </div>
-    <div class="row">
-        <?php if(count($upcoming_props) > 0): ?>
-            <?php foreach($upcoming_props as $prop): ?>
-                <?php renderPropertyCard($prop, $show_images, false); ?>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="col-12 text-center text-muted py-5">
-                <i class="fas fa-calendar-plus" style="font-size:3rem; opacity:0.2;"></i>
-                <p class="mt-3">No upcoming auctions at the moment. Check back later.</p>
-            </div>
-        <?php endif; ?>
-    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
