@@ -1,0 +1,113 @@
+<?php
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/functions.php';
+
+if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') { 
+    header("Location: login.php"); 
+    exit; 
+}
+
+$user_id = $_SESSION['user_id'];
+
+// Check if user can add more properties
+$pkg = $pdo->prepare("SELECT p.max_properties FROM users u 
+                      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active' AND s.end_date >= CURRENT_DATE
+                      LEFT JOIN packages p ON s.package_id = p.id
+                      WHERE u.id = ? ORDER BY s.id DESC LIMIT 1");
+$pkg->execute([$user_id]);
+$max_props = $pkg->fetchColumn();
+if(!$max_props) $max_props = 1;
+
+$count_stmt = $pdo->prepare("SELECT COUNT(*) FROM user_properties WHERE user_id = ?");
+$count_stmt->execute([$user_id]);
+$used = $count_stmt->fetchColumn();
+if($used >= $max_props) {
+    header("Location: user_properties.php?msg=limit_reached");
+    exit;
+}
+
+$message = '';
+$error = '';
+
+if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
+    $title = trim($_POST['title']);
+    $description = trim($_POST['description']);
+    $price = (float)$_POST['price'];
+    $city = trim($_POST['city']);
+    $state = trim($_POST['state']);
+    $type = trim($_POST['type']);
+    $image_url = '';
+
+    if(empty($title) || $price <= 0) {
+        $error = "❌ Title and Price are required.";
+    } else {
+        // Handle image upload
+        if(isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
+            $upload_dir = 'uploads/user_properties/';
+            if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+            $ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+            $filename = 'userprop_' . $user_id . '_' . time() . '.' . $ext;
+            move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $filename);
+            $image_url = $upload_dir . $filename;
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO user_properties (user_id, title, description, price, city, state, type, image_url, status) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+        $stmt->execute([$user_id, $title, $description, $price, $city, $state, $type, $image_url]);
+        header("Location: user_properties.php?msg=added");
+        exit;
+    }
+}
+
+include 'header.php'; 
+?>
+<div class="container-fluid">
+    <h4><i class="fas fa-plus-circle me-2"></i>Add Your Property</h4>
+    <?php if($error) echo "<div class='alert alert-danger'>$error</div>"; ?>
+    <div class="card p-4">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Title *</label>
+                    <input type="text" name="title" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Price (₹) *</label>
+                    <input type="number" step="0.01" name="price" class="form-control" required>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">City</label>
+                    <input type="text" name="city" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">State</label>
+                    <input type="text" name="state" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Type</label>
+                    <select name="type" class="form-control">
+                        <option value="Flat">Flat</option>
+                        <option value="Plot">Plot</option>
+                        <option value="Shop">Shop</option>
+                        <option value="Land">Land</option>
+                        <option value="House">House</option>
+                        <option value="Row House">Row House</option>
+                        <option value="Bungalow">Bungalow</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">Upload Image (1 photo)</label>
+                    <input type="file" name="image" class="form-control" accept="image/*">
+                </div>
+            </div>
+            <button type="submit" name="add_property" class="btn btn-primary mt-3">Submit Property</button>
+            <a href="user_properties.php" class="btn btn-secondary mt-3">Cancel</a>
+        </form>
+    </div>
+</div>
+<?php include 'footer.php'; ?>
