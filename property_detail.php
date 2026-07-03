@@ -1,28 +1,39 @@
 <?php
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
-
-if(!isset($_SESSION['user_id'])) { 
-    header("Location: login.php"); 
-    exit; 
-}
+if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
 $property_id = $_GET['id'] ?? 0;
+$source = $_GET['source'] ?? 'auction'; // default auction
+
 $user_id = $_SESSION['user_id'];
 
-// Fetch property data
-$stmt = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
-$stmt->execute([$property_id]);
-$prop = $stmt->fetch();
+if($source == 'auction') {
+    $stmt = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
+    $stmt->execute([$property_id]);
+    $prop = $stmt->fetch();
+    $is_customer = false;
+} else {
+    $stmt = $pdo->prepare("SELECT * FROM user_properties WHERE id = ? AND status = 'approved'");
+    $stmt->execute([$property_id]);
+    $prop = $stmt->fetch();
+    $is_customer = true;
+}
 if(!$prop) { die("Property not found!"); }
 
-// Check if user has an active subscription
-$has_subscription = userHasActiveSubscription($pdo, $user_id);
+// For customer properties, we show full detail regardless of subscription? Actually, we can show all because they are user-listed.
+// But we'll keep subscription check for auction properties only.
+if($source == 'auction') {
+    $has_subscription = userHasActiveSubscription($pdo, $user_id);
+} else {
+    $has_subscription = true; // customer properties are always visible
+}
 
 include 'header.php'; 
 
-// ---- IF NOT SUBSCRIBED: Show only 4 fields ----
-if(!$has_subscription) {
+// ---- IF NOT SUBSCRIBED (only for auction) ----
+if(!$has_subscription && $source == 'auction') {
+    // Show only 4 fields
     ?>
     <div class="container py-5">
         <div class="row justify-content-center">
@@ -30,37 +41,32 @@ if(!$has_subscription) {
                 <div class="card border-0 shadow-lg" style="border-radius: 30px; overflow: hidden;">
                     <div class="card-header text-white text-center p-4" style="background: linear-gradient(135deg, #1e293b, #3b82f6);">
                         <h3><i class="fas fa-lock me-2"></i>🔒 Access Restricted</h3>
-                        <p class="mb-0 opacity-75">Subscribe to view full property details</p>
+                        <p class="mb-0 opacity-75">Subscribe to view full auction property details</p>
                     </div>
                     <div class="card-body p-4" style="background: #f8fafc;">
-                        <!-- Show ONLY 4 fields: Reserve Price, Bank Name, City, Auction Date -->
                         <div class="text-center mb-4">
                             <i class="fas fa-building" style="font-size: 4rem; color: #94a3b8;"></i>
                             <h4 class="mt-2"><?= htmlspecialchars($prop['title']) ?></h4>
                         </div>
                         <div class="row g-3">
-                            <!-- 1. Reserve Price -->
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #dcfce7; border-left: 5px solid #22c55e;">
                                     <small class="text-muted text-uppercase fw-bold">💰 Reserve Price</small>
                                     <h6 class="fw-bold mb-0 text-success">₹ <?= indianCurrencyFormat($prop['price']) ?></h6>
                                 </div>
                             </div>
-                            <!-- 2. Bank Name -->
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #e0e7ff; border-left: 5px solid #6366f1;">
                                     <small class="text-muted text-uppercase fw-bold">🏦 Bank Name</small>
                                     <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['bank_name'] ?? 'N/A') ?></h6>
                                 </div>
                             </div>
-                            <!-- 3. City -->
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fef3c7; border-left: 5px solid #f59e0b;">
                                     <small class="text-muted text-uppercase fw-bold">📍 City</small>
                                     <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h6>
                                 </div>
                             </div>
-                            <!-- 4. Auction Date -->
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fce4ec; border-left: 5px solid #ef5350;">
                                     <small class="text-muted text-uppercase fw-bold">📅 Auction Date</small>
@@ -68,8 +74,6 @@ if(!$has_subscription) {
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Subscribe Button -->
                         <div class="text-center mt-4">
                             <a href="user_packages.php" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow">
                                 <i class="fas fa-rocket me-2"></i> Subscribe Now
@@ -86,55 +90,51 @@ if(!$has_subscription) {
     exit;
 }
 
-// ----- SUBSCRIBED USER: Show ALL Details (Full Page) -----
+// ----- SUBSCRIBED or CUSTOMER: Show ALL Details ----
 $gradient = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
+$image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image_url'] ?? '');
 ?>
 <div class="container-fluid px-4 mt-4">
     <div class="row justify-content-center">
         <div class="col-lg-10">
-            <a href="user_dashboard.php" class="btn btn-outline-secondary mb-4 shadow-sm rounded-pill px-4">
-                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            <a href="<?= ($source == 'auction') ? 'user_dashboard.php' : 'index.php?tab=customer' ?>" class="btn btn-outline-secondary mb-4 shadow-sm rounded-pill px-4">
+                <i class="fas fa-arrow-left me-2"></i>Back
             </a>
 
-            <!-- Main Card -->
             <div class="card border-0 shadow-xxl" style="border-radius: 28px; overflow: hidden; background: <?= $gradient ?>; color:#fff;">
-                <!-- Header -->
                 <div class="card-header p-4" style="background: rgba(0,0,0,0.2); border: none;">
                     <div class="d-flex justify-content-between align-items-center flex-wrap">
                         <div>
                             <h2 class="fw-bold mb-1"><i class="fas fa-gavel me-3" style="color: #fbbf24;"></i><?= htmlspecialchars($prop['title']) ?></h2>
-                            <span class="badge bg-warning text-dark px-3 py-2 mt-2">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank Auction') ?></span>
+                            <span class="badge bg-warning text-dark px-3 py-2 mt-2">🏦 <?= htmlspecialchars($prop['bank_name'] ?? ($source=='customer' ? 'Customer Property' : 'Bank Auction')) ?></span>
                         </div>
-                        <span class="badge bg-success px-3 py-2">✅ Subscribed</span>
+                        <span class="badge bg-success px-3 py-2"><?= ($source=='auction' ? '✅ Subscribed' : '🏠 Customer Listed') ?></span>
                     </div>
                 </div>
 
                 <div class="card-body p-4">
-                    <!-- All Details (Full) -->
+                    <!-- All Details -->
                     <div class="row g-4">
-                        <!-- Borrower & Type -->
                         <div class="col-md-6">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08); backdrop-filter:blur(4px);">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75">Borrower</small>
-                                <h5 class="fw-bold"><?= htmlspecialchars($prop['borrower_name'] ?? 'N/A') ?></h5>
+                                <h5 class="fw-bold"><?= htmlspecialchars($prop['borrower_name'] ?? ($source=='customer' ? 'Customer Listed' : 'N/A')) ?></h5>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08); backdrop-filter:blur(4px);">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75">Property Type</small>
                                 <h5 class="fw-bold"><?= htmlspecialchars($prop['type'] ?? 'N/A') ?></h5>
                             </div>
                         </div>
 
-                        <!-- Address -->
                         <div class="col-12">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08); backdrop-filter:blur(4px); border-left:4px solid #fbbf24;">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08); border-left:4px solid #fbbf24;">
                                 <i class="fas fa-home me-2" style="color:#fbbf24;"></i>
-                                <strong>Address:</strong> <?= htmlspecialchars($prop['location'] ?? 'Not Provided') ?>
+                                <strong>Address:</strong> <?= htmlspecialchars($prop['location'] ?? ($prop['city'] ?? 'Not Provided')) ?>
                             </div>
                         </div>
 
-                        <!-- City, State, Area -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75"><i class="fas fa-map-pin"></i> City</small>
@@ -150,31 +150,18 @@ $gradient = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
-                                <h6 class="fw-bold"><?= $prop['sqft'] ?? 0 ?> Sq Ft</h6>
+                                <h6 class="fw-bold"><?= $prop['sqft'] ?? ($prop['area'] ?? 'N/A') ?> Sq Ft</h6>
                             </div>
                         </div>
 
-                        <!-- Schedule -->
-                        <div class="col-md-6">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
-                                <small class="text-uppercase opacity-75">Auction Start</small>
-                                <h6 class="fw-bold"><?= htmlspecialchars($prop['auction_start_time'] ?? 'Not Set') ?></h6>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
-                                <small class="text-uppercase opacity-75">Auction End</small>
-                                <h6 class="fw-bold"><?= htmlspecialchars($prop['auction_end_time'] ?? 'Not Set') ?></h6>
-                            </div>
-                        </div>
-
-                        <!-- Price, EMD, Bid -->
+                        <!-- Price -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3);">
                                 <small class="text-uppercase opacity-75">Reserve Price</small>
                                 <h4 class="fw-bold" style="color:#fbbf24;">₹ <?= indianCurrencyFormat($prop['price']) ?></h4>
                             </div>
                         </div>
+                        <?php if($source == 'auction'): ?>
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3);">
                                 <small class="text-uppercase opacity-75">EMD Amount</small>
@@ -187,8 +174,9 @@ $gradient = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
                                 <h4 class="fw-bold" style="color:#34d399;">₹ <?= indianCurrencyFormat($prop['bid_increment'] ?? 0) ?></h4>
                             </div>
                         </div>
+                        <?php endif; ?>
 
-                        <!-- Contact & Map -->
+                        <!-- Contact -->
                         <div class="col-md-6">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
                                 <i class="fas fa-phone text-success me-2"></i> 
@@ -215,10 +203,10 @@ $gradient = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
                     <!-- Image Section -->
                     <div class="mt-5">
                         <h5 class="text-warning"><i class="fas fa-image me-2"></i>Property Image</h5>
-                        <?php if(!empty($prop['image_url'])): ?>
+                        <?php if(!empty($image_url)): ?>
                             <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.05);">
-                                <a href="<?= htmlspecialchars($prop['image_url']) ?>" target="_blank">
-                                    <img src="<?= htmlspecialchars($prop['image_url']) ?>" class="img-fluid" style="width:100%; max-height:400px; object-fit:contain; cursor:pointer;">
+                                <a href="<?= htmlspecialchars($image_url) ?>" target="_blank">
+                                    <img src="<?= htmlspecialchars($image_url) ?>" class="img-fluid" style="width:100%; max-height:400px; object-fit:contain; cursor:pointer;">
                                 </a>
                                 <div class="text-center py-2" style="background:rgba(0,0,0,0.2);">
                                     <small class="opacity-75">Click image to open full size</small>
