@@ -58,7 +58,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $best_props = $stmt->fetchAll();
 
-// ---- Render Card Function (same as home page) ----
+// ---- Render Card Function ----
 function renderDashboardCard($prop, $show_images, $is_today = false) {
     $badge_html = '';
     if($is_today) {
@@ -135,14 +135,15 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     }
     .user-welcome-banner .banner-actions {
         display: flex;
-        gap: 15px;
+        gap: 12px;
         flex-wrap: wrap;
         margin-top: 12px;
     }
     .user-welcome-banner .banner-actions .btn {
         border-radius: 30px;
         font-weight: 600;
-        padding: 10px 25px;
+        padding: 8px 20px;
+        font-size: 0.9rem;
     }
     .subscription-status-inline {
         display: flex;
@@ -162,7 +163,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     @media (max-width:576px) { .user-welcome-banner { padding: 20px; } }
 </style>
 
-<!-- ===== WELCOME BANNER (with View All Properties button) ===== -->
+<!-- ===== WELCOME BANNER (with My Properties button) ===== -->
 <div class="user-welcome-banner">
     <div class="row align-items-center">
         <div class="col-md-7">
@@ -171,6 +172,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
             <!-- Action Buttons -->
             <div class="banner-actions">
                 <a href="index.php" class="btn btn-light"><i class="fas fa-th-list me-2"></i>View All Properties</a>
+                <a href="user_properties.php" class="btn btn-light"><i class="fas fa-list me-2"></i>My Properties</a>
                 <a href="user_packages.php" class="btn btn-warning"><i class="fas fa-rocket me-2"></i>Subscribe Now</a>
             </div>
         </div>
@@ -221,7 +223,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     </div>
 <?php endif; ?>
 
-<!-- ===== BEST DEALS (10 Lowest Price) ===== -->
+<!-- ===== BEST DEALS ===== -->
 <div class="section-title">
     <i class="fas fa-fire" style="color:#f97316;"></i> Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?>
     <span class="badge bg-primary rounded-pill ms-2"><?= count($best_props) ?></span>
