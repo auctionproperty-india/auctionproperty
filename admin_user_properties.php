@@ -12,29 +12,16 @@ if(!hasViewPermission('properties', $pdo)) {
 
 include 'header.php';
 
-// Handle approve/reject
-if(isset($_GET['approve']) || isset($_GET['reject'])) {
+// Approve
+if(isset($_GET['approve'])) {
     if(!hasEditPermission('properties', $pdo)) die("Permission denied.");
-    $id = (int)($_GET['approve'] ?? $_GET['reject']);
-    $status = isset($_GET['approve']) ? 'approved' : 'rejected';
-    $remarks = $_POST['remarks'] ?? '';
-    if($status == 'rejected' && empty($remarks)) {
-        // if reject, we can pass remarks via GET or use form
-        // We'll use a simple form for reject
-        // Better to use a modal but for simplicity, we'll use GET with remarks
-    }
-    // For simplicity, we'll use a separate form for reject later. For now just approve/reject with no remarks in GET.
-    // We'll create a form for reject with remarks.
-    if($status == 'approved') {
-        $pdo->prepare("UPDATE user_properties SET status = 'approved', admin_remarks = NULL WHERE id = ?")->execute([$id]);
-        $msg = "✅ Property Approved!";
-    } else {
-        // For reject, we need remarks, so we'll use POST
-        // We'll handle via POST below
-    }
-    // Redirect
+    $id = (int)$_GET['approve'];
+    $pdo->prepare("UPDATE user_properties SET status = 'approved', admin_remarks = NULL WHERE id = ?")->execute([$id]);
+    header("Location: admin_user_properties.php?msg=approved");
+    exit;
 }
 
+// Reject with remarks
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['reject_submit'])) {
     $id = (int)$_POST['id'];
     $remarks = trim($_POST['remarks']);
@@ -46,7 +33,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['reject_submit'])) {
 $props = $pdo->query("SELECT up.*, u.name as user_name, u.email as user_email FROM user_properties up JOIN users u ON up.user_id = u.id ORDER BY up.created_at DESC")->fetchAll();
 ?>
 <div class="card-premium">
-    <h4><i class="fas fa-building me-2"></i>User Properties (Customer)</h4>
+    <h4><i class="fas fa-home me-2"></i>User Properties (Customer)</h4>
     <?php if(isset($_GET['msg'])): ?>
         <div class="alert alert-success"><?= htmlspecialchars($_GET['msg']) ?></div>
     <?php endif; ?>
@@ -69,12 +56,9 @@ $props = $pdo->query("SELECT up.*, u.name as user_name, u.email as user_email FR
                         <?php endif; ?>
                     </td>
                     <td>
-                        <?php if($p['status'] == 'pending'): ?>
-                            <?php if(hasEditPermission('properties', $pdo)): ?>
-                                <a href="?approve=<?= $p['id'] ?>" class="btn btn-sm btn-success" onclick="return confirm('Approve?')">✅ Approve</a>
-                                <!-- Reject with Remarks -->
-                                <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal" data-id="<?= $p['id'] ?>">❌ Reject</button>
-                            <?php endif; ?>
+                        <?php if($p['status'] == 'pending' && hasEditPermission('properties', $pdo)): ?>
+                            <a href="?approve=<?= $p['id'] ?>" class="btn btn-sm btn-success" onclick="return confirm('Approve?')">✅ Approve</a>
+                            <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal" data-id="<?= $p['id'] ?>">❌ Reject</button>
                         <?php else: ?>
                             <span class="text-muted">Done</span>
                         <?php endif; ?>
