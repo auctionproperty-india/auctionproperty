@@ -10,11 +10,12 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php'; 
 
-// ---- User Data ----
-$user_stmt = $pdo->prepare("SELECT id, name, email, phone, city, referral_code, referred_by, role, status, created_at as reg_date, wallet_balance FROM users WHERE id = ?");
+// ---- User Data (include coins) ----
+$user_stmt = $pdo->prepare("SELECT id, name, email, phone, city, referral_code, referred_by, role, status, created_at as reg_date, wallet_balance, coins FROM users WHERE id = ?");
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch();
 $user_city = $user['city'] ?? '';
+$coins_balance = (int)($user['coins'] ?? 0);
 
 // ---- Subscription ----
 $active_sub = $pdo->prepare("SELECT s.*, p.name as pkg_name, s.start_date, s.end_date, (s.end_date - CURRENT_DATE) as days_left FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE ORDER BY s.id DESC LIMIT 1");
@@ -58,7 +59,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $best_props = $stmt->fetchAll();
 
-// ---- Render Card Function ----
+// ---- Render Card Function (unchanged) ----
 function renderDashboardCard($prop, $show_images, $is_today = false) {
     $badge_html = '';
     if($is_today) {
@@ -129,10 +130,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         background: rgba(251, 191, 36, 0.08);
         border-radius: 50%;
     }
-    .user-welcome-banner h2 {
-        font-weight: 800;
-        letter-spacing: -0.5px;
-    }
+    .user-welcome-banner h2 { font-weight: 800; letter-spacing: -0.5px; }
     .user-welcome-banner .banner-actions {
         display: flex;
         gap: 12px;
@@ -163,7 +161,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     @media (max-width:576px) { .user-welcome-banner { padding: 20px; } }
 </style>
 
-<!-- ===== WELCOME BANNER (with My Properties button) ===== -->
+<!-- ===== WELCOME BANNER (Coins added) ===== -->
 <div class="user-welcome-banner">
     <div class="row align-items-center">
         <div class="col-md-7">
@@ -177,13 +175,12 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
             </div>
         </div>
         <div class="col-md-5 text-md-end">
-            <!-- Wallet Stats (compact) -->
-            <div style="display:flex; gap:20px; justify-content:flex-end; flex-wrap:wrap; font-size:0.9rem;">
+            <!-- Stats including Coins -->
+            <div style="display:flex; gap:15px; justify-content:flex-end; flex-wrap:wrap; font-size:0.9rem;">
                 <div><span class="opacity-75">💰 Wallet</span><br><strong>₹ <?= indianCurrencyFormat($wallet_balance) ?></strong></div>
                 <div><span class="opacity-75">⏳ Pending</span><br><strong>₹ <?= indianCurrencyFormat($total_pending) ?></strong></div>
                 <div><span class="opacity-75">✅ Paid</span><br><strong>₹ <?= indianCurrencyFormat($total_paid) ?></strong></div>
-                <div><span class="opacity-75">🪙 Coins</span><br><strong><?= (int)($user['coins'] ?? 0) ?></strong></div>
-</div>
+                <div><span class="opacity-75">🪙 Coins</span><br><strong><?= $coins_balance ?></strong></div>
             </div>
         </div>
     </div>
