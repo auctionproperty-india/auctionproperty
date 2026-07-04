@@ -93,6 +93,7 @@ $total_props = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
 $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
 $total_sold = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'sold'")->fetchColumn();
 $balance = getAccountBalance($pdo);
+$total_coins = $pdo->query("SELECT SUM(coins) FROM users")->fetchColumn();
 $user_search = $_GET['user_search'] ?? '';
 ?>
 <!-- Stats -->
@@ -101,6 +102,8 @@ $user_search = $_GET['user_search'] ?? '';
     <div class="col-md-3"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div><div><h5><?= $total_users ?></h5><small>Total Users</small></div></div></div>
     <div class="col-md-3"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div><div><h5><?= $total_sold ?></h5><small>Sold</small></div></div></div>
     <div class="col-md-3"><div class="card-premium d-flex align-items-center" style="border-left:4px solid #2563eb;"><div class="stat-icon bg-soft-info me-3"><i class="fas fa-wallet"></i></div><div><h5>₹ <?= indianCurrencyFormat($balance['balance']) ?></h5><small>Available Balance</small></div></div></div>
+    <!-- NEW: Total Coins -->
+    <div class="col-md-3"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-coins"></i></div><div><h5><?= (int)$total_coins ?></h5><small>Total Coins</small></div></div></div>
 </div>
 
 <?php if(isset($_SESSION['new_pass_display'])): ?>
@@ -129,15 +132,15 @@ $user_search = $_GET['user_search'] ?? '';
                     <th>Phone</th>
                     <th>Referred By</th>
                     <th>Role</th>
-                    <th>Plan</th> <!-- ✅ NEW PLAN COLUMN -->
+                    <th>Plan</th>
+                    <th>Coins</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr></thead>
                 <tbody>
                 <?php 
-                // ✅ Modified SQL to include active subscription plan
                 $sql_users = "SELECT 
-                                u.id, u.name, u.email, u.phone, u.referred_by, u.role, u.status, 
+                                u.id, u.name, u.email, u.phone, u.referred_by, u.role, u.status, u.coins,
                                 r.name as referrer_name,
                                 p.name as package_name,
                                 s.start_date as sub_start,
@@ -167,7 +170,6 @@ $user_search = $_GET['user_search'] ?? '';
                         $current_referrer = $u['referrer_name'] ?? 'Direct';
                         $status_badge = ($u['status'] == 'active') ? 'success' : 'secondary';
                         $status_text = ucfirst($u['status']);
-                        // Determine Plan
                         $plan_display = ($u['package_name']) ? htmlspecialchars($u['package_name']) : 'Free';
                 ?>
                     <tr>
@@ -183,6 +185,7 @@ $user_search = $_GET['user_search'] ?? '';
                                 <span class="badge bg-secondary">Free</span>
                             <?php endif; ?>
                         </td>
+                        <td><strong><?= (int)($u['coins'] ?? 0) ?></strong></td>
                         <td>
                             <?php if(!$is_self && $is_super_admin): ?>
                                 <a href="?toggle_status=<?= $u['id'] ?>" class="status-toggle" title="Toggle Status">
@@ -219,7 +222,7 @@ $user_search = $_GET['user_search'] ?? '';
                 <?php 
                     }
                 } else {
-                    echo "<tr><td colspan='8' class='text-center text-muted'>No users found.</td></tr>";
+                    echo "<tr><td colspan='9' class='text-center text-muted'>No users found.</td></tr>";
                 }
                 ?>
                 </tbody>
