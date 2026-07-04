@@ -48,6 +48,7 @@ include 'header.php';
                 <tr><th>Phone</th><td><?= htmlspecialchars($user['phone'] ?? 'N/A') ?></td></tr>
                 <tr><th>City</th><td><?= htmlspecialchars($user['city'] ?? 'N/A') ?></td></tr>
                 <tr><th>State</th><td><?= htmlspecialchars($user['state'] ?? 'N/A') ?></td></tr>
+                <tr><th>Coins</th><td><strong><?= (int)($user['coins'] ?? 0) ?></strong></td></tr>
                 <tr><th>Registered (Free Signup)</th><td><strong><?= date('d M Y, h:i A', strtotime($user['created_at'])) ?></strong></td></tr>
             </table>
         </div>
@@ -62,7 +63,7 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- ✅ Subscription Details Section -->
+    <!-- Subscription Details -->
     <div class="mt-4">
         <h5><i class="fas fa-crown me-2"></i>Subscription / Plan</h5>
         <?php if($user['package_name']): ?>
