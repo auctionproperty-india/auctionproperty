@@ -182,6 +182,8 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
                 <div><span class="opacity-75">💰 Wallet</span><br><strong>₹ <?= indianCurrencyFormat($wallet_balance) ?></strong></div>
                 <div><span class="opacity-75">⏳ Pending</span><br><strong>₹ <?= indianCurrencyFormat($total_pending) ?></strong></div>
                 <div><span class="opacity-75">✅ Paid</span><br><strong>₹ <?= indianCurrencyFormat($total_paid) ?></strong></div>
+                <div><span class="opacity-75">🪙 Coins</span><br><strong><?= (int)($user['coins'] ?? 0) ?></strong></div>
+</div>
             </div>
         </div>
     </div>
