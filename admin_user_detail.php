@@ -10,6 +10,24 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 $user_id = $_GET['id'] ?? 0;
 if(!$user_id) { die("User ID required"); }
 
+// Handle date updates
+if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_dates'])) {
+    $new_reg_date = $_POST['reg_date'];
+    $new_activation_date = $_POST['activation_date'];
+    
+    // Update registration date
+    if(!empty($new_reg_date)) {
+        $pdo->prepare("UPDATE users SET created_at = ? WHERE id = ?")->execute([$new_reg_date, $user_id]);
+    }
+    // Update activation date (start_date of active subscription)
+    if(!empty($new_activation_date)) {
+        $pdo->prepare("UPDATE subscriptions SET start_date = ? WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1")
+            ->execute([$new_activation_date, $user_id]);
+    }
+    header("Location: admin_user_detail.php?id=$user_id&msg=updated");
+    exit;
+}
+
 // Fetch user with subscription info
 $stmt = $pdo->prepare("SELECT 
                         u.*,
@@ -35,6 +53,8 @@ $user = $stmt->fetch();
 if(!$user) { die("User not found"); }
 
 include 'header.php'; 
+$reg_date = date('Y-m-d', strtotime($user['created_at']));
+$activation_date = $user['start_date'] ? date('Y-m-d', strtotime($user['start_date'])) : '';
 ?>
 <div class="card-premium">
     <h4><i class="fas fa-user me-2"></i>User Profile: <?= htmlspecialchars($user['name']) ?></h4>
@@ -61,6 +81,30 @@ include 'header.php';
                 <tr><th>Branch</th><td><?= htmlspecialchars($user['branch'] ?? 'N/A') ?></td></tr>
             </table>
         </div>
+    </div>
+
+    <!-- Edit Dates Form -->
+    <div class="mt-4 p-3" style="background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;">
+        <h5><i class="fas fa-edit me-2"></i>Edit Registration & Activation Dates</h5>
+        <?php if(isset($_GET['msg']) && $_GET['msg'] == 'updated'): ?>
+            <div class="alert alert-success">✅ Dates updated successfully!</div>
+        <?php endif; ?>
+        <form method="POST">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Registration Date (created_at)</label>
+                    <input type="datetime-local" name="reg_date" class="form-control" 
+                           value="<?= date('Y-m-d\TH:i', strtotime($user['created_at'])) ?>" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Activation Date (subscription start)</label>
+                    <input type="datetime-local" name="activation_date" class="form-control" 
+                           value="<?= $activation_date ? date('Y-m-d\TH:i', strtotime($activation_date)) : '' ?>">
+                    <small class="text-muted">Only works if user has an active subscription.</small>
+                </div>
+            </div>
+            <button type="submit" name="update_dates" class="btn btn-primary mt-3">Update Dates</button>
+        </form>
     </div>
 
     <!-- Subscription Details -->
