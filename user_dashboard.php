@@ -10,7 +10,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php'; 
 
-// ---- User Data (include coins) ----
+// ---- User Data ----
 $user_stmt = $pdo->prepare("SELECT id, name, email, phone, city, referral_code, referred_by, role, status, created_at as reg_date, wallet_balance, coins FROM users WHERE id = ?");
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch();
@@ -40,11 +40,10 @@ $wallet_balance = getUserWalletBalance($pdo, $user_id);
 // ---- Show Images ----
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
-// ---- Today's Auctions ----
-$today_str = date('d M Y');
-$today_sql = "SELECT * FROM properties WHERE status = 'available' AND auction_start_time ILIKE ? ORDER BY id DESC";
+// ---- Today's Auctions (using auction_date) ----
+$today_sql = "SELECT * FROM properties WHERE status = 'available' AND auction_date = CURRENT_DATE ORDER BY id DESC";
 $today_stmt = $pdo->prepare($today_sql);
-$today_stmt->execute(['%'.$today_str.'%']);
+$today_stmt->execute();
 $today_props = $today_stmt->fetchAll();
 
 // ---- Best Deals (10 Lowest Price) ----
@@ -59,9 +58,8 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $best_props = $stmt->fetchAll();
 
-// ---- Render Dashboard Card (Today Badge Removed) ----
+// ---- Render Dashboard Card (without Today badge) ----
 function renderDashboardCard($prop, $show_images, $is_today = false) {
-    // ✅ "Today" badge completely removed
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
         ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%)', 'text' => 'white'],
@@ -79,7 +77,6 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     ?>
     <div class="col-md-4 mb-4">
         <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:<?= $shadow ?>; transition:all 0.4s; background: <?= $g['bg'] ?>; color:<?= $text_color ?>;">
-            <!-- ✅ No "Today" badge here -->
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center">
                     <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
@@ -90,7 +87,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
                 <h5 class="fw-bold mt-2" style="color:<?= $text_color ?>;"><?= htmlspecialchars($prop['title']) ?></h5>
                 <div style="font-size:1.6rem; font-weight:800; color:<?= $text_color ?>;">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
                 <div style="font-size:0.85rem; opacity:0.8; color:<?= $text_color ?>;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
-                <a href="property_detail.php?id=<?= $prop['id'] ?>" style="display:block; margin-top:16px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
+                <a href="property_detail.php?id=<?= $prop['id'] ?>&source=auction" style="display:block; margin-top:16px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
             </div>
             <?php if($show_images && !empty($prop['image_url'])): ?>
                 <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="height:200px; width:100%; object-fit:cover; border-top:3px solid <?= $border ?>;" alt="<?= htmlspecialchars($prop['title']) ?>">
@@ -117,135 +114,34 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         overflow: hidden;
         box-shadow: 0 20px 40px -10px rgba(15,23,42,0.3);
     }
-    .user-welcome-banner::after {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -10%;
-        width: 300px;
-        height: 300px;
-        background: rgba(37, 99, 235, 0.08);
-        border-radius: 50%;
-    }
-    .user-welcome-banner * {
-        color: #ffffff !important;
-    }
-    .user-welcome-banner h2 {
-        font-weight: 800;
-        letter-spacing: -0.5px;
-        color: #ffffff !important;
-    }
-    .user-welcome-banner .opacity-75 {
-        color: rgba(255,255,255,0.75) !important;
-    }
-    .user-welcome-banner .banner-actions {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        margin-top: 12px;
-    }
-    .user-welcome-banner .banner-actions .btn {
-        border-radius: 30px;
-        font-weight: 600;
-        padding: 8px 20px;
-        font-size: 0.9rem;
-        border: none;
-        color: #ffffff !important;
-    }
-    .user-welcome-banner .banner-actions .btn-light {
-        background: #ffffff !important;
-        color: #0f172a !important;
-    }
-    .user-welcome-banner .banner-actions .btn-primary {
-        background: #2563eb !important;
-        color: #ffffff !important;
-    }
-    .user-welcome-banner .banner-actions .btn-primary:hover {
-        background: #1d4ed8 !important;
-    }
-    .user-welcome-banner .banner-actions .btn-light:hover {
-        background: #e2e8f0 !important;
-        color: #0f172a !important;
-    }
-    .user-welcome-banner .banner-stats {
-        display: flex;
-        gap: 15px;
-        justify-content: flex-end;
-        flex-wrap: wrap;
-        font-size: 0.9rem;
-        color: #ffffff !important;
-    }
-    .user-welcome-banner .banner-stats div {
-        color: #ffffff !important;
-    }
-    .user-welcome-banner .banner-stats .opacity-75 {
-        color: rgba(255,255,255,0.75) !important;
-    }
-    .user-welcome-banner .banner-stats strong {
-        color: #ffffff !important;
-    }
-    .subscription-status-inline {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        flex-wrap: wrap;
-        margin-top: 12px;
-        padding-top: 12px;
-        border-top: 1px solid rgba(255,255,255,0.15);
-        color: #ffffff !important;
-    }
-    .subscription-status-inline .label {
-        opacity: 0.7;
-        font-size: 0.85rem;
-        color: rgba(255,255,255,0.7) !important;
-    }
-    .subscription-status-inline .status-badge {
-        font-weight: 600;
-        color: #ffffff !important;
-    }
-    .subscription-status-inline .status-badge .icon {
-        font-size: 1.2rem;
-        margin-right: 4px;
-    }
-    .subscription-status-inline .status-badge .badge {
-        color: #0f172a !important;
-        background-color: #10b981 !important;
-    }
-    .subscription-status-inline .status-badge .badge.bg-warning {
-        background-color: #10b981 !important;
-    }
-    .subscription-status-inline .status-badge .ms-2 {
-        color: rgba(255,255,255,0.7) !important;
-    }
-    .subscription-status-inline .btn-primary {
-        background: #2563eb !important;
-        color: #ffffff !important;
-        border: none;
-    }
-    .subscription-status-inline .btn-primary:hover {
-        background: #1d4ed8 !important;
-    }
-    .section-title {
-        font-weight: 800;
-        color: #0f172a;
-        margin-bottom: 20px;
-        position: relative;
-    }
-    .section-title i {
-        margin-right: 10px;
-    }
-    .card:hover {
-        transform: translateY(-10px) !important;
-        box-shadow: 0 30px 60px -15px rgba(0,0,0,0.2) !important;
-    }
-    @media (max-width:576px) {
-        .user-welcome-banner {
-            padding: 20px;
-        }
-        .user-welcome-banner .banner-stats {
-            justify-content: flex-start;
-        }
-    }
+    .user-welcome-banner * { color: #ffffff !important; }
+    .user-welcome-banner h2 { font-weight: 800; letter-spacing: -0.5px; }
+    .user-welcome-banner .opacity-75 { color: rgba(255,255,255,0.75) !important; }
+    .user-welcome-banner .banner-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+    .user-welcome-banner .banner-actions .btn { border-radius: 30px; font-weight: 600; padding: 8px 20px; font-size: 0.9rem; border: none; color: #ffffff !important; }
+    .user-welcome-banner .banner-actions .btn-light { background: #ffffff !important; color: #0f172a !important; }
+    .user-welcome-banner .banner-actions .btn-primary { background: #2563eb !important; color: #ffffff !important; }
+    .user-welcome-banner .banner-actions .btn-primary:hover { background: #1d4ed8 !important; }
+    .user-welcome-banner .banner-actions .btn-light:hover { background: #e2e8f0 !important; color: #0f172a !important; }
+    .user-welcome-banner .banner-stats { display: flex; gap: 15px; justify-content: flex-end; flex-wrap: wrap; font-size: 0.9rem; color: #ffffff !important; }
+    .user-welcome-banner .banner-stats div { color: #ffffff !important; }
+    .user-welcome-banner .banner-stats .opacity-75 { color: rgba(255,255,255,0.75) !important; }
+    .user-welcome-banner .banner-stats strong { color: #ffffff !important; }
+    .subscription-status-inline { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.15); color: #ffffff !important; }
+    .subscription-status-inline .label { opacity: 0.7; font-size: 0.85rem; color: rgba(255,255,255,0.7) !important; }
+    .subscription-status-inline .status-badge { font-weight: 600; color: #ffffff !important; }
+    .subscription-status-inline .status-badge .icon { font-size: 1.2rem; margin-right: 4px; }
+    .subscription-status-inline .status-badge .badge { color: #0f172a !important; background-color: #10b981 !important; }
+    .subscription-status-inline .status-badge .badge.bg-warning { background-color: #10b981 !important; }
+    .subscription-status-inline .status-badge .ms-2 { color: rgba(255,255,255,0.7) !important; }
+    .subscription-status-inline .btn-primary { background: #2563eb !important; color: #ffffff !important; border: none; }
+    .subscription-status-inline .btn-primary:hover { background: #1d4ed8 !important; }
+    .section-title { font-weight: 800; color: #0f172a; margin-bottom: 20px; position: relative; }
+    .section-title i { margin-right: 10px; }
+    .card:hover { transform: translateY(-10px) !important; box-shadow: 0 30px 60px -15px rgba(0,0,0,0.2) !important; }
+    .no-auction-msg { background: #f8fafc; border-radius: 30px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
+    .no-auction-msg i { font-size: 2.5rem; opacity:0.3; }
+    @media (max-width:576px) { .user-welcome-banner { padding: 20px; } .user-welcome-banner .banner-stats { justify-content: flex-start; } }
 </style>
 
 <!-- ===== WELCOME BANNER ===== -->
@@ -291,7 +187,8 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
 <!-- ===== TODAY'S AUCTIONS ===== -->
 <?php if(count($today_props) > 0): ?>
     <div class="section-title">
-        <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
+        <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
+        <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
     </div>
     <div class="row">
         <?php foreach($today_props as $prop): ?>
@@ -300,10 +197,12 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     </div>
     <hr class="my-5">
 <?php else: ?>
-    <div class="alert alert-light text-center py-4" style="border-radius:30px; background:#f8fafc;">
-        <i class="fas fa-calendar-day" style="font-size:2rem; opacity:0.3;"></i>
-        <p class="mt-2">No auctions scheduled for today. Check best deals below.</p>
+    <div class="no-auction-msg">
+        <i class="fas fa-calendar-day"></i>
+        <p class="mt-2 fw-bold">📭 No auction today</p>
+        <p class="text-muted">Check best deals below.</p>
     </div>
+    <hr class="my-4">
 <?php endif; ?>
 
 <!-- ===== BEST DEALS ===== -->
