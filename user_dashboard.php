@@ -59,19 +59,18 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $best_props = $stmt->fetchAll();
 
-// ---- Render Card Function ----
+// ---- Render Dashboard Card (Today Badge Removed) ----
 function renderDashboardCard($prop, $show_images, $is_today = false) {
-    $badge_html = '';
-    if($is_today) {
-        $badge_html = '<span class="badge bg-danger text-white px-3 py-2" style="border-radius:30px; font-size:0.7rem; position:absolute; top:12px; right:12px; z-index:10; box-shadow:0 4px 12px rgba(220,38,38,0.4);"><i class="fas fa-fire"></i> Today</span>';
-    }
-    // Only dark blue, navy, green gradients
+    // ✅ "Today" badge completely removed
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)', 'text' => 'white'],
+        ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%)', 'text' => 'white'],
         ['bg' => 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #172554 0%, #3b82f6 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #0b1120 0%, #1e3a5f 100%)', 'text' => 'white'],
+        ['bg' => 'linear-gradient(135deg, #4c1d95 0%, #8b5cf6 100%)', 'text' => 'white'],
+        ['bg' => 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)', 'text' => 'white'],
+        ['bg' => 'linear-gradient(135deg, #78350f 0%, #f59e0b 100%)', 'text' => 'white'],
+        ['bg' => 'linear-gradient(135deg, #172554 0%, #6366f1 100%)', 'text' => 'white'],
+        ['bg' => 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 'text' => 'dark'],
     ];
     $g = $gradients[array_rand($gradients)];
     $text_color = ($g['text'] == 'white') ? '#ffffff' : '#0f172a';
@@ -80,7 +79,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     ?>
     <div class="col-md-4 mb-4">
         <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:<?= $shadow ?>; transition:all 0.4s; background: <?= $g['bg'] ?>; color:<?= $text_color ?>;">
-            <?= $badge_html ?>
+            <!-- ✅ No "Today" badge here -->
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center">
                     <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
@@ -249,13 +248,12 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     }
 </style>
 
-<!-- ===== WELCOME BANNER (सभी टेक्स्ट सफेद, डार्क बैकग्राउंड) ===== -->
+<!-- ===== WELCOME BANNER ===== -->
 <div class="user-welcome-banner">
     <div class="row align-items-center">
         <div class="col-md-7">
             <h2>🏡 Welcome, <?= htmlspecialchars($user['name']) ?>!</h2>
             <p class="opacity-75" style="margin-bottom:4px;">Discover the most affordable properties in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'your city' ?></p>
-            <!-- Action Buttons -->
             <div class="banner-actions">
                 <a href="index.php" class="btn btn-light"><i class="fas fa-th-list me-2"></i>View All Properties</a>
                 <a href="user_properties.php" class="btn btn-light"><i class="fas fa-list me-2"></i>My Properties</a>
@@ -263,7 +261,6 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
             </div>
         </div>
         <div class="col-md-5 text-md-end">
-            <!-- Stats including Coins -->
             <div class="banner-stats">
                 <div><span class="opacity-75">💰 Wallet</span><br><strong>₹ <?= indianCurrencyFormat($wallet_balance) ?></strong></div>
                 <div><span class="opacity-75">⏳ Pending</span><br><strong>₹ <?= indianCurrencyFormat($total_pending) ?></strong></div>
@@ -273,7 +270,6 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         </div>
     </div>
 
-    <!-- Subscription Status -->
     <div class="subscription-status-inline">
         <span class="label">📋 Subscription Status:</span>
         <?php if($is_subscribed): ?>
