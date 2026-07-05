@@ -380,10 +380,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     spinCount.textContent = data.spins_used;
                     slotCoins.textContent = data.total_coins_earned;
                     if (data.is_reward) {
+                        // 5th spin – coins
                         spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
                         showCoinAnimation(data.coins);
                         launchConfetti();
-                        // Update coins in banner
+                        // update coin display in banner
                         const coinSpan = document.querySelector('.banner-stats strong:last-child');
                         if (coinSpan) {
                             let current = parseInt(coinSpan.textContent);
@@ -398,18 +399,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             spinBtn.disabled = false;
                         }
                     } else if (data.show_property && data.property) {
+                        // 1-4 spins – property/car
                         const p = data.property;
+                        const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
+                        const icon = isCar ? '🚗' : '🏠';
+                        const titleText = isCar ? 'Check out this car!' : 'Check out this property!';
                         const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
                         propertyModalContent.innerHTML = `
                             ${imageHtml}
-                            <h5 class="fw-bold">${p.title}</h5>
+                            <h5 class="fw-bold">${icon} ${p.title}</h5>
                             <p class="text-muted">🏦 ${p.bank_name || 'Bank'}</p>
                             <p class="text-warning fw-bold">₹ ${parseInt(p.price).toLocaleString('en-IN')}</p>
                             <p><i class="fas fa-map-pin"></i> ${p.city || 'N/A'}</p>
+                            <p><small class="text-muted">Type: ${p.type || 'N/A'}</small></p>
                         `;
                         viewPropertyLink.href = `property_detail.php?id=${p.id}&source=auction`;
                         propertyModal.show();
-                        spinMessage.innerHTML = `🏠 Check out this property!`;
+                        spinMessage.innerHTML = titleText;
                         // Re-enable spin after modal close
                         propertyModal._element.addEventListener('hidden.bs.modal', function () {
                             spinBtn.disabled = false;
