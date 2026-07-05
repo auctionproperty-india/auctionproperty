@@ -177,7 +177,7 @@ function debitWallet($pdo, $user_id, $amount, $description, $reference_id = null
     return $stmt->execute([$user_id, $amount, $description, $reference_id]);
 }
 
-// ===== 🔥 4K Social Image Generator (All Details) =====
+// ===== 🔥 4K Social Image Generator =====
 function generateSocialCard($property) {
     if (!extension_loaded('gd')) return $property['image_url'] ?? '';
     $font_path = __DIR__ . '/fonts/Inter.ttf';
@@ -228,7 +228,6 @@ function generateSocialCard($property) {
 
         // ---- Premium Layout with All Details ----
         $font_regular = $font_path;
-        $font_bold = $font_path; // If we had separate bold font, we'd use it.
 
         // 1. Title (Big)
         $title = strtoupper($property['title'] ?? 'PRIME PROPERTY');
@@ -378,9 +377,49 @@ function saveImage($img) {
     return $path;
 }
 
-// ---- Send New Property Notification to all active users ----
+// ---- Send New Property Notification (SMTP version) ----
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+} else {
+    require_once __DIR__ . '/vendor/phpmailer/PHPMailer.php';
+    require_once __DIR__ . '/vendor/phpmailer/SMTP.php';
+    require_once __DIR__ . '/vendor/phpmailer/Exception.php';
+}
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
+function sendEmailSMTP($to, $subject, $body, $from_email = null, $from_name = null) {
+    if (!$from_email) $from_email = getenv('SMTP_FROM_EMAIL') ?: 'noreply@yourdomain.com';
+    if (!$from_name) $from_name = getenv('SMTP_FROM_NAME') ?: 'Prime Property';
+
+    $mail = new PHPMailer(true);
+    try {
+        $mail->isSMTP();
+        $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.sendgrid.net';
+        $mail->SMTPAuth   = true;
+        $mail->Username   = getenv('SMTP_USERNAME');
+        $mail->Password   = getenv('SMTP_PASSWORD');
+        $mail->SMTPSecure = getenv('SMTP_SECURE') ?: 'tls';
+        $mail->Port       = getenv('SMTP_PORT') ?: 587;
+
+        $mail->setFrom($from_email, $from_name);
+        $mail->addAddress($to);
+
+        $mail->isHTML(true);
+        $mail->Subject = $subject;
+        $mail->Body    = $body;
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log("Email send failed: " . $mail->ErrorInfo);
+        return false;
+    }
+}
+
 function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
-    // Fetch property details
     if ($source == 'auction') {
         $stmt = $pdo->prepare("SELECT title, price, city, id FROM properties WHERE id = ?");
     } else {
@@ -390,7 +429,6 @@ function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
     $prop = $stmt->fetch();
     if (!$prop) return false;
 
-    // Get all active users (any role except admin? we send to all active users)
     $users = $pdo->query("SELECT email FROM users WHERE status = 'active' AND email IS NOT NULL AND email != ''")->fetchAll();
     if (empty($users)) return false;
 
@@ -407,14 +445,89 @@ function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
     $message .= "<p style='margin-top:20px; font-size:0.8rem; color:#666;'>You are receiving this email because you are registered on our platform.</p>";
     $message .= "</body></html>";
 
-    $headers = "MIME-Version: 1.0" . "\r\n";
-    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-    $headers .= "From: Prime Property <noreply@" . $_SERVER['HTTP_HOST'] . ">" . "\r\n";
-
     foreach ($users as $user) {
-        mail($user['email'], $subject, $message, $headers);
+        sendEmailSMTP($user['email'], $subject, $message);
     }
     return true;
 }
 
+// ===== 🔄 DAILY SPIN SYSTEM =====
+function getCurrentSlot() {
+    $hour = (int)date('H');
+    if ($hour >= 0 && $hour < 8) return 1;
+    if ($hour >= 8 && $hour < 14) return 2;
+    return 3; // 14 to 23
+}
+
+function getSlotTimeRange($slot) {
+    switch($slot) {
+        case 1: return '12 AM – 8 AM';
+        case 2: return '8 AM – 2 PM';
+        case 3: return '2 PM – 12 AM';
+        default: return 'Unknown';
+    }
+}
+
+function getUserSpinData($pdo, $user_id) {
+    $today = date('Y-m-d');
+    $slot = getCurrentSlot();
+    $stmt = $pdo->prepare("SELECT * FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+    $stmt->execute([$user_id, $today, $slot]);
+    $data = $stmt->fetch();
+    if (!$data) {
+        // Create new record
+        $stmt = $pdo->prepare("INSERT INTO user_spins (user_id, slot_date, slot_number, spins_used, reward_given) VALUES (?, ?, ?, 0, FALSE)");
+        $stmt->execute([$user_id, $today, $slot]);
+        return ['spins_used' => 0, 'reward_given' => false, 'can_spin' => true];
+    }
+    return [
+        'spins_used' => $data['spins_used'],
+        'reward_given' => (bool)$data['reward_given'],
+        'can_spin' => ($data['spins_used'] < 5),
+        'slot_number' => $slot
+    ];
+}
+
+function performSpin($pdo, $user_id) {
+    $today = date('Y-m-d');
+    $slot = getCurrentSlot();
+    $stmt = $pdo->prepare("SELECT spins_used, reward_given FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+    $stmt->execute([$user_id, $today, $slot]);
+    $data = $stmt->fetch();
+    
+    if (!$data || $data['spins_used'] >= 5) {
+        return ['success' => false, 'message' => 'You have already used all spins for this slot.'];
+    }
+    
+    // Increment spins
+    $new_spins = $data['spins_used'] + 1;
+    $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, last_spin_at = CURRENT_TIMESTAMP WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+    $stmt->execute([$new_spins, $user_id, $today, $slot]);
+    
+    // Check if reward should be given (every 5 spins)
+    if ($new_spins == 5 && !$data['reward_given']) {
+        // Random coins between 5 and 20
+        $coins = rand(5, 20);
+        // Update user coins
+        $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coins, $user_id]);
+        // Mark reward as given
+        $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
+        return [
+            'success' => true, 
+            'message' => "🎉 You got $coins coins!",
+            'coins' => $coins,
+            'spins_used' => $new_spins,
+            'reward_given' => true,
+            'is_reward' => true
+        ];
+    }
+    
+    return [
+        'success' => true,
+        'message' => "Spin #$new_spins done! " . (5 - $new_spins) . " more to go for reward.",
+        'spins_used' => $new_spins,
+        'reward_given' => false,
+        'is_reward' => false
+    ];
+}
 ?>
