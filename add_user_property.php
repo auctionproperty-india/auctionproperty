@@ -37,6 +37,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
     $state = trim($_POST['state']);
     $type = trim($_POST['type']);
     $sqft = (float)($_POST['sqft'] ?? 0);
+    $construction_sqft = (float)($_POST['construction_sqft'] ?? 0);
     $image_url = '';
 
     if(empty($title) || $price <= 0) {
@@ -57,9 +58,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
         }
 
         if(empty($error)) {
-            $stmt = $pdo->prepare("INSERT INTO user_properties (user_id, title, description, price, city, state, type, sqft, image_url, status) 
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
-            $stmt->execute([$user_id, $title, $description, $price, $city, $state, $type, $sqft, $image_url]);
+            $stmt = $pdo->prepare("INSERT INTO user_properties (user_id, title, description, price, city, state, type, sqft, construction_sqft, image_url, status) 
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+            $stmt->execute([$user_id, $title, $description, $price, $city, $state, $type, $sqft, $construction_sqft, $image_url]);
             header("Location: user_properties.php?msg=added");
             exit;
         }
@@ -110,6 +111,11 @@ include 'header.php';
                 <div class="col-md-3">
                     <label class="form-label">Area (Sq Ft)</label>
                     <input type="number" step="0.01" name="sqft" class="form-control" placeholder="e.g. 1200">
+                </div>
+                <!-- ✅ NEW: Construction Area -->
+                <div class="col-md-3">
+                    <label class="form-label">Construction Area (Sq Ft)</label>
+                    <input type="number" step="0.01" name="construction_sqft" class="form-control" placeholder="e.g. 800">
                 </div>
                 <div class="col-md-12">
                     <label class="form-label">Upload Image (1 photo)</label>
