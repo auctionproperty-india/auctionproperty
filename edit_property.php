@@ -15,55 +15,43 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         move_uploaded_file($_FILES['image_file']['tmp_name'], $upload_dir . $filename);
         $image_path = $upload_dir . $filename;
     }
-    
-    // ✅ Inspection Date Conversion
-    $inspection_date_db = null;
-    if(!empty($_POST['inspection_date'])) {
-        $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
-        if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
+    $auction_date_db = null;
+    if(!empty($_POST['auction_date'])) {
+        $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['auction_date']);
+        if($date_obj) $auction_date_db = $date_obj->format('Y-m-d');
     }
-
-    try {
-        $sql = "UPDATE properties SET 
-            title=?, description='', price=?, location=?, city=?, type=?, google_location=?, image_url=?, 
-            bank_name=?, sqft=?, possession_type=?, inspection_date=?, 
-            borrower_name=?, emd_amount=?, bid_increment=?, emd_deadline=?, 
-            auction_start_time=?, auction_end_time=?, locality=?, reserve_price_per_sqft=?, contact_number=? 
-            WHERE id=?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            $_POST['title'], $_POST['price'], $_POST['location'], 
-            $_POST['city'], $_POST['type'], $_POST['google_location'], $image_path,
-            $_POST['bank_name'], $_POST['sqft'], $_POST['possession_type'], $inspection_date_db,
-            $_POST['borrower_name'], $_POST['emd_amount'], $_POST['bid_increment'], $_POST['emd_deadline'],
-            $_POST['auction_start_time'], $_POST['auction_end_time'], $_POST['locality'], 
-            $_POST['reserve_price_per_sqft'], $_POST['contact_number'], $id
-        ]);
-        header("Location: properties.php?updated=1");
-        exit;
-    } catch (PDOException $e) {
-        $_SESSION['edit_error'] = "❌ Update Failed: " . $e->getMessage();
-        header("Location: properties.php");
-        exit;
-    }
+    // ✅ Update with auction_date
+    $sql = "UPDATE properties SET 
+        title=?, description='', price=?, location=?, city=?, type=?, google_location=?, image_url=?, 
+        bank_name=?, sqft=?, possession_type=?, auction_date=?, 
+        borrower_name=?, emd_amount=?, bid_increment=?, emd_deadline=?, 
+        auction_start_time=?, auction_end_time=?, locality=?, reserve_price_per_sqft=?, contact_number=? 
+        WHERE id=?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        $_POST['title'], $_POST['price'], $_POST['location'], 
+        $_POST['city'], $_POST['type'], $_POST['google_location'], $image_path,
+        $_POST['bank_name'], $_POST['sqft'], $_POST['possession_type'], $auction_date_db,
+        $_POST['borrower_name'], $_POST['emd_amount'], $_POST['bid_increment'], $_POST['emd_deadline'],
+        $_POST['auction_start_time'], $_POST['auction_end_time'], $_POST['locality'], 
+        $_POST['reserve_price_per_sqft'], $_POST['contact_number'], $id
+    ]);
+    header("Location: properties.php?updated=1");
+    exit;
 }
 $stmt = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
 $stmt->execute([$id]);
 $prop = $stmt->fetch();
 if(!$prop) die("Property not found");
 include 'header.php'; 
-
 $display_date = '';
-if(!empty($prop['inspection_date'])) {
-    $date_obj = DateTime::createFromFormat('Y-m-d', $prop['inspection_date']);
+if(!empty($prop['auction_date'])) {
+    $date_obj = DateTime::createFromFormat('Y-m-d', $prop['auction_date']);
     if($date_obj) $display_date = $date_obj->format('d/m/Y');
 }
 ?>
 <div class="card-premium">
     <h4>✏️ Edit Property #<?= $id ?></h4>
-    <?php if(isset($_SESSION['edit_error'])): ?>
-        <div class="alert alert-danger"><?= $_SESSION['edit_error']; unset($_SESSION['edit_error']); ?></div>
-    <?php endif; ?>
     <form method="POST" enctype="multipart/form-data">
         <div class="row g-3">
             <div class="col-md-6"><label>Title</label><input name="title" value="<?= htmlspecialchars($prop['title']) ?>" class="form-control" required></div>
@@ -95,14 +83,11 @@ if(!empty($prop['inspection_date'])) {
             </div>
             <div class="col-md-3"><label>EMD Amount</label><input name="emd_amount" value="<?= $prop['emd_amount'] ?? '' ?>" class="form-control"></div>
             <div class="col-md-3"><label>Bid Increment</label><input name="bid_increment" value="<?= $prop['bid_increment'] ?? '' ?>" class="form-control"></div>
-            <div class="col-md-4"><label>Auction Start</label><input name="auction_start_time" value="<?= htmlspecialchars($prop['auction_start_time'] ?? '') ?>" class="form-control" placeholder="Wed, 24 Jun 2026 12:00 PM"></div>
-            <div class="col-md-4"><label>Auction End</label><input name="auction_end_time" value="<?= htmlspecialchars($prop['auction_end_time'] ?? '') ?>" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM"></div>
-            <div class="col-md-4"><label>EMD Deadline</label><input name="emd_deadline" value="<?= htmlspecialchars($prop['emd_deadline'] ?? '') ?>" class="form-control" placeholder="Wed, 24 Jun 2026 05:00 PM"></div>
-            
-            <!-- ✅ Inspection Date Field -->
-            <div class="col-md-6">
-                <label>Inspection Date (DD/MM/YYYY)</label>
-                <input type="text" name="inspection_date" class="form-control" placeholder="e.g. 24/06/2026" value="<?= $display_date ?>">
+            <div class="col-md-4"><label>Auction Start</label><input name="auction_start_time" value="<?= htmlspecialchars($prop['auction_start_time'] ?? '') ?>" class="form-control" placeholder="Thu, 24 Jun 2026 12:00 PM"></div>
+            <div class="col-md-4"><label>Auction End</label><input name="auction_end_time" value="<?= htmlspecialchars($prop['auction_end_time'] ?? '') ?>" class="form-control" placeholder="Thu, 24 Jun 2026 05:00 PM"></div>
+            <div class="col-md-4"><label>EMD Deadline</label><input name="emd_deadline" value="<?= htmlspecialchars($prop['emd_deadline'] ?? '') ?>" class="form-control" placeholder="Thu, 24 Jun 2026 05:00 PM"></div>
+            <div class="col-md-6"><label>Auction Date (DD/MM/YYYY)</label>
+                <input type="text" name="auction_date" class="form-control" placeholder="e.g. 24/06/2026" value="<?= $display_date ?>">
             </div>
             <div class="col-md-6"><label>Contact Number</label><input name="contact_number" value="<?= htmlspecialchars($prop['contact_number'] ?? '') ?>" class="form-control" required></div>
             <div class="col-12"><label>Google Map Link</label>
