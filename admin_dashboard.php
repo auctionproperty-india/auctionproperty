@@ -66,6 +66,28 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         header("Location: admin_dashboard.php");
         exit;
     }
+
+    // ---- NEW: Update Registration & Activation Dates ----
+    if(isset($_POST['update_dates']) && isset($_POST['user_id'])) {
+        $uid = (int)$_POST['user_id'];
+        $new_reg_date = $_POST['reg_date'] ?? null;
+        $new_act_date = $_POST['activation_date'] ?? null;
+
+        if(!empty($new_reg_date)) {
+            // Convert to Y-m-d H:i:s (assuming datetime-local gives Y-m-d\TH:i)
+            $reg_datetime = date('Y-m-d H:i:s', strtotime($new_reg_date));
+            $pdo->prepare("UPDATE users SET created_at = ? WHERE id = ?")->execute([$reg_datetime, $uid]);
+        }
+        if(!empty($new_act_date)) {
+            $act_datetime = date('Y-m-d', strtotime($new_act_date)); // start_date is date only
+            // Update active subscription's start_date
+            $pdo->prepare("UPDATE subscriptions SET start_date = ? WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1")
+                ->execute([$act_datetime, $uid]);
+        }
+        $_SESSION['new_pass_display'] = "✅ Registration & Activation dates updated!";
+        header("Location: admin_dashboard.php");
+        exit;
+    }
 }
 
 // ---- Handle GET actions ----
@@ -102,7 +124,6 @@ $user_search = $_GET['user_search'] ?? '';
     <div class="col-md-3"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-success me-3"><i class="fas fa-users"></i></div><div><h5><?= $total_users ?></h5><small>Total Users</small></div></div></div>
     <div class="col-md-3"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-check-circle"></i></div><div><h5><?= $total_sold ?></h5><small>Sold</small></div></div></div>
     <div class="col-md-3"><div class="card-premium d-flex align-items-center" style="border-left:4px solid #2563eb;"><div class="stat-icon bg-soft-info me-3"><i class="fas fa-wallet"></i></div><div><h5>₹ <?= indianCurrencyFormat($balance['balance']) ?></h5><small>Available Balance</small></div></div></div>
-    <!-- NEW: Total Coins -->
     <div class="col-md-3"><div class="card-premium d-flex align-items-center"><div class="stat-icon bg-soft-warning me-3"><i class="fas fa-coins"></i></div><div><h5><?= (int)$total_coins ?></h5><small>Total Coins</small></div></div></div>
 </div>
 
@@ -141,6 +162,7 @@ $user_search = $_GET['user_search'] ?? '';
                 <?php 
                 $sql_users = "SELECT 
                                 u.id, u.name, u.email, u.phone, u.referred_by, u.role, u.status, u.coins,
+                                u.created_at as reg_date,
                                 r.name as referrer_name,
                                 p.name as package_name,
                                 s.start_date as sub_start,
@@ -171,6 +193,9 @@ $user_search = $_GET['user_search'] ?? '';
                         $status_badge = ($u['status'] == 'active') ? 'success' : 'secondary';
                         $status_text = ucfirst($u['status']);
                         $plan_display = ($u['package_name']) ? htmlspecialchars($u['package_name']) : 'Free';
+                        // Dates for modal
+                        $reg_date = date('Y-m-d\TH:i', strtotime($u['reg_date']));
+                        $act_date = !empty($u['sub_start']) ? date('Y-m-d\TH:i', strtotime($u['sub_start'])) : '';
                 ?>
                     <tr>
                         <td><?= htmlspecialchars($u['name']) ?></td>
@@ -208,6 +233,8 @@ $user_search = $_GET['user_search'] ?? '';
                                         data-useremail="<?= htmlspecialchars($u['email']) ?>"
                                         data-userstatus="<?= $u['status'] ?>"
                                         data-currentreferrer="<?= htmlspecialchars($current_referrer) ?>"
+                                        data-regdate="<?= $reg_date ?>"
+                                        data-actdate="<?= $act_date ?>"
                                         onclick="populateModal(this)">
                                     <i class="fas fa-cog"></i>
                                 </button>
@@ -231,7 +258,7 @@ $user_search = $_GET['user_search'] ?? '';
     </div>
 </div>
 
-<!-- ====== USER SETTINGS MODAL ====== -->
+<!-- ====== USER SETTINGS MODAL (with Dates Edit) ====== -->
 <div class="modal fade" id="userSettingsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content" style="border-radius: 20px;">
@@ -249,6 +276,25 @@ $user_search = $_GET['user_search'] ?? '';
                     <div class="col-md-6">
                         <strong>Email:</strong> <span id="modal_user_email"></span>
                     </div>
+                </div>
+
+                <!-- ===== NEW: Edit Dates Section ===== -->
+                <div class="card mb-4 p-3 border-0 shadow-sm" style="border-left:4px solid #8b5cf6;">
+                    <h6><i class="fas fa-calendar-alt me-2 text-primary"></i>Edit Registration & Activation Dates</h6>
+                    <form method="POST" action="admin_dashboard.php">
+                        <input type="hidden" name="user_id" id="modal_dates_user_id" value="">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label small">Registration Date</label>
+                                <input type="datetime-local" name="reg_date" id="modal_reg_date" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Activation Date (Subscription Start)</label>
+                                <input type="datetime-local" name="activation_date" id="modal_act_date" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                        <button type="submit" name="update_dates" class="btn btn-sm btn-primary mt-2">Update Dates</button>
+                    </form>
                 </div>
 
                 <div class="card mb-4 p-3 border-0 shadow-sm">
@@ -328,10 +374,17 @@ $user_search = $_GET['user_search'] ?? '';
         var userEmail = btn.getAttribute('data-useremail');
         var userStatus = btn.getAttribute('data-userstatus');
         var currentReferrer = btn.getAttribute('data-currentreferrer') || 'Direct';
+        var regDate = btn.getAttribute('data-regdate') || '';
+        var actDate = btn.getAttribute('data-actdate') || '';
 
         document.getElementById('modal_user_id').value = userId;
         document.getElementById('modal_user_name').innerText = userName;
         document.getElementById('modal_user_email').innerText = userEmail;
+
+        // Dates
+        document.getElementById('modal_dates_user_id').value = userId;
+        document.getElementById('modal_reg_date').value = regDate;
+        document.getElementById('modal_act_date').value = actDate;
 
         var badge = document.getElementById('modal_user_status_badge');
         var statusClass = (userStatus === 'active') ? 'bg-success' : 'bg-secondary';
