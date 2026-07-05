@@ -58,7 +58,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $best_props = $stmt->fetchAll();
 
-// ---- Render Dashboard Card (without Today badge) ----
+// ---- Render Dashboard Card ----
 function renderDashboardCard($prop, $show_images, $is_today = false) {
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
@@ -141,7 +141,26 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     .card:hover { transform: translateY(-10px) !important; box-shadow: 0 30px 60px -15px rgba(0,0,0,0.2) !important; }
     .no-auction-msg { background: #f8fafc; border-radius: 30px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
     .no-auction-msg i { font-size: 2.5rem; opacity:0.3; }
-    @media (max-width:576px) { .user-welcome-banner { padding: 20px; } .user-welcome-banner .banner-stats { justify-content: flex-start; } }
+    /* Spinner Styles */
+    .spin-wheel {
+        transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+    }
+    .spin-wheel.pulse {
+        animation: spinPulse 1s infinite;
+    }
+    @keyframes spinPulse {
+        0% { box-shadow: 0 0 30px rgba(251,191,36,0.3); }
+        50% { box-shadow: 0 0 60px rgba(251,191,36,0.6); }
+        100% { box-shadow: 0 0 30px rgba(251,191,36,0.3); }
+    }
+    @keyframes slideIn {
+        from { transform: translateX(100px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @media (max-width:576px) {
+        .user-welcome-banner { padding: 20px; }
+        .user-welcome-banner .banner-stats { justify-content: flex-start; }
+    }
 </style>
 
 <!-- ===== WELCOME BANNER ===== -->
@@ -184,6 +203,41 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     </div>
 </div>
 
+<!-- ===== DAILY SPIN SYSTEM ===== -->
+<div class="card border-0 shadow-sm rounded-4 p-4 mb-4" style="background: linear-gradient(135deg, #1e293b, #334155); color: #fff;">
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
+            <p class="opacity-75 small">Spin up to 5 times per slot. Every 5 spins = 5-20 coins!</p>
+            <div class="d-flex gap-3 flex-wrap">
+                <span class="badge bg-primary">Slot: <?= getSlotTimeRange(getCurrentSlot()) ?></span>
+                <span class="badge bg-info">Spins Used: <span id="spinCount"><?= getUserSpinData($pdo, $user_id)['spins_used'] ?></span>/5</span>
+                <?php if(getUserSpinData($pdo, $user_id)['reward_given']): ?>
+                    <span class="badge bg-success">✅ Reward Claimed!</span>
+                <?php endif; ?>
+            </div>
+            <div id="spinMessage" class="mt-2 small"></div>
+        </div>
+        <div class="col-md-6 text-center">
+            <div class="spinner-wrapper" style="position:relative; display:inline-block;">
+                <div id="spinWheel" class="spin-wheel" style="width:120px; height:120px; border-radius:50%; background: conic-gradient(
+                    #fbbf24 0deg 72deg, 
+                    #ef4444 72deg 144deg, 
+                    #10b981 144deg 216deg, 
+                    #3b82f6 216deg 288deg, 
+                    #8b5cf6 288deg 360deg
+                ); border:4px solid #fff; box-shadow:0 0 30px rgba(251,191,36,0.3); margin:0 auto;">
+                </div>
+                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:30px; height:30px; border-radius:50%; border:3px solid #fbbf24;"></div>
+                <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:12px solid transparent; border-right:12px solid transparent; border-top:20px solid #fbbf24; filter:drop-shadow(0 0 10px rgba(251,191,36,0.5));"></div>
+            </div>
+            <button id="spinBtn" class="btn btn-warning mt-3 px-4 fw-bold" <?= (getUserSpinData($pdo, $user_id)['can_spin']) ? '' : 'disabled' ?>>
+                <i class="fas fa-sync-alt"></i> Spin!
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- ===== TODAY'S AUCTIONS ===== -->
 <?php if(count($today_props) > 0): ?>
     <div class="section-title">
@@ -222,5 +276,76 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         </div>
     <?php endif; ?>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const spinBtn = document.getElementById('spinBtn');
+    const wheel = document.getElementById('spinWheel');
+    const spinCount = document.getElementById('spinCount');
+    const spinMessage = document.getElementById('spinMessage');
+
+    // Predefined segments (5 segments)
+    const segments = [0, 72, 144, 216, 288];
+    let currentRotation = 0;
+
+    spinBtn.addEventListener('click', function() {
+        this.disabled = true;
+        spinMessage.innerHTML = '🔄 Spinning...';
+        
+        // Random rotation (at least 5 full rotations + random segment)
+        const randomSegment = segments[Math.floor(Math.random() * segments.length)];
+        const extraSpin = Math.floor(Math.random() * 360); // extra randomness
+        const totalRotation = 360 * 5 + randomSegment + extraSpin;
+        currentRotation += totalRotation;
+        
+        wheel.style.transform = `rotate(${currentRotation}deg)`;
+        wheel.classList.add('pulse');
+        
+        // AJAX call to spin
+        fetch('spin_ajax.php')
+            .then(response => response.json())
+            .then(data => {
+                wheel.classList.remove('pulse');
+                if (data.success) {
+                    spinCount.textContent = data.spins_used;
+                    if (data.is_reward) {
+                        spinMessage.innerHTML = `🎉 <strong>${data.message}</strong>`;
+                        // Show coin animation
+                        showCoinAnimation(data.coins);
+                    } else {
+                        spinMessage.innerHTML = `🔄 ${data.message}`;
+                    }
+                    if (data.spins_used >= 5) {
+                        spinBtn.disabled = true;
+                        spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
+                    } else {
+                        spinBtn.disabled = false;
+                    }
+                } else {
+                    spinMessage.innerHTML = `❌ ${data.message}`;
+                    spinBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                spinMessage.innerHTML = '❌ Error spinning. Please try again.';
+                spinBtn.disabled = false;
+                console.error('Spin error:', error);
+            });
+    });
+
+    function showCoinAnimation(coins) {
+        // Simple toast notification
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#10b981; color:white; padding:16px 24px; border-radius:12px; font-weight:bold; box-shadow:0 10px 30px rgba(0,0,0,0.2); z-index:9999; animation: slideIn 0.5s ease;';
+        toast.innerHTML = `🪙 +${coins} coins!`;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s';
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
+    }
+});
+</script>
 
 <?php include 'footer.php'; ?>
