@@ -10,7 +10,6 @@ $search_type = $_GET['type'] ?? '';
 $search_max_price = $_GET['max_price'] ?? '';
 $tab = $_GET['tab'] ?? 'auction';
 
-// Common search conditions
 $where = [];
 $params = [];
 if(!empty($search_city)) {
@@ -28,25 +27,23 @@ if(!empty($search_max_price)) {
 
 $where_clause = implode(" AND ", $where);
 
-// ---- Auction Properties (Today + Upcoming) ----
+// ---- Auction Properties ----
 $base_sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available'";
 if(!empty($where_clause)) {
     $base_sql .= " AND " . $where_clause;
 }
 
-// Today's Auctions
 $today_sql = $base_sql . " AND auction_date = CURRENT_DATE ORDER BY id DESC";
 $today_stmt = $pdo->prepare($today_sql);
 $today_stmt->execute($params);
 $today_props = $today_stmt->fetchAll();
 
-// Upcoming Auctions
 $upcoming_sql = $base_sql . " AND (auction_date != CURRENT_DATE OR auction_date IS NULL) ORDER BY id DESC";
 $upcoming_stmt = $pdo->prepare($upcoming_sql);
 $upcoming_stmt->execute($params);
 $upcoming_props = $upcoming_stmt->fetchAll();
 
-// ---- Customer Properties (only approved) ----
+// ---- Customer Properties ----
 $customer_where = "status = 'approved'";
 if(!empty($where_clause)) {
     $customer_where .= " AND " . $where_clause;
@@ -209,7 +206,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     </ul>
 
     <?php if($tab == 'auction'): ?>
-        <!-- Auction Properties: Today + Upcoming -->
+        <!-- Auction Properties -->
         <div class="section-title">
             <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
             <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
