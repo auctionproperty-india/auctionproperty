@@ -60,7 +60,6 @@ if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
         if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
     }
 
-    // ✅ Auction Date
     $auction_date_db = null;
     if(!empty($_POST['auction_date'])) {
         $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['auction_date']);
@@ -112,7 +111,6 @@ if(isset($_POST['add_property'])) {
         if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
     }
 
-    // ✅ Auction Date
     $auction_date_db = null;
     if(!empty($_POST['auction_date'])) {
         $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['auction_date']);
@@ -150,12 +148,13 @@ if(isset($_POST['add_property'])) {
         safeString($_POST['contact_number'] ?? $default_contact),
         $auction_date_db
     ]);
-    // After successful INSERT
-$new_id = $pdo->lastInsertId();
-// Send email notification to all users
-sendNewPropertyNotification($pdo, $new_id, 'auction');
-header("Location: properties.php?added=1");
-exit;
+    
+    $new_id = $pdo->lastInsertId();
+    // Send email notification to all users (if function exists)
+    if(function_exists('sendNewPropertyNotification')) {
+        sendNewPropertyNotification($pdo, $new_id, 'auction');
+    }
+    
     header("Location: properties.php?added=1");
     exit;
 }
@@ -170,9 +169,10 @@ include 'header.php';
     <div class="alert alert-success">✅ Property Updated Successfully!</div>
 <?php endif; ?>
 
-<div class="card-premium">
+<div class="container-fluid px-3">
+    <!-- Filter Form + Add Button (Top Row) -->
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <h5><i class="fas fa-list me-2"></i>All Properties (<?= $total_rows ?>)</h5>
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Properties (<?= $total_rows ?>)</h5>
         <?php if(hasEditPermission('properties', $pdo)): ?>
             <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#propertyModal" onclick="openAddModal()">
                 <i class="fas fa-plus-circle me-1"></i> Add New Property
@@ -182,49 +182,66 @@ include 'header.php';
         <?php endif; ?>
     </div>
 
-    <form method="GET" class="row g-2 mb-3">
-        <div class="col-md-3"><input type="text" name="filter_city" class="form-control" placeholder="🏙️ City" value="<?= htmlspecialchars($filter_city) ?>"></div>
-        <div class="col-md-3"><input type="text" name="filter_bank" class="form-control" placeholder="🏦 Bank Name" value="<?= htmlspecialchars($filter_bank) ?>"></div>
-        <div class="col-md-2"><input type="number" name="filter_price_min" class="form-control" placeholder="Min Price" value="<?= htmlspecialchars($filter_price_min) ?>"></div>
-        <div class="col-md-2"><input type="number" name="filter_price_max" class="form-control" placeholder="Max Price" value="<?= htmlspecialchars($filter_price_max) ?>"></div>
-        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button></div>
-    </form>
-
-    <div class="table-responsive">
-        <table class="table table-hover">
-            <thead class="table-light">
-                <tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-                <?php if(count($rows) > 0): ?>
-                    <?php foreach($rows as $row): ?>
-                        <tr>
-                            <td><?= $row['id'] ?></td>
-                            <td><?= htmlspecialchars($row['title']) ?></td>
-                            <td><?= htmlspecialchars($row['bank_name'] ?? '') ?></td>
-                            <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
-                            <td><?= indianCurrencyFormat($row['price']) ?></td>
-                            <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
-                            <td>
-                                <?php if(hasEditPermission('properties', $pdo)): ?>
-                                    <button class="btn btn-sm btn-primary" onclick="openEditModal(<?= $row['id'] ?>)">✏️</button>
-                                    <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
-                                <?php else: ?>
-                                    <span class="text-muted">View Only</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr><td colspan="7" class="text-center text-muted">No properties found.</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
+    <!-- Filter Form -->
+    <div class="bg-white p-2 rounded-3 shadow-sm mb-3 border">
+        <form method="GET" class="row g-1 align-items-center">
+            <div class="col-md-3">
+                <input type="text" name="filter_city" class="form-control form-control-sm" placeholder="🏙️ City" value="<?= htmlspecialchars($filter_city) ?>">
+            </div>
+            <div class="col-md-3">
+                <input type="text" name="filter_bank" class="form-control form-control-sm" placeholder="🏦 Bank Name" value="<?= htmlspecialchars($filter_bank) ?>">
+            </div>
+            <div class="col-md-2">
+                <input type="number" name="filter_price_min" class="form-control form-control-sm" placeholder="Min Price" value="<?= htmlspecialchars($filter_price_min) ?>">
+            </div>
+            <div class="col-md-2">
+                <input type="number" name="filter_price_max" class="form-control form-control-sm" placeholder="Max Price" value="<?= htmlspecialchars($filter_price_max) ?>">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-filter"></i> Filter</button>
+            </div>
+        </form>
     </div>
 
+    <!-- Table -->
+    <div class="bg-white rounded-3 p-2 shadow-sm border">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead class="table-light">
+                    <tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    <?php if(count($rows) > 0): ?>
+                        <?php foreach($rows as $row): ?>
+                            <tr>
+                                <td><?= $row['id'] ?></td>
+                                <td><?= htmlspecialchars($row['title']) ?></td>
+                                <td><?= htmlspecialchars($row['bank_name'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
+                                <td><?= indianCurrencyFormat($row['price']) ?></td>
+                                <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
+                                <td>
+                                    <?php if(hasEditPermission('properties', $pdo)): ?>
+                                        <button class="btn btn-sm btn-primary" onclick="openEditModal(<?= $row['id'] ?>)">✏️</button>
+                                        <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
+                                    <?php else: ?>
+                                        <span class="text-muted">View Only</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="7" class="text-center text-muted">No properties found.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
     <?php if($total_pages > 1): ?>
         <nav class="mt-3">
-            <ul class="pagination justify-content-center">
+            <ul class="pagination justify-content-center pagination-sm">
                 <?php if($page > 1): ?>
                     <li class="page-item"><a class="page-link" href="?page=<?= $page-1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">« Prev</a></li>
                 <?php endif; ?>
@@ -337,7 +354,6 @@ include 'header.php';
                 document.getElementById('edit_google_location').value = data.google_location || '';
                 document.getElementById('existing_image').value = data.image_url || '';
                 document.getElementById('edit_description').value = data.description || '';
-                // ✅ Auction Date
                 document.getElementById('edit_auction_date').value = data.auction_date || '';
 
                 if (data.image_url) {
