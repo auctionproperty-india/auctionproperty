@@ -67,24 +67,28 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // ---- NEW: Update Registration & Activation Dates ----
+    // ---- UPDATE Registration, Activation & End Dates ----
     if(isset($_POST['update_dates']) && isset($_POST['user_id'])) {
         $uid = (int)$_POST['user_id'];
         $new_reg_date = $_POST['reg_date'] ?? null;
         $new_act_date = $_POST['activation_date'] ?? null;
+        $new_end_date = $_POST['end_date'] ?? null;
 
         if(!empty($new_reg_date)) {
-            // Convert to Y-m-d H:i:s (assuming datetime-local gives Y-m-d\TH:i)
             $reg_datetime = date('Y-m-d H:i:s', strtotime($new_reg_date));
             $pdo->prepare("UPDATE users SET created_at = ? WHERE id = ?")->execute([$reg_datetime, $uid]);
         }
         if(!empty($new_act_date)) {
-            $act_datetime = date('Y-m-d', strtotime($new_act_date)); // start_date is date only
-            // Update active subscription's start_date
+            $act_datetime = date('Y-m-d', strtotime($new_act_date));
             $pdo->prepare("UPDATE subscriptions SET start_date = ? WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1")
                 ->execute([$act_datetime, $uid]);
         }
-        $_SESSION['new_pass_display'] = "✅ Registration & Activation dates updated!";
+        if(!empty($new_end_date)) {
+            $end_datetime = date('Y-m-d', strtotime($new_end_date));
+            $pdo->prepare("UPDATE subscriptions SET end_date = ? WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1")
+                ->execute([$end_datetime, $uid]);
+        }
+        $_SESSION['new_pass_display'] = "✅ Registration, Activation & End dates updated!";
         header("Location: admin_dashboard.php");
         exit;
     }
@@ -193,9 +197,10 @@ $user_search = $_GET['user_search'] ?? '';
                         $status_badge = ($u['status'] == 'active') ? 'success' : 'secondary';
                         $status_text = ucfirst($u['status']);
                         $plan_display = ($u['package_name']) ? htmlspecialchars($u['package_name']) : 'Free';
-                        // Dates for modal
+                        // Dates for modal (datetime-local format)
                         $reg_date = date('Y-m-d\TH:i', strtotime($u['reg_date']));
                         $act_date = !empty($u['sub_start']) ? date('Y-m-d\TH:i', strtotime($u['sub_start'])) : '';
+                        $end_date = !empty($u['sub_end']) ? date('Y-m-d\TH:i', strtotime($u['sub_end'])) : '';
                 ?>
                     <tr>
                         <td><?= htmlspecialchars($u['name']) ?></td>
@@ -235,6 +240,7 @@ $user_search = $_GET['user_search'] ?? '';
                                         data-currentreferrer="<?= htmlspecialchars($current_referrer) ?>"
                                         data-regdate="<?= $reg_date ?>"
                                         data-actdate="<?= $act_date ?>"
+                                        data-enddate="<?= $end_date ?>"
                                         onclick="populateModal(this)">
                                     <i class="fas fa-cog"></i>
                                 </button>
@@ -258,7 +264,7 @@ $user_search = $_GET['user_search'] ?? '';
     </div>
 </div>
 
-<!-- ====== USER SETTINGS MODAL (with Dates Edit) ====== -->
+<!-- ====== USER SETTINGS MODAL (with End Date Edit) ====== -->
 <div class="modal fade" id="userSettingsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content" style="border-radius: 20px;">
@@ -278,19 +284,23 @@ $user_search = $_GET['user_search'] ?? '';
                     </div>
                 </div>
 
-                <!-- ===== NEW: Edit Dates Section ===== -->
+                <!-- ===== Dates Edit Section ===== -->
                 <div class="card mb-4 p-3 border-0 shadow-sm" style="border-left:4px solid #8b5cf6;">
-                    <h6><i class="fas fa-calendar-alt me-2 text-primary"></i>Edit Registration & Activation Dates</h6>
+                    <h6><i class="fas fa-calendar-alt me-2 text-primary"></i>Edit Registration & Subscription Dates</h6>
                     <form method="POST" action="admin_dashboard.php">
                         <input type="hidden" name="user_id" id="modal_dates_user_id" value="">
                         <div class="row g-2">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label small">Registration Date</label>
                                 <input type="datetime-local" name="reg_date" id="modal_reg_date" class="form-control form-control-sm">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small">Activation Date (Subscription Start)</label>
+                            <div class="col-md-4">
+                                <label class="form-label small">Activation Date</label>
                                 <input type="datetime-local" name="activation_date" id="modal_act_date" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">End Date</label>
+                                <input type="datetime-local" name="end_date" id="modal_end_date" class="form-control form-control-sm">
                             </div>
                         </div>
                         <button type="submit" name="update_dates" class="btn btn-sm btn-primary mt-2">Update Dates</button>
@@ -376,6 +386,7 @@ $user_search = $_GET['user_search'] ?? '';
         var currentReferrer = btn.getAttribute('data-currentreferrer') || 'Direct';
         var regDate = btn.getAttribute('data-regdate') || '';
         var actDate = btn.getAttribute('data-actdate') || '';
+        var endDate = btn.getAttribute('data-enddate') || '';
 
         document.getElementById('modal_user_id').value = userId;
         document.getElementById('modal_user_name').innerText = userName;
@@ -385,6 +396,7 @@ $user_search = $_GET['user_search'] ?? '';
         document.getElementById('modal_dates_user_id').value = userId;
         document.getElementById('modal_reg_date').value = regDate;
         document.getElementById('modal_act_date').value = actDate;
+        document.getElementById('modal_end_date').value = endDate;
 
         var badge = document.getElementById('modal_user_status_badge');
         var statusClass = (userStatus === 'active') ? 'bg-success' : 'bg-secondary';
