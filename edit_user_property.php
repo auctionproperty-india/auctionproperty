@@ -26,27 +26,38 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_property'])) {
     $city = trim($_POST['city']);
     $state = trim($_POST['state']);
     $type = trim($_POST['type']);
+    $sqft = (float)($_POST['sqft'] ?? 0);
     $image_url = $prop['image_url'];
 
     if(empty($title) || $price <= 0) {
         $error = "❌ Title and Price are required.";
     } else {
-        // Handle image upload
+        // Handle new image upload
         if(isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
             $upload_dir = 'uploads/user_properties/';
             if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
             $ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
             $filename = 'userprop_' . $user_id . '_' . time() . '.' . $ext;
-            move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $filename);
-            $image_url = $upload_dir . $filename;
+            $target_path = $upload_dir . $filename;
+            if(move_uploaded_file($_FILES['image']['tmp_name'], $target_path)) {
+                // Delete old image if exists
+                if($prop['image_url'] && file_exists($prop['image_url'])) {
+                    unlink($prop['image_url']);
+                }
+                $image_url = $target_path;
+            } else {
+                $error = "❌ Failed to upload new image.";
+            }
         }
 
-        $stmt = $pdo->prepare("UPDATE user_properties SET 
-            title=?, description=?, price=?, city=?, state=?, type=?, image_url=?, updated_at=CURRENT_TIMESTAMP 
-            WHERE id=? AND user_id=?");
-        $stmt->execute([$title, $description, $price, $city, $state, $type, $image_url, $id, $user_id]);
-        header("Location: user_properties.php?msg=updated");
-        exit;
+        if(empty($error)) {
+            $stmt = $pdo->prepare("UPDATE user_properties SET 
+                title=?, description=?, price=?, city=?, state=?, type=?, sqft=?, image_url=?, updated_at=CURRENT_TIMESTAMP 
+                WHERE id=? AND user_id=?");
+            $stmt->execute([$title, $description, $price, $city, $state, $type, $sqft, $image_url, $id, $user_id]);
+            header("Location: user_properties.php?msg=updated");
+            exit;
+        }
     }
 }
 
@@ -70,15 +81,15 @@ include 'header.php';
                     <label class="form-label">Description</label>
                     <textarea name="description" class="form-control" rows="3"><?= htmlspecialchars($prop['description']) ?></textarea>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">City</label>
                     <input type="text" name="city" class="form-control" value="<?= htmlspecialchars($prop['city']) ?>">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">State</label>
                     <input type="text" name="state" class="form-control" value="<?= htmlspecialchars($prop['state']) ?>">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">Type</label>
                     <select name="type" class="form-control">
                         <option value="Flat" <?= ($prop['type']=='Flat')?'selected':'' ?>>Flat</option>
@@ -91,14 +102,18 @@ include 'header.php';
                         <option value="Other" <?= ($prop['type']=='Other')?'selected':'' ?>>Other</option>
                     </select>
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label">Area (Sq Ft)</label>
+                    <input type="number" step="0.01" name="sqft" class="form-control" value="<?= $prop['sqft'] ?? '' ?>" placeholder="e.g. 1200">
+                </div>
                 <div class="col-md-12">
                     <label class="form-label">Current Image</label><br>
                     <?php if($prop['image_url'] && file_exists($prop['image_url'])): ?>
-                        <img src="<?= $prop['image_url'] ?>" style="max-height:150px; border-radius:10px;">
+                        <img src="<?= $prop['image_url'] ?>" style="max-height:150px; border-radius:10px; margin-bottom:10px;">
                     <?php else: ?>
                         <p class="text-muted">No image</p>
                     <?php endif; ?>
-                    <input type="file" name="image" class="form-control mt-2" accept="image/*">
+                    <input type="file" name="image" class="form-control" accept="image/*">
                     <small>Leave empty to keep current image.</small>
                 </div>
             </div>
