@@ -36,20 +36,18 @@ $user_email = '';
 
 if($role == 'user') {
     $user_id = $_SESSION['user_id'];
-    // User data
     $stmt = $pdo->prepare("SELECT name, email, created_at as reg_date FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $user_sidebar = $stmt->fetch();
     $user_email = $user_sidebar['email'] ?? '';
     $reg_date = !empty($user_sidebar['reg_date']) ? date('d M Y', strtotime($user_sidebar['reg_date'])) : 'N/A';
 
-    // Activation date & expiry from active subscription
     $sub = $pdo->prepare("SELECT start_date, end_date FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
     $sub->execute([$user_id]);
     $sub_info = $sub->fetch();
     if($sub_info) {
         $activation_date = date('d M Y', strtotime($sub_info['start_date']));
-        $expiry_date = $sub_info['end_date']; // Y-m-d format
+        $expiry_date = $sub_info['end_date'];
         $days_left = (int) ((strtotime($expiry_date) - time()) / (60 * 60 * 24));
         $days_left = max(0, $days_left);
     } else {
@@ -112,17 +110,7 @@ if($role == 'user') {
         body.role-user .top-bar .user-info .name { color: #0f172a; }
         .top-bar .badge-role { padding: 4px 14px; border-radius: 30px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
         .top-bar .user-dates { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; color: inherit; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .top-bar .countdown-timer {
-            font-weight: 700 !important;
-            color: #dc3545 !important;
-            background: rgba(220, 53, 69, 0.1);
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
+        .top-bar .countdown-timer { font-weight: 700 !important; color: #dc3545 !important; background: rgba(220, 53, 69, 0.1); padding: 2px 12px; border-radius: 20px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; }
         .hamburger-btn { background: transparent; border: none; font-size: 28px; padding: 5px 10px; display: none; cursor: pointer; }
         body.role-admin .hamburger-btn { color: #e2e8f0; }
         body.role-user .hamburger-btn { color: #1e293b; }
@@ -189,9 +177,11 @@ if($role == 'user') {
         <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
+        <!-- ✅ NEW: Dholera Smart City Properties -->
+        <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
         
     <?php else: ?>
-        <!-- User Sidebar -->
+        <!-- User Sidebar (same as before) -->
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
@@ -225,7 +215,7 @@ if($role == 'user') {
                                 <?php if($expiry_date): ?>
                                     <?= $activation_date ?>
                                     <span class="countdown-timer" id="countdownDisplay" data-expiry="<?= $expiry_date ?>">
-                                        <i class="fas fa-clock"></i> ⏳ Loading...
+                                        <i class="fas fa-clock"></i> Loading...
                                     </span>
                                 <?php else: ?>
                                     Not Active
@@ -238,13 +228,12 @@ if($role == 'user') {
         </div>
     </div>
 
-<!-- ✅ Countdown Timer JavaScript -->
+<!-- Countdown Timer JavaScript -->
 <?php if($role == 'user' && $expiry_date): ?>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const expiryStr = document.getElementById('countdownDisplay').getAttribute('data-expiry');
-    const expiry = new Date(expiryStr + 'T23:59:59'); // end of day
-
+    const expiry = new Date(expiryStr + 'T23:59:59');
     function updateCountdown() {
         const now = new Date();
         const diff = expiry - now;
