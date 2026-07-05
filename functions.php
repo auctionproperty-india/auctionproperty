@@ -377,10 +377,10 @@ function saveImage($img) {
     return $path;
 }
 
-// ---- Send New Property Notification (SMTP version) ----
+// ---- Email Functions with Conditional PHPMailer ----
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
-} else {
+} elseif (file_exists(__DIR__ . '/vendor/phpmailer/PHPMailer.php')) {
     require_once __DIR__ . '/vendor/phpmailer/PHPMailer.php';
     require_once __DIR__ . '/vendor/phpmailer/SMTP.php';
     require_once __DIR__ . '/vendor/phpmailer/Exception.php';
@@ -391,32 +391,48 @@ use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
 function sendEmailSMTP($to, $subject, $body, $from_email = null, $from_name = null) {
-    if (!$from_email) $from_email = getenv('SMTP_FROM_EMAIL') ?: 'noreply@yourdomain.com';
-    if (!$from_name) $from_name = getenv('SMTP_FROM_NAME') ?: 'Prime Property';
+    // Check if PHPMailer is available
+    if (class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+        if (!$from_email) $from_email = getenv('SMTP_FROM_EMAIL') ?: 'noreply@yourdomain.com';
+        if (!$from_name) $from_name = getenv('SMTP_FROM_NAME') ?: 'Prime Property';
 
-    $mail = new PHPMailer(true);
-    try {
-        $mail->isSMTP();
-        $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.sendgrid.net';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = getenv('SMTP_USERNAME');
-        $mail->Password   = getenv('SMTP_PASSWORD');
-        $mail->SMTPSecure = getenv('SMTP_SECURE') ?: 'tls';
-        $mail->Port       = getenv('SMTP_PORT') ?: 587;
+        $mail = new PHPMailer(true);
+        try {
+            $mail->isSMTP();
+            $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.sendgrid.net';
+            $mail->SMTPAuth   = true;
+            $mail->Username   = getenv('SMTP_USERNAME');
+            $mail->Password   = getenv('SMTP_PASSWORD');
+            $mail->SMTPSecure = getenv('SMTP_SECURE') ?: 'tls';
+            $mail->Port       = getenv('SMTP_PORT') ?: 587;
 
-        $mail->setFrom($from_email, $from_name);
-        $mail->addAddress($to);
+            $mail->setFrom($from_email, $from_name);
+            $mail->addAddress($to);
 
-        $mail->isHTML(true);
-        $mail->Subject = $subject;
-        $mail->Body    = $body;
+            $mail->isHTML(true);
+            $mail->Subject = $subject;
+            $mail->Body    = $body;
 
-        $mail->send();
-        return true;
-    } catch (Exception $e) {
-        error_log("Email send failed: " . $mail->ErrorInfo);
-        return false;
+            $mail->send();
+            return true;
+        } catch (Exception $e) {
+            error_log("SMTP send failed: " . $mail->ErrorInfo);
+            // Fallback to mail()
+            return sendMailFallback($to, $subject, $body, $from_email, $from_name);
+        }
+    } else {
+        // PHPMailer not available, use mail()
+        return sendMailFallback($to, $subject, $body, $from_email, $from_name);
     }
+}
+
+function sendMailFallback($to, $subject, $body, $from_email = null, $from_name = null) {
+    if (!$from_email) $from_email = 'noreply@' . $_SERVER['HTTP_HOST'];
+    if (!$from_name) $from_name = 'Prime Property';
+    $headers = "MIME-Version: 1.0" . "\r\n";
+    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+    $headers .= "From: $from_name <$from_email>" . "\r\n";
+    return mail($to, $subject, $body, $headers);
 }
 
 function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
