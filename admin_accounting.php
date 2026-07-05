@@ -41,8 +41,8 @@ $balance = getAccountBalance($pdo);
 $entries = getAccountEntries($pdo, 200);
 ?>
 <div class="row g-3 mb-4">
-    <div class="col-md-4"><div class="card p-3 bg-success text-white text-center rounded-4"><h5>Total Income</h5><h2>₹ <?= indianCurrencyFormat($balance['income']) ?></h2></div></div>
-    <div class="col-md-4"><div class="card p-3 bg-danger text-white text-center rounded-4"><h5>Total Expense</h5><h2>₹ <?= indianCurrencyFormat($balance['expense']) ?></h2></div></div>
+    <div class="col-md-4"><div class="card p-3 bg-success text-white text-center rounded-4"><h5>💰 Fund In (Income)</h5><h2>₹ <?= indianCurrencyFormat($balance['income']) ?></h2></div></div>
+    <div class="col-md-4"><div class="card p-3 bg-danger text-white text-center rounded-4"><h5>💸 Expense</h5><h2>₹ <?= indianCurrencyFormat($balance['expense']) ?></h2></div></div>
     <div class="col-md-4"><div class="card p-3 bg-primary text-white text-center rounded-4"><h5>💰 Available Balance</h5><h2>₹ <?= indianCurrencyFormat($balance['balance']) ?></h2></div></div>
 </div>
 
@@ -53,12 +53,20 @@ $entries = getAccountEntries($pdo, 200);
         <div class="row g-3">
             <div class="col-md-2">
                 <select name="type" class="form-control" required>
-                    <option value="income">Income</option>
+                    <option value="income">Fund In (Income)</option>
                     <option value="expense">Expense</option>
                 </select>
             </div>
             <div class="col-md-2"><input type="number" step="0.01" name="amount" class="form-control" placeholder="Amount" required></div>
-            <div class="col-md-3"><input type="text" name="category" class="form-control" placeholder="Category (e.g. Hosting, Payout)" required></div>
+            <div class="col-md-3">
+                <select name="category" class="form-control" required>
+                    <option value="Auction Subscription">Auction Subscription</option>
+                    <option value="Hosting">Hosting</option>
+                    <option value="Payout">Payout</option>
+                    <option value="Salary">Salary</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
             <div class="col-md-3"><input type="text" name="description" class="form-control" placeholder="Description / To whom" required></div>
             <div class="col-md-2"><input type="date" name="entry_date" class="form-control" value="<?= date('Y-m-d') ?>"></div>
         </div>
@@ -74,10 +82,11 @@ $entries = getAccountEntries($pdo, 200);
             <tbody>
             <?php if(count($entries)>0) {
                 foreach($entries as $e) {
-                    $badge = $e['type']=='income' ? 'success' : 'danger';
+                    $type_label = ($e['type'] == 'income') ? 'Fund In' : 'Expense';
+                    $badge = ($e['type'] == 'income') ? 'success' : 'danger';
                     echo "<tr>
                         <td>".date('d M Y', strtotime($e['entry_date']))."</td>
-                        <td><span class='badge bg-$badge'>".$e['type']."</span></td>
+                        <td><span class='badge bg-$badge'>$type_label</span></td>
                         <td>".htmlspecialchars($e['category'])."</td>
                         <td>".htmlspecialchars($e['description'])."</td>
                         <td>₹".indianCurrencyFormat($e['amount'])."</td>
