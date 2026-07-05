@@ -277,7 +277,6 @@ function generateSocialCard($property) {
         $addr_box = imagettfbbox($addr_size, 0, $font_regular, $address);
         $addr_w = $addr_box[2] - $addr_box[0];
         if ($addr_w > $width - 200) {
-            // wrap long address? for simplicity, just truncate
             $address = substr($address, 0, 80) . '...';
             $addr_box = imagettfbbox($addr_size, 0, $font_regular, $address);
             $addr_w = $addr_box[2] - $addr_box[0];
@@ -305,7 +304,6 @@ function generateSocialCard($property) {
             imagefilledrectangle($img, $x_pos, $box_y, $x_pos + $box_w, $box_y + $box_h, $box_color);
             imagerectangle($img, $x_pos, $box_y, $x_pos + $box_w, $box_y + $box_h, $gold);
 
-            // Label (first part before colon)
             $parts = explode(':', $text);
             $label = $parts[0] . ':';
             $value = isset($parts[1]) ? trim($parts[1]) : '';
@@ -375,12 +373,11 @@ function saveImage($img) {
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
     $filename = 'social_' . time() . '_' . bin2hex(random_bytes(6)) . '.png';
     $path = $upload_dir . $filename;
-    // ✅ High Quality (Compression Level 0 = best quality)
     imagepng($img, $path, 0);
     imagedestroy($img);
     return $path;
 }
-?>
+
 // ---- Send New Property Notification to all active users ----
 function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
     // Fetch property details
@@ -393,11 +390,10 @@ function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
     $prop = $stmt->fetch();
     if (!$prop) return false;
 
-    // Get all active users (role = 'user' or 'admin'? we send to all active)
+    // Get all active users (any role except admin? we send to all active users)
     $users = $pdo->query("SELECT email FROM users WHERE status = 'active' AND email IS NOT NULL AND email != ''")->fetchAll();
     if (empty($users)) return false;
 
-    // Build email content
     $base_url = (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
     $detail_url = $base_url . '/property_detail.php?id=' . $property_id . '&source=' . $source;
     $subject = "🏠 New Property Added: " . $prop['title'];
@@ -415,9 +411,10 @@ function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
     $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
     $headers .= "From: Prime Property <noreply@" . $_SERVER['HTTP_HOST'] . ">" . "\r\n";
 
-    // Send to each user
     foreach ($users as $user) {
         mail($user['email'], $subject, $message, $headers);
     }
     return true;
 }
+
+?>
