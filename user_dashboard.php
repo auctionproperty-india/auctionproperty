@@ -65,15 +65,13 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     if($is_today) {
         $badge_html = '<span class="badge bg-danger text-white px-3 py-2" style="border-radius:30px; font-size:0.7rem; position:absolute; top:12px; right:12px; z-index:10; box-shadow:0 4px 12px rgba(220,38,38,0.4);"><i class="fas fa-fire"></i> Today</span>';
     }
+    // Only dark blue, navy, green gradients
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%)', 'text' => 'white'],
+        ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)', 'text' => 'white'],
         ['bg' => 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #4c1d95 0%, #8b5cf6 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #78350f 0%, #f59e0b 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #172554 0%, #6366f1 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 'text' => 'dark'],
+        ['bg' => 'linear-gradient(135deg, #172554 0%, #3b82f6 100%)', 'text' => 'white'],
+        ['bg' => 'linear-gradient(135deg, #0b1120 0%, #1e3a5f 100%)', 'text' => 'white'],
     ];
     $g = $gradients[array_rand($gradients)];
     $text_color = ($g['text'] == 'white') ? '#ffffff' : '#0f172a';
@@ -101,7 +99,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
                 <div style="height:150px; background:rgba(255,255,255,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px); border-top:3px solid <?= $border ?>; padding:10px;">
                     <i class="fas fa-lock" style="font-size:1.8rem; opacity:0.7; color:<?= $text_color ?>;"></i>
                     <span style="font-size:0.8rem; font-weight:600; margin-top:4px; color:<?= $text_color ?>;">🔒 Subscribe to unlock</span>
-                    <a href="user_packages.php" class="btn btn-sm btn-warning mt-2" style="border-radius:30px; font-weight:600; color:#1e293b;">Subscribe Now</a>
+                    <a href="user_packages.php" class="btn btn-sm btn-primary mt-2" style="border-radius:30px; font-weight:600; color:#ffffff; background:#2563eb; border:none;">Subscribe Now</a>
                 </div>
             <?php endif; ?>
         </div>
@@ -127,7 +125,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         right: -10%;
         width: 300px;
         height: 300px;
-        background: rgba(251, 191, 36, 0.08);
+        background: rgba(37, 99, 235, 0.08);
         border-radius: 50%;
     }
     .user-welcome-banner * {
@@ -152,21 +150,23 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         font-weight: 600;
         padding: 8px 20px;
         font-size: 0.9rem;
-        color: #0f172a !important;
+        border: none;
+        color: #ffffff !important;
     }
     .user-welcome-banner .banner-actions .btn-light {
         background: #ffffff !important;
         color: #0f172a !important;
     }
-    .user-welcome-banner .banner-actions .btn-warning {
-        background: #fbbf24 !important;
-        color: #0f172a !important;
+    .user-welcome-banner .banner-actions .btn-primary {
+        background: #2563eb !important;
+        color: #ffffff !important;
+    }
+    .user-welcome-banner .banner-actions .btn-primary:hover {
+        background: #1d4ed8 !important;
     }
     .user-welcome-banner .banner-actions .btn-light:hover {
         background: #e2e8f0 !important;
-    }
-    .user-welcome-banner .banner-actions .btn-warning:hover {
-        background: #f59e0b !important;
+        color: #0f172a !important;
     }
     .user-welcome-banner .banner-stats {
         display: flex;
@@ -210,9 +210,21 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     }
     .subscription-status-inline .status-badge .badge {
         color: #0f172a !important;
+        background-color: #10b981 !important;
+    }
+    .subscription-status-inline .status-badge .badge.bg-warning {
+        background-color: #10b981 !important;
     }
     .subscription-status-inline .status-badge .ms-2 {
         color: rgba(255,255,255,0.7) !important;
+    }
+    .subscription-status-inline .btn-primary {
+        background: #2563eb !important;
+        color: #ffffff !important;
+        border: none;
+    }
+    .subscription-status-inline .btn-primary:hover {
+        background: #1d4ed8 !important;
     }
     .section-title {
         font-weight: 800;
@@ -247,7 +259,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
             <div class="banner-actions">
                 <a href="index.php" class="btn btn-light"><i class="fas fa-th-list me-2"></i>View All Properties</a>
                 <a href="user_properties.php" class="btn btn-light"><i class="fas fa-list me-2"></i>My Properties</a>
-                <a href="user_packages.php" class="btn btn-warning"><i class="fas fa-rocket me-2"></i>Subscribe Now</a>
+                <a href="user_packages.php" class="btn btn-primary"><i class="fas fa-rocket me-2"></i>Subscribe Now</a>
             </div>
         </div>
         <div class="col-md-5 text-md-end">
@@ -267,13 +279,13 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         <?php if($is_subscribed): ?>
             <span class="status-badge text-success">
                 <span class="icon">✅</span> Active
-                <span class="badge bg-warning text-dark ms-2">⏳ <?= $days_left ?> Days Left</span>
+                <span class="badge bg-success ms-2">⏳ <?= $days_left ?> Days Left</span>
                 <span class="ms-2" style="font-size:0.8rem; opacity:0.7;">Activated: <?= $activation_date_formatted ?></span>
             </span>
         <?php else: ?>
             <span class="status-badge text-danger">
                 <span class="icon">❌</span> Not Active
-                <a href="user_packages.php" class="btn btn-sm btn-warning ms-2" style="font-weight:600; color:#1e293b;">Buy Plan</a>
+                <a href="user_packages.php" class="btn btn-primary btn-sm ms-2">Buy Plan</a>
                 <span class="ms-2" style="font-size:0.8rem; opacity:0.7;">Activated: Not Active</span>
             </span>
         <?php endif; ?>
