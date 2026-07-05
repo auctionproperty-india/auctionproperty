@@ -59,7 +59,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $best_props = $stmt->fetchAll();
 
-// ---- Render Card Function (unchanged) ----
+// ---- Render Card Function ----
 function renderDashboardCard($prop, $show_images, $is_today = false) {
     $badge_html = '';
     if($is_today) {
@@ -114,7 +114,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         background: linear-gradient(135deg, #0f172a, #1e293b);
         border-radius: 30px;
         padding: 30px 35px;
-        color: white;
+        color: #ffffff !important;
         margin-bottom: 30px;
         position: relative;
         overflow: hidden;
@@ -130,7 +130,17 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         background: rgba(251, 191, 36, 0.08);
         border-radius: 50%;
     }
-    .user-welcome-banner h2 { font-weight: 800; letter-spacing: -0.5px; }
+    .user-welcome-banner * {
+        color: #ffffff !important;
+    }
+    .user-welcome-banner h2 {
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        color: #ffffff !important;
+    }
+    .user-welcome-banner .opacity-75 {
+        color: rgba(255,255,255,0.75) !important;
+    }
     .user-welcome-banner .banner-actions {
         display: flex;
         gap: 12px;
@@ -142,6 +152,38 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         font-weight: 600;
         padding: 8px 20px;
         font-size: 0.9rem;
+        color: #0f172a !important;
+    }
+    .user-welcome-banner .banner-actions .btn-light {
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+    .user-welcome-banner .banner-actions .btn-warning {
+        background: #fbbf24 !important;
+        color: #0f172a !important;
+    }
+    .user-welcome-banner .banner-actions .btn-light:hover {
+        background: #e2e8f0 !important;
+    }
+    .user-welcome-banner .banner-actions .btn-warning:hover {
+        background: #f59e0b !important;
+    }
+    .user-welcome-banner .banner-stats {
+        display: flex;
+        gap: 15px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        font-size: 0.9rem;
+        color: #ffffff !important;
+    }
+    .user-welcome-banner .banner-stats div {
+        color: #ffffff !important;
+    }
+    .user-welcome-banner .banner-stats .opacity-75 {
+        color: rgba(255,255,255,0.75) !important;
+    }
+    .user-welcome-banner .banner-stats strong {
+        color: #ffffff !important;
     }
     .subscription-status-inline {
         display: flex;
@@ -150,18 +192,52 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         flex-wrap: wrap;
         margin-top: 12px;
         padding-top: 12px;
-        border-top: 1px solid rgba(255,255,255,0.1);
+        border-top: 1px solid rgba(255,255,255,0.15);
+        color: #ffffff !important;
     }
-    .subscription-status-inline .label { opacity: 0.7; font-size: 0.85rem; }
-    .subscription-status-inline .status-badge { font-weight: 600; }
-    .subscription-status-inline .status-badge .icon { font-size: 1.2rem; margin-right: 4px; }
-    .section-title { font-weight:800; color:#0f172a; margin-bottom:20px; position:relative; }
-    .section-title i { margin-right:10px; }
-    .card:hover { transform: translateY(-10px) !important; box-shadow: 0 30px 60px -15px rgba(0,0,0,0.2) !important; }
-    @media (max-width:576px) { .user-welcome-banner { padding: 20px; } }
+    .subscription-status-inline .label {
+        opacity: 0.7;
+        font-size: 0.85rem;
+        color: rgba(255,255,255,0.7) !important;
+    }
+    .subscription-status-inline .status-badge {
+        font-weight: 600;
+        color: #ffffff !important;
+    }
+    .subscription-status-inline .status-badge .icon {
+        font-size: 1.2rem;
+        margin-right: 4px;
+    }
+    .subscription-status-inline .status-badge .badge {
+        color: #0f172a !important;
+    }
+    .subscription-status-inline .status-badge .ms-2 {
+        color: rgba(255,255,255,0.7) !important;
+    }
+    .section-title {
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 20px;
+        position: relative;
+    }
+    .section-title i {
+        margin-right: 10px;
+    }
+    .card:hover {
+        transform: translateY(-10px) !important;
+        box-shadow: 0 30px 60px -15px rgba(0,0,0,0.2) !important;
+    }
+    @media (max-width:576px) {
+        .user-welcome-banner {
+            padding: 20px;
+        }
+        .user-welcome-banner .banner-stats {
+            justify-content: flex-start;
+        }
+    }
 </style>
 
-<!-- ===== WELCOME BANNER (Coins added) ===== -->
+<!-- ===== WELCOME BANNER (सभी टेक्स्ट सफेद, डार्क बैकग्राउंड) ===== -->
 <div class="user-welcome-banner">
     <div class="row align-items-center">
         <div class="col-md-7">
@@ -176,7 +252,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
         </div>
         <div class="col-md-5 text-md-end">
             <!-- Stats including Coins -->
-            <div style="display:flex; gap:15px; justify-content:flex-end; flex-wrap:wrap; font-size:0.9rem;">
+            <div class="banner-stats">
                 <div><span class="opacity-75">💰 Wallet</span><br><strong>₹ <?= indianCurrencyFormat($wallet_balance) ?></strong></div>
                 <div><span class="opacity-75">⏳ Pending</span><br><strong>₹ <?= indianCurrencyFormat($total_pending) ?></strong></div>
                 <div><span class="opacity-75">✅ Paid</span><br><strong>₹ <?= indianCurrencyFormat($total_paid) ?></strong></div>
