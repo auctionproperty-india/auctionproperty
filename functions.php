@@ -177,13 +177,10 @@ function debitWallet($pdo, $user_id, $amount, $description, $reference_id = null
     return $stmt->execute([$user_id, $amount, $description, $reference_id]);
 }
 
-// ===== 🔥 4K Social Image Generator =====
+// ===== 🔥 4K Social Image Generator (Full version – keep yours) =====
+// To avoid missing it, I'll include a placeholder; but you should replace with your full version.
 function generateSocialCard($property) {
-    // This function is very long; I assume you already have it in your file.
-    // To avoid duplication, I'm leaving a placeholder. Copy your existing generateSocialCard code here.
-    // If you don't have it, the system will work without social images.
-    // For completeness, I'll include a minimal version that returns a default image.
-    // But you should replace this with your actual full function.
+    // Keep your existing full function here. If you don't have it, this minimal version will work.
     return $property['image_url'] ?? '';
 }
 function saveImage($img) {
@@ -276,7 +273,7 @@ function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
     return true;
 }
 
-// ===== 🔄 DAILY SPIN SYSTEM (with "force new plan" comments) =====
+// ===== 🔄 DAILY SPIN SYSTEM (Updated with property display) =====
 function getCurrentSlot() {
     $hour = (int)date('H');
     if ($hour >= 0 && $hour < 8) return 1;
@@ -296,7 +293,6 @@ function getSlotTimeRange($slot) {
 function getUserSpinData($pdo, $user_id, $slot = null) {
     if ($slot === null) $slot = getCurrentSlot();
     $today = date('Y-m-d');
-    // ✅ Add a comment to force new plan in PostgreSQL
     $stmt = $pdo->prepare("/* force new plan */ SELECT * FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
     $stmt->execute([$user_id, $today, $slot]);
     $data = $stmt->fetch();
@@ -314,10 +310,26 @@ function getUserSpinData($pdo, $user_id, $slot = null) {
     ];
 }
 
+function getRandomLowPriceProperty($pdo, $exclude_ids = []) {
+    // Get top 10 lowest price properties
+    $sql = "SELECT id, title, price, city, image_url, bank_name FROM properties WHERE status = 'available' ORDER BY price ASC LIMIT 10";
+    $stmt = $pdo->query($sql);
+    $props = $stmt->fetchAll();
+    if (empty($props)) return null;
+    // Filter out already shown
+    $available = array_filter($props, function($p) use ($exclude_ids) {
+        return !in_array($p['id'], $exclude_ids);
+    });
+    if (empty($available)) {
+        // If all excluded, just take first from list
+        $available = $props;
+    }
+    return $available[array_rand($available)];
+}
+
 function performSpin($pdo, $user_id) {
     $today = date('Y-m-d');
     $slot = getCurrentSlot();
-    // ✅ Add a comment to force new plan in PostgreSQL
     $stmt = $pdo->prepare("/* force new plan */ SELECT spins_used, reward_given, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
     $stmt->execute([$user_id, $today, $slot]);
     $data = $stmt->fetch();
@@ -335,33 +347,61 @@ function performSpin($pdo, $user_id) {
     if ($spins_used >= 5) {
         return ['success' => false, 'message' => 'You have already used all spins for this slot.'];
     }
-    $coin_amount = rand(1, 4);
-    $new_coins = $coins_earned + $coin_amount;
-    if ($new_coins > 20) {
-        $coin_amount = 20 - $coins_earned;
-        if ($coin_amount < 1) $coin_amount = 0;
-    }
+
     $new_spins = $spins_used + 1;
-    $new_coins_earned = $coins_earned + $coin_amount;
-    $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = CURRENT_TIMESTAMP WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
-    $stmt->execute([$new_spins, $new_coins_earned, $user_id, $today, $slot]);
-    if ($coin_amount > 0) {
+    $is_fifth = ($new_spins == 5);
+
+    if ($is_fifth) {
+        // Give 20 coins
+        $coin_amount = 20;
         $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
+        $pdo->prepare("UPDATE user_spins SET reward_given = TRUE, spins_used = ?, coins_earned = coins_earned + ? WHERE user_id = ? AND slot_date = ? AND slot_number = ?")
+            ->execute([$new_spins, $coin_amount, $user_id, $today, $slot]);
+        return [
+            'success' => true,
+            'message' => "🎉 You got 20 coins!",
+            'coins' => $coin_amount,
+            'spins_used' => $new_spins,
+            'is_reward' => true,
+            'show_property' => false,
+            'total_coins_earned' => $coins_earned + $coin_amount
+        ];
+    } else {
+        // spins 1-4: show a property
+        if (!isset($_SESSION['shown_properties'])) {
+            $_SESSION['shown_properties'] = [];
+        }
+        $exclude = $_SESSION['shown_properties'];
+        $prop = getRandomLowPriceProperty($pdo, $exclude);
+        if ($prop) {
+            $_SESSION['shown_properties'][] = $prop['id'];
+            if (count($_SESSION['shown_properties']) > 10) array_shift($_SESSION['shown_properties']);
+            $response = [
+                'success' => true,
+                'message' => "🏠 Check out this property!",
+                'spins_used' => $new_spins,
+                'show_property' => true,
+                'property' => $prop,
+                'coins' => 0,
+                'is_reward' => false,
+                'total_coins_earned' => $coins_earned
+            ];
+        } else {
+            $response = [
+                'success' => true,
+                'message' => "No property available.",
+                'spins_used' => $new_spins,
+                'show_property' => false,
+                'coins' => 0,
+                'is_reward' => false,
+                'total_coins_earned' => $coins_earned
+            ];
+        }
+        // Update spins_used (no coins added)
+        $pdo->prepare("UPDATE user_spins SET spins_used = ? WHERE user_id = ? AND slot_date = ? AND slot_number = ?")
+            ->execute([$new_spins, $user_id, $today, $slot]);
+        return $response;
     }
-    $is_reward = ($new_spins == 5);
-    if ($is_reward) {
-        $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
-    }
-    return [
-        'success' => true,
-        'message' => $coin_amount > 0 ? "🎉 +$coin_amount coins!" : "You've reached the max 20 coins for this slot!",
-        'coins' => $coin_amount,
-        'spins_used' => $new_spins,
-        'reward_given' => $is_reward,
-        'is_reward' => $is_reward,
-        'total_coins_earned' => $new_coins_earned,
-        'remaining_spins' => 5 - $new_spins
-    ];
 }
 
 function getSlotStatus($pdo, $user_id, $slot) {
