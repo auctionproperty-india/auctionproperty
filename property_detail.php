@@ -4,8 +4,7 @@ require_once __DIR__ . '/functions.php';
 if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
 $property_id = $_GET['id'] ?? 0;
-$source = $_GET['source'] ?? 'auction'; // default auction
-
+$source = $_GET['source'] ?? 'auction';
 $user_id = $_SESSION['user_id'];
 
 if($source == 'auction') {
@@ -24,13 +23,13 @@ if(!$prop) { die("Property not found!"); }
 if($source == 'auction') {
     $has_subscription = userHasActiveSubscription($pdo, $user_id);
 } else {
-    $has_subscription = true; // customer properties are always visible
+    $has_subscription = true;
 }
 
 include 'header.php'; 
 
-// ---- IF NOT SUBSCRIBED (only for auction) ----
 if(!$has_subscription && $source == 'auction') {
+    // ... (same as before, keep the restricted view) ...
     ?>
     <div class="container py-5">
         <div class="row justify-content-center">
@@ -75,7 +74,7 @@ if(!$has_subscription && $source == 'auction') {
                             <a href="user_packages.php" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow">
                                 <i class="fas fa-rocket me-2"></i> Subscribe Now
                             </a>
-                            <a href="user_dashboard.php" class="btn btn-outline-secondary btn-lg px-4 ms-2 rounded-pill">⬅ Back</a>
+                            <a href="javascript:history.back()" class="btn btn-outline-secondary btn-lg px-4 ms-2 rounded-pill">⬅ Back</a>
                         </div>
                     </div>
                 </div>
@@ -87,18 +86,39 @@ if(!$has_subscription && $source == 'auction') {
     exit;
 }
 
-// ----- SUBSCRIBED or CUSTOMER: Show ALL Details ----
+// ----- SUBSCRIBED or CUSTOMER: Show ALL Details -----
 $gradient = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
 $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image_url'] ?? '');
+
+// ---- Similar Properties (only for auction, based on city and price) ----
+$similar_props = [];
+if($source == 'auction') {
+    $city = $prop['city'] ?? '';
+    $price = (float)$prop['price'];
+    $min_price = $price * 0.7; // 30% less
+    $max_price = $price * 1.3; // 30% more
+    $sql = "SELECT id, title, price, city, image_url, bank_name, auction_date 
+            FROM properties 
+            WHERE status = 'available' 
+            AND id != ? 
+            AND (city ILIKE ? OR city = ?) 
+            AND price BETWEEN ? AND ? 
+            ORDER BY id DESC 
+            LIMIT 5";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$property_id, '%'.$city.'%', $city, $min_price, $max_price]);
+    $similar_props = $stmt->fetchAll();
+}
 ?>
 <div class="container-fluid px-4 mt-4">
     <div class="row justify-content-center">
         <div class="col-lg-10">
-            <a href="<?= ($source == 'auction') ? 'user_dashboard.php' : 'index.php?tab=customer' ?>" class="btn btn-outline-secondary mb-4 shadow-sm rounded-pill px-4">
+            <a href="javascript:history.back()" class="btn btn-outline-secondary mb-4 shadow-sm rounded-pill px-4">
                 <i class="fas fa-arrow-left me-2"></i>Back
             </a>
 
             <div class="card border-0 shadow-xxl" style="border-radius: 28px; overflow: hidden; background: <?= $gradient ?>; color:#fff;">
+                <!-- ... (same header and body as before) ... -->
                 <div class="card-header p-4" style="background: rgba(0,0,0,0.2); border: none;">
                     <div class="d-flex justify-content-between align-items-center flex-wrap">
                         <div>
@@ -110,7 +130,7 @@ $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image
                 </div>
 
                 <div class="card-body p-4">
-                    <!-- All Details -->
+                    <!-- All Details (same as before) -->
                     <div class="row g-4">
                         <div class="col-md-6">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
@@ -132,7 +152,7 @@ $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image
                             </div>
                         </div>
 
-                        <!-- Area and Construction Area (for customer properties) -->
+                        <!-- Area and Construction Area (for customer) -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75"><i class="fas fa-map-pin"></i> City</small>
@@ -147,7 +167,6 @@ $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image
                         </div>
 
                         <?php if($source == 'customer'): ?>
-                            <!-- Customer Property: Show both Area and Construction Area -->
                             <div class="col-md-4">
                                 <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                     <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
@@ -163,7 +182,6 @@ $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image
                             </div>
                             <?php endif; ?>
                         <?php else: ?>
-                            <!-- Auction Property: just area -->
                             <div class="col-md-4">
                                 <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                     <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
@@ -239,6 +257,37 @@ $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image
                             </div>
                         <?php endif; ?>
                     </div>
+
+                    <!-- ===== SIMILAR PROPERTIES SECTION (only for auction) ===== -->
+                    <?php if($source == 'auction' && count($similar_props) > 0): ?>
+                    <div class="mt-5">
+                        <h5 class="text-warning"><i class="fas fa-list-ul me-2"></i>Similar Properties</h5>
+                        <div class="row g-3">
+                            <?php foreach($similar_props as $sim): ?>
+                            <div class="col-md-4">
+                                <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.05); color:#fff;">
+                                    <?php if($show_images && !empty($sim['image_url'])): ?>
+                                        <img src="<?= htmlspecialchars($sim['image_url']) ?>" style="height:150px; object-fit:cover;" alt="<?= htmlspecialchars($sim['title']) ?>">
+                                    <?php else: ?>
+                                        <div style="height:150px; background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center;">
+                                            <i class="fas fa-home fa-2x opacity-50"></i>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="card-body p-3">
+                                        <h6 class="fw-bold"><?= htmlspecialchars($sim['title']) ?></h6>
+                                        <div class="text-muted small">🏦 <?= htmlspecialchars($sim['bank_name'] ?? 'Bank') ?></div>
+                                        <div class="fw-bold text-warning">₹ <?= indianCurrencyFormat($sim['price']) ?></div>
+                                        <div class="small opacity-75"><?= htmlspecialchars($sim['city']) ?></div>
+                                        <a href="property_detail.php?id=<?= $sim['id'] ?>&source=auction" class="btn btn-sm btn-outline-light mt-2 w-100">View</a>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    <!-- ===== END SIMILAR PROPERTIES ===== -->
+
                 </div>
             </div>
         </div>
