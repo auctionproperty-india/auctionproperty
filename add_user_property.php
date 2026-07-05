@@ -9,7 +9,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 
 $user_id = $_SESSION['user_id'];
 
-// Check if user can add more properties
+// Check limit
 $pkg = $pdo->prepare("SELECT p.max_properties FROM users u 
                       LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active' AND s.end_date >= CURRENT_DATE
                       LEFT JOIN packages p ON s.package_id = p.id
@@ -36,6 +36,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
     $city = trim($_POST['city']);
     $state = trim($_POST['state']);
     $type = trim($_POST['type']);
+    $sqft = (float)($_POST['sqft'] ?? 0);
     $image_url = '';
 
     if(empty($title) || $price <= 0) {
@@ -47,15 +48,21 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
             if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
             $ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
             $filename = 'userprop_' . $user_id . '_' . time() . '.' . $ext;
-            move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $filename);
-            $image_url = $upload_dir . $filename;
+            $target_path = $upload_dir . $filename;
+            if(move_uploaded_file($_FILES['image']['tmp_name'], $target_path)) {
+                $image_url = $target_path;
+            } else {
+                $error = "❌ Failed to upload image. Please check directory permissions.";
+            }
         }
 
-        $stmt = $pdo->prepare("INSERT INTO user_properties (user_id, title, description, price, city, state, type, image_url, status) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
-        $stmt->execute([$user_id, $title, $description, $price, $city, $state, $type, $image_url]);
-        header("Location: user_properties.php?msg=added");
-        exit;
+        if(empty($error)) {
+            $stmt = $pdo->prepare("INSERT INTO user_properties (user_id, title, description, price, city, state, type, sqft, image_url, status) 
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+            $stmt->execute([$user_id, $title, $description, $price, $city, $state, $type, $sqft, $image_url]);
+            header("Location: user_properties.php?msg=added");
+            exit;
+        }
     }
 }
 
@@ -79,15 +86,15 @@ include 'header.php';
                     <label class="form-label">Description</label>
                     <textarea name="description" class="form-control" rows="3"></textarea>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">City</label>
                     <input type="text" name="city" class="form-control">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">State</label>
                     <input type="text" name="state" class="form-control">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">Type</label>
                     <select name="type" class="form-control">
                         <option value="Flat">Flat</option>
@@ -100,9 +107,14 @@ include 'header.php';
                         <option value="Other">Other</option>
                     </select>
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label">Area (Sq Ft)</label>
+                    <input type="number" step="0.01" name="sqft" class="form-control" placeholder="e.g. 1200">
+                </div>
                 <div class="col-md-12">
                     <label class="form-label">Upload Image (1 photo)</label>
                     <input type="file" name="image" class="form-control" accept="image/*">
+                    <small class="text-muted">Max file size: 5MB. Supported: JPG, PNG, GIF.</small>
                 </div>
             </div>
             <button type="submit" name="add_property" class="btn btn-primary mt-3">Submit Property</button>
