@@ -5,13 +5,12 @@ require_once __DIR__ . '/functions.php';
 $user_id = $_SESSION['user_id'] ?? null;
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
-// ---- Search parameters ----
+$today_str = date('d M Y');
 $search_city = $_GET['city'] ?? '';
 $search_type = $_GET['type'] ?? '';
 $search_max_price = $_GET['max_price'] ?? '';
-$tab = $_GET['tab'] ?? 'auction'; // 'auction' or 'customer'
+$tab = $_GET['tab'] ?? 'auction';
 
-// ---- Common WHERE for both ----
 $where = [];
 $params = [];
 if(!empty($search_city)) {
@@ -27,7 +26,7 @@ if(!empty($search_max_price)) {
     $params[] = (float)$search_max_price;
 }
 
-// ---- 1. Auction Properties ----
+// ---- Auction Properties ----
 $auction_where = "status = 'available'";
 if(!empty($where)) {
     $auction_where .= " AND " . implode(" AND ", $where);
@@ -37,7 +36,7 @@ $auction_stmt = $pdo->prepare($auction_sql);
 $auction_stmt->execute($params);
 $auction_props = $auction_stmt->fetchAll();
 
-// ---- 2. Customer Properties (only approved) ----
+// ---- Customer Properties ----
 $customer_where = "status = 'approved'";
 if(!empty($where)) {
     $customer_where .= " AND " . implode(" AND ", $where);
@@ -47,12 +46,9 @@ $customer_stmt = $pdo->prepare($customer_sql);
 $customer_stmt->execute($params);
 $customer_props = $customer_stmt->fetchAll();
 
-// ---- Helper function to render cards (both types) ----
+// ---- Render Property Card (Today Badge Removed) ----
 function renderPropertyCard($prop, $show_images, $is_today = false) {
-    $badge_html = '';
-    if($is_today && $prop['source'] == 'auction') {
-        $badge_html = '<span class="badge bg-danger text-white px-3 py-2" style="border-radius:30px; font-size:0.7rem; position:absolute; top:12px; right:12px; z-index:10; box-shadow:0 4px 12px rgba(220,38,38,0.4);"><i class="fas fa-fire"></i> Today</span>';
-    }
+    // ✅ "Today" badge completely removed
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
         ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%)', 'text' => 'white'],
@@ -71,11 +67,10 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     ?>
     <div class="col-md-4 mb-4">
         <div class="property-card" style="position:relative; border-radius:24px; overflow:hidden; box-shadow:<?= $shadow ?>; height:100%; background: <?= $g['bg'] ?>; color:<?= $text_color ?>; transition:all 0.4s; border:1px solid <?= $border ?>;">
-            <?= $badge_html ?>
-            
+            <!-- ✅ No "Today" badge here -->
             <div class="p-4">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Customer') ?></span>
+                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? ($prop['source']=='customer' ? 'Customer' : 'Bank')) ?></span>
                     <?php if(!empty($prop['auction_start_time']) && $prop['source'] == 'auction'): ?>
                         <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                     <?php elseif($prop['source'] == 'customer'): ?>
@@ -207,7 +202,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     <?php if($tab == 'auction'): ?>
         <!-- Auction Properties -->
         <div class="section-title">
-            <i class="fas fa-bolt" style="color:#dc2626;"></i> Auction Properties
+            <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
             <span class="badge bg-primary rounded-pill ms-2"><?= count($auction_props) ?></span>
         </div>
         <div class="row">
