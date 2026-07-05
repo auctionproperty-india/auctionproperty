@@ -64,7 +64,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     ?>
     <div class="col-md-4 mb-4">
         <div class="property-card" style="position:relative; border-radius:24px; overflow:hidden; box-shadow:<?= $shadow ?>; height:100%; background: <?= $g['bg'] ?>; color:<?= $text_color ?>; transition:all 0.4s; border:1px solid <?= $border ?>;">
-            <!-- No "Today" badge -->
             <div class="p-4">
                 <div class="d-flex justify-content-between align-items-center">
                     <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
@@ -81,7 +80,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                     <a href="login.php" class="btn btn-light w-100 mt-3" style="border-radius:16px; font-weight:600; color:#1e293b;">Login to View</a>
                 <?php endif; ?>
             </div>
-            <!-- Image section -->
             <?php if($show_images && !empty($prop['image_url'])): ?>
                 <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="height:200px; width:100%; object-fit:cover; border-top:3px solid <?= $border ?>;" alt="<?= htmlspecialchars($prop['title']) ?>">
             <?php else: ?>
