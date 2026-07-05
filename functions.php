@@ -177,10 +177,9 @@ function debitWallet($pdo, $user_id, $amount, $description, $reference_id = null
     return $stmt->execute([$user_id, $amount, $description, $reference_id]);
 }
 
-// ===== 🔥 4K Social Image Generator (Full version – keep yours) =====
-// To avoid missing it, I'll include a placeholder; but you should replace with your full version.
+// ===== 🔥 4K Social Image Generator =====
 function generateSocialCard($property) {
-    // Keep your existing full function here. If you don't have it, this minimal version will work.
+    // Keep your existing full function here. If not, this minimal version works.
     return $property['image_url'] ?? '';
 }
 function saveImage($img) {
@@ -273,7 +272,7 @@ function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
     return true;
 }
 
-// ===== 🔄 DAILY SPIN SYSTEM (Updated with property display) =====
+// ===== 🔄 DAILY SPIN SYSTEM (Final Version) =====
 function getCurrentSlot() {
     $hour = (int)date('H');
     if ($hour >= 0 && $hour < 8) return 1;
@@ -310,18 +309,47 @@ function getUserSpinData($pdo, $user_id, $slot = null) {
     ];
 }
 
-function getRandomLowPriceProperty($pdo, $exclude_ids = []) {
-    // Get top 10 lowest price properties
-    $sql = "SELECT id, title, price, city, image_url, bank_name FROM properties WHERE status = 'available' ORDER BY price ASC LIMIT 10";
-    $stmt = $pdo->query($sql);
+function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
+    // If type is 'car' then look for type = 'Car' or 'Vehicle', else any property
+    $sql = "SELECT id, title, price, city, image_url, bank_name, type FROM properties WHERE status = 'available'";
+    if ($type) {
+        if ($type == 'car') {
+            $sql .= " AND (type ILIKE '%Car%' OR type ILIKE '%Vehicle%')";
+        } else {
+            $sql .= " AND type NOT ILIKE '%Car%' AND type NOT ILIKE '%Vehicle%'";
+        }
+    }
+    if (!empty($exclude_ids)) {
+        $placeholders = implode(',', array_fill(0, count($exclude_ids), '?'));
+        $sql .= " AND id NOT IN ($placeholders)";
+    }
+    $sql .= " ORDER BY price ASC LIMIT 10";
+    $stmt = $pdo->prepare($sql);
+    if (!empty($exclude_ids)) {
+        $stmt->execute($exclude_ids);
+    } else {
+        $stmt->execute();
+    }
     $props = $stmt->fetchAll();
-    if (empty($props)) return null;
-    // Filter out already shown
+    if (empty($props)) {
+        // fallback: get any without type filter
+        $sql = "SELECT id, title, price, city, image_url, bank_name, type FROM properties WHERE status = 'available'";
+        if (!empty($exclude_ids)) {
+            $placeholders = implode(',', array_fill(0, count($exclude_ids), '?'));
+            $sql .= " AND id NOT IN ($placeholders)";
+        }
+        $sql .= " ORDER BY price ASC LIMIT 10";
+        $stmt = $pdo->prepare($sql);
+        if (!empty($exclude_ids)) $stmt->execute($exclude_ids);
+        else $stmt->execute();
+        $props = $stmt->fetchAll();
+        if (empty($props)) return null;
+    }
+    // filter out excluded again just in case
     $available = array_filter($props, function($p) use ($exclude_ids) {
         return !in_array($p['id'], $exclude_ids);
     });
     if (empty($available)) {
-        // If all excluded, just take first from list
         $available = $props;
     }
     return $available[array_rand($available)];
@@ -351,8 +379,14 @@ function performSpin($pdo, $user_id) {
     $new_spins = $spins_used + 1;
     $is_fifth = ($new_spins == 5);
 
+    // Manage session for shown properties per slot
+    if (!isset($_SESSION['shown_properties'])) {
+        $_SESSION['shown_properties'] = [];
+    }
+    $exclude = $_SESSION['shown_properties'];
+
     if ($is_fifth) {
-        // Give 20 coins
+        // 5th spin: give 20 coins, no property
         $coin_amount = 20;
         $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
         $pdo->prepare("UPDATE user_spins SET reward_given = TRUE, spins_used = ?, coins_earned = coins_earned + ? WHERE user_id = ? AND slot_date = ? AND slot_number = ?")
@@ -367,24 +401,27 @@ function performSpin($pdo, $user_id) {
             'total_coins_earned' => $coins_earned + $coin_amount
         ];
     } else {
-        // spins 1-4: show a property
-        if (!isset($_SESSION['shown_properties'])) {
-            $_SESSION['shown_properties'] = [];
+        // spins 1-4: show property or car alternately
+        // We'll alternate between car and property based on spin number: spin 1 -> car, spin 2 -> property, spin 3 -> car, spin 4 -> property
+        $type = ($new_spins % 2 == 1) ? 'car' : 'property'; // odd spins = car, even = property
+        $prop = getRandomLowPriceProperty($pdo, $exclude, $type);
+        // If no property of that type, fallback to any
+        if (!$prop) {
+            $prop = getRandomLowPriceProperty($pdo, $exclude);
         }
-        $exclude = $_SESSION['shown_properties'];
-        $prop = getRandomLowPriceProperty($pdo, $exclude);
         if ($prop) {
             $_SESSION['shown_properties'][] = $prop['id'];
             if (count($_SESSION['shown_properties']) > 10) array_shift($_SESSION['shown_properties']);
             $response = [
                 'success' => true,
-                'message' => "🏠 Check out this property!",
+                'message' => ($type == 'car') ? "🚗 Check out this car!" : "🏠 Check out this property!",
                 'spins_used' => $new_spins,
                 'show_property' => true,
                 'property' => $prop,
                 'coins' => 0,
                 'is_reward' => false,
-                'total_coins_earned' => $coins_earned
+                'total_coins_earned' => $coins_earned,
+                'type' => $type
             ];
         } else {
             $response = [
