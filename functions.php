@@ -381,3 +381,43 @@ function saveImage($img) {
     return $path;
 }
 ?>
+// ---- Send New Property Notification to all active users ----
+function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
+    // Fetch property details
+    if ($source == 'auction') {
+        $stmt = $pdo->prepare("SELECT title, price, city, id FROM properties WHERE id = ?");
+    } else {
+        $stmt = $pdo->prepare("SELECT title, price, city, id FROM user_properties WHERE id = ?");
+    }
+    $stmt->execute([$property_id]);
+    $prop = $stmt->fetch();
+    if (!$prop) return false;
+
+    // Get all active users (role = 'user' or 'admin'? we send to all active)
+    $users = $pdo->query("SELECT email FROM users WHERE status = 'active' AND email IS NOT NULL AND email != ''")->fetchAll();
+    if (empty($users)) return false;
+
+    // Build email content
+    $base_url = (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
+    $detail_url = $base_url . '/property_detail.php?id=' . $property_id . '&source=' . $source;
+    $subject = "🏠 New Property Added: " . $prop['title'];
+    $message = "<html><body style='font-family: Arial, sans-serif;'>";
+    $message .= "<h2>New Property Alert!</h2>";
+    $message .= "<p>A new property has been added to our platform.</p>";
+    $message .= "<p><strong>Title:</strong> " . htmlspecialchars($prop['title']) . "</p>";
+    $message .= "<p><strong>Price:</strong> ₹ " . indianCurrencyFormat($prop['price']) . "</p>";
+    $message .= "<p><strong>City:</strong> " . htmlspecialchars($prop['city']) . "</p>";
+    $message .= "<p><a href='$detail_url' style='display:inline-block; background:#2563eb; color:#fff; padding:10px 20px; text-decoration:none; border-radius:5px;'>View Property</a></p>";
+    $message .= "<p style='margin-top:20px; font-size:0.8rem; color:#666;'>You are receiving this email because you are registered on our platform.</p>";
+    $message .= "</body></html>";
+
+    $headers = "MIME-Version: 1.0" . "\r\n";
+    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+    $headers .= "From: Prime Property <noreply@" . $_SERVER['HTTP_HOST'] . ">" . "\r\n";
+
+    // Send to each user
+    foreach ($users as $user) {
+        mail($user['email'], $subject, $message, $headers);
+    }
+    return true;
+}
