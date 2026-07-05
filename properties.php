@@ -150,8 +150,8 @@ if(isset($_POST['add_property'])) {
     ]);
     
     $new_id = $pdo->lastInsertId();
-    // Send email notification to all users (if function exists)
-    if(function_exists('sendNewPropertyNotification')) {
+    // ✅ Send email notification to all users
+    if (function_exists('sendNewPropertyNotification')) {
         sendNewPropertyNotification($pdo, $new_id, 'auction');
     }
     
