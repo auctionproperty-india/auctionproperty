@@ -150,7 +150,12 @@ if(isset($_POST['add_property'])) {
         safeString($_POST['contact_number'] ?? $default_contact),
         $auction_date_db
     ]);
-    
+    // After successful INSERT
+$new_id = $pdo->lastInsertId();
+// Send email notification to all users
+sendNewPropertyNotification($pdo, $new_id, 'auction');
+header("Location: properties.php?added=1");
+exit;
     header("Location: properties.php?added=1");
     exit;
 }
