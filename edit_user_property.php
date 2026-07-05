@@ -27,6 +27,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_property'])) {
     $state = trim($_POST['state']);
     $type = trim($_POST['type']);
     $sqft = (float)($_POST['sqft'] ?? 0);
+    $construction_sqft = (float)($_POST['construction_sqft'] ?? 0);
     $image_url = $prop['image_url'];
 
     if(empty($title) || $price <= 0) {
@@ -52,9 +53,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_property'])) {
 
         if(empty($error)) {
             $stmt = $pdo->prepare("UPDATE user_properties SET 
-                title=?, description=?, price=?, city=?, state=?, type=?, sqft=?, image_url=?, updated_at=CURRENT_TIMESTAMP 
+                title=?, description=?, price=?, city=?, state=?, type=?, sqft=?, construction_sqft=?, image_url=?, updated_at=CURRENT_TIMESTAMP 
                 WHERE id=? AND user_id=?");
-            $stmt->execute([$title, $description, $price, $city, $state, $type, $sqft, $image_url, $id, $user_id]);
+            $stmt->execute([$title, $description, $price, $city, $state, $type, $sqft, $construction_sqft, $image_url, $id, $user_id]);
             header("Location: user_properties.php?msg=updated");
             exit;
         }
@@ -105,6 +106,10 @@ include 'header.php';
                 <div class="col-md-3">
                     <label class="form-label">Area (Sq Ft)</label>
                     <input type="number" step="0.01" name="sqft" class="form-control" value="<?= $prop['sqft'] ?? '' ?>" placeholder="e.g. 1200">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Construction Area (Sq Ft)</label>
+                    <input type="number" step="0.01" name="construction_sqft" class="form-control" value="<?= $prop['construction_sqft'] ?? '' ?>" placeholder="e.g. 800">
                 </div>
                 <div class="col-md-12">
                     <label class="form-label">Current Image</label><br>
