@@ -21,8 +21,6 @@ if($source == 'auction') {
 }
 if(!$prop) { die("Property not found!"); }
 
-// For customer properties, we show full detail regardless of subscription? Actually, we can show all because they are user-listed.
-// But we'll keep subscription check for auction properties only.
 if($source == 'auction') {
     $has_subscription = userHasActiveSubscription($pdo, $user_id);
 } else {
@@ -33,7 +31,6 @@ include 'header.php';
 
 // ---- IF NOT SUBSCRIBED (only for auction) ----
 if(!$has_subscription && $source == 'auction') {
-    // Show only 4 fields
     ?>
     <div class="container py-5">
         <div class="row justify-content-center">
@@ -135,6 +132,7 @@ $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image
                             </div>
                         </div>
 
+                        <!-- Area and Construction Area (for customer properties) -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75"><i class="fas fa-map-pin"></i> City</small>
@@ -147,12 +145,32 @@ $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image
                                 <h6 class="fw-bold"><?= htmlspecialchars($prop['state'] ?? 'N/A') ?></h6>
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
-                                <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
-                                <h6 class="fw-bold"><?= $prop['sqft'] ?? ($prop['area'] ?? 'N/A') ?> Sq Ft</h6>
+
+                        <?php if($source == 'customer'): ?>
+                            <!-- Customer Property: Show both Area and Construction Area -->
+                            <div class="col-md-4">
+                                <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
+                                    <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
+                                    <h6 class="fw-bold"><?= $prop['sqft'] ?? 'N/A' ?> Sq Ft</h6>
+                                </div>
                             </div>
-                        </div>
+                            <?php if(!empty($prop['construction_sqft']) && $prop['construction_sqft'] > 0): ?>
+                            <div class="col-md-4">
+                                <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
+                                    <small class="text-uppercase opacity-75"><i class="fas fa-building"></i> Construction Area</small>
+                                    <h6 class="fw-bold"><?= $prop['construction_sqft'] ?> Sq Ft</h6>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <!-- Auction Property: just area -->
+                            <div class="col-md-4">
+                                <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
+                                    <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
+                                    <h6 class="fw-bold"><?= $prop['sqft'] ?? 'N/A' ?> Sq Ft</h6>
+                                </div>
+                            </div>
+                        <?php endif; ?>
 
                         <!-- Price -->
                         <div class="col-md-4">
