@@ -67,27 +67,42 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // ---- UPDATE Registration, Activation & End Dates ----
+    // ---- UPDATE Registration, Activation & End Dates (PostgreSQL compatible) ----
     if(isset($_POST['update_dates']) && isset($_POST['user_id'])) {
         $uid = (int)$_POST['user_id'];
         $new_reg_date = $_POST['reg_date'] ?? null;
         $new_act_date = $_POST['activation_date'] ?? null;
         $new_end_date = $_POST['end_date'] ?? null;
 
+        // Update registration date
         if(!empty($new_reg_date)) {
             $reg_datetime = date('Y-m-d H:i:s', strtotime($new_reg_date));
             $pdo->prepare("UPDATE users SET created_at = ? WHERE id = ?")->execute([$reg_datetime, $uid]);
         }
+
+        // Update activation date (start_date) – using subquery to get the active subscription id
         if(!empty($new_act_date)) {
             $act_datetime = date('Y-m-d', strtotime($new_act_date));
-            $pdo->prepare("UPDATE subscriptions SET start_date = ? WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1")
-                ->execute([$act_datetime, $uid]);
+            // First find the active subscription id
+            $sub_id = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
+            $sub_id->execute([$uid]);
+            $sid = $sub_id->fetchColumn();
+            if($sid) {
+                $pdo->prepare("UPDATE subscriptions SET start_date = ? WHERE id = ?")->execute([$act_datetime, $sid]);
+            }
         }
+
+        // Update end date – using subquery
         if(!empty($new_end_date)) {
             $end_datetime = date('Y-m-d', strtotime($new_end_date));
-            $pdo->prepare("UPDATE subscriptions SET end_date = ? WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1")
-                ->execute([$end_datetime, $uid]);
+            $sub_id = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
+            $sub_id->execute([$uid]);
+            $sid = $sub_id->fetchColumn();
+            if($sid) {
+                $pdo->prepare("UPDATE subscriptions SET end_date = ? WHERE id = ?")->execute([$end_datetime, $sid]);
+            }
         }
+
         $_SESSION['new_pass_display'] = "✅ Registration, Activation & End dates updated!";
         header("Location: admin_dashboard.php");
         exit;
