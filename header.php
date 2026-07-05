@@ -112,7 +112,17 @@ if($role == 'user') {
         body.role-user .top-bar .user-info .name { color: #0f172a; }
         .top-bar .badge-role { padding: 4px 14px; border-radius: 30px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
         .top-bar .user-dates { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; color: inherit; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .top-bar .countdown-timer { font-weight: 600; color: #fbbf24; background: rgba(0,0,0,0.1); padding: 0 8px; border-radius: 4px; }
+        .top-bar .countdown-timer {
+            font-weight: 700 !important;
+            color: #dc3545 !important;
+            background: rgba(220, 53, 69, 0.1);
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
         .hamburger-btn { background: transparent; border: none; font-size: 28px; padding: 5px 10px; display: none; cursor: pointer; }
         body.role-admin .hamburger-btn { color: #e2e8f0; }
         body.role-user .hamburger-btn { color: #1e293b; }
@@ -154,8 +164,7 @@ if($role == 'user') {
     <?php if($role == 'admin'): ?>
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <?php if(hasViewPermission('properties', $pdo)): ?>
-            <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
-        <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
+            <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
         <?php endif; ?>
         <?php if($is_super_admin): ?>
             <a href="admin_dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
@@ -179,17 +188,18 @@ if($role == 'user') {
         <?php endif; ?>
         <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
+        <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
         
     <?php else: ?>
         <!-- User Sidebar -->
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        <a href="user_properties.php"><i class="fas fa-home"></i> <span>My Properties</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
         <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
         <a href="user_referrals.php"><i class="fas fa-link"></i> <span>Referrals</span></a>
         <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
         <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
+        <a href="user_properties.php"><i class="fas fa-home"></i> <span>My Properties</span></a>
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
     <?php endif; ?>
     
@@ -214,7 +224,9 @@ if($role == 'user') {
                             <span>✅ Act: 
                                 <?php if($expiry_date): ?>
                                     <?= $activation_date ?>
-                                    <span class="countdown-timer" id="countdownDisplay" data-expiry="<?= $expiry_date ?>">⏳ Loading...</span>
+                                    <span class="countdown-timer" id="countdownDisplay" data-expiry="<?= $expiry_date ?>">
+                                        <i class="fas fa-clock"></i> ⏳ Loading...
+                                    </span>
                                 <?php else: ?>
                                     Not Active
                                 <?php endif; ?>
@@ -237,7 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const now = new Date();
         const diff = expiry - now;
         if (diff <= 0) {
-            document.getElementById('countdownDisplay').innerHTML = '⏳ Expired';
+            document.getElementById('countdownDisplay').innerHTML = '<i class="fas fa-clock"></i> Expired';
             return;
         }
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -245,7 +257,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
         document.getElementById('countdownDisplay').innerHTML = 
-            '⏳ ' + days + 'd ' + hours + 'h ' + minutes + 'm ' + seconds + 's remaining';
+            '<i class="fas fa-clock"></i> ' + days + 'd ' + hours + 'h ' + minutes + 'm ' + seconds + 's remaining';
     }
     updateCountdown();
     setInterval(updateCountdown, 1000);
