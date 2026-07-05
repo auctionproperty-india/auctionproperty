@@ -22,7 +22,7 @@ $pkg = $pdo->prepare("SELECT p.max_properties FROM users u
                       WHERE u.id = ? ORDER BY s.id DESC LIMIT 1");
 $pkg->execute([$user_id]);
 $max_props = $pkg->fetchColumn();
-if(!$max_props) $max_props = 1; // default free
+if(!$max_props) $max_props = 1;
 
 $used_props = count($props);
 $can_add = ($used_props < $max_props);
@@ -62,8 +62,12 @@ $can_add = ($used_props < $max_props);
             ?>
                 <div class="col-md-4 mb-4">
                     <div class="property-card">
-                        <?php if($p['image_url'] && file_exists($p['image_url'])): ?>
-                            <img src="<?= $p['image_url'] ?>" alt="<?= htmlspecialchars($p['title']) ?>">
+                        <?php if($p['image_url']): ?>
+                            <img src="<?= htmlspecialchars($p['image_url']) ?>" alt="<?= htmlspecialchars($p['title']) ?>" 
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div style="display:none; height:180px; background:#f1f5f9; align-items:center; justify-content:center; color:#94a3b8;">
+                                <i class="fas fa-image fa-3x"></i>
+                            </div>
                         <?php else: ?>
                             <div style="height:180px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8;">
                                 <i class="fas fa-image fa-3x"></i>
@@ -71,7 +75,11 @@ $can_add = ($used_props < $max_props);
                         <?php endif; ?>
                         <div class="p-3">
                             <h5><?= htmlspecialchars($p['title']) ?></h5>
-                            <p class="text-muted small"><?= htmlspecialchars($p['city']) ?>, <?= htmlspecialchars($p['state']) ?></p>
+                            <p class="text-muted small">
+                                <?= htmlspecialchars($p['city']) ?>, <?= htmlspecialchars($p['state']) ?>
+                                <?php if(!empty($p['sqft'])): ?> | Area: <?= $p['sqft'] ?> Sq Ft <?php endif; ?>
+                                <?php if(!empty($p['construction_sqft'])): ?> | Built-up: <?= $p['construction_sqft'] ?> Sq Ft <?php endif; ?>
+                            </p>
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="fw-bold">₹ <?= indianCurrencyFormat($p['price']) ?></span>
                                 <span class="badge badge-<?= $status_class ?>"><?= ucfirst($p['status']) ?></span>
