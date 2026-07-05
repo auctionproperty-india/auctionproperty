@@ -40,13 +40,13 @@ $wallet_balance = getUserWalletBalance($pdo, $user_id);
 // ---- Show Images ----
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
-// ---- Today's Auctions (using auction_date) ----
+// ---- Today's Auctions ----
 $today_sql = "SELECT * FROM properties WHERE status = 'available' AND auction_date = CURRENT_DATE ORDER BY id DESC";
 $today_stmt = $pdo->prepare($today_sql);
 $today_stmt->execute();
 $today_props = $today_stmt->fetchAll();
 
-// ---- Best Deals (10 Lowest Price) ----
+// ---- Best Deals ----
 $sql = "SELECT * FROM properties WHERE status = 'available'";
 $params = [];
 if(!empty($user_city)) {
@@ -58,7 +58,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $best_props = $stmt->fetchAll();
 
-// ---- Render Dashboard Card (without Today badge) ----
+// ---- Render Dashboard Card ----
 function renderDashboardCard($prop, $show_images, $is_today = false) {
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
@@ -103,7 +103,7 @@ function renderDashboardCard($prop, $show_images, $is_today = false) {
     <?php
 }
 
-// ---- Get all three slot statuses ----
+// ---- Get slot statuses ----
 $slot_statuses = [];
 for ($slot = 1; $slot <= 3; $slot++) {
     $slot_statuses[$slot] = getSlotStatus($pdo, $user_id, $slot);
@@ -149,7 +149,6 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
     .card:hover { transform: translateY(-10px) !important; box-shadow: 0 30px 60px -15px rgba(0,0,0,0.2) !important; }
     .no-auction-msg { background: #f8fafc; border-radius: 30px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
     .no-auction-msg i { font-size: 2.5rem; opacity:0.3; }
-    /* Spinner Styles */
     .spin-wheel { transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99); }
     .spin-wheel.pulse { animation: spinPulse 1s infinite; }
     @keyframes spinPulse {
@@ -175,10 +174,11 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
     .slot-card.claimed { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); }
     .slot-card.current { background: rgba(37, 99, 235, 0.15); border-color: rgba(37, 99, 235, 0.3); }
     .slot-card.upcoming { background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.05); }
+    .modal-content { border: none; }
     @media (max-width:576px) { .user-welcome-banner { padding: 20px; } .user-welcome-banner .banner-stats { justify-content: flex-start; } }
 </style>
 
-<!-- ===== WELCOME BANNER (with View All Properties, My Properties, Subscribe) ===== -->
+<!-- ===== WELCOME BANNER ===== -->
 <div class="user-welcome-banner">
     <div class="row align-items-center">
         <div class="col-md-7">
@@ -288,6 +288,27 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
     <?php endif; ?>
 </div>
 
+<!-- ===== PROPERTY MODAL ===== -->
+<div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff;">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h5 class="modal-title"><i class="fas fa-home me-2" style="color: #fbbf24;"></i>🏠 Low Price Property</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div id="propertyModalContent">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal"><i class="fas fa-undo-alt me-2"></i>Back to Spin</button>
+                <a href="#" id="viewPropertyLink" class="btn btn-primary" target="_blank">View Details</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ===== TODAY'S AUCTIONS ===== -->
 <?php if(count($today_props) > 0): ?>
     <div class="section-title">
@@ -334,9 +355,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const spinCount = document.getElementById('spinCount');
     const spinMessage = document.getElementById('spinMessage');
     const slotCoins = document.getElementById('slotCoins');
+    const propertyModal = new bootstrap.Modal(document.getElementById('propertyModal'));
+    const propertyModalContent = document.getElementById('propertyModalContent');
+    const viewPropertyLink = document.getElementById('viewPropertyLink');
+
     if (!spinBtn) return;
     const segments = [0, 72, 144, 216, 288];
     let currentRotation = 0;
+
     spinBtn.addEventListener('click', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
@@ -353,20 +379,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     spinCount.textContent = data.spins_used;
                     slotCoins.textContent = data.total_coins_earned;
-                    if (data.coins > 0) {
+                    if (data.is_reward) {
                         spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
                         showCoinAnimation(data.coins);
-                    } else {
-                        spinMessage.innerHTML = `⚠️ You've reached the max 20 coins for this slot!`;
-                    }
-                    if (data.is_reward) {
                         launchConfetti();
-                        spinMessage.innerHTML = `🎊 Congratulations! You completed the slot! Total coins: ${data.total_coins_earned}`;
-                    }
-                    if (data.spins_used >= 5) {
-                        spinBtn.disabled = true;
-                        spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
+                        // Update coins in banner
+                        const coinSpan = document.querySelector('.banner-stats strong:last-child');
+                        if (coinSpan) {
+                            let current = parseInt(coinSpan.textContent);
+                            if (!isNaN(current)) {
+                                coinSpan.textContent = current + data.coins;
+                            }
+                        }
+                        if (data.spins_used >= 5) {
+                            spinBtn.disabled = true;
+                            spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
+                        } else {
+                            spinBtn.disabled = false;
+                        }
+                    } else if (data.show_property && data.property) {
+                        const p = data.property;
+                        const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
+                        propertyModalContent.innerHTML = `
+                            ${imageHtml}
+                            <h5 class="fw-bold">${p.title}</h5>
+                            <p class="text-muted">🏦 ${p.bank_name || 'Bank'}</p>
+                            <p class="text-warning fw-bold">₹ ${parseInt(p.price).toLocaleString('en-IN')}</p>
+                            <p><i class="fas fa-map-pin"></i> ${p.city || 'N/A'}</p>
+                        `;
+                        viewPropertyLink.href = `property_detail.php?id=${p.id}&source=auction`;
+                        propertyModal.show();
+                        spinMessage.innerHTML = `🏠 Check out this property!`;
+                        // Re-enable spin after modal close
+                        propertyModal._element.addEventListener('hidden.bs.modal', function () {
+                            spinBtn.disabled = false;
+                        });
                     } else {
+                        spinMessage.innerHTML = data.message || 'Spin done!';
                         spinBtn.disabled = false;
                     }
                 } else {
@@ -380,6 +429,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Spin error:', error);
             });
     });
+
     function showCoinAnimation(coins) {
         const toast = document.createElement('div');
         toast.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#10b981; color:white; padding:16px 24px; border-radius:12px; font-weight:bold; box-shadow:0 10px 30px rgba(0,0,0,0.2); z-index:9999; animation: slideIn 0.5s ease;';
@@ -391,6 +441,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => toast.remove(), 500);
         }, 3000);
     }
+
     function launchConfetti() {
         const container = document.createElement('div');
         container.className = 'confetti-container';
