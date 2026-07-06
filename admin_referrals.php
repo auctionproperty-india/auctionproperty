@@ -10,14 +10,20 @@ if(!hasViewPermission('referrals', $pdo)) {
     die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page.</div>");
 }
 
-// ---- Get Global TDS & Admin Charge from settings ----
+// ---- Helper to get user bank details ----
+function getUserBankDetails($pdo, $user_id) {
+    $stmt = $pdo->prepare("SELECT bank_name, account_number, ifsc FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    return $stmt->fetch();
+}
+
+// ---- Global functions ----
 function getGlobalDeductions($pdo) {
     $tds = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='tds_percent'")->fetchColumn();
     $admin = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='admin_charge_percent'")->fetchColumn();
     return ['tds' => (float)$tds ?: 10, 'admin' => (float)$admin ?: 5];
 }
 
-// ---- Helper function to calculate net ----
 function calculateNet($amount, $tds_percent, $admin_charge_percent) {
     $tds = ($amount * $tds_percent) / 100;
     $admin_charge = ($amount * $admin_charge_percent) / 100;
@@ -25,7 +31,6 @@ function calculateNet($amount, $tds_percent, $admin_charge_percent) {
     return ['tds' => $tds, 'admin_charge' => $admin_charge, 'net' => $net];
 }
 
-// ---- Helper function to activate subscription ----
 function activateSubscriptionForUser($pdo, $user_id, $package_id, $duration_months = 1) {
     $stmt = $pdo->prepare("SELECT id, end_date FROM subscriptions WHERE user_id = ? AND package_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
     $stmt->execute([$user_id, $package_id]);
@@ -156,7 +161,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pay_all'])) {
 
 // ---- Manual Add Referral Payout ----
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_manual_payout'])) {
-    // ... (same as before, no changes) ...
     if(!hasEditPermission('referrals', $pdo)) {
         die("<div class='alert alert-danger m-5'>❌ You do not have permission to add referrals.</div>");
     }
@@ -192,7 +196,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_manual_payout'])) {
 
 include 'header.php';
 
-// Get global defaults
 $defaults = getGlobalDeductions($pdo);
 
 // ---- Fetch pending groups ----
@@ -238,7 +241,6 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
     <div class="card border-0 shadow-sm p-3 mb-4" style="background: #f8fafc; border-radius: 16px;">
         <h5><i class="fas fa-plus-circle me-2" style="color: #2563eb;"></i>Manual Add Referral Payout</h5>
         <form method="POST" class="row g-2 align-items-end">
-            <!-- ... (same as before) ... -->
             <div class="col-md-3">
                 <label class="form-label small">Referrer</label>
                 <select name="referrer_id" class="form-select form-select-sm" required>
@@ -287,7 +289,7 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
         </script>
     </div>
 
-    <!-- Pending Payouts (Grouped) -->
+    <!-- ===== Pending Payouts (Grouped by Referrer) ===== -->
     <h5 class="mt-4">Pending Payouts</h5>
     <?php if(count($pendingGroups) > 0): ?>
         <div class="table-responsive">
@@ -305,6 +307,8 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                 <?php foreach($pendingGroups as $group): 
                     $gross = $group['total_amount'];
                     $calc = calculateNet($gross, $defaults['tds'], $defaults['admin']);
+                    // Fetch bank details for this referrer
+                    $bank = getUserBankDetails($pdo, $group['referrer_id']);
                 ?>
                     <tr>
                         <td><strong><?= htmlspecialchars($group['referrer_name']) ?></strong><br><small><?= htmlspecialchars($group['referrer_email']) ?></small></td>
@@ -332,15 +336,15 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                                         </div>
                                         <div class="col-md-2">
                                             <label class="form-label small">Bank</label>
-                                            <input type="text" name="bank_name" class="form-control form-control-sm" placeholder="Bank" required>
+                                            <input type="text" name="bank_name" class="form-control form-control-sm" value="<?= htmlspecialchars($bank['bank_name'] ?? '') ?>" placeholder="Bank">
                                         </div>
                                         <div class="col-md-2">
                                             <label class="form-label small">A/c No.</label>
-                                            <input type="text" name="account_number" class="form-control form-control-sm" placeholder="A/c No." required>
+                                            <input type="text" name="account_number" class="form-control form-control-sm" value="<?= htmlspecialchars($bank['account_number'] ?? '') ?>" placeholder="A/c No.">
                                         </div>
                                         <div class="col-md-2">
                                             <label class="form-label small">IFSC</label>
-                                            <input type="text" name="ifsc" class="form-control form-control-sm" placeholder="IFSC" required>
+                                            <input type="text" name="ifsc" class="form-control form-control-sm" value="<?= htmlspecialchars($bank['ifsc'] ?? '') ?>" placeholder="IFSC">
                                         </div>
                                         <div class="col-md-2">
                                             <label class="form-label small">UTR</label>
@@ -383,7 +387,7 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
         </div>
     <?php else: echo "<p class='text-muted'>No pending payouts.</p>"; endif; ?>
 
-    <!-- Individual Pending Items -->
+    <!-- ===== Individual Pending Items ===== -->
     <h5 class="mt-4">Individual Pending Referrals</h5>
     <?php
     $individualPending = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_name, p.name as package_name 
@@ -410,6 +414,8 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                 <tbody>
                 <?php foreach($individualPending as $p): 
                     $calc = calculateNet($p['amount'], $defaults['tds'], $defaults['admin']);
+                    // Fetch bank details for this referrer
+                    $bank = getUserBankDetails($pdo, $p['user_id']);
                 ?>
                     <tr>
                         <td><?= htmlspecialchars($p['referrer_name']) ?></td>
@@ -422,11 +428,11 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                         <td><?= $p['referred_activation_date'] ? date('d M Y', strtotime($p['referred_activation_date'])) : 'N/A' ?></td>
                         <td>
                             <form method="POST" action="?pay=1&id=<?= $p['id'] ?>" class="row g-1">
-                                <div class="col-md-2"><input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="<?= $defaults['tds'] ?>" placeholder="TDS %"></div>
-                                <div class="col-md-2"><input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="<?= $defaults['admin'] ?>" placeholder="Admin %"></div>
-                                <div class="col-md-2"><input type="text" name="bank_name" class="form-control form-control-sm" placeholder="Bank"></div>
-                                <div class="col-md-2"><input type="text" name="account_number" class="form-control form-control-sm" placeholder="A/c No."></div>
-                                <div class="col-md-2"><input type="text" name="ifsc" class="form-control form-control-sm" placeholder="IFSC"></div>
+                                <div class="col-md-2"><input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="<?= $defaults['tds'] ?>" placeholder="TDS %" required></div>
+                                <div class="col-md-2"><input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="<?= $defaults['admin'] ?>" placeholder="Admin %" required></div>
+                                <div class="col-md-2"><input type="text" name="bank_name" class="form-control form-control-sm" value="<?= htmlspecialchars($bank['bank_name'] ?? '') ?>" placeholder="Bank"></div>
+                                <div class="col-md-2"><input type="text" name="account_number" class="form-control form-control-sm" value="<?= htmlspecialchars($bank['account_number'] ?? '') ?>" placeholder="A/c No."></div>
+                                <div class="col-md-2"><input type="text" name="ifsc" class="form-control form-control-sm" value="<?= htmlspecialchars($bank['ifsc'] ?? '') ?>" placeholder="IFSC"></div>
                                 <div class="col-md-2"><input type="text" name="utr" class="form-control form-control-sm" placeholder="UTR" required></div>
                                 <div class="col-12">
                                     <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#subOpts<?= $p['id'] ?>">Options</button>
@@ -466,7 +472,7 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
         </div>
     <?php else: echo "<p class='text-muted'>No individual pending items.</p>"; endif; ?>
 
-    <!-- Paid Payouts (History with UTR) -->
+    <!-- ===== Paid Payouts (History) ===== -->
     <h5 class="mt-4">Paid Payouts (History)</h5>
     <?php if(count($paid) > 0): ?>
         <div class="table-responsive">
