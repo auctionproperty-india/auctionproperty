@@ -1,1 +1,0 @@
-ALTER TABLE user_properties ADD COLUMN IF NOT EXISTS construction_sqft DECIMAL(10,2) DEFAULT NULL;
