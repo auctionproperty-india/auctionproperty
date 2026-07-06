@@ -179,15 +179,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_manual_payout'])) {
 
 include 'header.php';
 
-// ---- Fetch pending groups ----
+// ---- Fetch pending groups (PostgreSQL compatible) ----
+// Removed GROUP_CONCAT (not needed) and using string_agg if required, but we don't need it.
 $pendingGroups = $pdo->query("
     SELECT 
         e.user_id as referrer_id,
         u.name as referrer_name,
         u.email as referrer_email,
         SUM(e.amount) as total_amount,
-        COUNT(e.id) as total_count,
-        GROUP_CONCAT(DISTINCT e.package_id) as package_ids
+        COUNT(e.id) as total_count
     FROM user_referral_earnings e
     JOIN users u ON e.user_id = u.id
     WHERE e.status = 'pending'
