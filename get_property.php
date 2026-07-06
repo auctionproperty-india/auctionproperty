@@ -1,13 +1,9 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     http_response_code(403);
-    header('Content-Type: application/json');
     echo json_encode(['error' => 'Unauthorized']);
     exit;
 }
@@ -15,7 +11,6 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if(!$id) {
     http_response_code(400);
-    header('Content-Type: application/json');
     echo json_encode(['error' => 'Property ID required']);
     exit;
 }
@@ -35,25 +30,18 @@ $property = $stmt->fetch();
 
 if(!$property) {
     http_response_code(404);
-    header('Content-Type: application/json');
     echo json_encode(['error' => 'Property not found']);
     exit;
 }
 
-// Convert inspection_date
+// Convert dates
 if(!empty($property['inspection_date'])) {
-    $date_obj = DateTime::createFromFormat('Y-m-d', $property['inspection_date']);
-    if($date_obj) {
-        $property['inspection_date'] = $date_obj->format('d/m/Y');
-    }
+    $d = DateTime::createFromFormat('Y-m-d', $property['inspection_date']);
+    if($d) $property['inspection_date'] = $d->format('d/m/Y');
 }
-
-// Convert auction_date
 if(!empty($property['auction_date'])) {
-    $date_obj = DateTime::createFromFormat('Y-m-d', $property['auction_date']);
-    if($date_obj) {
-        $property['auction_date'] = $date_obj->format('d/m/Y');
-    }
+    $d = DateTime::createFromFormat('Y-m-d', $property['auction_date']);
+    if($d) $property['auction_date'] = $d->format('d/m/Y');
 } else {
     $property['auction_date'] = '';
 }
