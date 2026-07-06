@@ -45,7 +45,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-// ---- ADD / UPDATE LOGIC ----
+// ---- ADD / UPDATE LOGIC (unchanged) ----
 function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
 function safeString($val) { return trim($val ?? ''); }
 
@@ -150,7 +150,6 @@ if(isset($_POST['add_property'])) {
     ]);
     
     $new_id = $pdo->lastInsertId();
-    // Send email notification
     if (function_exists('sendNewPropertyNotification')) {
         sendNewPropertyNotification($pdo, $new_id, 'auction');
     }
@@ -302,40 +301,32 @@ include 'header.php';
         document.getElementById('currentImagePreview').style.display = 'none';
         document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
         
-        document.getElementById('edit_title').value = '';
-        document.getElementById('edit_price').value = '';
-        document.getElementById('edit_reserve_price_per_sqft').value = '';
-        document.getElementById('edit_borrower_name').value = '';
-        document.getElementById('edit_bank_name').value = '';
-        document.getElementById('edit_location').value = '';
-        document.getElementById('edit_locality').value = '';
-        document.getElementById('edit_city').value = '';
-        document.getElementById('edit_state').value = '';
-        document.getElementById('edit_emd_amount').value = '';
-        document.getElementById('edit_bid_increment').value = '';
-        document.getElementById('edit_sqft').value = '';
-        document.getElementById('edit_emd_deadline').value = '';
-        document.getElementById('edit_auction_start_time').value = '';
-        document.getElementById('edit_auction_end_time').value = '';
-        document.getElementById('edit_inspection_date').value = '';
-        document.getElementById('edit_contact_number').value = '';
-        document.getElementById('edit_google_location').value = '';
-        document.getElementById('edit_description').value = '';
-        document.getElementById('edit_auction_date').value = '';
-        
+        // Clear all fields
+        document.querySelectorAll('#propertyForm input, #propertyForm select, #propertyForm textarea').forEach(el => {
+            if (el.type !== 'file' && el.id !== 'edit_contact_number') {
+                el.value = '';
+            }
+        });
         document.getElementById('edit_type').value = 'Flat';
         document.getElementById('edit_possession_type').value = 'Physical';
     }
 
     function openEditModal(id) {
+        console.log('openEditModal called for ID:', id); // Debug log
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + id;
         document.getElementById('submitBtn').name = 'update_property';
         document.getElementById('submitBtn').innerHTML = 'Update Property';
         document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
 
         fetch('get_property.php?id=' + id)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP error ' + response.status);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Property data received:', data); // Debug log
                 if (data.error) {
                     alert('Error: ' + data.error);
                     return;
@@ -364,7 +355,6 @@ include 'header.php';
                 document.getElementById('edit_google_location').value = data.google_location || '';
                 document.getElementById('existing_image').value = data.image_url || '';
                 document.getElementById('edit_description').value = data.description || '';
-                // ✅ Auction Date
                 document.getElementById('edit_auction_date').value = data.auction_date || '';
 
                 if (data.image_url) {
