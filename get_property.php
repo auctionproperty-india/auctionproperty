@@ -1,8 +1,4 @@
 <?php
-// ============================================================
-// ✅ get_property.php – सिर्फ Data Fetch, Session db.php से
-// ============================================================
-
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -26,7 +22,7 @@ $sql = "SELECT
             google_location, image_url, bank_name, sqft, possession_type, 
             inspection_date, borrower_name, emd_amount, bid_increment, 
             emd_deadline, auction_start_time, auction_end_time, locality, 
-            reserve_price_per_sqft, contact_number, status, created_at 
+            reserve_price_per_sqft, contact_number, auction_date, status, created_at 
         FROM properties 
         WHERE id = ?";
 
@@ -41,19 +37,22 @@ if(!$property) {
     exit;
 }
 
-// ✅ Inspection Date को DD/MM/YYYY में बदलें
+// Convert inspection_date to DD/MM/YYYY
 if(!empty($property['inspection_date'])) {
     $date_obj = DateTime::createFromFormat('Y-m-d', $property['inspection_date']);
     if($date_obj) {
         $property['inspection_date'] = $date_obj->format('d/m/Y');
-    } else {
-        $property['inspection_date'] = '';
     }
-} else {
-    $property['inspection_date'] = '';
+}
+
+// ✅ Convert auction_date to DD/MM/YYYY for display in form
+if(!empty($property['auction_date'])) {
+    $date_obj = DateTime::createFromFormat('Y-m-d', $property['auction_date']);
+    if($date_obj) {
+        $property['auction_date'] = $date_obj->format('d/m/Y');
+    }
 }
 
 header('Content-Type: application/json');
 echo json_encode($property);
 exit;
-?>
