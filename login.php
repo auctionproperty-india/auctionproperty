@@ -15,7 +15,6 @@ $error = '';
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
-    // ✅ Explicit columns to avoid cached plan mismatch after schema changes
     $stmt = $pdo->prepare("SELECT id, name, email, password, role, is_super_admin, status, wallet_balance FROM users WHERE email = ? AND status = 'active'");
     $stmt->execute([$email]);
     $user = $stmt->fetch();
@@ -28,6 +27,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         } else {
             $_SESSION['is_super_admin'] = false;
         }
+        // ✅ Log Login Activity
+        logActivity($pdo, $user['id'], 'login');
         if($user['role'] == 'admin') {
             header("Location: admin_dashboard.php");
         } else {
