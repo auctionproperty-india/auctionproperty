@@ -1,4 +1,7 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -37,7 +40,7 @@ if(!$property) {
     exit;
 }
 
-// Convert inspection_date to DD/MM/YYYY
+// Convert inspection_date
 if(!empty($property['inspection_date'])) {
     $date_obj = DateTime::createFromFormat('Y-m-d', $property['inspection_date']);
     if($date_obj) {
@@ -45,12 +48,14 @@ if(!empty($property['inspection_date'])) {
     }
 }
 
-// ✅ Convert auction_date to DD/MM/YYYY for display in form
+// Convert auction_date
 if(!empty($property['auction_date'])) {
     $date_obj = DateTime::createFromFormat('Y-m-d', $property['auction_date']);
     if($date_obj) {
         $property['auction_date'] = $date_obj->format('d/m/Y');
     }
+} else {
+    $property['auction_date'] = '';
 }
 
 header('Content-Type: application/json');
