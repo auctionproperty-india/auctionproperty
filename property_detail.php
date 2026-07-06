@@ -1,4 +1,10 @@
 <?php
+// After fetching user_id and property
+// Log property view
+if (isset($user_id) && isset($property_id)) {
+    $source = $_GET['source'] ?? 'auction';
+    logActivity($pdo, $user_id, 'property_view', 'Property ID: ' . $property_id . ', Source: ' . $source);
+}
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
