@@ -67,23 +67,49 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
 
-    // ---- UPDATE Registration, Activation & End Dates (PostgreSQL compatible) ----
+    // ---- UPDATE User Details (Name, Email, Phone) ----
+    if(isset($_POST['update_user_details']) && isset($_POST['user_id'])) {
+        $uid = (int)$_POST['user_id'];
+        $name = trim($_POST['name']);
+        $email = trim($_POST['email']);
+        $phone = trim($_POST['phone']);
+
+        // Validate email
+        if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $_SESSION['new_pass_display'] = "❌ Invalid email format.";
+            header("Location: admin_dashboard.php");
+            exit;
+        }
+
+        // Check if email already exists for another user
+        $check = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $check->execute([$email, $uid]);
+        if($check->rowCount() > 0) {
+            $_SESSION['new_pass_display'] = "❌ Email already used by another user.";
+            header("Location: admin_dashboard.php");
+            exit;
+        }
+
+        // Update
+        $pdo->prepare("UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?")->execute([$name, $email, $phone, $uid]);
+        $_SESSION['new_pass_display'] = "✅ User details updated successfully!";
+        header("Location: admin_dashboard.php");
+        exit;
+    }
+
+    // ---- UPDATE Registration, Activation & End Dates ----
     if(isset($_POST['update_dates']) && isset($_POST['user_id'])) {
         $uid = (int)$_POST['user_id'];
         $new_reg_date = $_POST['reg_date'] ?? null;
         $new_act_date = $_POST['activation_date'] ?? null;
         $new_end_date = $_POST['end_date'] ?? null;
 
-        // Update registration date
         if(!empty($new_reg_date)) {
             $reg_datetime = date('Y-m-d H:i:s', strtotime($new_reg_date));
             $pdo->prepare("UPDATE users SET created_at = ? WHERE id = ?")->execute([$reg_datetime, $uid]);
         }
-
-        // Update activation date (start_date) – using subquery to get the active subscription id
         if(!empty($new_act_date)) {
             $act_datetime = date('Y-m-d', strtotime($new_act_date));
-            // First find the active subscription id
             $sub_id = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
             $sub_id->execute([$uid]);
             $sid = $sub_id->fetchColumn();
@@ -91,8 +117,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $pdo->prepare("UPDATE subscriptions SET start_date = ? WHERE id = ?")->execute([$act_datetime, $sid]);
             }
         }
-
-        // Update end date – using subquery
         if(!empty($new_end_date)) {
             $end_datetime = date('Y-m-d', strtotime($new_end_date));
             $sub_id = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
@@ -102,7 +126,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $pdo->prepare("UPDATE subscriptions SET end_date = ? WHERE id = ?")->execute([$end_datetime, $sid]);
             }
         }
-
         $_SESSION['new_pass_display'] = "✅ Registration, Activation & End dates updated!";
         header("Location: admin_dashboard.php");
         exit;
@@ -251,6 +274,7 @@ $user_search = $_GET['user_search'] ?? '';
                                         data-userid="<?= $u['id'] ?>"
                                         data-username="<?= htmlspecialchars($u['name']) ?>"
                                         data-useremail="<?= htmlspecialchars($u['email']) ?>"
+                                        data-userphone="<?= htmlspecialchars($u['phone'] ?? '') ?>"
                                         data-userstatus="<?= $u['status'] ?>"
                                         data-currentreferrer="<?= htmlspecialchars($current_referrer) ?>"
                                         data-regdate="<?= $reg_date ?>"
@@ -279,7 +303,7 @@ $user_search = $_GET['user_search'] ?? '';
     </div>
 </div>
 
-<!-- ====== USER SETTINGS MODAL (with End Date Edit) ====== -->
+<!-- ====== USER SETTINGS MODAL ====== -->
 <div class="modal fade" id="userSettingsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content" style="border-radius: 20px;">
@@ -299,7 +323,30 @@ $user_search = $_GET['user_search'] ?? '';
                     </div>
                 </div>
 
-                <!-- ===== Dates Edit Section ===== -->
+                <!-- ===== EDIT USER DETAILS (Name, Email, Phone) ===== -->
+                <div class="card mb-4 p-3 border-0 shadow-sm" style="border-left:4px solid #3b82f6;">
+                    <h6><i class="fas fa-user-edit me-2 text-primary"></i>Edit User Details</h6>
+                    <form method="POST" action="admin_dashboard.php">
+                        <input type="hidden" name="user_id" id="modal_details_user_id" value="">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small">Name</label>
+                                <input type="text" name="name" id="modal_edit_name" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Email</label>
+                                <input type="email" name="email" id="modal_edit_email" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Phone</label>
+                                <input type="text" name="phone" id="modal_edit_phone" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                        <button type="submit" name="update_user_details" class="btn btn-sm btn-primary mt-2">Save Details</button>
+                    </form>
+                </div>
+
+                <!-- ===== EDIT DATES ===== -->
                 <div class="card mb-4 p-3 border-0 shadow-sm" style="border-left:4px solid #8b5cf6;">
                     <h6><i class="fas fa-calendar-alt me-2 text-primary"></i>Edit Registration & Subscription Dates</h6>
                     <form method="POST" action="admin_dashboard.php">
@@ -322,6 +369,7 @@ $user_search = $_GET['user_search'] ?? '';
                     </form>
                 </div>
 
+                <!-- ===== CHANGE STATUS ===== -->
                 <div class="card mb-4 p-3 border-0 shadow-sm">
                     <h6><i class="fas fa-power-off me-2 text-warning"></i>Change Status</h6>
                     <p>
@@ -332,6 +380,7 @@ $user_search = $_GET['user_search'] ?? '';
                     </a>
                 </div>
 
+                <!-- ===== SET PASSWORD ===== -->
                 <div class="card mb-4 p-3 border-0 shadow-sm">
                     <h6><i class="fas fa-key me-2 text-primary"></i>Set / Reset Password</h6>
                     <form method="POST" action="admin_dashboard.php">
@@ -352,6 +401,7 @@ $user_search = $_GET['user_search'] ?? '';
                     </div>
                 </div>
 
+                <!-- ===== CHANGE REFERRER ===== -->
                 <div class="card mb-4 p-3 border-0 shadow-sm">
                     <h6><i class="fas fa-link me-2 text-success"></i>Change Referrer</h6>
                     <p><strong>Current Referrer:</strong> <span id="modal_current_referrer"></span></p>
@@ -376,6 +426,7 @@ $user_search = $_GET['user_search'] ?? '';
                     </form>
                 </div>
 
+                <!-- ===== DELETE USER ===== -->
                 <div class="card p-3 border-0 shadow-sm" style="border-left: 4px solid #dc3545 !important;">
                     <h6 class="text-danger"><i class="fas fa-trash-alt me-2"></i>Delete User</h6>
                     <form method="POST" action="admin_dashboard.php" onsubmit="return confirm('Are you sure you want to delete this user? This action is irreversible!')">
@@ -397,6 +448,7 @@ $user_search = $_GET['user_search'] ?? '';
         var userId = btn.getAttribute('data-userid');
         var userName = btn.getAttribute('data-username');
         var userEmail = btn.getAttribute('data-useremail');
+        var userPhone = btn.getAttribute('data-userphone') || '';
         var userStatus = btn.getAttribute('data-userstatus');
         var currentReferrer = btn.getAttribute('data-currentreferrer') || 'Direct';
         var regDate = btn.getAttribute('data-regdate') || '';
@@ -406,6 +458,12 @@ $user_search = $_GET['user_search'] ?? '';
         document.getElementById('modal_user_id').value = userId;
         document.getElementById('modal_user_name').innerText = userName;
         document.getElementById('modal_user_email').innerText = userEmail;
+
+        // Populate edit details form
+        document.getElementById('modal_details_user_id').value = userId;
+        document.getElementById('modal_edit_name').value = userName;
+        document.getElementById('modal_edit_email').value = userEmail;
+        document.getElementById('modal_edit_phone').value = userPhone;
 
         // Dates
         document.getElementById('modal_dates_user_id').value = userId;
