@@ -284,6 +284,7 @@ if($role == 'admin') {
         <?php if(hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
+        <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
         <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
