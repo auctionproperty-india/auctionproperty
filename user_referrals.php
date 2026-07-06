@@ -58,7 +58,7 @@ $user_subs = $user_subs->fetchAll();
     <?php endif; ?>
 </div>
 
-<!-- ===== Paid Earnings (with Breakdown) ===== -->
+<!-- ===== Paid Earnings (with UTR) ===== -->
 <div class="card-premium mt-4">
     <h5><i class="fas fa-history me-2"></i>Paid Earnings History</h5>
     <?php if(count($paid_earnings) > 0): ?>
@@ -71,6 +71,7 @@ $user_subs = $user_subs->fetchAll();
                     <th>TDS Deducted</th>
                     <th>Admin Charge</th>
                     <th>Net Paid</th>
+                    <th>UTR Number</th>
                     <th>Paid On</th>
                 </tr></thead>
                 <tbody>
@@ -82,6 +83,7 @@ $user_subs = $user_subs->fetchAll();
                         <td>₹<?= indianCurrencyFormat($e['tds_deducted']) ?></td>
                         <td>₹<?= indianCurrencyFormat($e['admin_charge_deducted']) ?></td>
                         <td><strong class="text-success">₹<?= indianCurrencyFormat($e['net_amount']) ?></strong></td>
+                        <td><?= htmlspecialchars($e['utr_no'] ?? 'N/A') ?></td>
                         <td><?= date('d M Y', strtotime($e['paid_at'])) ?></td>
                     </tr>
                 <?php endforeach; ?>
@@ -96,7 +98,28 @@ $user_subs = $user_subs->fetchAll();
 <!-- ===== Subscription History (unchanged) ===== -->
 <div class="card-premium mt-4">
     <h4><i class="fas fa-history me-2"></i>Your Subscription Requests</h4>
-    <!-- ... keep your existing code ... -->
+    <?php if(count($user_subs) > 0): ?>
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead><tr><th>Package</th><th>Amount</th><th>Status</th><th>Payment Method</th><th>UTR</th><th>Request Date</th><th>Activation/Reject Date</th></tr></thead>
+                <tbody>
+                <?php foreach($user_subs as $us): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($us['pkg_name']) ?></td>
+                        <td>₹<?= $us['amount'] ?></td>
+                        <td><span class="badge bg-<?= $us['status']=='active'?'success':($us['status']=='pending'?'warning':'danger') ?>"><?= $us['status'] ?></span></td>
+                        <td><?= $us['payment_method'] ?></td>
+                        <td><?= htmlspecialchars($us['utr'] ?? 'N/A') ?></td>
+                        <td><?= date('d M Y', strtotime($us['created_at'])) ?></td>
+                        <td><?= $us['start_date'] ? date('d M Y', strtotime($us['start_date'])) : ($us['status']=='rejected' ? 'Rejected' : '—') ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php else: ?>
+        <p class="text-muted">No subscription requests yet.</p>
+    <?php endif; ?>
 </div>
 
 <script>
