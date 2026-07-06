@@ -11,7 +11,7 @@ if(!hasViewPermission('settings', $pdo)) {
 }
 
 $message = '';
-$settings_keys = ['default_contact', 'company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch'];
+$settings_keys = ['default_contact', 'company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent'];
 
 // Handle QR upload
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
@@ -78,6 +78,23 @@ $qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'compa
                 <label class="fw-bold">Default Contact Number</label>
                 <input type="text" name="default_contact" class="form-control" value="<?= htmlspecialchars($settings['default_contact']) ?>">
             </div>
+        </div>
+        <hr>
+        <h5><i class="fas fa-percent me-2"></i>Referral Payout Deductions</h5>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="fw-bold">TDS %</label>
+                <input type="number" step="0.01" name="tds_percent" class="form-control" value="<?= htmlspecialchars($settings['tds_percent']) ?>">
+                <small class="text-muted">Default TDS percentage for referral payouts.</small>
+            </div>
+            <div class="col-md-6">
+                <label class="fw-bold">Admin Charge %</label>
+                <input type="number" step="0.01" name="admin_charge_percent" class="form-control" value="<?= htmlspecialchars($settings['admin_charge_percent']) ?>">
+                <small class="text-muted">Default Admin Charge percentage for referral payouts.</small>
+            </div>
+        </div>
+        <hr>
+        <div class="row g-3">
             <div class="col-12">
                 <label class="fw-bold">UPI QR Code (for Payment Page)</label>
                 <input type="file" name="qr_code" class="form-control" accept="image/*">
