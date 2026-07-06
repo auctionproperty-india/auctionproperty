@@ -1,17 +1,16 @@
 <?php
-// After fetching user_id and property
-// Log property view
-if (isset($user_id) && isset($property_id)) {
-    $source = $_GET['source'] ?? 'auction';
-    logActivity($pdo, $user_id, 'property_view', 'Property ID: ' . $property_id . ', Source: ' . $source);
-}
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
 $property_id = $_GET['id'] ?? 0;
-$source = $_GET['source'] ?? 'auction';
+$source = $_GET['source'] ?? 'auction'; // default auction
 $user_id = $_SESSION['user_id'];
+
+// Log property view
+if ($property_id) {
+    logActivity($pdo, $user_id, 'property_view', 'Property ID: ' . $property_id . ', Source: ' . $source);
+}
 
 if($source == 'auction') {
     $stmt = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
@@ -29,13 +28,13 @@ if(!$prop) { die("Property not found!"); }
 if($source == 'auction') {
     $has_subscription = userHasActiveSubscription($pdo, $user_id);
 } else {
-    $has_subscription = true;
+    $has_subscription = true; // customer properties are always visible
 }
 
 include 'header.php'; 
 
+// ---- IF NOT SUBSCRIBED (only for auction) ----
 if(!$has_subscription && $source == 'auction') {
-    // ... (same as before, keep the restricted view) ...
     ?>
     <div class="container py-5">
         <div class="row justify-content-center">
@@ -92,7 +91,7 @@ if(!$has_subscription && $source == 'auction') {
     exit;
 }
 
-// ----- SUBSCRIBED or CUSTOMER: Show ALL Details -----
+// ----- SUBSCRIBED or CUSTOMER: Show ALL Details ----
 $gradient = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
 $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image_url'] ?? '');
 
@@ -124,7 +123,6 @@ if($source == 'auction') {
             </a>
 
             <div class="card border-0 shadow-xxl" style="border-radius: 28px; overflow: hidden; background: <?= $gradient ?>; color:#fff;">
-                <!-- ... (same header and body as before) ... -->
                 <div class="card-header p-4" style="background: rgba(0,0,0,0.2); border: none;">
                     <div class="d-flex justify-content-between align-items-center flex-wrap">
                         <div>
@@ -136,7 +134,7 @@ if($source == 'auction') {
                 </div>
 
                 <div class="card-body p-4">
-                    <!-- All Details (same as before) -->
+                    <!-- All Details -->
                     <div class="row g-4">
                         <div class="col-md-6">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
@@ -158,7 +156,7 @@ if($source == 'auction') {
                             </div>
                         </div>
 
-                        <!-- Area and Construction Area (for customer) -->
+                        <!-- Area and Construction Area (for customer properties) -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75"><i class="fas fa-map-pin"></i> City</small>
@@ -173,6 +171,7 @@ if($source == 'auction') {
                         </div>
 
                         <?php if($source == 'customer'): ?>
+                            <!-- Customer Property: Show both Area and Construction Area -->
                             <div class="col-md-4">
                                 <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                     <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
@@ -188,6 +187,7 @@ if($source == 'auction') {
                             </div>
                             <?php endif; ?>
                         <?php else: ?>
+                            <!-- Auction Property: just area -->
                             <div class="col-md-4">
                                 <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                     <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
@@ -303,4 +303,19 @@ if($source == 'auction') {
     .shadow-xxl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important; }
     .rounded-4 { border-radius: 1.25rem !important; }
 </style>
+
+<!-- Copy Data Logging JavaScript -->
+<script>
+document.addEventListener('copy', function(e) {
+    var text = window.getSelection().toString();
+    if (text.length > 0) {
+        fetch('log_copy.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'text=' + encodeURIComponent(text.substring(0, 500))
+        });
+    }
+});
+</script>
+
 <?php include 'footer.php'; ?>
