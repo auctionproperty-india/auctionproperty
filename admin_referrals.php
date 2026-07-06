@@ -10,19 +10,31 @@ if(!hasViewPermission('referrals', $pdo)) {
     die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page.</div>");
 }
 
-// ---- Helper function to activate subscription for a user ----
+// ---- Get Global TDS & Admin Charge from settings ----
+function getGlobalDeductions($pdo) {
+    $tds = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='tds_percent'")->fetchColumn();
+    $admin = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='admin_charge_percent'")->fetchColumn();
+    return ['tds' => (float)$tds ?: 10, 'admin' => (float)$admin ?: 5];
+}
+
+// ---- Helper function to calculate net with given percentages ----
+function calculateNet($amount, $tds_percent, $admin_charge_percent) {
+    $tds = ($amount * $tds_percent) / 100;
+    $admin_charge = ($amount * $admin_charge_percent) / 100;
+    $net = $amount - $tds - $admin_charge;
+    return ['tds' => $tds, 'admin_charge' => $admin_charge, 'net' => $net];
+}
+
+// ---- Helper function to activate subscription ----
 function activateSubscriptionForUser($pdo, $user_id, $package_id, $duration_months = 1) {
-    // Check if already active subscription for this package?
     $stmt = $pdo->prepare("SELECT id, end_date FROM subscriptions WHERE user_id = ? AND package_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
     $stmt->execute([$user_id, $package_id]);
     $existing = $stmt->fetch();
     if ($existing) {
-        // Extend by duration
         $new_end = date('Y-m-d', strtotime($existing['end_date'] . " + $duration_months months"));
         $pdo->prepare("UPDATE subscriptions SET end_date = ? WHERE id = ?")->execute([$new_end, $existing['id']]);
         return true;
     } else {
-        // Create new
         $start = date('Y-m-d');
         $end = date('Y-m-d', strtotime("+ $duration_months months"));
         $stmt = $pdo->prepare("INSERT INTO subscriptions (user_id, package_id, amount, payment_method, status, start_date, end_date) VALUES (?, ?, 0, 'referral_bonus', 'active', ?, ?)");
@@ -36,12 +48,11 @@ if(isset($_GET['pay']) && isset($_GET['id'])) {
         die("<div class='alert alert-danger m-5'>❌ You do not have permission to edit referrals.</div>");
     }
     $id = $_GET['pay'];
-    $tds_percent = $_POST['tds_percent'] ?? 10;
-    $admin_charge_percent = $_POST['admin_charge_percent'] ?? 5;
+    $tds_percent = (float)$_POST['tds_percent'];
+    $admin_charge_percent = (float)$_POST['admin_charge_percent'];
     $bank_name = $_POST['bank_name'] ?? '';
     $account_number = $_POST['account_number'] ?? '';
     $ifsc = $_POST['ifsc'] ?? '';
-    // Subscription activation options
     $give_subscription = isset($_POST['give_subscription']) && $_POST['give_subscription'] == '1';
     $package_id = (int)($_POST['package_id'] ?? 0);
     $duration_months = (int)($_POST['duration_months'] ?? 1);
@@ -53,7 +64,7 @@ if(isset($_GET['pay']) && isset($_GET['id'])) {
     $user_id = $data['user_id'];
     $pkg_id = $data['package_id'];
     if($amount) {
-        $calc = calculateReferralNet($amount, $tds_percent, $admin_charge_percent);
+        $calc = calculateNet($amount, $tds_percent, $admin_charge_percent);
         $pdo->prepare("UPDATE user_referral_earnings SET 
                         status = 'paid', 
                         paid_at = CURRENT_TIMESTAMP,
@@ -68,12 +79,10 @@ if(isset($_GET['pay']) && isset($_GET['id'])) {
         
         creditWallet($pdo, $user_id, $calc['net'], "Referral bonus (net) for earning ID $id", $id);
 
-        // If admin opted to give subscription
         if ($give_subscription && $package_id > 0) {
-            $final_pkg = $package_id ?: $pkg_id; // use provided or fallback to earning's package
+            $final_pkg = $package_id ?: $pkg_id;
             activateSubscriptionForUser($pdo, $user_id, $final_pkg, $duration_months);
         }
-
         header("Location: admin_referrals.php?paid=1");
         exit;
     }
@@ -90,13 +99,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pay_all'])) {
     $bank_name = trim($_POST['bank_name']);
     $account_number = trim($_POST['account_number']);
     $ifsc = trim($_POST['ifsc']);
-    // Subscription options for all
     $give_subscription_all = isset($_POST['give_subscription_all']) && $_POST['give_subscription_all'] == '1';
     $package_id_all = (int)($_POST['package_id_all'] ?? 0);
     $duration_all = (int)($_POST['duration_all'] ?? 1);
 
-    // Fetch all pending earnings for this referrer
-    $earnings = $pdo->prepare("SELECT id, amount, package_id FROM user_referral_earnings WHERE user_id = ? AND status = 'pending'");
+    $earnings = $pdo->prepare("SELECT id, amount FROM user_referral_earnings WHERE user_id = ? AND status = 'pending'");
     $earnings->execute([$referrer_id]);
     $earnings = $earnings->fetchAll();
 
@@ -107,10 +114,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pay_all'])) {
     }
 
     $total_net = 0;
+    $total_gross = 0;
+    $total_tds = 0;
+    $total_admin = 0;
     foreach($earnings as $earning) {
-        $calc = calculateReferralNet($earning['amount'], $tds_percent, $admin_charge_percent);
-        $net = $calc['net'];
-        $total_net += $net;
+        $calc = calculateNet($earning['amount'], $tds_percent, $admin_charge_percent);
+        $total_net += $calc['net'];
+        $total_gross += $earning['amount'];
+        $total_tds += $calc['tds'];
+        $total_admin += $calc['admin_charge'];
         $stmt = $pdo->prepare("UPDATE user_referral_earnings SET 
                                 status = 'paid', 
                                 paid_at = CURRENT_TIMESTAMP,
@@ -121,23 +133,19 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pay_all'])) {
                                 account_number = ?,
                                 ifsc_code = ?
                             WHERE id = ?");
-        $stmt->execute([$calc['tds'], $calc['admin_charge'], $net, $bank_name, $account_number, $ifsc, $earning['id']]);
+        $stmt->execute([$calc['tds'], $calc['admin_charge'], $calc['net'], $bank_name, $account_number, $ifsc, $earning['id']]);
     }
 
-    // Credit wallet with total net
     if($total_net > 0) {
         creditWallet($pdo, $referrer_id, $total_net, "Referral bonus (net) for multiple referrals (Paid via Admin Pay All)", 0);
     }
 
-    // Give subscription to referrer if opted
     if ($give_subscription_all && $package_id_all > 0) {
         activateSubscriptionForUser($pdo, $referrer_id, $package_id_all, $duration_all);
     }
 
-    $_SESSION['msg'] = "✅ Total ₹" . indianCurrencyFormat($total_net) . " credited to wallet for " . count($earnings) . " referrals.";
-    if ($give_subscription_all) {
-        $_SESSION['msg'] .= " Subscription activated for referrer.";
-    }
+    $_SESSION['msg'] = "✅ Total Gross: ₹" . indianCurrencyFormat($total_gross) . ", Deductions: TDS ₹" . indianCurrencyFormat($total_tds) . ", Admin ₹" . indianCurrencyFormat($total_admin) . ", Net ₹" . indianCurrencyFormat($total_net) . " credited.";
+    if ($give_subscription_all) $_SESSION['msg'] .= " Subscription activated.";
     header("Location: admin_referrals.php?paid=1");
     exit;
 }
@@ -179,8 +187,10 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_manual_payout'])) {
 
 include 'header.php';
 
-// ---- Fetch pending groups (PostgreSQL compatible) ----
-// Removed GROUP_CONCAT (not needed) and using string_agg if required, but we don't need it.
+// Get global defaults
+$defaults = getGlobalDeductions($pdo);
+
+// ---- Fetch pending groups ----
 $pendingGroups = $pdo->query("
     SELECT 
         e.user_id as referrer_id,
@@ -217,24 +227,25 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
 ?>
 <div class="card-premium">
     <h4><i class="fas fa-hand-holding-usd me-2"></i>Referral Payouts</h4>
+    <p class="text-muted">Global TDS: <strong><?= $defaults['tds'] ?>%</strong> | Admin Charge: <strong><?= $defaults['admin'] ?>%</strong> (Edit in Settings)</p>
 
-    <!-- ===== Manual Add Section ===== -->
+    <!-- Manual Add Section -->
     <div class="card border-0 shadow-sm p-3 mb-4" style="background: #f8fafc; border-radius: 16px;">
         <h5><i class="fas fa-plus-circle me-2" style="color: #2563eb;"></i>Manual Add Referral Payout</h5>
         <form method="POST" class="row g-2 align-items-end">
             <div class="col-md-3">
-                <label class="form-label small">Referrer (who gets paid)</label>
+                <label class="form-label small">Referrer</label>
                 <select name="referrer_id" class="form-select form-select-sm" required>
-                    <option value="">Select Referrer</option>
+                    <option value="">Select</option>
                     <?php foreach($all_users as $u): ?>
                         <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= $u['email'] ?>)</option>
                     <?php endforeach; ?>
                 </select>
             </div>
             <div class="col-md-3">
-                <label class="form-label small">Referred User (who activated)</label>
+                <label class="form-label small">Referred User</label>
                 <select name="referred_id" class="form-select form-select-sm" required>
-                    <option value="">Select User</option>
+                    <option value="">Select</option>
                     <?php foreach($all_users as $u): ?>
                         <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= $u['email'] ?>)</option>
                     <?php endforeach; ?>
@@ -258,7 +269,7 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                 <input type="date" name="activation_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>">
             </div>
             <div class="col-md-2">
-                <button type="submit" name="add_manual_payout" class="btn btn-primary btn-sm w-100">Add Payout</button>
+                <button type="submit" name="add_manual_payout" class="btn btn-primary btn-sm w-100">Add</button>
             </div>
         </form>
         <script>
@@ -270,28 +281,36 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
         </script>
     </div>
 
-    <!-- ===== Pending Payouts (Grouped by Referrer) ===== -->
+    <!-- Pending Payouts (Grouped) with Breakdown -->
     <h5 class="mt-4">Pending Payouts</h5>
     <?php if(count($pendingGroups) > 0): ?>
         <div class="table-responsive">
             <table class="table table-bordered">
                 <thead><tr>
                     <th>Referrer</th>
-                    <th>Total Pending (₹)</th>
+                    <th>Total Gross (₹)</th>
+                    <th>TDS (<?= $defaults['tds'] ?>%)</th>
+                    <th>Admin Charge (<?= $defaults['admin'] ?>%)</th>
+                    <th>Net Payable (₹)</th>
                     <th>No. of Referrals</th>
                     <th>Action</th>
                 </tr></thead>
                 <tbody>
-                <?php foreach($pendingGroups as $group): ?>
+                <?php foreach($pendingGroups as $group): 
+                    $gross = $group['total_amount'];
+                    $calc = calculateNet($gross, $defaults['tds'], $defaults['admin']);
+                ?>
                     <tr>
                         <td>
                             <strong><?= htmlspecialchars($group['referrer_name']) ?></strong><br>
                             <small><?= htmlspecialchars($group['referrer_email']) ?></small>
                         </td>
-                        <td><strong>₹<?= indianCurrencyFormat($group['total_amount']) ?></strong></td>
+                        <td><strong>₹<?= indianCurrencyFormat($gross) ?></strong></td>
+                        <td>₹<?= indianCurrencyFormat($calc['tds']) ?></td>
+                        <td>₹<?= indianCurrencyFormat($calc['admin_charge']) ?></td>
+                        <td><strong class="text-success">₹<?= indianCurrencyFormat($calc['net']) ?></strong></td>
                         <td><?= $group['total_count'] ?></td>
                         <td>
-                            <!-- Pay All Form -->
                             <button class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#payAllForm<?= $group['referrer_id'] ?>">
                                 <i class="fas fa-credit-card"></i> Pay All
                             </button>
@@ -302,11 +321,11 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                                     <div class="row g-1">
                                         <div class="col-md-3">
                                             <label class="form-label small">TDS %</label>
-                                            <input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="10" required>
+                                            <input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="<?= $defaults['tds'] ?>" required>
                                         </div>
                                         <div class="col-md-3">
                                             <label class="form-label small">Admin Charge %</label>
-                                            <input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="5" required>
+                                            <input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="<?= $defaults['admin'] ?>" required>
                                         </div>
                                         <div class="col-md-2">
                                             <label class="form-label small">Bank</label>
@@ -321,14 +340,11 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                                             <input type="text" name="ifsc" class="form-control form-control-sm" placeholder="IFSC" required>
                                         </div>
                                     </div>
-                                    <!-- Subscription activation options for Pay All -->
                                     <div class="row g-1 mt-2">
                                         <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="give_subscription_all" value="1" id="subAll<?= $group['referrer_id'] ?>">
-                                                <label class="form-check-label small" for="subAll<?= $group['referrer_id'] ?>">
-                                                    Give Subscription to Referrer
-                                                </label>
+                                                <label class="form-check-label small" for="subAll<?= $group['referrer_id'] ?>">Give Subscription</label>
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -346,8 +362,8 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                                         </div>
                                     </div>
                                     <div class="col-md-12 mt-2">
-                                        <button type="submit" class="btn btn-success btn-sm w-100" onclick="return confirm('Pay all pending ₹<?= indianCurrencyFormat($group['total_amount']) ?> for <?= htmlspecialchars($group['referrer_name']) ?>?')">
-                                            ✅ Confirm Pay All (Total: ₹<?= indianCurrencyFormat($group['total_amount']) ?>)
+                                        <button type="submit" class="btn btn-success btn-sm w-100" onclick="return confirm('Pay all pending ₹<?= indianCurrencyFormat($gross) ?> for <?= htmlspecialchars($group['referrer_name']) ?>?')">
+                                            ✅ Confirm Pay All (Net: ₹<?= indianCurrencyFormat($calc['net']) ?>)
                                         </button>
                                     </div>
                                 </form>
@@ -360,10 +376,9 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
         </div>
     <?php else: echo "<p class='text-muted'>No pending payouts.</p>"; endif; ?>
 
-    <!-- ===== Individual Pending Items (for single pay) ===== -->
+    <!-- Individual Pending Items -->
     <h5 class="mt-4">Individual Pending Referrals</h5>
     <?php
-    // Fetch individual pending items for single pay
     $individualPending = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_name, p.name as package_name 
                                      FROM user_referral_earnings e
                                      JOIN users u ON e.user_id = u.id
@@ -378,22 +393,30 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                     <th>Referrer</th>
                     <th>Referred</th>
                     <th>Package</th>
-                    <th>Amount</th>
+                    <th>Gross</th>
+                    <th>TDS</th>
+                    <th>Admin Charge</th>
+                    <th>Net</th>
                     <th>Activation Date</th>
                     <th>Action</th>
                 </tr></thead>
                 <tbody>
-                <?php foreach($individualPending as $p): ?>
+                <?php foreach($individualPending as $p): 
+                    $calc = calculateNet($p['amount'], $defaults['tds'], $defaults['admin']);
+                ?>
                     <tr>
                         <td><?= htmlspecialchars($p['referrer_name']) ?></td>
                         <td><?= htmlspecialchars($p['referred_name']) ?></td>
                         <td><?= htmlspecialchars($p['package_name']) ?></td>
                         <td>₹<?= indianCurrencyFormat($p['amount']) ?></td>
+                        <td>₹<?= indianCurrencyFormat($calc['tds']) ?></td>
+                        <td>₹<?= indianCurrencyFormat($calc['admin_charge']) ?></td>
+                        <td><strong class="text-success">₹<?= indianCurrencyFormat($calc['net']) ?></strong></td>
                         <td><?= $p['referred_activation_date'] ? date('d M Y', strtotime($p['referred_activation_date'])) : 'N/A' ?></td>
                         <td>
                             <form method="POST" action="?pay=1&id=<?= $p['id'] ?>" class="row g-1">
-                                <div class="col-md-2"><input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="10" placeholder="TDS %"></div>
-                                <div class="col-md-2"><input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="5" placeholder="Admin %"></div>
+                                <div class="col-md-2"><input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="<?= $defaults['tds'] ?>" placeholder="TDS %"></div>
+                                <div class="col-md-2"><input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="<?= $defaults['admin'] ?>" placeholder="Admin %"></div>
                                 <div class="col-md-2"><input type="text" name="bank_name" class="form-control form-control-sm" placeholder="Bank"></div>
                                 <div class="col-md-2"><input type="text" name="account_number" class="form-control form-control-sm" placeholder="A/c No."></div>
                                 <div class="col-md-2"><input type="text" name="ifsc" class="form-control form-control-sm" placeholder="IFSC"></div>
@@ -435,7 +458,7 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
         </div>
     <?php else: echo "<p class='text-muted'>No individual pending items.</p>"; endif; ?>
 
-    <!-- ===== Paid Payouts (History) ===== -->
+    <!-- Paid Payouts (History with Breakdown) -->
     <h5 class="mt-4">Paid Payouts (History)</h5>
     <?php if(count($paid) > 0): ?>
         <div class="table-responsive">
@@ -460,7 +483,7 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                         <td>₹<?= indianCurrencyFormat($p['amount']) ?></td>
                         <td>₹<?= indianCurrencyFormat($p['tds_deducted']) ?></td>
                         <td>₹<?= indianCurrencyFormat($p['admin_charge_deducted']) ?></td>
-                        <td><strong>₹<?= indianCurrencyFormat($p['net_amount']) ?></strong></td>
+                        <td><strong class="text-success">₹<?= indianCurrencyFormat($p['net_amount']) ?></strong></td>
                         <td><?= $p['referred_activation_date'] ? date('d M Y', strtotime($p['referred_activation_date'])) : 'N/A' ?></td>
                         <td><?= date('d M Y', strtotime($p['paid_at'])) ?></td>
                     </tr>
