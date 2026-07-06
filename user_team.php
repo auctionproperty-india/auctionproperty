@@ -10,7 +10,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php'; 
 
-// ---- Fetch the entire referral tree with package info ----
+// ---- Fetch the entire referral tree with package info and active flag ----
 $sql = "
 WITH RECURSIVE team_tree AS (
     SELECT 
@@ -23,10 +23,12 @@ WITH RECURSIVE team_tree AS (
         0 as level,
         ARRAY[u.id] as path,
         p.name as package_name,
-        s.status as sub_status
+        s.status as sub_status,
+        s.id as sub_id,
+        CASE WHEN s.status = 'active' AND s.end_date >= CURRENT_DATE THEN 1 ELSE 0 END as is_active_sub
     FROM users u 
     LEFT JOIN (
-        SELECT DISTINCT ON (user_id) user_id, package_id, status
+        SELECT DISTINCT ON (user_id) user_id, package_id, status, end_date
         FROM subscriptions
         WHERE status = 'active' AND end_date >= CURRENT_DATE
         ORDER BY user_id, id DESC
@@ -46,11 +48,13 @@ WITH RECURSIVE team_tree AS (
         t.level + 1,
         t.path || u.id,
         p.name as package_name,
-        s.status as sub_status
+        s.status as sub_status,
+        s.id as sub_id,
+        CASE WHEN s.status = 'active' AND s.end_date >= CURRENT_DATE THEN 1 ELSE 0 END as is_active_sub
     FROM users u
     INNER JOIN team_tree t ON u.referred_by = t.id
     LEFT JOIN (
-        SELECT DISTINCT ON (user_id) user_id, package_id, status
+        SELECT DISTINCT ON (user_id) user_id, package_id, status, end_date
         FROM subscriptions
         WHERE status = 'active' AND end_date >= CURRENT_DATE
         ORDER BY user_id, id DESC
@@ -64,7 +68,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([':user_id' => $user_id]);
 $team_members = $stmt->fetchAll();
 
-// ---- Build nested array for tree rendering ----
+// ---- Build nested array for tree rendering (sorted by active status) ----
 function buildTree($members, $parentId = null) {
     $branch = [];
     foreach ($members as $member) {
@@ -76,6 +80,13 @@ function buildTree($members, $parentId = null) {
             $branch[] = $member;
         }
     }
+    // Sort children: active first (is_active_sub = 1), then free
+    usort($branch, function($a, $b) {
+        if ($a['is_active_sub'] == $b['is_active_sub']) {
+            return strcmp($a['name'], $b['name']);
+        }
+        return $b['is_active_sub'] - $a['is_active_sub']; // active first
+    });
     return $branch;
 }
 
@@ -84,7 +95,7 @@ $total_members = count($team_members);
 
 // ---- Function to count total members in a subtree ----
 function countSubtree($node) {
-    $count = 1; // self
+    $count = 1;
     if (isset($node['children']) && count($node['children']) > 0) {
         foreach ($node['children'] as $child) {
             $count += countSubtree($child);
@@ -93,7 +104,7 @@ function countSubtree($node) {
     return $count;
 }
 
-// ---- Function to render tree recursively ----
+// ---- Function to render tree recursively (with search filter support via JS) ----
 function renderTree($nodes, $level = 0) {
     if (empty($nodes)) return '';
     $html = '<ul style="list-style:none; padding-left:' . ($level > 0 ? '25px' : '0') . ';">';
@@ -116,16 +127,21 @@ function renderTree($nodes, $level = 0) {
             $packageBadge = ' <span class="badge bg-secondary">Free</span>';
         }
         
+        // Active green tick
+        $activeIcon = $node['is_active_sub'] ? ' <i class="fas fa-check-circle" style="color:#10b981;" title="Active Subscriber"></i>' : '';
+        
         $icon = $hasChildren ? '📂' : '👤';
         
-        $html .= '<li style="margin-bottom:8px; border-left:2px solid #e2e8f0; padding-left:12px;">';
+        // Add data attributes for search filtering
+        $searchData = 'data-name="' . strtolower(htmlspecialchars($node['name'])) . '" data-email="' . strtolower(htmlspecialchars($node['email'])) . '"';
+        $html .= '<li style="margin-bottom:8px; border-left:2px solid #e2e8f0; padding-left:12px;" ' . $searchData . '>';
         $html .= '<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:'.($level==0?'#f1f5f9':'transparent').'; border-radius:8px; flex-wrap:wrap;">';
         $html .= '<span style="font-size:1.2rem;">' . $icon . '</span>';
-        $html .= '<strong>' . htmlspecialchars($node['name']) . '</strong>';
+        $html .= '<strong>' . htmlspecialchars($node['name']) . $activeIcon . '</strong>';
         $html .= '<span style="font-size:0.8rem; color:#64748b;">(' . htmlspecialchars($node['email']) . ')</span>';
         $html .= $packageBadge;
         
-        // Show total members in this subtree (only for direct referrals / level 0)
+        // Show total members in this subtree (only for direct referrals)
         if ($level == 0 && $totalInSubtree > 0) {
             $html .= ' <span class="badge bg-light text-dark border" style="font-weight:600;">👥 ' . ($totalInSubtree - 1) . ' members</span>';
         }
@@ -163,6 +179,23 @@ function renderTree($nodes, $level = 0) {
         font-weight: 700;
         margin: 0;
     }
+    .team-search {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    .team-search input {
+        border-radius: 30px;
+        padding: 6px 16px;
+        border: 1px solid #e2e8f0;
+        font-size: 0.9rem;
+        min-width: 200px;
+    }
+    .team-search input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
     .team-tree {
         padding: 10px 0;
     }
@@ -171,6 +204,7 @@ function renderTree($nodes, $level = 0) {
     }
     .team-tree li {
         transition: all 0.2s;
+        cursor: default;
     }
     .team-tree li:hover > div {
         background: #f8fafc;
@@ -180,17 +214,24 @@ function renderTree($nodes, $level = 0) {
     .badge-primary { background-color: #0d6efd; color: white; }
     .badge-info { background-color: #0dcaf0; color: #212529; }
     .badge-success { background-color: #198754; color: white; }
+    /* Search highlight */
+    .team-tree li.hidden-item {
+        display: none !important;
+    }
 </style>
 
 <div class="container-fluid">
     <div class="team-container">
         <div class="team-header">
             <h4><i class="fas fa-users me-2"></i>My Team</h4>
-            <span class="badge bg-primary rounded-pill"><?= $total_members ?> Members</span>
+            <div class="team-search">
+                <input type="text" id="teamSearch" placeholder="🔍 Search by name or email..." onkeyup="filterTeam(this.value)">
+                <span class="badge bg-primary rounded-pill"><?= $total_members ?> Members</span>
+            </div>
         </div>
 
         <?php if($total_members > 0): ?>
-            <div class="team-tree">
+            <div class="team-tree" id="teamTree">
                 <?= renderTree($tree) ?>
             </div>
         <?php else: ?>
@@ -202,5 +243,25 @@ function renderTree($nodes, $level = 0) {
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+function filterTeam(searchText) {
+    const query = searchText.toLowerCase().trim();
+    const items = document.querySelectorAll('#teamTree li');
+    if (!query) {
+        items.forEach(el => el.classList.remove('hidden-item'));
+        return;
+    }
+    items.forEach(el => {
+        const name = el.getAttribute('data-name') || '';
+        const email = el.getAttribute('data-email') || '';
+        if (name.includes(query) || email.includes(query)) {
+            el.classList.remove('hidden-item');
+        } else {
+            el.classList.add('hidden-item');
+        }
+    });
+}
+</script>
 
 <?php include 'footer.php'; ?>
