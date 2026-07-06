@@ -45,7 +45,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
-// ---- ADD / UPDATE LOGIC (unchanged) ----
+// ---- ADD / UPDATE LOGIC ----
 function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
 function safeString($val) { return trim($val ?? ''); }
 
@@ -169,7 +169,6 @@ include 'header.php';
 <?php endif; ?>
 
 <div class="container-fluid px-3">
-    <!-- Filter Form + Add Button -->
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Properties (<?= $total_rows ?>)</h5>
         <?php if(hasEditPermission('properties', $pdo)): ?>
@@ -181,7 +180,6 @@ include 'header.php';
         <?php endif; ?>
     </div>
 
-    <!-- Filter Form -->
     <div class="bg-white p-2 rounded-3 shadow-sm mb-3 border">
         <form method="GET" class="row g-1 align-items-center">
             <div class="col-md-3">
@@ -202,7 +200,6 @@ include 'header.php';
         </form>
     </div>
 
-    <!-- Table -->
     <div class="bg-white rounded-3 p-2 shadow-sm border">
         <div class="table-responsive">
             <table class="table table-hover table-sm mb-0">
@@ -247,7 +244,6 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- Pagination -->
     <?php if($total_pages > 1): ?>
         <nav class="mt-3">
             <ul class="pagination justify-content-center pagination-sm">
@@ -312,26 +308,27 @@ include 'header.php';
     }
 
     function openEditModal(id) {
-        console.log('openEditModal called for ID:', id); // Debug log
-        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + id;
+        // Reset form and show loading state
+        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Loading Property #' + id + '...';
         document.getElementById('submitBtn').name = 'update_property';
         document.getElementById('submitBtn').innerHTML = 'Update Property';
         document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
 
+        // Fetch property data
         fetch('get_property.php?id=' + id)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('HTTP error ' + response.status);
+                    throw new Error('HTTP ' + response.status);
                 }
                 return response.json();
             })
             .then(data => {
-                console.log('Property data received:', data); // Debug log
                 if (data.error) {
                     alert('Error: ' + data.error);
                     return;
                 }
                 
+                // Populate fields
                 document.getElementById('property_id').value = data.id || '';
                 document.getElementById('edit_title').value = data.title || '';
                 document.getElementById('edit_location').value = data.location || '';
@@ -357,13 +354,21 @@ include 'header.php';
                 document.getElementById('edit_description').value = data.description || '';
                 document.getElementById('edit_auction_date').value = data.auction_date || '';
 
+                // Image preview
                 if (data.image_url) {
-                    document.getElementById('currentImage').src = data.image_url;
-                    document.getElementById('currentImagePreview').style.display = 'block';
+                    var img = document.getElementById('currentImage');
+                    if (img) {
+                        img.src = data.image_url;
+                        document.getElementById('currentImagePreview').style.display = 'block';
+                    }
                 } else {
                     document.getElementById('currentImagePreview').style.display = 'none';
                 }
 
+                // Update modal title
+                document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + data.id;
+
+                // Show modal
                 var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
                 modal.show();
             })
