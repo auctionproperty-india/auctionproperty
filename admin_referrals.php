@@ -10,7 +10,7 @@ if(!hasViewPermission('referrals', $pdo)) {
     die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page.</div>");
 }
 
-// Mark as Paid
+// ---- Mark as Paid (existing) ----
 if(isset($_GET['pay']) && isset($_GET['id'])) {
     if(!hasEditPermission('referrals', $pdo)) {
         die("<div class='alert alert-danger m-5'>❌ You do not have permission to edit referrals.</div>");
@@ -41,13 +41,47 @@ if(isset($_GET['pay']) && isset($_GET['id'])) {
                     WHERE id = ?")
             ->execute([$calc['tds'], $calc['admin_charge'], $calc['net'], $bank_name, $account_number, $ifsc, $id]);
         
-        // ---- 🆕 Credit to Wallet ----
-        $description = "Referral bonus (net) for earning ID $id";
-        creditWallet($pdo, $user_id, $calc['net'], $description, $id);
-        
+        creditWallet($pdo, $user_id, $calc['net'], "Referral bonus (net) for earning ID $id", $id);
         header("Location: admin_referrals.php?paid=1");
         exit;
     }
+}
+
+// ---- Manual Add Referral Payout ----
+if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_manual_payout'])) {
+    if(!hasEditPermission('referrals', $pdo)) {
+        die("<div class='alert alert-danger m-5'>❌ You do not have permission to add referrals.</div>");
+    }
+    $referrer_id = (int)$_POST['referrer_id'];
+    $referred_id = (int)$_POST['referred_id'];
+    $package_id = (int)$_POST['package_id'];
+    $amount = (float)$_POST['amount'];
+    $activation_date = $_POST['activation_date'] ?? date('Y-m-d');
+
+    if($referrer_id == $referred_id) {
+        $_SESSION['msg'] = "❌ Referrer and referred user cannot be same.";
+        header("Location: admin_referrals.php");
+        exit;
+    }
+
+    // Check if this referral already exists (optional)
+    $check = $pdo->prepare("SELECT id FROM user_referral_earnings WHERE user_id = ? AND referred_user_id = ? AND package_id = ?");
+    $check->execute([$referrer_id, $referred_id, $package_id]);
+    if($check->rowCount() > 0) {
+        $_SESSION['msg'] = "⚠️ This referral already exists.";
+        header("Location: admin_referrals.php");
+        exit;
+    }
+
+    // Insert as pending
+    $stmt = $pdo->prepare("INSERT INTO user_referral_earnings 
+                           (user_id, referred_user_id, package_id, amount, status, referred_activation_date) 
+                           VALUES (?, ?, ?, ?, 'pending', ?)");
+    $stmt->execute([$referrer_id, $referred_id, $package_id, $amount, $activation_date]);
+
+    $_SESSION['msg'] = "✅ Manual payout added successfully! It will appear in pending list.";
+    header("Location: admin_referrals.php");
+    exit;
 }
 
 include 'header.php';
@@ -67,17 +101,86 @@ $paid = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_nam
                      JOIN packages p ON e.package_id = p.id
                      WHERE e.status = 'paid'
                      ORDER BY e.paid_at DESC")->fetchAll();
+
+// ---- Fetch dropdown data ----
+$all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
+$packages = $pdo->query("SELECT id, name, referral_bonus FROM packages ORDER BY name")->fetchAll();
+
+// ---- Show messages ----
+if(isset($_SESSION['msg'])) {
+    echo "<div class='alert alert-info'>" . $_SESSION['msg'] . "</div>";
+    unset($_SESSION['msg']);
+}
+if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout Marked as Paid & Wallet Credited!</div>";
 ?>
 <div class="card-premium">
     <h4><i class="fas fa-hand-holding-usd me-2"></i>Referral Payouts</h4>
-    <?php if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout Marked as Paid & Wallet Credited!</div>"; ?>
-    
+
+    <!-- ===== Manual Add Section ===== -->
+    <div class="card border-0 shadow-sm p-3 mb-4" style="background: #f8fafc; border-radius: 16px;">
+        <h5><i class="fas fa-plus-circle me-2" style="color: #2563eb;"></i>Manual Add Referral Payout</h5>
+        <form method="POST" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small">Referrer (who gets paid)</label>
+                <select name="referrer_id" class="form-select form-select-sm" required>
+                    <option value="">Select Referrer</option>
+                    <?php foreach($all_users as $u): ?>
+                        <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= $u['email'] ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Referred User (who activated)</label>
+                <select name="referred_id" class="form-select form-select-sm" required>
+                    <option value="">Select User</option>
+                    <?php foreach($all_users as $u): ?>
+                        <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= $u['email'] ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Package</label>
+                <select name="package_id" id="manual_package_id" class="form-select form-select-sm" required onchange="updateManualAmount()">
+                    <option value="">Select</option>
+                    <?php foreach($packages as $p): ?>
+                        <option value="<?= $p['id'] ?>" data-bonus="<?= $p['referral_bonus'] ?>"><?= htmlspecialchars($p['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Bonus Amount (₹)</label>
+                <input type="number" step="0.01" name="amount" id="manual_amount" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Activation Date</label>
+                <input type="date" name="activation_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" name="add_manual_payout" class="btn btn-primary btn-sm w-100">Add Payout</button>
+            </div>
+        </form>
+        <script>
+            function updateManualAmount() {
+                const sel = document.getElementById('manual_package_id');
+                const bonus = sel.options[sel.selectedIndex]?.getAttribute('data-bonus') || 0;
+                document.getElementById('manual_amount').value = bonus;
+            }
+        </script>
+    </div>
+
+    <!-- ===== Pending Payouts ===== -->
     <h5 class="mt-4">Pending Payouts</h5>
     <?php if(count($pending) > 0): ?>
         <div class="table-responsive">
             <table class="table table-bordered">
-                <thead><tr><th>Referrer</th><th>Referred User</th><th>Package</th><th>Amount (₹)</th>
-                <?php if(hasEditPermission('referrals', $pdo)): ?><th>Action</th><?php endif; ?></tr></thead>
+                <thead><tr>
+                    <th>Referrer</th>
+                    <th>Referred User</th>
+                    <th>Package</th>
+                    <th>Amount (₹)</th>
+                    <th>Activation Date</th>
+                    <?php if(hasEditPermission('referrals', $pdo)): ?><th>Action</th><?php endif; ?>
+                </tr></thead>
                 <tbody>
                 <?php foreach($pending as $p): ?>
                     <tr>
@@ -85,9 +188,10 @@ $paid = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_nam
                         <td><?= htmlspecialchars($p['referred_name']) ?></td>
                         <td><?= htmlspecialchars($p['package_name']) ?></td>
                         <td>₹<?= indianCurrencyFormat($p['amount']) ?></td>
+                        <td><?= $p['referred_activation_date'] ? date('d M Y', strtotime($p['referred_activation_date'])) : 'N/A' ?></td>
                         <?php if(hasEditPermission('referrals', $pdo)): ?>
                         <td>
-                            <form method="POST" action="?pay=1&id=<?= $p['id'] ?>" class="row g-2">
+                            <form method="POST" action="?pay=1&id=<?= $p['id'] ?>" class="row g-1">
                                 <div class="col-md-2"><input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="10" placeholder="TDS %"></div>
                                 <div class="col-md-2"><input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="5" placeholder="Admin %"></div>
                                 <div class="col-md-3"><input type="text" name="bank_name" class="form-control form-control-sm" placeholder="Bank"></div>
@@ -104,11 +208,22 @@ $paid = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_nam
         </div>
     <?php else: echo "<p class='text-muted'>No pending payouts.</p>"; endif; ?>
 
+    <!-- ===== Paid Payouts ===== -->
     <h5 class="mt-4">Paid Payouts</h5>
     <?php if(count($paid) > 0): ?>
         <div class="table-responsive">
             <table class="table table-bordered">
-                <thead><tr><th>Referrer</th><th>Referred</th><th>Package</th><th>Gross</th><th>TDS</th><th>Admin Charge</th><th>Net Paid</th><th>Bank</th><th>A/c No.</th><th>IFSC</th><th>Paid On</th></tr></thead>
+                <thead><tr>
+                    <th>Referrer</th>
+                    <th>Referred</th>
+                    <th>Package</th>
+                    <th>Gross</th>
+                    <th>TDS</th>
+                    <th>Admin Charge</th>
+                    <th>Net Paid</th>
+                    <th>Activation Date</th>
+                    <th>Paid On</th>
+                </tr></thead>
                 <tbody>
                 <?php foreach($paid as $p): ?>
                     <tr>
@@ -119,9 +234,7 @@ $paid = $pdo->query("SELECT e.*, u.name as referrer_name, r.name as referred_nam
                         <td>₹<?= indianCurrencyFormat($p['tds_deducted']) ?></td>
                         <td>₹<?= indianCurrencyFormat($p['admin_charge_deducted']) ?></td>
                         <td><strong>₹<?= indianCurrencyFormat($p['net_amount']) ?></strong></td>
-                        <td><?= htmlspecialchars($p['bank_name'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($p['account_number'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($p['ifsc_code'] ?? '') ?></td>
+                        <td><?= $p['referred_activation_date'] ? date('d M Y', strtotime($p['referred_activation_date'])) : 'N/A' ?></td>
                         <td><?= date('d M Y', strtotime($p['paid_at'])) ?></td>
                     </tr>
                 <?php endforeach; ?>
