@@ -40,7 +40,7 @@ $count_stmt->execute($params);
 $total_rows = $count_stmt->fetchColumn();
 $total_pages = ceil($total_rows / $limit);
 
-$sql = "SELECT id, title, bank_name, city, price, status FROM properties $where_clause ORDER BY id DESC LIMIT $limit OFFSET $offset";
+$sql = "SELECT id, title, bank_name, city, price, status, auction_date FROM properties $where_clause ORDER BY id DESC LIMIT $limit OFFSET $offset";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
@@ -150,7 +150,7 @@ if(isset($_POST['add_property'])) {
     ]);
     
     $new_id = $pdo->lastInsertId();
-    // ✅ Send email notification to all users
+    // Send email notification
     if (function_exists('sendNewPropertyNotification')) {
         sendNewPropertyNotification($pdo, $new_id, 'auction');
     }
@@ -170,7 +170,7 @@ include 'header.php';
 <?php endif; ?>
 
 <div class="container-fluid px-3">
-    <!-- Filter Form + Add Button (Top Row) -->
+    <!-- Filter Form + Add Button -->
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Properties (<?= $total_rows ?>)</h5>
         <?php if(hasEditPermission('properties', $pdo)): ?>
@@ -208,7 +208,16 @@ include 'header.php';
         <div class="table-responsive">
             <table class="table table-hover table-sm mb-0">
                 <thead class="table-light">
-                    <tr><th>ID</th><th>Title</th><th>Bank</th><th>City</th><th>Price</th><th>Status</th><th>Actions</th></tr>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Bank</th>
+                        <th>City</th>
+                        <th>Price</th>
+                        <th>Auction Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
                 </thead>
                 <tbody>
                     <?php if(count($rows) > 0): ?>
@@ -219,6 +228,7 @@ include 'header.php';
                                 <td><?= htmlspecialchars($row['bank_name'] ?? '') ?></td>
                                 <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
                                 <td><?= indianCurrencyFormat($row['price']) ?></td>
+                                <td><?= $row['auction_date'] ? date('d M Y', strtotime($row['auction_date'])) : '<span class="text-muted">N/A</span>' ?></td>
                                 <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
                                 <td>
                                     <?php if(hasEditPermission('properties', $pdo)): ?>
@@ -231,7 +241,7 @@ include 'header.php';
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="7" class="text-center text-muted">No properties found.</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted">No properties found.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -354,6 +364,7 @@ include 'header.php';
                 document.getElementById('edit_google_location').value = data.google_location || '';
                 document.getElementById('existing_image').value = data.image_url || '';
                 document.getElementById('edit_description').value = data.description || '';
+                // ✅ Auction Date
                 document.getElementById('edit_auction_date').value = data.auction_date || '';
 
                 if (data.image_url) {
