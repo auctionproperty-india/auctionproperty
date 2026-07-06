@@ -56,6 +56,41 @@ if($role == 'user') {
         $days_left = 0;
     }
 }
+
+// ---- Admin Notifications ----
+$notification_count = 0;
+$notifications = [];
+if($role == 'admin') {
+    // Count pending subscriptions
+    $pending_subs = $pdo->query("SELECT COUNT(*) FROM subscriptions WHERE status = 'pending'")->fetchColumn();
+    // Count open tickets (status != 'closed')
+    $open_tickets = $pdo->query("SELECT COUNT(*) FROM support_tickets WHERE status != 'closed'")->fetchColumn();
+    $notification_count = (int)$pending_subs + (int)$open_tickets;
+
+    // Fetch details for dropdown
+    $pending_list = $pdo->query("SELECT s.id, u.name as user_name, pk.name as pkg_name, s.amount FROM subscriptions s JOIN users u ON s.user_id = u.id JOIN packages pk ON s.package_id = pk.id WHERE s.status = 'pending' ORDER BY s.created_at DESC LIMIT 5")->fetchAll();
+    $ticket_list = $pdo->query("SELECT t.id, u.name as user_name, t.subject, t.status FROM support_tickets t JOIN users u ON t.user_id = u.id WHERE t.status != 'closed' ORDER BY t.created_at DESC LIMIT 5")->fetchAll();
+    $notifications = array_merge(
+        array_map(function($item) {
+            return [
+                'type' => 'subscription',
+                'id' => $item['id'],
+                'message' => '💳 ' . htmlspecialchars($item['user_name']) . ' requested ' . htmlspecialchars($item['pkg_name']) . ' (₹' . $item['amount'] . ')',
+                'link' => 'admin_subscriptions.php',
+                'time' => ''
+            ];
+        }, $pending_list),
+        array_map(function($item) {
+            return [
+                'type' => 'ticket',
+                'id' => $item['id'],
+                'message' => '🎫 ' . htmlspecialchars($item['user_name']) . ' raised ticket: ' . htmlspecialchars($item['subject']),
+                'link' => 'support_admin.php?id=' . $item['id'],
+                'time' => ''
+            ];
+        }, $ticket_list)
+    );
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -141,6 +176,81 @@ if($role == 'user') {
         .user-welcome-banner h2 { font-weight: 800; }
         .user-welcome-banner p { opacity: 0.9; }
         @media (max-width: 576px) { .top-bar .user-info .name { font-size: 14px; } .card-premium { padding: 15px; } .stat-icon { width: 40px; height: 40px; font-size: 18px; } .hide-on-mobile { display: none; } .user-welcome-banner { padding: 20px; } }
+
+        /* Notification Dropdown Styles */
+        .notification-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .notification-dropdown .dropdown-menu {
+            min-width: 350px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 0;
+            margin-top: 8px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .notification-dropdown .dropdown-item {
+            color: #e2e8f0;
+            padding: 10px 16px;
+            border-bottom: 1px solid #2d3748;
+            white-space: normal;
+            font-size: 0.85rem;
+        }
+        .notification-dropdown .dropdown-item:hover {
+            background: #2d3748;
+            color: #fff;
+        }
+        .notification-dropdown .dropdown-item:last-child {
+            border-bottom: none;
+        }
+        .notification-dropdown .dropdown-header {
+            color: #94a3b8;
+            padding: 10px 16px;
+            font-weight: 600;
+            border-bottom: 1px solid #2d3748;
+            background: #0f172a;
+            border-radius: 12px 12px 0 0;
+        }
+        .notification-dropdown .badge-notify {
+            position: absolute;
+            top: -6px;
+            right: -8px;
+            background: #ef4444;
+            color: #fff;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 700;
+            min-width: 18px;
+            text-align: center;
+        }
+        .notification-dropdown .btn-notify {
+            background: transparent;
+            border: none;
+            color: #e2e8f0;
+            font-size: 1.4rem;
+            padding: 4px 8px;
+            position: relative;
+            cursor: pointer;
+        }
+        .notification-dropdown .btn-notify:hover {
+            color: #fbbf24;
+        }
+        .no-notification {
+            color: #94a3b8;
+            padding: 20px;
+            text-align: center;
+        }
+        @media (max-width: 576px) {
+            .notification-dropdown .dropdown-menu {
+                min-width: 280px;
+                right: -10px;
+            }
+        }
     </style>
 </head>
 <body class="role-<?= $role ?>">
@@ -177,11 +287,10 @@ if($role == 'user') {
         <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
-        <!-- ✅ NEW: Dholera Smart City Properties -->
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
         
     <?php else: ?>
-        <!-- User Sidebar (same as before) -->
+        <!-- User Sidebar -->
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
@@ -226,30 +335,32 @@ if($role == 'user') {
                 </div>
             </div>
         </div>
-    </div>
 
-<!-- Countdown Timer JavaScript -->
-<?php if($role == 'user' && $expiry_date): ?>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const expiryStr = document.getElementById('countdownDisplay').getAttribute('data-expiry');
-    const expiry = new Date(expiryStr + 'T23:59:59');
-    function updateCountdown() {
-        const now = new Date();
-        const diff = expiry - now;
-        if (diff <= 0) {
-            document.getElementById('countdownDisplay').innerHTML = '<i class="fas fa-clock"></i> Expired';
-            return;
-        }
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        document.getElementById('countdownDisplay').innerHTML = 
-            '<i class="fas fa-clock"></i> ' + days + 'd ' + hours + 'h ' + minutes + 'm ' + seconds + 's remaining';
-    }
-    updateCountdown();
-    setInterval(updateCountdown, 1000);
-});
-</script>
-<?php endif; ?>
+        <!-- Notification Bell (Only for Admin) -->
+        <?php if($role == 'admin'): ?>
+        <div class="notification-dropdown">
+            <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-bell"></i>
+                <?php if($notification_count > 0): ?>
+                    <span class="badge-notify"><?= $notification_count ?></span>
+                <?php endif; ?>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifyToggle">
+                <li class="dropdown-header">🔔 Notifications</li>
+                <?php if($notification_count > 0): ?>
+                    <?php foreach($notifications as $notif): ?>
+                        <li>
+                            <a class="dropdown-item" href="<?= $notif['link'] ?>">
+                                <?= $notif['message'] ?>
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-center text-muted small" href="#">Mark all as read (coming soon)</a></li>
+                <?php else: ?>
+                    <li class="no-notification">✨ No new notifications</li>
+                <?php endif; ?>
+            </ul>
+        </div>
+        <?php endif; ?>
+    </div>
