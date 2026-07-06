@@ -49,6 +49,11 @@
             <option value="Row House">Row House</option>
             <option value="Bungalow">Bungalow</option>
             <option value="Car">Car</option>
+            <!-- ✅ NEW OPTIONS -->
+            <option value="Land & Building">Land & Building</option>
+            <option value="Hotel">Hotel</option>
+            <option value="Factory">Factory</option>
+            <option value="Other">Other</option>
         </select>
     </div>
     <div class="col-md-3">
@@ -107,8 +112,34 @@
         <input type="text" name="inspection_date" id="edit_inspection_date" class="form-control form-control-md" value="">
     </div>
 
-    <!-- CONTACT NUMBER HIDDEN -->
-    <input type="hidden" name="contact_number" id="edit_contact_number" value="<?= $default_contact ?? '' ?>">
+    <!-- AUCTION DATE (NEW) -->
+    <div class="col-md-3">
+        <label class="form-label-md">Auction Date (DD/MM/YYYY)</label>
+        <input type="text" name="auction_date" id="edit_auction_date" class="form-control form-control-md" value="">
+    </div>
 
-    <!-- ✅ IMAGE UPLOAD COMPLETELY REMOVED -->
+    <!-- CONTACT NUMBER (hidden or visible) -->
+    <div class="col-md-3">
+        <label class="form-label-md">Contact Number</label>
+        <input type="text" name="contact_number" id="edit_contact_number" class="form-control form-control-md" value="">
+    </div>
+
+    <!-- GOOGLE LOCATION (hidden) -->
+    <input type="hidden" name="google_location" id="edit_google_location" value="">
+
+    <!-- DESCRIPTION (hidden or we can show) -->
+    <div class="col-12">
+        <label class="form-label-md">Description</label>
+        <textarea name="description" id="edit_description" class="form-control" rows="2"></textarea>
+    </div>
+
+    <!-- IMAGE UPLOAD (optional) -->
+    <div class="col-12">
+        <label class="form-label-md">Image</label>
+        <input type="file" name="image_file" id="image_file" class="form-control" accept="image/*">
+        <small id="imageHelpText" class="text-muted">Leave empty to auto-generate premium social card.</small>
+        <div id="currentImagePreview" style="display:none; margin-top:10px;">
+            <img id="currentImage" src="" style="max-height:150px; border-radius:8px; border:1px solid #ddd; padding:4px;">
+        </div>
+    </div>
 </div>
