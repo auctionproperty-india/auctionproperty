@@ -1,11 +1,12 @@
 <style>
-    .form-label-md { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.2rem; color: #1e293b; }
-    .form-control-md { font-size: 0.9rem; padding: 0.35rem 0.6rem; height: calc(2rem + 2px); border-radius: 6px; }
-    .form-control-lg-custom { font-size: 1rem; padding: 0.4rem 0.75rem; height: calc(2.3rem + 2px); border-radius: 6px; }
-    .select-md { font-size: 0.9rem; padding: 0.35rem 0.6rem; height: calc(2rem + 2px); border-radius: 6px; }
+    .form-label-md { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.2rem; color: #1e293b; }
+    .form-control-md { font-size: 0.85rem; padding: 0.25rem 0.5rem; height: calc(1.8rem + 2px); border-radius: 6px; }
+    .form-control-lg-custom { font-size: 0.9rem; padding: 0.3rem 0.6rem; height: calc(2rem + 2px); border-radius: 6px; }
+    .select-md { font-size: 0.85rem; padding: 0.25rem 0.5rem; height: calc(1.8rem + 2px); border-radius: 6px; }
+    .form-row-compact { margin-bottom: 0.5rem; }
 </style>
 
-<div class="row g-2">
+<div class="row g-1">
 
     <!-- TITLE & ADDRESS -->
     <div class="col-md-6">
@@ -17,7 +18,7 @@
         <input type="text" name="location" id="edit_location" class="form-control form-control-lg-custom" required value="">
     </div>
 
-    <!-- PRICE -->
+    <!-- PRICE & PER SQ FT -->
     <div class="col-md-3">
         <label class="form-label-md">Reserve Price (₹) <span class="text-danger">*</span></label>
         <input type="number" step="0.01" name="price" id="edit_price" class="form-control form-control-md" required value="">
@@ -49,7 +50,6 @@
             <option value="Row House">Row House</option>
             <option value="Bungalow">Bungalow</option>
             <option value="Car">Car</option>
-            <!-- ✅ NEW OPTIONS -->
             <option value="Land & Building">Land & Building</option>
             <option value="Hotel">Hotel</option>
             <option value="Factory">Factory</option>
@@ -78,7 +78,11 @@
         <input type="text" name="state" id="edit_state" class="form-control form-control-md" value="">
     </div>
 
-    <!-- EMD, BID, AREA -->
+    <!-- AREA & EMD / BID -->
+    <div class="col-md-3">
+        <label class="form-label-md">Area (Sq Ft)</label>
+        <input type="number" step="0.01" name="sqft" id="edit_sqft" class="form-control form-control-md" value="">
+    </div>
     <div class="col-md-3">
         <label class="form-label-md">EMD Amount (₹)</label>
         <input type="number" step="0.01" name="emd_amount" id="edit_emd_amount" class="form-control form-control-md" value="">
@@ -87,59 +91,32 @@
         <label class="form-label-md">Bid Increment (₹)</label>
         <input type="number" step="0.01" name="bid_increment" id="edit_bid_increment" class="form-control form-control-md" value="">
     </div>
-    <div class="col-md-3">
-        <label class="form-label-md">Area (Sq Ft)</label>
-        <input type="number" step="0.01" name="sqft" id="edit_sqft" class="form-control form-control-md" value="">
-    </div>
 
-    <!-- AUCTION START / END / DEADLINE -->
+    <!-- AUCTION DATES -->
     <div class="col-md-3">
-        <label class="form-label-md">EMD Submission Deadline</label>
+        <label class="form-label-md">EMD Deadline</label>
         <input type="text" name="emd_deadline" id="edit_emd_deadline" class="form-control form-control-md" value="">
     </div>
     <div class="col-md-3">
-        <label class="form-label-md">Auction Start Date & Time</label>
+        <label class="form-label-md">Auction Start</label>
         <input type="text" name="auction_start_time" id="edit_auction_start_time" class="form-control form-control-md" value="">
     </div>
     <div class="col-md-3">
-        <label class="form-label-md">Auction End Date & Time</label>
+        <label class="form-label-md">Auction End</label>
         <input type="text" name="auction_end_time" id="edit_auction_end_time" class="form-control form-control-md" value="">
     </div>
 
-    <!-- INSPECTION DATE -->
+    <!-- INSPECTION & AUCTION DATE -->
     <div class="col-md-3">
         <label class="form-label-md">Inspection Date (DD/MM/YYYY)</label>
         <input type="text" name="inspection_date" id="edit_inspection_date" class="form-control form-control-md" value="">
     </div>
-
-    <!-- AUCTION DATE (NEW) -->
     <div class="col-md-3">
         <label class="form-label-md">Auction Date (DD/MM/YYYY)</label>
         <input type="text" name="auction_date" id="edit_auction_date" class="form-control form-control-md" value="">
     </div>
 
-    <!-- CONTACT NUMBER (hidden or visible) -->
-    <div class="col-md-3">
-        <label class="form-label-md">Contact Number</label>
-        <input type="text" name="contact_number" id="edit_contact_number" class="form-control form-control-md" value="">
-    </div>
-
-    <!-- GOOGLE LOCATION (hidden) -->
+    <!-- GOOGLE LOCATION (HIDDEN) -->
     <input type="hidden" name="google_location" id="edit_google_location" value="">
 
-    <!-- DESCRIPTION (hidden or we can show) -->
-    <div class="col-12">
-        <label class="form-label-md">Description</label>
-        <textarea name="description" id="edit_description" class="form-control" rows="2"></textarea>
-    </div>
-
-    <!-- IMAGE UPLOAD (optional) -->
-    <div class="col-12">
-        <label class="form-label-md">Image</label>
-        <input type="file" name="image_file" id="image_file" class="form-control" accept="image/*">
-        <small id="imageHelpText" class="text-muted">Leave empty to auto-generate premium social card.</small>
-        <div id="currentImagePreview" style="display:none; margin-top:10px;">
-            <img id="currentImage" src="" style="max-height:150px; border-radius:8px; border:1px solid #ddd; padding:4px;">
-        </div>
-    </div>
 </div>
