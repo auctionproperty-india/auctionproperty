@@ -74,14 +74,12 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         $email = trim($_POST['email']);
         $phone = trim($_POST['phone']);
 
-        // Validate email
         if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $_SESSION['new_pass_display'] = "❌ Invalid email format.";
             header("Location: admin_dashboard.php");
             exit;
         }
 
-        // Check if email already exists for another user
         $check = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
         $check->execute([$email, $uid]);
         if($check->rowCount() > 0) {
@@ -90,7 +88,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit;
         }
 
-        // Update
         $pdo->prepare("UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?")->execute([$name, $email, $phone, $uid]);
         $_SESSION['new_pass_display'] = "✅ User details updated successfully!";
         header("Location: admin_dashboard.php");
@@ -202,13 +199,15 @@ $user_search = $_GET['user_search'] ?? '';
                 </tr></thead>
                 <tbody>
                 <?php 
+                // Modified query to sort active subscribers first (package_name NOT NULL)
                 $sql_users = "SELECT 
                                 u.id, u.name, u.email, u.phone, u.referred_by, u.role, u.status, u.coins,
                                 u.created_at as reg_date,
                                 r.name as referrer_name,
                                 p.name as package_name,
                                 s.start_date as sub_start,
-                                s.end_date as sub_end
+                                s.end_date as sub_end,
+                                CASE WHEN p.name IS NOT NULL THEN 1 ELSE 0 END as is_active_sub
                               FROM users u 
                               LEFT JOIN users r ON u.referred_by = r.id
                               LEFT JOIN (
@@ -221,10 +220,10 @@ $user_search = $_GET['user_search'] ?? '';
                 
                 if(!empty($user_search)) {
                     $sql_users .= " WHERE u.name ILIKE ? OR u.email ILIKE ?";
-                    $stmt = $pdo->prepare($sql_users . " ORDER BY u.id DESC");
+                    $stmt = $pdo->prepare($sql_users . " ORDER BY is_active_sub DESC, u.id DESC");
                     $stmt->execute(['%'.$user_search.'%', '%'.$user_search.'%']);
                 } else {
-                    $stmt = $pdo->query($sql_users . " ORDER BY u.id DESC");
+                    $stmt = $pdo->query($sql_users . " ORDER BY is_active_sub DESC, u.id DESC");
                 }
                 $users = $stmt->fetchAll();
 
@@ -239,9 +238,16 @@ $user_search = $_GET['user_search'] ?? '';
                         $reg_date = date('Y-m-d\TH:i', strtotime($u['reg_date']));
                         $act_date = !empty($u['sub_start']) ? date('Y-m-d\TH:i', strtotime($u['sub_start'])) : '';
                         $end_date = !empty($u['sub_end']) ? date('Y-m-d\TH:i', strtotime($u['sub_end'])) : '';
+                        // Green tick if active subscription
+                        $active_badge = $u['is_active_sub'] ? ' ✅' : '';
                 ?>
                     <tr>
-                        <td><?= htmlspecialchars($u['name']) ?></td>
+                        <td>
+                            <?= htmlspecialchars($u['name']) ?>
+                            <?php if($u['is_active_sub']): ?>
+                                <span class="badge bg-success" title="Active Subscriber"><i class="fas fa-check-circle"></i></span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= $u['email'] ?></td>
                         <td><?= htmlspecialchars($u['phone'] ?? 'N/A') ?></td>
                         <td><?= ($u['referrer_name'] ? htmlspecialchars($u['referrer_name']) : '<span class="text-muted">Direct</span>') ?></td>
