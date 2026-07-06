@@ -24,7 +24,6 @@ WITH RECURSIVE team_tree AS (
         ARRAY[u.id] as path,
         p.name as package_name,
         s.status as sub_status,
-        s.id as sub_id,
         CASE WHEN s.status = 'active' AND s.end_date >= CURRENT_DATE THEN 1 ELSE 0 END as is_active_sub
     FROM users u 
     LEFT JOIN (
@@ -49,7 +48,6 @@ WITH RECURSIVE team_tree AS (
         t.path || u.id,
         p.name as package_name,
         s.status as sub_status,
-        s.id as sub_id,
         CASE WHEN s.status = 'active' AND s.end_date >= CURRENT_DATE THEN 1 ELSE 0 END as is_active_sub
     FROM users u
     INNER JOIN team_tree t ON u.referred_by = t.id
@@ -214,7 +212,6 @@ function renderTree($nodes, $level = 0) {
     .badge-primary { background-color: #0d6efd; color: white; }
     .badge-info { background-color: #0dcaf0; color: #212529; }
     .badge-success { background-color: #198754; color: white; }
-    /* Search highlight */
     .team-tree li.hidden-item {
         display: none !important;
     }
