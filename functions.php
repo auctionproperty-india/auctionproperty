@@ -482,4 +482,9 @@ function getSlotStatus($pdo, $user_id, $slot) {
     }
     return $status;
 }
+function logActivity($pdo, $user_id, $activity_type, $details = null) {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $stmt = $pdo->prepare("INSERT INTO user_activity_log (user_id, activity_type, details, ip_address) VALUES (?, ?, ?, ?)");
+    return $stmt->execute([$user_id, $activity_type, $details, $ip]);
+}
 ?>
