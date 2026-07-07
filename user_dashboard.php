@@ -28,13 +28,17 @@ $activation_date_formatted = ($is_subscribed && !empty($sub_info['start_date']))
 $expiry_date_formatted = ($is_subscribed && !empty($sub_info['end_date'])) ? date('d M Y', strtotime($sub_info['end_date'])) : 'N/A';
 $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 
-// ---- Referral Earnings ----
-$earnings = getReferralEarnings($pdo, $user_id, 'pending');
+// ---- Referral Earnings (Gross for Pending & Paid) ----
+$pending_earnings = getReferralEarnings($pdo, $user_id, 'pending');
 $paid_earnings = getReferralEarnings($pdo, $user_id, 'paid');
-$total_pending = array_sum(array_column($earnings, 'amount'));
-$total_paid = array_sum(array_column($paid_earnings, 'net_amount'));
 
-// ---- Wallet ----
+// ✅ Pending = Gross (amount)
+$total_pending = array_sum(array_column($pending_earnings, 'amount'));
+
+// ✅ Paid = Gross (amount) – not net
+$total_paid = array_sum(array_column($paid_earnings, 'amount'));
+
+// ---- Wallet Balance ----
 $wallet_balance = getUserWalletBalance($pdo, $user_id);
 
 // ---- Show Images ----
@@ -288,27 +292,6 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
     <?php endif; ?>
 </div>
 
-<!-- ===== PROPERTY MODAL ===== -->
-<div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff;">
-            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <h5 class="modal-title"><i class="fas fa-home me-2" style="color: #fbbf24;"></i>🏠 Low Price Property</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center p-4">
-                <div id="propertyModalContent">
-                    <!-- Dynamic content -->
-                </div>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal"><i class="fas fa-undo-alt me-2"></i>Back to Spin</button>
-                <a href="#" id="viewPropertyLink" class="btn btn-primary" target="_blank">View Details</a>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- ===== TODAY'S AUCTIONS ===== -->
 <?php if(count($today_props) > 0): ?>
     <div class="section-title">
@@ -380,7 +363,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     spinCount.textContent = data.spins_used;
                     slotCoins.textContent = data.total_coins_earned;
                     if (data.is_reward) {
-                        // 5th spin – coins
                         spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
                         showCoinAnimation(data.coins);
                         launchConfetti();
