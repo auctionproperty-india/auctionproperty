@@ -84,12 +84,19 @@ if(isset($_GET['pay']) && isset($_GET['id'])) {
                     WHERE id = ?")
             ->execute([$calc['tds'], $calc['admin_charge'], $calc['net'], $bank_name, $account_number, $ifsc, $utr_no, $id]);
         
-        // Credit wallet with net amount (but we will zero it immediately after)
+        // Credit wallet with net amount
         if ($calc['net'] > 0) {
             creditWallet($pdo, $user_id, $calc['net'], "Referral bonus (net) for earning ID $id", $id);
         }
 
-        // ✅ ZERO the wallet balance so user cannot use it for subscription
+        // ✅ Add Expense Entry in Accounting (Net amount)
+        $user_name = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+        $user_name->execute([$user_id]);
+        $uname = $user_name->fetchColumn();
+        $description = "Referral payout to $uname (ID: $user_id) - Net ₹" . indianCurrencyFormat($calc['net']) . " | UTR: $utr_no";
+        addAccountEntry($pdo, 'expense', $calc['net'], $description, 'Referral Payout');
+
+        // ✅ ZERO the wallet balance
         $pdo->prepare("UPDATE users SET wallet_balance = 0 WHERE id = ?")->execute([$user_id]);
 
         if ($give_subscription && $package_id > 0) {
@@ -156,14 +163,21 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pay_all'])) {
         creditWallet($pdo, $referrer_id, $total_net, "Referral bonus (net) for multiple referrals (Paid via Admin Pay All)", 0);
     }
 
-    // ✅ ZERO the wallet balance so user cannot use it for subscription
+    // ✅ Add Expense Entry in Accounting (Total Net)
+    $user_name = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+    $user_name->execute([$referrer_id]);
+    $uname = $user_name->fetchColumn();
+    $description = "Referral payout to $uname (ID: $referrer_id) - Net ₹" . indianCurrencyFormat($total_net) . " | UTR: $utr_no (Pay All)";
+    addAccountEntry($pdo, 'expense', $total_net, $description, 'Referral Payout');
+
+    // ✅ ZERO the wallet balance
     $pdo->prepare("UPDATE users SET wallet_balance = 0 WHERE id = ?")->execute([$referrer_id]);
 
     if ($give_subscription_all && $package_id_all > 0) {
         activateSubscriptionForUser($pdo, $referrer_id, $package_id_all, $duration_all);
     }
 
-    $_SESSION['msg'] = "✅ Total Gross: ₹" . indianCurrencyFormat($total_gross) . ", Deductions: TDS ₹" . indianCurrencyFormat($total_tds) . ", Admin ₹" . indianCurrencyFormat($total_admin) . ", Net ₹" . indianCurrencyFormat($total_net) . " credited. Wallet balance has been set to 0. UTR: $utr_no";
+    $_SESSION['msg'] = "✅ Total Gross: ₹" . indianCurrencyFormat($total_gross) . ", Deductions: TDS ₹" . indianCurrencyFormat($total_tds) . ", Admin ₹" . indianCurrencyFormat($total_admin) . ", Net ₹" . indianCurrencyFormat($total_net) . " credited. Wallet balance set to 0. UTR: $utr_no";
     if ($give_subscription_all) $_SESSION['msg'] .= " Subscription activated.";
     header("Location: admin_referrals.php?paid=1");
     exit;
@@ -208,6 +222,17 @@ include 'header.php';
 
 $defaults = getGlobalDeductions($pdo);
 
+// ---- Summary Statistics ----
+$summary = $pdo->query("SELECT 
+                           COALESCE(SUM(tds_deducted), 0) as total_tds,
+                           COALESCE(SUM(admin_charge_deducted), 0) as total_admin,
+                           COALESCE(SUM(net_amount), 0) as total_net_paid
+                       FROM user_referral_earnings WHERE status = 'paid'")->fetch();
+
+$total_tds = $summary['total_tds'];
+$total_admin = $summary['total_admin'];
+$total_net_paid = $summary['total_net_paid'];
+
 // ---- Fetch pending groups ----
 $pendingGroups = $pdo->query("
     SELECT 
@@ -241,16 +266,46 @@ if(isset($_SESSION['msg'])) {
     echo "<div class='alert alert-info'>" . $_SESSION['msg'] . "</div>";
     unset($_SESSION['msg']);
 }
-if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) completed! Wallet balance set to 0.</div>";
+if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) completed! Expense entry added to accounting.</div>";
 ?>
 <div class="card-premium">
     <h4><i class="fas fa-hand-holding-usd me-2"></i>Referral Payouts</h4>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white p-3 rounded-4">
+                <h6>Total Net Paid</h6>
+                <h3>₹ <?= indianCurrencyFormat($total_net_paid) ?></h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark p-3 rounded-4">
+                <h6>Total TDS Deducted</h6>
+                <h3>₹ <?= indianCurrencyFormat($total_tds) ?></h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-dark p-3 rounded-4">
+                <h6>Total Admin Charge</h6>
+                <h3>₹ <?= indianCurrencyFormat($total_admin) ?></h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white p-3 rounded-4">
+                <h6>Total Gross Referrals</h6>
+                <h3>₹ <?= indianCurrencyFormat($total_net_paid + $total_tds + $total_admin) ?></h3>
+            </div>
+        </div>
+    </div>
+
     <p class="text-muted">Global TDS: <strong><?= $defaults['tds'] ?>%</strong> | Admin Charge: <strong><?= $defaults['admin'] ?>%</strong> (Edit in Settings)</p>
 
     <!-- Manual Add Section -->
     <div class="card border-0 shadow-sm p-3 mb-4" style="background: #f8fafc; border-radius: 16px;">
         <h5><i class="fas fa-plus-circle me-2" style="color: #2563eb;"></i>Manual Add Referral Payout</h5>
         <form method="POST" class="row g-2 align-items-end">
+            <!-- ... same as before ... -->
             <div class="col-md-3">
                 <label class="form-label small">Referrer</label>
                 <select name="referrer_id" class="form-select form-select-sm" required>
