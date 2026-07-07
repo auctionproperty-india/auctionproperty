@@ -56,41 +56,6 @@ if($role == 'user') {
         $days_left = 0;
     }
 }
-
-// ---- Admin Notifications ----
-$notification_count = 0;
-$notifications = [];
-if($role == 'admin') {
-    // Count pending subscriptions
-    $pending_subs = $pdo->query("SELECT COUNT(*) FROM subscriptions WHERE status = 'pending'")->fetchColumn();
-    // Count open tickets (status != 'closed')
-    $open_tickets = $pdo->query("SELECT COUNT(*) FROM support_tickets WHERE status != 'closed'")->fetchColumn();
-    $notification_count = (int)$pending_subs + (int)$open_tickets;
-
-    // Fetch details for dropdown
-    $pending_list = $pdo->query("SELECT s.id, u.name as user_name, pk.name as pkg_name, s.amount FROM subscriptions s JOIN users u ON s.user_id = u.id JOIN packages pk ON s.package_id = pk.id WHERE s.status = 'pending' ORDER BY s.created_at DESC LIMIT 5")->fetchAll();
-    $ticket_list = $pdo->query("SELECT t.id, u.name as user_name, t.subject, t.status FROM support_tickets t JOIN users u ON t.user_id = u.id WHERE t.status != 'closed' ORDER BY t.created_at DESC LIMIT 5")->fetchAll();
-    $notifications = array_merge(
-        array_map(function($item) {
-            return [
-                'type' => 'subscription',
-                'id' => $item['id'],
-                'message' => '💳 ' . htmlspecialchars($item['user_name']) . ' requested ' . htmlspecialchars($item['pkg_name']) . ' (₹' . $item['amount'] . ')',
-                'link' => 'admin_subscriptions.php',
-                'time' => ''
-            ];
-        }, $pending_list),
-        array_map(function($item) {
-            return [
-                'type' => 'ticket',
-                'id' => $item['id'],
-                'message' => '🎫 ' . htmlspecialchars($item['user_name']) . ' raised ticket: ' . htmlspecialchars($item['subject']),
-                'link' => 'support_admin.php?id=' . $item['id'],
-                'time' => ''
-            ];
-        }, $ticket_list)
-    );
-}
 ?>
 <!DOCTYPE html>
 <html>
@@ -278,13 +243,14 @@ if($role == 'admin') {
         <?php if(hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
+        <!-- ✅ NEW: Deductions Menu -->
+        <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
         <?php if(hasViewPermission('accounting', $pdo)): ?>
             <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
         <?php endif; ?>
         <?php if(hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
-        <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
         <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
@@ -342,13 +308,13 @@ if($role == 'admin') {
         <div class="notification-dropdown">
             <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="fas fa-bell"></i>
-                <?php if($notification_count > 0): ?>
+                <?php if(isset($notification_count) && $notification_count > 0): ?>
                     <span class="badge-notify"><?= $notification_count ?></span>
                 <?php endif; ?>
             </button>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifyToggle">
                 <li class="dropdown-header">🔔 Notifications</li>
-                <?php if($notification_count > 0): ?>
+                <?php if(isset($notifications) && count($notifications) > 0): ?>
                     <?php foreach($notifications as $notif): ?>
                         <li>
                             <a class="dropdown-item" href="<?= $notif['link'] ?>">
