@@ -243,8 +243,10 @@ if($role == 'user') {
         <?php if(hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
-        <!-- ✅ NEW: Deductions Menu -->
+        <!-- ✅ Deductions (TDS/Admin Charge) -->
         <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
+        <!-- ✅ Activity Logs (Online Users, Spin, Copy, View) -->
+        <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
         <?php if(hasViewPermission('accounting', $pdo)): ?>
             <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
         <?php endif; ?>
