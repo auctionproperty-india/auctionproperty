@@ -84,7 +84,13 @@ if(isset($_GET['pay']) && isset($_GET['id'])) {
                     WHERE id = ?")
             ->execute([$calc['tds'], $calc['admin_charge'], $calc['net'], $bank_name, $account_number, $ifsc, $utr_no, $id]);
         
-        creditWallet($pdo, $user_id, $calc['net'], "Referral bonus (net) for earning ID $id", $id);
+        // Credit wallet with net amount (but we will zero it immediately after)
+        if ($calc['net'] > 0) {
+            creditWallet($pdo, $user_id, $calc['net'], "Referral bonus (net) for earning ID $id", $id);
+        }
+
+        // ✅ ZERO the wallet balance so user cannot use it for subscription
+        $pdo->prepare("UPDATE users SET wallet_balance = 0 WHERE id = ?")->execute([$user_id]);
 
         if ($give_subscription && $package_id > 0) {
             $final_pkg = $package_id ?: $pkg_id;
@@ -145,15 +151,19 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pay_all'])) {
         $stmt->execute([$calc['tds'], $calc['admin_charge'], $calc['net'], $bank_name, $account_number, $ifsc, $utr_no, $earning['id']]);
     }
 
+    // Credit wallet with total net
     if($total_net > 0) {
         creditWallet($pdo, $referrer_id, $total_net, "Referral bonus (net) for multiple referrals (Paid via Admin Pay All)", 0);
     }
+
+    // ✅ ZERO the wallet balance so user cannot use it for subscription
+    $pdo->prepare("UPDATE users SET wallet_balance = 0 WHERE id = ?")->execute([$referrer_id]);
 
     if ($give_subscription_all && $package_id_all > 0) {
         activateSubscriptionForUser($pdo, $referrer_id, $package_id_all, $duration_all);
     }
 
-    $_SESSION['msg'] = "✅ Total Gross: ₹" . indianCurrencyFormat($total_gross) . ", Deductions: TDS ₹" . indianCurrencyFormat($total_tds) . ", Admin ₹" . indianCurrencyFormat($total_admin) . ", Net ₹" . indianCurrencyFormat($total_net) . " credited. UTR: $utr_no";
+    $_SESSION['msg'] = "✅ Total Gross: ₹" . indianCurrencyFormat($total_gross) . ", Deductions: TDS ₹" . indianCurrencyFormat($total_tds) . ", Admin ₹" . indianCurrencyFormat($total_admin) . ", Net ₹" . indianCurrencyFormat($total_net) . " credited. Wallet balance has been set to 0. UTR: $utr_no";
     if ($give_subscription_all) $_SESSION['msg'] .= " Subscription activated.";
     header("Location: admin_referrals.php?paid=1");
     exit;
@@ -231,13 +241,13 @@ if(isset($_SESSION['msg'])) {
     echo "<div class='alert alert-info'>" . $_SESSION['msg'] . "</div>";
     unset($_SESSION['msg']);
 }
-if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) completed! Wallet credited.</div>";
+if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) completed! Wallet balance set to 0.</div>";
 ?>
 <div class="card-premium">
     <h4><i class="fas fa-hand-holding-usd me-2"></i>Referral Payouts</h4>
     <p class="text-muted">Global TDS: <strong><?= $defaults['tds'] ?>%</strong> | Admin Charge: <strong><?= $defaults['admin'] ?>%</strong> (Edit in Settings)</p>
 
-    <!-- Manual Add Section (unchanged) -->
+    <!-- Manual Add Section -->
     <div class="card border-0 shadow-sm p-3 mb-4" style="background: #f8fafc; border-radius: 16px;">
         <h5><i class="fas fa-plus-circle me-2" style="color: #2563eb;"></i>Manual Add Referral Payout</h5>
         <form method="POST" class="row g-2 align-items-end">
@@ -289,7 +299,7 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
         </script>
     </div>
 
-    <!-- ===== Pending Payouts (Grouped by Referrer) ===== -->
+    <!-- ===== Pending Payouts (Grouped) ===== -->
     <h5 class="mt-4">Pending Payouts</h5>
     <?php if(count($pendingGroups) > 0): ?>
         <div class="table-responsive">
@@ -307,7 +317,6 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                 <?php foreach($pendingGroups as $group): 
                     $gross = $group['total_amount'];
                     $calc = calculateNet($gross, $defaults['tds'], $defaults['admin']);
-                    // Fetch bank details for this referrer
                     $bank = getUserBankDetails($pdo, $group['referrer_id']);
                 ?>
                     <tr>
@@ -414,7 +423,6 @@ if(isset($_GET['paid'])) echo "<div class='alert alert-success'>✅ Payout(s) co
                 <tbody>
                 <?php foreach($individualPending as $p): 
                     $calc = calculateNet($p['amount'], $defaults['tds'], $defaults['admin']);
-                    // Fetch bank details for this referrer
                     $bank = getUserBankDetails($pdo, $p['user_id']);
                 ?>
                     <tr>
