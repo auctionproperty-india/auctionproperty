@@ -263,7 +263,7 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
         <div class="col-md-6">
             <p class="mb-1">Current Slot: <strong><?= getSlotTimeRange($current_slot) ?></strong></p>
             <p class="mb-1">Spins Used: <span id="spinCount"><?= $current_slot_data['spins_used'] ?></span>/5</p>
-            <p class="mb-1">Coins Earned this slot: <span id="slotCoins"><?= $current_slot_data['coins_earned'] ?></span>/20</p>
+            <p class="mb-1">Coins Earned this slot: <span id="slotCoins"><?= $current_slot_data['coins_earned'] ?></span>/22</p>
             <div id="spinMessage" class="mt-2 small"></div>
         </div>
         <div class="col-md-6 text-center">
@@ -287,7 +287,7 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
     <?php else: ?>
     <div class="alert alert-secondary text-center mt-3">
         <?php if ($current_slot_data['spins_used'] >= 5): ?>
-            You have completed this slot! Total coins earned: <?= $current_slot_data['coins_earned'] ?>/20
+            You have completed this slot! Total coins earned: <?= $current_slot_data['coins_earned'] ?>/22
         <?php else: ?>
             No spins available for this slot.
         <?php endif; ?>
@@ -383,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
         
-        // Random rotation - always spin with random segment
+        // Random rotation
         const randomSegment = segments[Math.floor(Math.random() * segments.length)];
         const extraSpin = Math.floor(Math.random() * 360);
         const totalRotation = 360 * 5 + randomSegment + extraSpin;
@@ -436,20 +436,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         const icon = isCar ? '🚗' : '🏠';
                         const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
                         propertyModalContent.innerHTML = `
-    ${imageHtml}
-    <h5 class="fw-bold">${icon} ${p.title}</h5>
-    <p class="text-muted">🏦 ${p.bank_name || 'Bank'}</p>
-    <p class="text-warning fw-bold">₹ ${parseInt(p.price).toLocaleString('en-IN')}</p>
-    <p><i class="fas fa-map-pin"></i> ${p.city || 'N/A'}</p>
-    <p><small class="text-muted">Type: ${p.type || 'N/A'}</small></p>
-    <div class="mt-2 p-2 bg-success bg-opacity-25 rounded-3">
-        <i class="fas fa-coins text-warning"></i> You earned <strong>${data.coins}</strong> coins!
-    </div>
-`;                        `;
+                            ${imageHtml}
+                            <h5 class="fw-bold">${icon} ${p.title}</h5>
+                            <p class="text-muted">🏦 ${p.bank_name || 'Bank'}</p>
+                            <p class="text-warning fw-bold">₹ ${parseInt(p.price).toLocaleString('en-IN')}</p>
+                            <p><i class="fas fa-map-pin"></i> ${p.city || 'N/A'}</p>
+                            <p><small class="text-muted">Type: ${p.type || 'N/A'}</small></p>
+                            <div class="mt-2 p-2 bg-success bg-opacity-25 rounded-3">
+                                <i class="fas fa-coins text-warning"></i> You earned <strong>${data.coins}</strong> coins!
+                            </div>
+                        `;
                         viewPropertyLink.href = `property_detail.php?id=${p.id}&source=auction`;
                         propertyModal.show();
                         spinMessage.innerHTML = data.message || '🏠 Check out this property!';
-                        // After modal closes, re-enable spin
+                        // Re-enable spin after modal closes
                         propertyModal._element.addEventListener('hidden.bs.modal', function () {
                             spinBtn.disabled = false;
                         });
