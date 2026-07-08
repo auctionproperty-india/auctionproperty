@@ -179,9 +179,177 @@ function debitWallet($pdo, $user_id, $amount, $description, $reference_id = null
 
 // ===== 🔥 4K Social Image Generator =====
 function generateSocialCard($property) {
-    // Keep your existing full function here. If not, this minimal version works.
-    return $property['image_url'] ?? '';
+    if (!extension_loaded('gd')) return $property['image_url'] ?? '';
+    $font_path = __DIR__ . '/fonts/Inter.ttf';
+    $font_exists = file_exists($font_path);
+
+    try {
+        // 4K Resolution: 3840 x 2160 (Ultra HD)
+        $width = 1920;
+        $height = 1080;
+        $img = imagecreatetruecolor($width, $height);
+        if (!$img) return $property['image_url'] ?? '';
+
+        $dark_blue = imagecolorallocate($img, 15, 23, 42);
+        imagefilledrectangle($img, 0, 0, $width, $height, $dark_blue);
+        for ($i = 0; $i < $height; $i += 10) {
+            $ratio = $i / $height;
+            $r = (int)(15 + (30 - 15) * $ratio);
+            $g = (int)(23 + (58 - 23) * $ratio);
+            $b = (int)(42 + (138 - 42) * $ratio);
+            $col = imagecolorallocate($img, $r, $g, $b);
+            imagefilledrectangle($img, 0, $i, $width, $i + 10, $col);
+        }
+
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $gold = imagecolorallocate($img, 251, 191, 36);
+        $light_gray = imagecolorallocate($img, 200, 210, 220);
+        $dark_bg = imagecolorallocate($img, 15, 23, 42);
+
+        if (!$font_exists) {
+            $f_size = 5;
+            $lines = [
+                strtoupper($property['title'] ?? 'PROPERTY'),
+                "BANK: " . ($property['bank_name'] ?? 'N/A'),
+                "PRICE: ₹ " . indianCurrencyFormat($property['price'] ?? 0),
+                "CITY: " . ($property['city'] ?? ''),
+                "CONTACT: " . ($property['contact_number'] ?? 'N/A')
+            ];
+            $y = 200;
+            foreach ($lines as $line) {
+                $x = (int)(($width - (strlen($line) * imagefontwidth($f_size))) / 2);
+                imagestring($img, $f_size, $x, $y, $line, $white);
+                $y += 100;
+            }
+            return saveImage($img);
+        }
+
+        $font_regular = $font_path;
+        $title = strtoupper($property['title'] ?? 'PRIME PROPERTY');
+        $title_size = 120;
+        $title_box = imagettfbbox($title_size, 0, $font_regular, $title);
+        $title_width = $title_box[2] - $title_box[0];
+        $x = (int)(($width - $title_width) / 2);
+        imagettftext($img, $title_size, 0, $x, 250, $gold, $font_regular, $title);
+
+        $bank = strtoupper($property['bank_name'] ?? 'BANK AUCTION');
+        $bank_size = 70;
+        $bank_box = imagettfbbox($bank_size, 0, $font_regular, $bank);
+        $bank_w = ($bank_box[2] - $bank_box[0]) + 120;
+        $bank_h = 100;
+        $bank_x = (int)(($width - $bank_w) / 2);
+        imagefilledrectangle($img, $bank_x, 320, $bank_x + $bank_w, 320 + $bank_h, $gold);
+        $txt_x = $bank_x + 60;
+        $txt_y = 320 + 80;
+        imagettftext($img, $bank_size, 0, $txt_x, $txt_y, $dark_bg, $font_regular, $bank);
+
+        $type = $property['type'] ?? 'N/A';
+        $possession = $property['possession_type'] ?? 'N/A';
+        $info_line = "TYPE: $type   |   POSSESSION: $possession";
+        $info_size = 50;
+        $info_box = imagettfbbox($info_size, 0, $font_regular, $info_line);
+        $info_w = $info_box[2] - $info_box[0];
+        $x = (int)(($width - $info_w) / 2);
+        imagettftext($img, $info_size, 0, $x, 520, $white, $font_regular, $info_line);
+
+        $city = $property['city'] ?? '';
+        $locality = $property['locality'] ?? '';
+        $state = $property['state'] ?? '';
+        $loc_str = "$city, $locality, $state";
+        $loc_size = 44;
+        $loc_box = imagettfbbox($loc_size, 0, $font_regular, $loc_str);
+        $loc_w = $loc_box[2] - $loc_box[0];
+        $x = (int)(($width - $loc_w) / 2);
+        imagettftext($img, $loc_size, 0, $x, 620, $light_gray, $font_regular, $loc_str);
+
+        $address = $property['location'] ?? '';
+        $addr_size = 40;
+        $addr_box = imagettfbbox($addr_size, 0, $font_regular, $address);
+        $addr_w = $addr_box[2] - $addr_box[0];
+        if ($addr_w > $width - 200) {
+            $address = substr($address, 0, 80) . '...';
+            $addr_box = imagettfbbox($addr_size, 0, $font_regular, $address);
+            $addr_w = $addr_box[2] - $addr_box[0];
+        }
+        $x = (int)(($width - $addr_w) / 2);
+        imagettftext($img, $addr_size, 0, $x, 720, $white, $font_regular, $address);
+
+        $price = "RESERVE PRICE: ₹ " . indianCurrencyFormat($property['price'] ?? 0);
+        $emd = "EMD: ₹ " . indianCurrencyFormat($property['emd_amount'] ?? 0);
+        $bid = "BID INCREMENT: ₹ " . indianCurrencyFormat($property['bid_increment'] ?? 0);
+        $area = "AREA: " . ($property['sqft'] ?? 0) . " Sq Ft";
+        $items = [$price, $emd, $bid, $area];
+        $cols = 4;
+        $box_w = 700;
+        $box_h = 150;
+        $gap = 40;
+        $start_x = (int)(($width - ($box_w * $cols + $gap * ($cols - 1))) / 2);
+        $box_y = 800;
+        foreach ($items as $i => $text) {
+            $x_pos = $start_x + ($i * ($box_w + $gap));
+            $box_color = imagecolorallocate($img, 30, 50, 80);
+            imagefilledrectangle($img, $x_pos, $box_y, $x_pos + $box_w, $box_y + $box_h, $box_color);
+            imagerectangle($img, $x_pos, $box_y, $x_pos + $box_w, $box_y + $box_h, $gold);
+            $parts = explode(':', $text);
+            $label = $parts[0] . ':';
+            $value = isset($parts[1]) ? trim($parts[1]) : '';
+            $label_size = 32;
+            $value_size = 44;
+            $label_box = imagettfbbox($label_size, 0, $font_regular, $label);
+            $label_w = $label_box[2] - $label_box[0];
+            $lx = (int)($x_pos + ($box_w - $label_w) / 2);
+            imagettftext($img, $label_size, 0, $lx, $box_y + 50, $light_gray, $font_regular, $label);
+            $value_box = imagettfbbox($value_size, 0, $font_regular, $value);
+            $value_w = $value_box[2] - $value_box[0];
+            $vx = (int)($x_pos + ($box_w - $value_w) / 2);
+            imagettftext($img, $value_size, 0, $vx, $box_y + 120, $white, $font_regular, $value);
+        }
+
+        $start = $property['auction_start_time'] ?? 'N/A';
+        $end = $property['auction_end_time'] ?? 'N/A';
+        $deadline = $property['emd_deadline'] ?? 'N/A';
+        $auction_date = $property['auction_date'] ?? '';
+        if (!empty($auction_date)) {
+            $auction_date = date('d M Y', strtotime($auction_date));
+        }
+        $date_line = "START: $start   |   END: $end   |   EMD DEADLINE: $deadline   |   AUCTION DATE: $auction_date";
+        $date_size = 40;
+        $date_box = imagettfbbox($date_size, 0, $font_regular, $date_line);
+        $date_w = $date_box[2] - $date_box[0];
+        if ($date_w > $width - 100) {
+            $date_line = "START: $start   |   END: $end";
+            $date_box = imagettfbbox($date_size, 0, $font_regular, $date_line);
+            $date_w = $date_box[2] - $date_box[0];
+        }
+        $x = (int)(($width - $date_w) / 2);
+        imagettftext($img, $date_size, 0, $x, 1050, $white, $font_regular, $date_line);
+
+        $borrower = "BORROWER: " . ($property['borrower_name'] ?? 'N/A');
+        $contact = "CONTACT: " . ($property['contact_number'] ?? 'N/A');
+        $info_size2 = 44;
+        $borrower_box = imagettfbbox($info_size2, 0, $font_regular, $borrower);
+        $borrower_w = $borrower_box[2] - $borrower_box[0];
+        $x = (int)(($width - $borrower_w) / 2);
+        imagettftext($img, $info_size2, 0, $x, 1200, $gold, $font_regular, $borrower);
+        $contact_box = imagettfbbox($info_size2, 0, $font_regular, $contact);
+        $contact_w = $contact_box[2] - $contact_box[0];
+        $x = (int)(($width - $contact_w) / 2);
+        imagettftext($img, $info_size2, 0, $x, 1280, $white, $font_regular, $contact);
+
+        $brand = "🔹 PRIME PROPERTY";
+        $brand_size = 50;
+        $brand_box = imagettfbbox($brand_size, 0, $font_regular, $brand);
+        $brand_w = $brand_box[2] - $brand_box[0];
+        $x = (int)(($width - $brand_w) / 2);
+        imagettftext($img, $brand_size, 0, $x, 1900, $gold, $font_regular, $brand);
+
+        return saveImage($img);
+
+    } catch (Exception $e) {
+        return $property['image_url'] ?? '';
+    }
 }
+
 function saveImage($img) {
     $upload_dir = 'uploads/';
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
@@ -272,7 +440,7 @@ function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
     return true;
 }
 
-// ===== 🔄 DAILY SPIN SYSTEM (Final Version) =====
+// ===== 🔄 DAILY SPIN SYSTEM (Updated with coin settings) =====
 function getCurrentSlot() {
     $hour = (int)date('H');
     if ($hour >= 0 && $hour < 8) return 1;
@@ -310,7 +478,6 @@ function getUserSpinData($pdo, $user_id, $slot = null) {
 }
 
 function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
-    // If type is 'car' then look for type = 'Car' or 'Vehicle', else any property
     $sql = "SELECT id, title, price, city, image_url, bank_name, type FROM properties WHERE status = 'available'";
     if ($type) {
         if ($type == 'car') {
@@ -345,7 +512,6 @@ function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
         $props = $stmt->fetchAll();
         if (empty($props)) return null;
     }
-    // filter out excluded again just in case
     $available = array_filter($props, function($p) use ($exclude_ids) {
         return !in_array($p['id'], $exclude_ids);
     });
@@ -355,139 +521,6 @@ function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
     return $available[array_rand($available)];
 }
 
-function performSpin($pdo, $user_id) {
-    $today = date('Y-m-d');
-    $slot = getCurrentSlot();
-    $stmt = $pdo->prepare("/* force new plan */ SELECT spins_used, reward_given, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
-    $stmt->execute([$user_id, $today, $slot]);
-    $data = $stmt->fetch();
-    if (!$data) {
-        $stmt = $pdo->prepare("INSERT INTO user_spins (user_id, slot_date, slot_number, spins_used, reward_given, coins_earned) VALUES (?, ?, ?, 0, FALSE, 0)");
-        $stmt->execute([$user_id, $today, $slot]);
-        $spins_used = 0;
-        $coins_earned = 0;
-        $reward_given = false;
-    } else {
-        $spins_used = $data['spins_used'];
-        $coins_earned = $data['coins_earned'];
-        $reward_given = $data['reward_given'];
-    }
-    if ($spins_used >= 5) {
-        return ['success' => false, 'message' => 'You have already used all spins for this slot.'];
-    }
-
-    $new_spins = $spins_used + 1;
-    $is_fifth = ($new_spins == 5);
-
-    // Manage session for shown properties per slot
-    if (!isset($_SESSION['shown_properties'])) {
-        $_SESSION['shown_properties'] = [];
-    }
-    $exclude = $_SESSION['shown_properties'];
-
-    if ($is_fifth) {
-        // 5th spin: give 20 coins, no property
-        $coin_amount = 20;
-        $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
-        $pdo->prepare("UPDATE user_spins SET reward_given = TRUE, spins_used = ?, coins_earned = coins_earned + ? WHERE user_id = ? AND slot_date = ? AND slot_number = ?")
-            ->execute([$new_spins, $coin_amount, $user_id, $today, $slot]);
-        return [
-            'success' => true,
-            'message' => "🎉 You got 20 coins!",
-            'coins' => $coin_amount,
-            'spins_used' => $new_spins,
-            'is_reward' => true,
-            'show_property' => false,
-            'total_coins_earned' => $coins_earned + $coin_amount
-        ];
-    } else {
-        // spins 1-4: show property or car alternately
-        // We'll alternate between car and property based on spin number: spin 1 -> car, spin 2 -> property, spin 3 -> car, spin 4 -> property
-        $type = ($new_spins % 2 == 1) ? 'car' : 'property'; // odd spins = car, even = property
-        $prop = getRandomLowPriceProperty($pdo, $exclude, $type);
-        // If no property of that type, fallback to any
-        if (!$prop) {
-            $prop = getRandomLowPriceProperty($pdo, $exclude);
-        }
-        if ($prop) {
-            $_SESSION['shown_properties'][] = $prop['id'];
-            if (count($_SESSION['shown_properties']) > 10) array_shift($_SESSION['shown_properties']);
-            $response = [
-                'success' => true,
-                'message' => ($type == 'car') ? "🚗 Check out this car!" : "🏠 Check out this property!",
-                'spins_used' => $new_spins,
-                'show_property' => true,
-                'property' => $prop,
-                'coins' => 0,
-                'is_reward' => false,
-                'total_coins_earned' => $coins_earned,
-                'type' => $type
-            ];
-        } else {
-            $response = [
-                'success' => true,
-                'message' => "No property available.",
-                'spins_used' => $new_spins,
-                'show_property' => false,
-                'coins' => 0,
-                'is_reward' => false,
-                'total_coins_earned' => $coins_earned
-            ];
-        }
-        // Update spins_used (no coins added)
-        $pdo->prepare("UPDATE user_spins SET spins_used = ? WHERE user_id = ? AND slot_date = ? AND slot_number = ?")
-            ->execute([$new_spins, $user_id, $today, $slot]);
-        return $response;
-    }
-}
-
-function getSlotStatus($pdo, $user_id, $slot) {
-    $data = getUserSpinData($pdo, $user_id, $slot);
-    $spins = $data['spins_used'];
-    $coins = $data['coins_earned'];
-    $is_current = ($slot == getCurrentSlot());
-    $is_past = (!$is_current && ($slot < getCurrentSlot()));
-    $is_future = (!$is_current && ($slot > getCurrentSlot()));
-    $status = [];
-    $status['slot'] = $slot;
-    $status['time_range'] = getSlotTimeRange($slot);
-    $status['spins_used'] = $spins;
-    $status['coins_earned'] = $coins;
-    $status['is_current'] = $is_current;
-    $status['is_past'] = $is_past;
-    $status['is_future'] = $is_future;
-    $status['can_spin'] = $data['can_spin'] && $is_current;
-    if ($is_past) {
-        if ($spins > 0) {
-            $status['message'] = "✅ Spins: $spins/5 | Coins: $coins";
-            $status['label'] = 'claimed';
-        } else {
-            $status['message'] = "❌ Missed Reward";
-            $status['label'] = 'missed';
-        }
-    } elseif ($is_current) {
-        if ($spins == 0) {
-            $status['message'] = "⏳ You haven't spun yet!";
-            $status['label'] = 'ready';
-        } elseif ($spins < 5) {
-            $status['message'] = "🔄 $spins/5 spins used | $coins coins earned";
-            $status['label'] = 'progress';
-        } else {
-            $status['message'] = "✅ Completed! Total coins: $coins";
-            $status['label'] = 'done';
-        }
-    } else {
-        $status['message'] = "⏳ Upcoming Slot";
-        $status['label'] = 'upcoming';
-    }
-    return $status;
-}
-function logActivity($pdo, $user_id, $activity_type, $details = null) {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-    $stmt = $pdo->prepare("INSERT INTO user_activity_log (user_id, activity_type, details, ip_address) VALUES (?, ?, ?, ?)");
-    return $stmt->execute([$user_id, $activity_type, $details, $ip]);
-}
-// ---- Get spin coin settings from database ----
 function getSpinCoinSettings($pdo) {
     $min = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='spin_min_coins'")->fetchColumn();
     $max = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='spin_max_coins'")->fetchColumn();
@@ -497,7 +530,6 @@ function getSpinCoinSettings($pdo) {
     ];
 }
 
-// ---- Updated performSpin ----
 function performSpin($pdo, $user_id) {
     $today = date('Y-m-d');
     $slot = getCurrentSlot();
@@ -548,7 +580,6 @@ function performSpin($pdo, $user_id) {
     // Check if 5th spin (reward milestone)
     $is_reward = ($new_spins == 5);
     if ($is_reward) {
-        // Mark reward as given (optional, we can keep for tracking)
         $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
     }
 
@@ -605,5 +636,54 @@ function performSpin($pdo, $user_id) {
     }
 
     return $response;
+}
+
+function getSlotStatus($pdo, $user_id, $slot) {
+    $data = getUserSpinData($pdo, $user_id, $slot);
+    $spins = $data['spins_used'];
+    $coins = $data['coins_earned'];
+    $is_current = ($slot == getCurrentSlot());
+    $is_past = (!$is_current && ($slot < getCurrentSlot()));
+    $is_future = (!$is_current && ($slot > getCurrentSlot()));
+    $status = [];
+    $status['slot'] = $slot;
+    $status['time_range'] = getSlotTimeRange($slot);
+    $status['spins_used'] = $spins;
+    $status['coins_earned'] = $coins;
+    $status['is_current'] = $is_current;
+    $status['is_past'] = $is_past;
+    $status['is_future'] = $is_future;
+    $status['can_spin'] = $data['can_spin'] && $is_current;
+    if ($is_past) {
+        if ($spins > 0) {
+            $status['message'] = "✅ Spins: $spins/5 | Coins: $coins";
+            $status['label'] = 'claimed';
+        } else {
+            $status['message'] = "❌ Missed Reward";
+            $status['label'] = 'missed';
+        }
+    } elseif ($is_current) {
+        if ($spins == 0) {
+            $status['message'] = "⏳ You haven't spun yet!";
+            $status['label'] = 'ready';
+        } elseif ($spins < 5) {
+            $status['message'] = "🔄 $spins/5 spins used | $coins coins earned";
+            $status['label'] = 'progress';
+        } else {
+            $status['message'] = "✅ Completed! Total coins: $coins";
+            $status['label'] = 'done';
+        }
+    } else {
+        $status['message'] = "⏳ Upcoming Slot";
+        $status['label'] = 'upcoming';
+    }
+    return $status;
+}
+
+// ---- Activity Log ----
+function logActivity($pdo, $user_id, $activity_type, $details = null) {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $stmt = $pdo->prepare("INSERT INTO user_activity_log (user_id, activity_type, details, ip_address) VALUES (?, ?, ?, ?)");
+    return $stmt->execute([$user_id, $activity_type, $details, $ip]);
 }
 ?>
