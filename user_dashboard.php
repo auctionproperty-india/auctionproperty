@@ -414,7 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.is_reward) {
                         spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
                         showCoinAnimation(data.coins);
-                        launchConfetti();
+                        launchStarShower(); // 🌟 New Star Shower Effect
                         // Update coins in banner
                         const coinSpan = document.querySelector('.banner-stats strong:last-child');
                         if (coinSpan) {
@@ -483,51 +483,87 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    function launchConfetti() {
+    // 🌟 ===== WORLD CLASS STAR SHOWER EFFECT =====
+    function launchStarShower() {
         const container = document.createElement('div');
-        container.className = 'confetti-container';
+        container.className = 'star-shower-container';
         document.body.appendChild(container);
-        for (let i = 0; i < 50; i++) {
-            const confetti = document.createElement('div');
-            confetti.className = 'confetti';
-            confetti.style.left = Math.random() * 100 + '%';
-            confetti.style.top = Math.random() * 100 + '%';
-            confetti.style.background = ['#fbbf24', '#ef4444', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'][Math.floor(Math.random()*6)];
-            confetti.style.width = (Math.random() * 10 + 5) + 'px';
-            confetti.style.height = (Math.random() * 10 + 5) + 'px';
-            confetti.style.animationDuration = (Math.random() * 2 + 1) + 's';
-            container.appendChild(confetti);
+
+        const count = 130;
+        const colors = ['#fbbf24', '#f59e0b', '#fcd34d', '#fde68a', '#fef3c7', '#ffffff', '#ffd700', '#ffb700', '#ffaa00', '#ffcc66'];
+
+        for (let i = 0; i < count; i++) {
+            const star = document.createElement('div');
+            star.className = 'star-shower';
+            const size = 8 + Math.random() * 22;
+            const left = Math.random() * 100;
+            const duration = 1.5 + Math.random() * 2.8;
+            const delay = Math.random() * 1.6;
+            const rotation = Math.random() * 360;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const starChar = Math.random() > 0.4 ? '★' : '✦';
+            
+            star.style.cssText = `
+                position: absolute;
+                top: -20px;
+                left: ${left}%;
+                font-size: ${size}px;
+                color: ${color};
+                opacity: 0;
+                transform: rotate(${rotation}deg);
+                animation: starFall ${duration}s ease-in ${delay}s forwards;
+                text-shadow: 0 0 10px ${color}, 0 0 20px ${color};
+                pointer-events: none;
+            `;
+            star.textContent = starChar;
+            container.appendChild(star);
         }
-        setTimeout(() => container.remove(), 3000);
+
+        const maxDuration = 3.0 + 1.6;
+        setTimeout(() => {
+            if (container.parentNode) {
+                container.parentNode.removeChild(container);
+            }
+        }, maxDuration * 1000 + 500);
     }
 
-    // Helper to add slideIn animation if not exists
+    // Add star shower CSS
     const style = document.createElement('style');
     style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .confetti-container {
+        .star-shower-container {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 9998;
+            z-index: 9999;
             overflow: hidden;
         }
-        .confetti {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background: #fbbf24;
-            animation: confettiFall 2s linear;
+        @keyframes starFall {
+            0% {
+                opacity: 0;
+                transform: translateY(-20px) rotate(0deg) scale(0.5);
+            }
+            10% {
+                opacity: 1;
+                transform: translateY(10vh) rotate(36deg) scale(1);
+            }
+            90% {
+                opacity: 1;
+                transform: translateY(90vh) rotate(360deg) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(100vh) rotate(400deg) scale(0.3);
+            }
         }
-        @keyframes confettiFall {
-            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        .star-shower {
+            filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.8));
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
     `;
     document.head.appendChild(style);
