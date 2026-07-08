@@ -487,4 +487,123 @@ function logActivity($pdo, $user_id, $activity_type, $details = null) {
     $stmt = $pdo->prepare("INSERT INTO user_activity_log (user_id, activity_type, details, ip_address) VALUES (?, ?, ?, ?)");
     return $stmt->execute([$user_id, $activity_type, $details, $ip]);
 }
+// ---- Get spin coin settings from database ----
+function getSpinCoinSettings($pdo) {
+    $min = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='spin_min_coins'")->fetchColumn();
+    $max = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='spin_max_coins'")->fetchColumn();
+    return [
+        'min' => (float)$min ?: 3,
+        'max' => (float)$max ?: 7
+    ];
+}
+
+// ---- Updated performSpin ----
+function performSpin($pdo, $user_id) {
+    $today = date('Y-m-d');
+    $slot = getCurrentSlot();
+    $stmt = $pdo->prepare("/* force new plan */ SELECT spins_used, reward_given, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+    $stmt->execute([$user_id, $today, $slot]);
+    $data = $stmt->fetch();
+    if (!$data) {
+        $stmt = $pdo->prepare("INSERT INTO user_spins (user_id, slot_date, slot_number, spins_used, reward_given, coins_earned) VALUES (?, ?, ?, 0, FALSE, 0)");
+        $stmt->execute([$user_id, $today, $slot]);
+        $spins_used = 0;
+        $coins_earned = 0;
+        $reward_given = false;
+    } else {
+        $spins_used = $data['spins_used'];
+        $coins_earned = $data['coins_earned'];
+        $reward_given = $data['reward_given'];
+    }
+    if ($spins_used >= 5) {
+        return ['success' => false, 'message' => 'You have already used all spins for this slot.'];
+    }
+
+    // Get coin settings
+    $coin_settings = getSpinCoinSettings($pdo);
+    $min_coin = $coin_settings['min'];
+    $max_coin = $coin_settings['max'];
+    $cap_per_slot = 22; // fixed cap
+
+    // Determine random coin (between min and max)
+    $coin_amount = rand((int)$min_coin, (int)$max_coin);
+    // Ensure total doesn't exceed cap
+    if ($coins_earned + $coin_amount > $cap_per_slot) {
+        $coin_amount = $cap_per_slot - $coins_earned;
+        if ($coin_amount < 1) $coin_amount = 0;
+    }
+
+    $new_spins = $spins_used + 1;
+    $new_coins_earned = $coins_earned + $coin_amount;
+
+    // Update spins_used, coins_earned
+    $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = CURRENT_TIMESTAMP WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+    $stmt->execute([$new_spins, $new_coins_earned, $user_id, $today, $slot]);
+
+    // Credit user's total coins
+    if ($coin_amount > 0) {
+        $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
+    }
+
+    // Check if 5th spin (reward milestone)
+    $is_reward = ($new_spins == 5);
+    if ($is_reward) {
+        // Mark reward as given (optional, we can keep for tracking)
+        $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
+    }
+
+    // For spins 1-4, show a property (car/property); for 5th, we can also show property (optional)
+    $show_property = true; // always show property
+    if ($show_property) {
+        // Manage session for shown properties
+        if (!isset($_SESSION['shown_properties'])) {
+            $_SESSION['shown_properties'] = [];
+        }
+        $exclude = $_SESSION['shown_properties'];
+        // Alternate between car and property
+        $type = ($new_spins % 2 == 1) ? 'car' : 'property';
+        $prop = getRandomLowPriceProperty($pdo, $exclude, $type);
+        if (!$prop) {
+            $prop = getRandomLowPriceProperty($pdo, $exclude);
+        }
+        if ($prop) {
+            $_SESSION['shown_properties'][] = $prop['id'];
+            if (count($_SESSION['shown_properties']) > 10) array_shift($_SESSION['shown_properties']);
+            $response = [
+                'success' => true,
+                'message' => ($type == 'car') ? "🚗 +$coin_amount coins! Check out this car!" : "🏠 +$coin_amount coins! Check out this property!",
+                'spins_used' => $new_spins,
+                'show_property' => true,
+                'property' => $prop,
+                'coins' => $coin_amount,
+                'is_reward' => $is_reward,
+                'total_coins_earned' => $new_coins_earned,
+                'type' => $type
+            ];
+        } else {
+            $response = [
+                'success' => true,
+                'message' => "+$coin_amount coins! No property available.",
+                'spins_used' => $new_spins,
+                'show_property' => false,
+                'coins' => $coin_amount,
+                'is_reward' => $is_reward,
+                'total_coins_earned' => $new_coins_earned
+            ];
+        }
+    } else {
+        // No property (if we ever want to skip)
+        $response = [
+            'success' => true,
+            'message' => "+$coin_amount coins!",
+            'spins_used' => $new_spins,
+            'show_property' => false,
+            'coins' => $coin_amount,
+            'is_reward' => $is_reward,
+            'total_coins_earned' => $new_coins_earned
+        ];
+    }
+
+    return $response;
+}
 ?>
