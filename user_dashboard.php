@@ -179,7 +179,10 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
     .slot-card.current { background: rgba(37, 99, 235, 0.15); border-color: rgba(37, 99, 235, 0.3); }
     .slot-card.upcoming { background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.05); }
     .modal-content { border: none; }
-    @media (max-width:576px) { .user-welcome-banner { padding: 20px; } .user-welcome-banner .banner-stats { justify-content: flex-start; } }
+    @media (max-width:576px) {
+        .user-welcome-banner { padding: 20px; }
+        .user-welcome-banner .banner-stats { justify-content: flex-start; }
+    }
 </style>
 
 <!-- ===== WELCOME BANNER ===== -->
@@ -292,6 +295,27 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
     <?php endif; ?>
 </div>
 
+<!-- ===== PROPERTY MODAL ===== -->
+<div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff;">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h5 class="modal-title"><i class="fas fa-home me-2" style="color: #fbbf24;"></i>🏠 Low Price Property</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div id="propertyModalContent">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal"><i class="fas fa-undo-alt me-2"></i>Back to Spin</button>
+                <a href="#" id="viewPropertyLink" class="btn btn-primary" target="_blank">View Details</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ===== TODAY'S AUCTIONS ===== -->
 <?php if(count($today_props) > 0): ?>
     <div class="section-title">
@@ -342,31 +366,56 @@ document.addEventListener('DOMContentLoaded', function() {
     const propertyModalContent = document.getElementById('propertyModalContent');
     const viewPropertyLink = document.getElementById('viewPropertyLink');
 
-    if (!spinBtn) return;
+    if (!spinBtn) {
+        console.log('Spin button not found');
+        return;
+    }
+    
+    console.log('Spin system initialized');
+
     const segments = [0, 72, 144, 216, 288];
     let currentRotation = 0;
+    let isSpinning = false;
 
     spinBtn.addEventListener('click', function() {
+        if (isSpinning) return;
+        isSpinning = true;
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
+        
+        // Random rotation - always spin with random segment
         const randomSegment = segments[Math.floor(Math.random() * segments.length)];
         const extraSpin = Math.floor(Math.random() * 360);
         const totalRotation = 360 * 5 + randomSegment + extraSpin;
         currentRotation += totalRotation;
+        
+        wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
         wheel.style.transform = `rotate(${currentRotation}deg)`;
         wheel.classList.add('pulse');
+        
+        console.log('Spinning...');
+
         fetch('spin_ajax.php')
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP error ' + response.status);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Spin response:', data);
                 wheel.classList.remove('pulse');
+                isSpinning = false;
+                
                 if (data.success) {
-                    spinCount.textContent = data.spins_used;
-                    slotCoins.textContent = data.total_coins_earned;
+                    spinCount.textContent = data.spins_used || 0;
+                    slotCoins.textContent = data.total_coins_earned || 0;
+                    
                     if (data.is_reward) {
                         spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
                         showCoinAnimation(data.coins);
                         launchConfetti();
-                        // update coin display in banner
+                        // Update coins in banner
                         const coinSpan = document.querySelector('.banner-stats strong:last-child');
                         if (coinSpan) {
                             let current = parseInt(coinSpan.textContent);
@@ -381,11 +430,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             spinBtn.disabled = false;
                         }
                     } else if (data.show_property && data.property) {
-                        // 1-4 spins – property/car
+                        // Show property modal
                         const p = data.property;
                         const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
                         const icon = isCar ? '🚗' : '🏠';
-                        const titleText = isCar ? 'Check out this car!' : 'Check out this property!';
                         const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
                         propertyModalContent.innerHTML = `
                             ${imageHtml}
@@ -397,8 +445,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         `;
                         viewPropertyLink.href = `property_detail.php?id=${p.id}&source=auction`;
                         propertyModal.show();
-                        spinMessage.innerHTML = titleText;
-                        // Re-enable spin after modal close
+                        spinMessage.innerHTML = data.message || '🏠 Check out this property!';
+                        // After modal closes, re-enable spin
                         propertyModal._element.addEventListener('hidden.bs.modal', function () {
                             spinBtn.disabled = false;
                         });
@@ -407,14 +455,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         spinBtn.disabled = false;
                     }
                 } else {
-                    spinMessage.innerHTML = `❌ ${data.message}`;
+                    spinMessage.innerHTML = `❌ ${data.message || 'Something went wrong'}`;
                     spinBtn.disabled = false;
                 }
             })
             .catch(error => {
+                console.error('Spin error:', error);
+                wheel.classList.remove('pulse');
                 spinMessage.innerHTML = '❌ Error spinning. Please try again.';
                 spinBtn.disabled = false;
-                console.error('Spin error:', error);
+                isSpinning = false;
             });
     });
 
@@ -447,6 +497,37 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         setTimeout(() => container.remove(), 3000);
     }
+
+    // Helper to add slideIn animation if not exists
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9998;
+            overflow: hidden;
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #fbbf24;
+            animation: confettiFall 2s linear;
+        }
+        @keyframes confettiFall {
+            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
 });
 </script>
 
