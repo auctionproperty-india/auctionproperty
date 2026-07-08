@@ -8,13 +8,18 @@ if(!isset($_SESSION['user_id'])) {
 }
 
 $user_id = $_SESSION['user_id'];
-$result = performSpin($pdo, $user_id);
 
-// ✅ Log Spin Activity if successful
-if ($result['success']) {
-    $details = "Slot: " . getCurrentSlot() . ", Spins: " . ($result['spins_used'] ?? 0) . ", Coins: " . ($result['coins'] ?? 0);
-    logActivity($pdo, $user_id, 'spin', $details);
+try {
+    $result = performSpin($pdo, $user_id);
+
+    // Log activity only if function exists and spin succeeded
+    if ($result['success'] && function_exists('logActivity')) {
+        $details = "Slot: " . getCurrentSlot() . ", Spins: " . ($result['spins_used'] ?? 0) . ", Coins: " . ($result['coins'] ?? 0);
+        logActivity($pdo, $user_id, 'spin', $details);
+    }
+
+    echo json_encode($result);
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
 }
-
-echo json_encode($result);
 ?>
