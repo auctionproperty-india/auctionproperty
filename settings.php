@@ -11,7 +11,7 @@ if(!hasViewPermission('settings', $pdo)) {
 }
 
 $message = '';
-$settings_keys = ['default_contact', 'company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent'];
+$settings_keys = ['default_contact', 'company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent', 'spin_min_coins', 'spin_max_coins'];
 
 // Handle QR upload
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
@@ -91,6 +91,23 @@ $qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'compa
                 <label class="fw-bold">Admin Charge %</label>
                 <input type="number" step="0.01" name="admin_charge_percent" class="form-control" value="<?= htmlspecialchars($settings['admin_charge_percent']) ?>">
                 <small class="text-muted">Default Admin Charge percentage for referral payouts.</small>
+            </div>
+        </div>
+        <hr>
+        <h5><i class="fas fa-coins me-2"></i>Daily Spin Coin Settings</h5>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="fw-bold">Min Coins per Spin</label>
+                <input type="number" step="0.01" name="spin_min_coins" class="form-control" value="<?= htmlspecialchars($settings['spin_min_coins']) ?>">
+                <small class="text-muted">Minimum coins user gets on each spin.</small>
+            </div>
+            <div class="col-md-6">
+                <label class="fw-bold">Max Coins per Spin</label>
+                <input type="number" step="0.01" name="spin_max_coins" class="form-control" value="<?= htmlspecialchars($settings['spin_max_coins']) ?>">
+                <small class="text-muted">Maximum coins user gets on each spin.</small>
+            </div>
+            <div class="col-12">
+                <small class="text-muted">Per slot total is capped at 22 coins. Adjust min/max to control average.</small>
             </div>
         </div>
         <hr>
