@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📥 FINAL IMPORT - Specifically for mysql_import.sql
+// 📥 FINAL IMPORT - Complete Version with All Paths
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'localhost';
@@ -36,10 +36,11 @@ try {
     echo "<div class='success'>✅ Database Connected: $dbname</div>";
 
     // ============================================================
-    // LOCATE SQL FILE - Specifically mysql_import.sql
+    // LOCATE SQL FILE - ALL POSSIBLE PATHS
     // ============================================================
     echo "<h2>🔍 Searching for mysql_import.sql...</h2>";
     
+    // Saare possible paths check karein
     $possible_paths = [
         __DIR__ . '/mysql_import.sql',
         '/var/www/html/mysql_import.sql',
@@ -47,32 +48,41 @@ try {
         $_SERVER['DOCUMENT_ROOT'] . '/mysql_import.sql',
         '/app/mysql_import.sql',
         './mysql_import.sql',
-        'mysql_import.sql'
+        'mysql_import.sql',
+        '/opt/render/project/src/mysql_import.sql',
+        '/home/render/mysql_import.sql',
+        '/data/mysql_import.sql',
+        '/tmp/mysql_import.sql'
     ];
     
     $sql_file = null;
+    
+    // Pehle saare paths check karein
     foreach ($possible_paths as $path) {
         if (file_exists($path)) {
             $sql_file = $path;
-            echo "<div class='success'>✅ Found: $path</div>";
+            echo "<div class='success'>✅ Found at: $path</div>";
             break;
         }
     }
     
+    // Agar nahi mila toh current directory mein .sql files search karein
     if (!$sql_file) {
-        // Check current directory for any SQL file
         $files = glob("*.sql");
         if (!empty($files)) {
             $sql_file = $files[0];
-            echo "<div class='success'>✅ Found SQL file: " . basename($sql_file) . "</div>";
-        } else {
-            die("<div class='error'>
-                ❌ mysql_import.sql NOT FOUND!<br><br>
-                <strong>Please upload mysql_import.sql to your project root folder.</strong><br><br>
-                Current directory: " . __DIR__ . "<br>
-                Files found: " . implode(", ", glob("*")) . "
-            </div>");
+            echo "<div class='success'>✅ Found SQL file: " . basename($sql_file) . " (in current directory)</div>";
         }
+    }
+    
+    // Agar phir bhi nahi mila toh error dikhayein
+    if (!$sql_file) {
+        echo "<div class='error'>❌ mysql_import.sql NOT FOUND!</div>";
+        echo "<div class='info'>📂 Current directory: " . __DIR__ . "</div>";
+        echo "<div class='info'>📂 Document Root: " . $_SERVER['DOCUMENT_ROOT'] . "</div>";
+        echo "<div class='info'>📂 getcwd(): " . getcwd() . "</div>";
+        echo "<div class='info'>📄 Files found: " . implode(", ", glob("*")) . "</div>";
+        die("Please upload mysql_import.sql file.");
     }
     
     // ============================================================
@@ -114,11 +124,13 @@ try {
     
     echo "<div class='info'>⏳ Total statements: $total</div>";
     
+    $error_messages = [];
+    
     foreach ($statements as $stmt) {
         $stmt = trim($stmt);
         if (empty($stmt)) continue;
         
-        // Skip DROP TABLE IF EXISTS (we'll handle tables separately)
+        // Skip DROP TABLE IF EXISTS
         if (preg_match('/^DROP TABLE/i', $stmt)) {
             continue;
         }
@@ -127,19 +139,25 @@ try {
             $pdo->exec($stmt);
             $success++;
         } catch (PDOException $e) {
-            // Ignore "already exists" errors
+            // Ignore "already exists" and "duplicate key" errors
             if (strpos($e->getMessage(), 'already exists') === false &&
                 strpos($e->getMessage(), 'duplicate key') === false) {
                 $failed++;
-                // Only show first few errors
-                if ($failed <= 5) {
-                    echo "<div class='error'>❌ " . htmlspecialchars(substr($e->getMessage(), 0, 100)) . "</div>";
+                if ($failed <= 10) {
+                    $error_messages[] = htmlspecialchars(substr($e->getMessage(), 0, 150));
                 }
             }
         }
     }
     
     echo "<div class='success'>✅ Executed: $success successful, $failed failed</div>";
+    
+    if (!empty($error_messages)) {
+        echo "<div class='info'>⚠️ First few errors:</div>";
+        foreach ($error_messages as $msg) {
+            echo "<div class='error'>❌ $msg</div>";
+        }
+    }
 
     // ============================================================
     // VERIFY DATA
@@ -152,22 +170,27 @@ try {
                'user_referral_earnings', 'account_entries'];
     
     echo "<table>";
-    echo "<tr><th>#</th><th>Table</th><th>Record Count</th></tr>";
+    echo "<tr><th>#</th><th>Table</th><th>Record Count</th><th>Status</th></tr>";
     
     $idx = 1;
+    $total_records = 0;
+    
     foreach ($tables as $table) {
         try {
             $stmt = $pdo->query("SELECT COUNT(*) FROM $table");
             $count = $stmt->fetchColumn();
+            $total_records += $count;
             $status = $count > 0 ? '✅' : '⚠️ Empty';
-            echo "<tr><td>$idx</td><td>$table</td><td>$count</td></tr>";
+            echo "<tr><td>$idx</td><td>$table</td><td>$count</td><td>$status</td></tr>";
             $idx++;
         } catch (PDOException $e) {
-            echo "<tr><td>$idx</td><td>$table</td><td>❌ Not Found</td></tr>";
+            echo "<tr><td>$idx</td><td>$table</td><td>❌ Not Found</td><td>❌</td></tr>";
             $idx++;
         }
     }
     echo "</table>";
+    
+    echo "<div class='success'>✅ Total Records: $total_records</div>";
 
     echo "<hr>";
     echo "<div class='success'>✅ Import completed successfully!</div>";
