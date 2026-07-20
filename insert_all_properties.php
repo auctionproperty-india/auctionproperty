@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📥 Insert All Properties - Corrected (Using Heredoc)
+// 📥 Insert All Properties - Corrected (Row 172 fixed)
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'localhost';
@@ -31,6 +31,7 @@ try {
     echo "<div class='success'>✅ Database Connected: $dbname</div>";
 
     // ---------- Insert all properties using Heredoc ----------
+    // Fixed row 172: removed double single quotes from location and city
     $sql = <<<SQL
     INSERT INTO properties (id, title, description, price, location, city, state, type, google_location, image_url, bank_name, sqft, possession_type, inspection_date, borrower_name, emd_amount, bid_increment, emd_deadline, auction_start_time, auction_end_time, locality, reserve_price_per_sqft, contact_number, status, created_at, auction_date) VALUES
     (17,'Plot in Barwaha, Khargone','',1674400.00,'Plot No 52, Ward No 06, Nagar Palika- Barwaha, Mahaveer Ward, Nanda Marg South Side, Teh Barwaha Dist Khargone, M.P','Khargone','mp','Plot',NULL,NULL,'Aavas Financiers',990.00,'Physical',NULL,'',167440.00,0.00,'Wed, 22 Jul 2026 12:00 AM','Thu, 23 Jul 2026 11:00 AM','Thu, 23 Jul 2026 01:00 PM','Barwaha',0.00,'9238215516','available','2026-06-19 16:25:22.778819','2026-07-23'),
@@ -190,7 +191,7 @@ try {
     (169,'Vehicle Jcb 3 Dx Xtra Bharat Stage Iii - 2018 in Pune','',1625000.00,'vehicle of JCB make Model 3 DX XTRA Bharat stage III bearing engine no. H00198811 Chasis No. HAR3DXXTH02616125 registration no. MH-12-RK-1786 dated 17.10.2018.','Pune','Maharashtra','Car',NULL,NULL,'Bank of Maharashtra',0.00,'Physical',NULL,'M/s. Om Yashoda Construction',162500.00,25000.00,'Thu, 30 Jul 2026 02:00 PM','Thu, 30 Jul 2026 11:00 AM','Thu, 30 Jul 2026 03:00 P','Pune',0.00,'9238215516','available','2026-07-06 11:29:43.729448',NULL),
     (170,'Flat in Dapodi, Pune','',2208600.00,'Flat No 202 Second Floor Wing A, Sai Puram, CTS No 153 To 171 Mauje Dapodi Tal Haveli Dist Pune Maharashtra- 411012','Pune','Maharashtra','Flat',NULL,NULL,' ICICI Home Finance Company',0.00,'Physical',NULL,'Vikram Subhash Gajarmal',220860.00,0.00,'Fri, 24 Jul 2026 05:00 PM','Mon, 27 Jul 2026 11:00 AM','Mon, 27 Jul 2026 12:00 PM','Dapodi, Pune',0.00,'9238215516','available','2026-07-06 11:32:54.117131',NULL),
     (171,'Flat in Bhavani Peth, Pune','',1800000.00,'Flat No.5, 1st Floor, "Shivkrishna Apartment", Revenue Village Wadgaon Budruk, Taluka Haveli, District Pune,','Pune','Maharashtra','Flat',NULL,NULL,'Edelweiss ARC',470.00,'Physical',NULL,'SAHIL PRECISION WORKS',180000.00,0.00,'','Thu, 16 Jul 2026 12:00 PM','','Bhavani Peth, Pune',0.00,'9238215516','available','2026-07-06 11:39:36.877004',NULL),
-    (172,'Flat in Daund, Pune','',600000.00,''Plot No 12 First Floor Flat No 01 , Situated at Shrushti Apartment , Near Jadhav Hospital , Gopalwadi Road At Post Daund , Tal Daund Dist Pune, which is bounded as;',''Pune','Maharashtra','Flat',NULL,NULL,'Canara Bank',0.00,'Physical',NULL,'BABURAO PANDURANG RUPNAWAR',60000.00,10000.00,'13 Jul 2026 05:00 PM','Tue, 14 Jul 2026 11:00 AM','Tue, 14 Jul 2026 12:00 PM','Daund, Pune',0.00,'9238215516','available','2026-07-06 11:43:35.037303',NULL),
+    (172,'Flat in Daund, Pune','',600000.00,'Plot No 12 First Floor Flat No 01 , Situated at Shrushti Apartment , Near Jadhav Hospital , Gopalwadi Road At Post Daund , Tal Daund Dist Pune, which is bounded as;','Pune','Maharashtra','Flat',NULL,NULL,'Canara Bank',0.00,'Physical',NULL,'BABURAO PANDURANG RUPNAWAR',60000.00,10000.00,'13 Jul 2026 05:00 PM','Tue, 14 Jul 2026 11:00 AM','Tue, 14 Jul 2026 12:00 PM','Daund, Pune',0.00,'9238215516','available','2026-07-06 11:43:35.037303',NULL),
     (173,'Flat in Koregaon Bhima, Pune','',865000.00,'Flat No. 404, Forth FloorIndrayani Heights Phase I  Mouje Koregaon Bhima','Pune','Maharashtra','Flat',NULL,NULL,'earcil',565.00,'Physical',NULL,'Deshpande Rajiv Chandrakant',86500.00,5000.00,'','Mon, 13 Jul 2026 12:30 PM','','Koregaon Bhima, Pune',0.00,'9238215516','available','2026-07-06 11:46:40.951049',NULL),
     (174,'Flat in Chinarr Nest, Bhopal','',765000.00,'Flat No. 102 Ground Floor Block Badal Near Mother Teresa School Chinar Nest Bhopal Madhya Pradesh','Bhopal','Madhya Pradesh','Flat',NULL,NULL,'Piramal Capital & Housing Finance',0.00,'Physical',NULL,'Virendra Singh',76500.00,0.00,'Thu, 16 Jul 2026 04:00 PM','Fri, 17 Jul 2026 11:00 AM','Fri, 17 Jul 2026 01:00 PM','Chinarr Nest, Bhopal',0.00,'9238215516','available','2026-07-06 11:50:19.389766',NULL),
     (177,'Plot in Phanda, Bhopal','',358425.00,'PLOT NO.48, VILLAGE IMALIYA BLOCK PHANDA TEHSIL- HUZUR DISTRICT BHOPAL','Bhopal','Madhya Pradesh','Plot',NULL,NULL,'ummeed housing finance',450.00,'Physical',NULL,'RAJ KUMAR',35842.00,15000.00,'Wed, 15 Jul 2026 12:00 PM','15 Jul 2026 01:00 PM','Wed, 15 Jul 2026 01:00 PM','Phanda, Bhopal',450.00,'9238215516','available','2026-07-06 12:35:31.223795',NULL),
@@ -245,6 +246,7 @@ try {
     ON CONFLICT (id) DO NOTHING;
 SQL;
 
+    // Execute the SQL
     $pdo->exec($sql);
     echo "<div class='success'>✅ All properties inserted successfully!</div>";
 
@@ -253,7 +255,7 @@ SQL;
     $count = $stmt->fetchColumn();
     echo "<div class='info'>📊 Total properties in database: $count</div>";
 
-    // Show last 5 properties
+    // Show last 10 properties
     $stmt = $pdo->query("SELECT id, title, price, location FROM properties ORDER BY id DESC LIMIT 10");
     echo "<h2>📋 Latest Properties</h2>";
     echo "<table border='1' cellpadding='5'>";
