@@ -30,12 +30,29 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     echo "<div class='success'>✅ Database Connected</div>";
 
-    // Alter column type to BOOLEAN
+    // Step 1: Drop default if exists
+    try {
+        $pdo->exec("ALTER TABLE user_spins ALTER COLUMN reward_given DROP DEFAULT");
+        echo "<div class='info'>✅ Dropped default from reward_given</div>";
+    } catch (PDOException $e) {
+        // Default might not exist, ignore
+        echo "<div class='info'>ℹ️ No default found or already dropped</div>";
+    }
+
+    // Step 2: Change column type to BOOLEAN using USING
     $pdo->exec("ALTER TABLE user_spins ALTER COLUMN reward_given TYPE BOOLEAN USING reward_given::BOOLEAN");
     echo "<div class='success'>✅ Column 'reward_given' changed to BOOLEAN</div>";
 
-    // Check
-    $stmt = $pdo->query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'user_spins' AND column_name = 'reward_given'");
+    // Step 3: Set default to FALSE (optional)
+    try {
+        $pdo->exec("ALTER TABLE user_spins ALTER COLUMN reward_given SET DEFAULT FALSE");
+        echo "<div class='success'>✅ Default set to FALSE</div>";
+    } catch (PDOException $e) {
+        echo "<div class='info'>ℹ️ Could not set default: " . $e->getMessage() . "</div>";
+    }
+
+    // Check column info
+    $stmt = $pdo->query("SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = 'user_spins' AND column_name = 'reward_given'");
     $col = $stmt->fetch(PDO::FETCH_ASSOC);
     echo "<div class='info'>📊 Column info: " . print_r($col, true) . "</div>";
 
