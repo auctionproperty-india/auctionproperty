@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार (Admin के लिए padding fix)
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (White/Blue Admin Theme)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -72,7 +72,7 @@ if ($is_logged_in && $role == 'user') {
         /* ====== ग्लोबल ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; padding-top: 70px; }
-        body.role-admin { background: #0f172a; padding-top: 70px; }  /* ✅ वापस 70px – अच्छा लगता है */
+        body.role-admin { background: #f8fafc; padding-top: 70px; }  /* ✅ Admin background light */
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
 
@@ -153,7 +153,7 @@ if ($is_logged_in && $role == 'user') {
             .top-nav .nav-right .btn-register { padding: 4px 12px; font-size: 12px; }
         }
 
-        /* ====== साइडबार ====== */
+        /* ====== साइडबार – Admin White/Blue Theme ====== */
         .sidebar {
             height: 100vh;
             width: 280px;
@@ -161,31 +161,42 @@ if ($is_logged_in && $role == 'user') {
             top: 70px;
             left: 0;
             padding: 30px 15px;
-            box-shadow: 4px 0 25px rgba(0,0,0,0.15);
+            box-shadow: 2px 0 12px rgba(0,0,0,0.06);
             z-index: 1050;
             transition: transform 0.3s ease-in-out, background 0.3s;
             overflow-y: auto;
         }
-        body.role-admin .sidebar { background: linear-gradient(180deg, #0b1120 0%, #1a2332 100%); color: #94a3b8; }
-        body.role-user .sidebar { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); color: #334155; border-right: 1px solid #e2e8f0; }
+        /* ✅ Admin sidebar – White background with blue accents */
+        body.role-admin .sidebar {
+            background: #ffffff;
+            color: #1e293b;
+            border-right: 1px solid #e2e8f0;
+        }
+        body.role-user .sidebar {
+            background: #ffffff;
+            color: #334155;
+            border-right: 1px solid #e2e8f0;
+        }
         @media (max-width: 991px) {
             .sidebar { transform: translateX(-100%); top: 0; }
             .sidebar.show { transform: translateX(0); }
         }
         @media (min-width: 992px) { .sidebar { transform: translateX(0) !important; } }
+
+        /* Brand */
         .sidebar .brand {
             font-size: 24px;
             font-weight: 800;
             text-align: center;
             padding-bottom: 25px;
-            border-bottom: 1px solid #2a3a52;
+            border-bottom: 1px solid #e2e8f0;
             margin-bottom: 25px;
             letter-spacing: 1px;
+            color: #1e293b;
         }
-        body.role-admin .sidebar .brand { color: #ffffff; }
-        body.role-admin .sidebar .brand i { color: #fbbf24; }
-        body.role-user .sidebar .brand { color: #0f172a; }
-        body.role-user .sidebar .brand i { color: #10b981; }
+        .sidebar .brand i { color: #1e3a8a; }
+
+        /* Links */
         .sidebar a {
             display: flex;
             align-items: center;
@@ -197,28 +208,38 @@ if ($is_logged_in && $role == 'user') {
             font-size: 15px;
             transition: all 0.3s ease;
             border-left: 3px solid transparent;
+            color: #475569;
         }
-        body.role-admin .sidebar a { color: #94a3b8; }
-        body.role-user .sidebar a { color: #475569; }
-        .sidebar a i { width: 28px; font-size: 18px; transition: all 0.3s; }
-        body.role-admin .sidebar a i { color: #64748b; }
-        body.role-user .sidebar a i { color: #94a3b8; }
-        .sidebar a:hover { background: #1e2a41; color: #ffffff; }
-        .sidebar a:hover i { color: #fbbf24; }
-        body.role-user .sidebar a:hover { background: #e2e8f0; color: #0f172a; }
-        body.role-user .sidebar a:hover i { color: #10b981; }
-        .sidebar a.active { background: #1e2a41; color: #ffffff; border-left-color: #fbbf24; }
-        body.role-user .sidebar a.active { background: #10b981; color: #ffffff; border-left-color: #059669; }
-        .sidebar a.active i { color: #fbbf24; }
-        body.role-user .sidebar a.active i { color: #ffffff; }
+        .sidebar a i {
+            width: 28px;
+            font-size: 18px;
+            transition: all 0.3s;
+            color: #94a3b8;
+        }
+        .sidebar a:hover {
+            background: #f1f5f9;
+            color: #1e3a8a;
+        }
+        .sidebar a:hover i { color: #1e3a8a; }
+        .sidebar a.active {
+            background: #eef2ff;
+            color: #1e3a8a;
+            border-left-color: #1e3a8a;
+        }
+        .sidebar a.active i { color: #1e3a8a; }
+
+        /* Logout link – red */
         .sidebar .logout-link {
             margin-top: 30px;
-            border-top: 1px solid #2a3a52;
+            border-top: 1px solid #e2e8f0;
             padding-top: 20px;
-            color: #ef4444;
+            color: #dc2626 !important;
         }
-        body.role-user .sidebar .logout-link { border-top-color: #e2e8f0; }
-        .sidebar .logout-link i { color: #ef4444; }
+        .sidebar .logout-link i { color: #dc2626 !important; }
+        .sidebar .logout-link:hover {
+            background: #fef2f2 !important;
+            color: #b91c1c !important;
+        }
         .sidebar-overlay {
             display: none;
             position: fixed;
@@ -237,16 +258,14 @@ if ($is_logged_in && $role == 'user') {
             min-height: 100vh;
             transition: margin-left 0.3s;
         }
-        /* ✅ Admin के लिए थोड़ा extra top padding – ताकि content नीचे आ जाए */
+        /* ✅ Admin के लिए थोड़ा extra top padding – सही spacing */
         body.role-admin .main-content {
-            padding-top: 1px;
+            padding-top: 5px;
         }
-        /* ✅ साइडबार वाले यूजर के लिए margin */
         body.role-admin .main-content,
         body.role-user .main-content {
             margin-left: 280px;
         }
-        /* ✅ बिना लॉगिन (guest) के लिए margin हटाएँ – पूरा पेज */
         body.role-guest .main-content {
             margin-left: 0 !important;
         }
@@ -276,13 +295,14 @@ if ($is_logged_in && $role == 'user') {
             color: #0f172a;
         }
         body.role-admin .top-bar {
-            background: #1e293b;
-            border: 1px solid #334155;
-            color: #e2e8f0;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            color: #1e293b;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
         .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
         .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
-        body.role-admin .top-bar .user-info .name { color: #f8fafc; }
+        body.role-admin .top-bar .user-info .name { color: #0f172a; }
         body.role-user .top-bar .user-info .name { color: #0f172a; }
         .top-bar .badge-role {
             padding: 4px 14px;
@@ -321,7 +341,7 @@ if ($is_logged_in && $role == 'user') {
             display: none;
             cursor: pointer;
         }
-        body.role-admin .hamburger-btn { color: #e2e8f0; }
+        body.role-admin .hamburger-btn { color: #1e293b; }
         body.role-user .hamburger-btn { color: #1e293b; }
         @media (max-width: 991px) { .hamburger-btn { display: block; } }
 
@@ -331,35 +351,35 @@ if ($is_logged_in && $role == 'user') {
             min-width: 350px;
             max-height: 400px;
             overflow-y: auto;
-            background: #1e293b;
-            border: 1px solid #334155;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
             border-radius: 12px;
             padding: 0;
             margin-top: 8px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
         }
         .notification-dropdown .dropdown-item {
-            color: #e2e8f0;
+            color: #1e293b;
             padding: 10px 16px;
-            border-bottom: 1px solid #2d3748;
+            border-bottom: 1px solid #f1f5f9;
             white-space: normal;
             font-size: 0.85rem;
         }
-        .notification-dropdown .dropdown-item:hover { background: #2d3748; color: #fff; }
+        .notification-dropdown .dropdown-item:hover { background: #f8fafc; color: #0f172a; }
         .notification-dropdown .dropdown-item:last-child { border-bottom: none; }
         .notification-dropdown .dropdown-header {
-            color: #94a3b8;
+            color: #475569;
             padding: 10px 16px;
             font-weight: 600;
-            border-bottom: 1px solid #2d3748;
-            background: #0f172a;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
             border-radius: 12px 12px 0 0;
         }
         .notification-dropdown .badge-notify {
             position: absolute;
             top: -6px;
             right: -8px;
-            background: #ef4444;
+            background: #dc2626;
             color: #fff;
             border-radius: 50%;
             padding: 2px 6px;
@@ -371,13 +391,13 @@ if ($is_logged_in && $role == 'user') {
         .notification-dropdown .btn-notify {
             background: transparent;
             border: none;
-            color: #e2e8f0;
+            color: #1e293b;
             font-size: 1.4rem;
             padding: 4px 8px;
             position: relative;
             cursor: pointer;
         }
-        .notification-dropdown .btn-notify:hover { color: #fbbf24; }
+        .notification-dropdown .btn-notify:hover { color: #1e3a8a; }
         .no-notification { color: #94a3b8; padding: 20px; text-align: center; }
         @media (max-width: 576px) {
             .notification-dropdown .dropdown-menu { min-width: 280px; right: -10px; }
@@ -392,16 +412,17 @@ if ($is_logged_in && $role == 'user') {
             transition: transform 0.2s, box-shadow 0.2s;
         }
         body.role-admin .card-premium {
-            background: #1e293b;
-            color: #e2e8f0;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+            background: #ffffff;
+            color: #0f172a;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e2e8f0;
         }
         body.role-user .card-premium {
             background: #ffffff;
             color: #0f172a;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
         }
-        .card-premium:hover { transform: translateY(-2px); box-shadow: 0 20px 30px -10px rgba(0,0,0,0.1); }
+        .card-premium:hover { transform: translateY(-2px); box-shadow: 0 20px 30px -10px rgba(0,0,0,0.08); }
         .stat-icon {
             width: 50px;
             height: 50px;
@@ -412,23 +433,23 @@ if ($is_logged_in && $role == 'user') {
             font-size: 24px;
             flex-shrink: 0;
         }
-        body.role-admin .stat-icon.bg-soft-primary { background: #1e3a5f; color: #60a5fa; }
-        body.role-admin .stat-icon.bg-soft-success { background: #14532d; color: #34d399; }
-        body.role-admin .stat-icon.bg-soft-warning { background: #713f12; color: #fbbf24; }
+        body.role-admin .stat-icon.bg-soft-primary { background: #eef2ff; color: #1e3a8a; }
+        body.role-admin .stat-icon.bg-soft-success { background: #dcfce7; color: #166534; }
+        body.role-admin .stat-icon.bg-soft-warning { background: #fef3c7; color: #92400e; }
         body.role-user .stat-icon.bg-soft-primary { background: #dbeafe; color: #2563eb; }
         body.role-user .stat-icon.bg-soft-success { background: #d1fae5; color: #059669; }
         body.role-user .stat-icon.bg-soft-warning { background: #fef3c7; color: #d97706; }
         .btn { border-radius: 10px; font-weight: 600; padding: 8px 16px; font-size: 14px; }
-        .btn-primary { background: #2563eb; border: none; }
-        .btn-primary:hover { background: #1d4ed8; }
+        .btn-primary { background: #1e3a8a; border: none; }
+        .btn-primary:hover { background: #1e40af; }
         .btn-sm { padding: 5px 10px; font-size: 12px; }
         .user-welcome-banner {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
             border-radius: 24px;
             padding: 30px;
             color: white;
             margin-bottom: 25px;
-            box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3);
         }
         .user-welcome-banner h2 { font-weight: 800; }
         .user-welcome-banner p { opacity: 0.9; }
@@ -535,10 +556,10 @@ if ($is_logged_in && $role == 'user') {
                 <i class="fas fa-bars"></i>
             </button>
             <div class="user-info">
-                <i class="fas fa-user-circle" style="font-size:32px; <?= ($role=='admin')?'color:#60a5fa;':'color:#10b981;' ?>"></i>
+                <i class="fas fa-user-circle" style="font-size:32px; <?= ($role=='admin')?'color:#1e3a8a;':'color:#10b981;' ?>"></i>
                 <div>
                     <div class="name"><?= htmlspecialchars($_SESSION['user_name']) ?>
-                        <span class="badge-role badge <?= ($role=='admin')?'bg-danger':'bg-success' ?>"><?= strtoupper($role) ?></span>
+                        <span class="badge-role badge <?= ($role=='admin')?'bg-primary':'bg-success' ?>"><?= strtoupper($role) ?></span>
                     </div>
                     <?php if ($role == 'user'): ?>
                         <div class="user-dates">
