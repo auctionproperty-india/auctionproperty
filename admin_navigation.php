@@ -3,14 +3,24 @@
 // 🎯 Navigation Manager (Admin Only)
 // ============================================================
 
+// ✅ session_start() only if not already active
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// ✅ अब डेटाबेस और functions include करें
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-session_start();
+// ✅ अगर admin नहीं है तो redirect करें – इससे पहले कोई output नहीं होना चाहिए
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: login.php");
     exit;
 }
+
+// ---- बाकी सारा कोड (Add/Edit/Delete) ----
+// (यहाँ आपका पिछला admin_navigation.php का पूरा कोड आएगा)
+// मैंने नीचे पूरा कोड फिर से दे दिया है – इसे कॉपी करें और अपनी फाइल में replace करें
 
 // Handle Add/Edit/Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -182,7 +192,7 @@ $items = $pdo->query("SELECT * FROM navigation_items ORDER BY display_order")->f
         <div class="text-muted mt-2"><small>💡 Total: <?= count($items) ?> items</small></div>
     </div>
 
-    <!-- How to Use (Footer) – अब दिखेगा -->
+    <!-- How to Use (Footer) -->
     <div class="card footer-note">
         <h6><i class="fas fa-lightbulb text-warning"></i> How to use:</h6>
         <ul>
