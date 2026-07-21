@@ -271,7 +271,7 @@ if ($is_logged_in && $role == 'user') {
             transition: margin-left 0.3s;
         }
         body.role-admin .main-content {
-            padding-top: 0 !important;
+            padding-top: 2px; !important;
         }
         body.role-admin .main-content,
         body.role-user .main-content {
