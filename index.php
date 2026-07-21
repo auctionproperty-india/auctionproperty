@@ -1,15 +1,9 @@
 <?php
 // ============================================================
-// 🏠 Home Page – Updated with Dynamic Header (No Duplicate Nav)
+// 🏠 Home Page – पूरी फाइल
 // ============================================================
 
-// ✅ नया डायनामिक हेडर – इसमें session_start() और नेविगेशन पहले से हैंडल है
 require_once __DIR__ . '/header.php';
-
-// ============================================================
-// बाकी का original index.php का कंटेंट (navbar हटा दिया गया है)
-// ============================================================
-
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -64,7 +58,7 @@ $customer_stmt = $pdo->prepare($customer_sql);
 $customer_stmt->execute($params);
 $customer_props = $customer_stmt->fetchAll();
 
-// ---- Render Property Card (without "Today" badge) ----
+// ---- Render Property Card ----
 function renderPropertyCard($prop, $show_images, $is_today = false) {
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
@@ -84,7 +78,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     ?>
     <div class="col-md-4 mb-4">
         <div class="property-card" style="position:relative; border-radius:24px; overflow:hidden; box-shadow:<?= $shadow ?>; height:100%; background: <?= $g['bg'] ?>; color:<?= $text_color ?>; transition:all 0.4s; border:1px solid <?= $border ?>;">
-            <!-- No badge -->
             <div class="p-4">
                 <div class="d-flex justify-content-between align-items-center">
                     <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? ($prop['source']=='customer' ? 'Customer' : 'Bank')) ?></span>
@@ -131,8 +124,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background: #f4f6fa; color: #1e293b; padding-top: 76px; }
-        /* ✅ Navbar style हटा दिया गया क्योंकि अब header.php से आ रहा है */
+        body { font-family: 'Inter', sans-serif; background: #f4f6fa; color: #1e293b; }
         .search-box { background:#ffffff; padding:25px 30px; border-radius:30px; box-shadow:0 15px 40px -10px rgba(0,0,0,0.08); border:1px solid rgba(255,255,255,0.3); backdrop-filter:blur(10px); margin-bottom:40px; }
         .search-box .form-control { border:none; background:#f1f5f9; border-radius:20px; padding:12px 20px; font-size:0.95rem; }
         .search-box .btn-primary { border-radius:30px; padding:12px 30px; background:linear-gradient(135deg, #1e3a8a, #2563eb); border:none; font-weight:600; transition:all 0.3s; }
@@ -145,121 +137,90 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         .nav-tabs .nav-link:hover { border-bottom: 3px solid #94a3b8; }
         .no-auction-msg { background: #f8fafc; border-radius: 30px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
         .no-auction-msg i { font-size: 2.5rem; opacity:0.3; }
-        @media (max-width:576px) { .search-box { padding:20px; } body { padding-top: 66px; } }
+        @media (max-width:576px) { .search-box { padding:20px; } }
     </style>
 </head>
 <body>
+    <div class="container mt-4">
+        <!-- Search Box -->
+        <div class="search-box">
+            <form method="GET" class="row g-3 align-items-center">
+                <input type="hidden" name="tab" value="<?= $tab ?>">
+                <div class="col-md-4">
+                    <input type="text" name="city" class="form-control" placeholder="🔍 Search by City..." value="<?= htmlspecialchars($search_city) ?>">
+                </div>
+                <div class="col-md-3">
+                    <select name="type" class="form-control">
+                        <option value="">All Types</option>
+                        <option value="Flat" <?= ($search_type=='Flat')?'selected':'' ?>>Flat</option>
+                        <option value="Plot" <?= ($search_type=='Plot')?'selected':'' ?>>Plot</option>
+                        <option value="Shop" <?= ($search_type=='Shop')?'selected':'' ?>>Shop</option>
+                        <option value="Land" <?= ($search_type=='Land')?'selected':'' ?>>Land</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <input type="number" name="max_price" class="form-control" placeholder="Max Price (₹)" value="<?= htmlspecialchars($search_max_price) ?>">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button>
+                </div>
+            </form>
+        </div>
 
-<!-- 
-    ✅ नया navbar header.php से आ रहा है – यहाँ कोई duplicate navbar नहीं है
-    ✅ सारा कंटेंट (सर्च, टैब्स, प्रॉपर्टी) नीचे है
--->
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-4">
+            <li class="nav-item">
+                <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?tab=auction&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>">
+                    <i class="fas fa-gavel me-2"></i>Auction Properties
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?tab=customer&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>">
+                    <i class="fas fa-home me-2"></i>Customer Properties
+                </a>
+            </li>
+        </ul>
 
-<div class="container mt-4">
-    <!-- Search Box -->
-    <div class="search-box">
-        <form method="GET" class="row g-3 align-items-center">
-            <input type="hidden" name="tab" value="<?= $tab ?>">
-            <div class="col-md-4">
-                <input type="text" name="city" class="form-control" placeholder="🔍 Search by City..." value="<?= htmlspecialchars($search_city) ?>">
+        <?php if($tab == 'auction'): ?>
+            <div class="section-title">
+                <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
+                <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
             </div>
-            <div class="col-md-3">
-                <select name="type" class="form-control">
-                    <option value="">All Types</option>
-                    <option value="Flat" <?= ($search_type=='Flat')?'selected':'' ?>>Flat</option>
-                    <option value="Plot" <?= ($search_type=='Plot')?'selected':'' ?>>Plot</option>
-                    <option value="Shop" <?= ($search_type=='Shop')?'selected':'' ?>>Shop</option>
-                    <option value="Land" <?= ($search_type=='Land')?'selected':'' ?>>Land</option>
-                </select>
+            <?php if(count($today_props) > 0): ?>
+                <div class="row"><?php foreach($today_props as $prop) renderPropertyCard($prop, $show_images, true); ?></div>
+            <?php else: ?>
+                <div class="no-auction-msg"><i class="fas fa-calendar-day"></i><p class="mt-2 fw-bold">📭 No auction today</p></div>
+            <?php endif; ?>
+
+            <hr class="my-5">
+            <div class="section-title">
+                <i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions
+                <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span>
             </div>
-            <div class="col-md-3">
-                <input type="number" name="max_price" class="form-control" placeholder="Max Price (₹)" value="<?= htmlspecialchars($search_max_price) ?>">
+            <?php if(count($upcoming_props) > 0): ?>
+                <div class="row"><?php foreach($upcoming_props as $prop) renderPropertyCard($prop, $show_images, false); ?></div>
+            <?php else: ?>
+                <div class="no-auction-msg"><i class="fas fa-calendar-plus"></i><p class="mt-2 fw-bold">📅 No upcoming auctions</p></div>
+            <?php endif; ?>
+
+        <?php else: ?>
+            <div class="section-title">
+                <i class="fas fa-home" style="color:#10b981;"></i> Customer Properties
+                <span class="badge bg-primary rounded-pill ms-2"><?= count($customer_props) ?></span>
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button>
-            </div>
-        </form>
+            <?php if(count($customer_props) > 0): ?>
+                <div class="row"><?php foreach($customer_props as $prop) renderPropertyCard($prop, $show_images, false); ?></div>
+            <?php else: ?>
+                <div class="no-auction-msg">
+                    <i class="fas fa-home"></i>
+                    <p class="mt-2 fw-bold">🏠 No customer properties yet</p>
+                    <?php if(isset($_SESSION['user_id']) && $_SESSION['role'] != 'admin'): ?>
+                        <a href="add_user_property.php" class="btn btn-primary mt-2">Add Your Property</a>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
     </div>
-
-    <!-- Tabs -->
-    <ul class="nav nav-tabs mb-4">
-        <li class="nav-item">
-            <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?tab=auction&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>">
-                <i class="fas fa-gavel me-2"></i>Auction Properties
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?tab=customer&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>">
-                <i class="fas fa-home me-2"></i>Customer Properties
-            </a>
-        </li>
-    </ul>
-
-    <?php if($tab == 'auction'): ?>
-        <!-- Auction Properties -->
-        <div class="section-title">
-            <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
-            <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
-        </div>
-        <?php if(count($today_props) > 0): ?>
-            <div class="row">
-                <?php foreach($today_props as $prop): ?>
-                    <?php renderPropertyCard($prop, $show_images, true); ?>
-                <?php endforeach; ?>
-            </div>
-        <?php else: ?>
-            <div class="no-auction-msg">
-                <i class="fas fa-calendar-day"></i>
-                <p class="mt-2 fw-bold">📭 No auction today</p>
-                <p class="text-muted">Check upcoming auctions below.</p>
-            </div>
-        <?php endif; ?>
-
-        <hr class="my-5">
-
-        <div class="section-title">
-            <i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions
-            <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span>
-        </div>
-        <?php if(count($upcoming_props) > 0): ?>
-            <div class="row">
-                <?php foreach($upcoming_props as $prop): ?>
-                    <?php renderPropertyCard($prop, $show_images, false); ?>
-                <?php endforeach; ?>
-            </div>
-        <?php else: ?>
-            <div class="no-auction-msg">
-                <i class="fas fa-calendar-plus"></i>
-                <p class="mt-2 fw-bold">📅 No upcoming auctions</p>
-                <p class="text-muted">Check back later.</p>
-            </div>
-        <?php endif; ?>
-
-    <?php else: ?>
-        <!-- Customer Properties -->
-        <div class="section-title">
-            <i class="fas fa-home" style="color:#10b981;"></i> Customer Properties
-            <span class="badge bg-primary rounded-pill ms-2"><?= count($customer_props) ?></span>
-        </div>
-        <?php if(count($customer_props) > 0): ?>
-            <div class="row">
-                <?php foreach($customer_props as $prop): ?>
-                    <?php renderPropertyCard($prop, $show_images, false); ?>
-                <?php endforeach; ?>
-            </div>
-        <?php else: ?>
-            <div class="no-auction-msg">
-                <i class="fas fa-home"></i>
-                <p class="mt-2 fw-bold">🏠 No customer properties yet</p>
-                <p class="text-muted">Be the first to list your property!</p>
-                <?php if(isset($_SESSION['user_id']) && $_SESSION['role'] != 'admin'): ?>
-                    <a href="add_user_property.php" class="btn btn-primary mt-2">Add Your Property</a>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
-    <?php endif; ?>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
