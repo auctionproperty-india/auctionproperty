@@ -98,7 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
 
         // Update package (subscription)
         if ($package_id) {
-            // Check if active subscription exists
             $stmt = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
             $stmt->execute([$id]);
             $sub = $stmt->fetch();
@@ -106,7 +105,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                 $stmt = $pdo->prepare("UPDATE subscriptions SET package_id = ? WHERE id = ?");
                 $stmt->execute([$package_id, $sub['id']]);
             } else {
-                // Create new subscription
                 $stmt = $pdo->prepare("
                     INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at)
                     VALUES (?, ?, 0, 'active', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', NOW())
@@ -125,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     }
 }
 
-// ---- Fetch all users with package info ----
+// ---- Fetch all users with package info and coins ----
 $sql = "
     SELECT 
         u.*,
@@ -133,7 +131,8 @@ $sql = "
         s.status as sub_status,
         s.start_date as sub_start,
         s.end_date as sub_end,
-        s.package_id as current_package_id
+        s.package_id as current_package_id,
+        u.coins as user_coins
     FROM users u
     LEFT JOIN (
         SELECT DISTINCT ON (user_id) user_id, package_id, status, start_date, end_date
@@ -187,6 +186,7 @@ include 'header.php';
                         <th>Name</th>
                         <th>Email</th>
                         <th>Phone</th>
+                        <th>Coins</th>
                         <th>Reg. Date</th>
                         <th>Act. Date</th>
                         <th>Package</th>
@@ -203,6 +203,7 @@ include 'header.php';
                         <td><strong><?= htmlspecialchars($user['name']) ?></strong></td>
                         <td><?= htmlspecialchars($user['email']) ?></td>
                         <td><?= htmlspecialchars($user['phone'] ?? 'N/A') ?></td>
+                        <td><span class="badge bg-warning text-dark"><?= number_format($user['user_coins'] ?? 0) ?></span></td>
                         <td><?= $user['created_at'] ? date('d M Y', strtotime($user['created_at'])) : 'N/A' ?></td>
                         <td><?= $user['activation_date'] ? date('d M Y', strtotime($user['activation_date'])) : 'Not Active' ?></td>
                         <td>
@@ -226,8 +227,8 @@ include 'header.php';
                             <?= $user['is_super_admin'] ? '<span class="badge bg-danger">Admin</span>' : '<span class="badge bg-secondary">User</span>' ?>
                         </td>
                         <td class="actions">
-                            <!-- Edit Button -->
-                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal<?= $user['id'] ?>">
+                            <!-- Edit Button – Fixed -->
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal<?= $user['id'] ?>">
                                 <i class="fas fa-edit"></i>
                             </button>
 
@@ -255,7 +256,7 @@ include 'header.php';
                     </tr>
 
                     <!-- ====== EDIT MODAL ====== -->
-                    <div class="modal fade" id="editModal<?= $user['id'] ?>" tabindex="-1">
+                    <div class="modal fade" id="editModal<?= $user['id'] ?>" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
                                 <form method="POST">
