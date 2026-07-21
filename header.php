@@ -74,14 +74,13 @@ if ($is_logged_in && $role == 'user') {
         /* ====== ग्लोबल ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; }
-        /* ✅ Body padding – top nav के लिए (70px), लेकिन जब top nav छिपा हो तो 0 */
         body { padding-top: 70px; }
         body.top-nav-hidden { padding-top: 0; }
         body.role-admin { background: #f8fafc; }
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
 
-        /* ====== स्टिकी नेविगेशन – केवल home page पर ====== */
+        /* ====== स्टिकी नेविगेशन ====== */
         .top-nav {
             position: fixed;
             top: 0;
@@ -97,7 +96,6 @@ if ($is_logged_in && $role == 'user') {
             border-bottom: 1px solid #334155;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
-        /* ✅ जब top nav छिपा हो तो उसे display none */
         body.top-nav-hidden .top-nav {
             display: none !important;
         }
@@ -162,7 +160,7 @@ if ($is_logged_in && $role == 'user') {
             .top-nav .nav-right .btn-register { padding: 4px 12px; font-size: 12px; }
         }
 
-        /* ====== साइडबार – Admin White/Blue Theme ====== */
+        /* ====== साइडबार ====== */
         .sidebar {
             height: 100vh;
             width: 280px;
@@ -175,7 +173,6 @@ if ($is_logged_in && $role == 'user') {
             transition: transform 0.3s ease-in-out, background 0.3s;
             overflow-y: auto;
         }
-        /* ✅ जब top nav दिख रहा हो तो sidebar top: 70px, otherwise top: 0 */
         body:not(.top-nav-hidden) .sidebar {
             top: 70px;
         }
@@ -271,7 +268,7 @@ if ($is_logged_in && $role == 'user') {
             transition: margin-left 0.3s;
         }
         body.role-admin .main-content {
-            padding-top: 2px; !important;
+            padding-top: 0 !important;
         }
         body.role-admin .main-content,
         body.role-user .main-content {
@@ -287,7 +284,7 @@ if ($is_logged_in && $role == 'user') {
             }
         }
 
-        /* ====== टॉप बार (यूजर इन्फो) ====== */
+        /* ====== टॉप बार ====== */
         .top-bar {
             padding: 15px 20px;
             border-radius: 20px;
@@ -471,7 +468,7 @@ if ($is_logged_in && $role == 'user') {
 </head>
 <body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?>">
 
-<!-- ====== स्टिकी नेविगेशन – केवल Home Page पर दिखे ====== -->
+<!-- ====== स्टिकी नेविगेशन – केवल Home Page पर ====== -->
 <?php if (!$hide_top_nav): ?>
 <nav class="top-nav">
     <span class="nav-brand"><i class="fas fa-building"></i> Prime Property India</span>
@@ -514,7 +511,8 @@ if ($is_logged_in && $role == 'user') {
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
         <?php endif; ?>
         <?php if ($is_super_admin): ?>
-            <a href="admin_dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
+            <!-- ✅ FIX: Manage Users now points to users.php instead of admin_dashboard.php#users-section -->
+            <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
         <?php if (hasViewPermission('packages', $pdo)): ?>
