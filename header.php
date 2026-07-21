@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार (Top nav only on home page)
+// ✅ Header – Top Nav only on Home Page + Proper Spacing
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -73,12 +73,15 @@ if ($is_logged_in && $role == 'user') {
     <style>
         /* ====== ग्लोबल ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; padding-top: 70px; }
-        body.role-admin { background: #f8fafc; padding-top: 70px; }
+        body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; }
+        /* ✅ Body padding – top nav के लिए (70px), लेकिन जब top nav छिपा हो तो 0 */
+        body { padding-top: 70px; }
+        body.top-nav-hidden { padding-top: 0; }
+        body.role-admin { background: #f8fafc; }
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
 
-        /* ====== स्टिकी नेविगेशन ====== */
+        /* ====== स्टिकी नेविगेशन – केवल home page पर ====== */
         .top-nav {
             position: fixed;
             top: 0;
@@ -93,6 +96,10 @@ if ($is_logged_in && $role == 'user') {
             gap: 5px 15px;
             border-bottom: 1px solid #334155;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        /* ✅ जब top nav छिपा हो तो उसे display none */
+        body.top-nav-hidden .top-nav {
+            display: none !important;
         }
         .top-nav a {
             color: #94a3b8;
@@ -160,13 +167,20 @@ if ($is_logged_in && $role == 'user') {
             height: 100vh;
             width: 280px;
             position: fixed;
-            top: 70px;
+            top: 0;
             left: 0;
             padding: 30px 15px;
             box-shadow: 2px 0 12px rgba(0,0,0,0.06);
             z-index: 1050;
             transition: transform 0.3s ease-in-out, background 0.3s;
             overflow-y: auto;
+        }
+        /* ✅ जब top nav दिख रहा हो तो sidebar top: 70px, otherwise top: 0 */
+        body:not(.top-nav-hidden) .sidebar {
+            top: 70px;
+        }
+        body.top-nav-hidden .sidebar {
+            top: 0;
         }
         body.role-admin .sidebar {
             background: #ffffff;
@@ -179,7 +193,7 @@ if ($is_logged_in && $role == 'user') {
             border-right: 1px solid #e2e8f0;
         }
         @media (max-width: 991px) {
-            .sidebar { transform: translateX(-100%); top: 0; }
+            .sidebar { transform: translateX(-100%); top: 0 !important; }
             .sidebar.show { transform: translateX(0); }
         }
         @media (min-width: 992px) { .sidebar { transform: translateX(0) !important; } }
@@ -455,7 +469,7 @@ if ($is_logged_in && $role == 'user') {
         }
     </style>
 </head>
-<body class="role-<?= $is_logged_in ? $role : 'guest' ?>">
+<body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?>">
 
 <!-- ====== स्टिकी नेविगेशन – केवल Home Page पर दिखे ====== -->
 <?php if (!$hide_top_nav): ?>
