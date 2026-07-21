@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – सभी Pages का Common Header
+// ✅ Header – Updated with Dynamic Navigation
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -26,6 +26,9 @@ if(isset($_SESSION['user_id'])) {
         $_SESSION['is_super_admin'] = false;
     }
 }
+
+// ---- Get Navigation Items from Database ----
+$nav_items = $pdo->query("SELECT * FROM navigation_items WHERE is_active = TRUE ORDER BY display_order")->fetchAll();
 
 // ---- User Data for Top Bar ----
 $reg_date = '';
@@ -62,12 +65,12 @@ if($role == 'user') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Prime Property</title>
+    <title>Prime Property India</title> <!-- ✅ Updated -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* Same as before, keep all styles */
+        /* --- Same as before, keep all styles --- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; transition: background 0.3s; }
         body.role-admin { background: #0f172a; }
@@ -82,6 +85,7 @@ if($role == 'user') {
         body.role-admin .sidebar .brand i { color: #fbbf24; }
         body.role-user .sidebar .brand { color: #0f172a; }
         body.role-user .sidebar .brand i { color: #10b981; }
+        .sidebar .brand span { /* ✅ Updated brand text */ }
         .sidebar a { display: flex; align-items: center; padding: 12px 20px; margin: 4px 0; text-decoration: none; border-radius: 12px; font-weight: 500; font-size: 15px; transition: all 0.3s ease; border-left: 3px solid transparent; }
         body.role-admin .sidebar a { color: #94a3b8; }
         body.role-user .sidebar a { color: #475569; }
@@ -117,6 +121,82 @@ if($role == 'user') {
         @media (max-width: 991px) { .hamburger-btn { display: block; } }
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1040; }
         .sidebar-overlay.show { display: block; }
+
+        /* ✅ NEW: Top Navigation Bar Styles */
+        .top-nav {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 8px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 5px 15px;
+            border: 1px solid #334155;
+        }
+        .top-nav a {
+            color: #94a3b8;
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .top-nav a:hover,
+        .top-nav a.active-nav {
+            color: #f8fafc;
+            background: #2d3748;
+        }
+        .top-nav a i {
+            font-size: 14px;
+            color: #fbbf24;
+        }
+        .top-nav .nav-brand {
+            color: #f8fafc;
+            font-weight: 700;
+            font-size: 18px;
+            margin-right: 15px;
+        }
+        .top-nav .nav-brand i {
+            color: #fbbf24;
+            font-size: 20px;
+        }
+        .top-nav .nav-right {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .top-nav .nav-right a {
+            padding: 6px 14px;
+            border-radius: 20px;
+        }
+        .top-nav .nav-right .btn-login {
+            background: #2563eb;
+            color: #fff !important;
+        }
+        .top-nav .nav-right .btn-login:hover {
+            background: #1d4ed8;
+            color: #fff !important;
+        }
+        .top-nav .nav-right .btn-register {
+            border: 1px solid #2563eb;
+            color: #60a5fa !important;
+        }
+        .top-nav .nav-right .btn-register:hover {
+            background: #2563eb;
+            color: #fff !important;
+        }
+        @media (max-width: 768px) {
+            .top-nav .nav-brand { font-size: 16px; }
+            .top-nav a { font-size: 13px; padding: 6px 10px; }
+            .top-nav .nav-right .btn-login,
+            .top-nav .nav-right .btn-register { padding: 4px 12px; font-size: 12px; }
+        }
         .card-premium { border-radius: 20px; border: none; padding: 20px 24px; margin-bottom: 20px; transition: transform 0.2s, box-shadow 0.2s; }
         body.role-admin .card-premium { background: #1e293b; color: #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); }
         body.role-user .card-premium { background: #ffffff; color: #0f172a; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
@@ -222,7 +302,7 @@ if($role == 'user') {
 
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
-    <div class="brand"><i class="fas fa-building"></i> <span>Prime Property</span></div>
+    <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div> <!-- ✅ Updated -->
     
     <?php if($role == 'admin'): ?>
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
@@ -243,9 +323,7 @@ if($role == 'user') {
         <?php if(hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
-        <!-- ✅ Deductions (TDS/Admin Charge) -->
         <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
-        <!-- ✅ Activity Logs (Online Users, Spin, Copy, View) -->
         <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
         <?php if(hasViewPermission('accounting', $pdo)): ?>
             <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
@@ -257,6 +335,8 @@ if($role == 'user') {
         <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
+        <!-- ✅ NEW: Navigation Manager -->
+        <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
         
     <?php else: ?>
         <!-- User Sidebar -->
@@ -275,6 +355,38 @@ if($role == 'user') {
 </div>
 
 <div class="main-content">
+    <!-- ✅ NEW: Top Navigation Bar (Dynamic from Database) -->
+    <nav class="top-nav">
+        <span class="nav-brand"><i class="fas fa-building"></i> Prime Property India</span>
+        <?php foreach ($nav_items as $item): ?>
+            <?php
+                $is_active = (strpos($_SERVER['REQUEST_URI'], $item['url']) !== false);
+                if ($item['url'] == '/' && $_SERVER['REQUEST_URI'] == '/') {
+                    $is_active = true;
+                }
+                if ($item['url'] != '/' && $_SERVER['REQUEST_URI'] == '/') {
+                    $is_active = false;
+                }
+            ?>
+            <a href="<?= htmlspecialchars($item['url']) ?>" class="<?= $is_active ? 'active-nav' : '' ?>">
+                <?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?>
+                <?= htmlspecialchars($item['label']) ?>
+            </a>
+        <?php endforeach; ?>
+        <div class="nav-right">
+            <?php if (isset($_SESSION['user_id'])): ?>
+                <span style="color:#94a3b8; font-size:13px;">
+                    <i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['user_name'] ?? 'User') ?>
+                </span>
+                <a href="logout.php" style="color:#ef4444;"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            <?php else: ?>
+                <a href="login.php" class="btn-login"><i class="fas fa-sign-in-alt"></i> Login</a>
+                <a href="register.php" class="btn-register"><i class="fas fa-user-plus"></i> Register</a>
+            <?php endif; ?>
+        </div>
+    </nav>
+
+    <!-- Remaining top-bar code (user info, notification) -->
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
             <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()">
@@ -333,3 +445,8 @@ if($role == 'user') {
         </div>
         <?php endif; ?>
     </div>
+
+<?php
+// Continue with rest of your page content...
+// Note: You need to close the main-content and body tags in your footer
+?>
