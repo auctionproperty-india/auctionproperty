@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (With Referrer)
+// 👥 User Management – Admin Panel (Search + Working Modal)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -123,6 +123,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     }
 }
 
+// ---- Search ----
+$search = trim($_GET['search'] ?? '');
+$search_condition = "";
+$search_params = [];
+if (!empty($search)) {
+    $search_condition = " WHERE u.name ILIKE ? OR u.email ILIKE ? OR u.phone ILIKE ?";
+    $search_params = ['%' . $search . '%', '%' . $search . '%', '%' . $search . '%'];
+}
+
 // ---- Fetch all users with package info, coins, and referrer ----
 $sql = "
     SELECT 
@@ -144,9 +153,12 @@ $sql = "
         ORDER BY user_id, id DESC
     ) s ON u.id = s.user_id
     LEFT JOIN packages p ON s.package_id = p.id
+    " . $search_condition . "
     ORDER BY u.id DESC
 ";
-$users = $pdo->query($sql)->fetchAll();
+$stmt = $pdo->prepare($sql);
+$stmt->execute($search_params);
+$users = $stmt->fetchAll();
 
 // ---- Get all packages for dropdown ----
 $packages = $pdo->query("SELECT id, name FROM packages ORDER BY id")->fetchAll();
@@ -166,12 +178,26 @@ include 'header.php';
     .badge-status.inactive { background: #fee2e2; color: #991b1b; }
     .badge-status.blocked { background: #fef3c7; color: #92400e; }
     .badge-referrer { font-size: 0.75rem; background: #eef2ff; color: #1e3a8a; padding: 2px 10px; border-radius: 30px; }
+    .search-box { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
+    .search-box input { border-radius: 30px; padding: 8px 20px; border: 1px solid #e2e8f0; min-width: 250px; }
+    .search-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
 </style>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="text-light"><i class="fas fa-users me-2"></i>User Management</h4>
         <span class="badge bg-primary">Total: <?= count($users) ?> users</span>
+    </div>
+
+    <!-- ====== SEARCH BAR ====== -->
+    <div class="search-box">
+        <form method="GET" class="d-flex gap-2 flex-wrap">
+            <input type="text" name="search" placeholder="🔍 Search by name, email, or phone..." value="<?= htmlspecialchars($search) ?>">
+            <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Search</button>
+            <?php if (!empty($search)): ?>
+                <a href="users.php" class="btn btn-secondary btn-sm"><i class="fas fa-times"></i> Clear</a>
+            <?php endif; ?>
+        </form>
     </div>
 
     <?php if ($message): ?>
@@ -202,6 +228,9 @@ include 'header.php';
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if (empty($users)): ?>
+                        <tr><td colspan="13" class="text-center text-muted py-4">No users found.</td></tr>
+                    <?php endif; ?>
                     <?php foreach ($users as $user): ?>
                     <tr>
                         <td><?= $user['id'] ?></td>
@@ -241,28 +270,28 @@ include 'header.php';
                             <?= $user['is_super_admin'] ? '<span class="badge bg-danger">Admin</span>' : '<span class="badge bg-secondary">User</span>' ?>
                         </td>
                         <td class="actions">
-                            <!-- Edit Button -->
+                            <!-- ✅ Edit Button – Working -->
                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal<?= $user['id'] ?>">
                                 <i class="fas fa-edit"></i>
                             </button>
 
                             <!-- Delete -->
                             <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                <a href="?delete=<?= $user['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">
+                                <a href="?delete=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">
                                     <i class="fas fa-trash"></i>
                                 </a>
                             <?php endif; ?>
 
                             <!-- Block/Unblock -->
                             <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                <a href="?toggle_block=<?= $user['id'] ?>" class="btn btn-sm btn-warning">
+                                <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-warning">
                                     <?= $user['status'] == 'blocked' ? '<i class="fas fa-unlock"></i>' : '<i class="fas fa-lock"></i>' ?>
                                 </a>
                             <?php endif; ?>
 
                             <!-- Toggle Admin -->
                             <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                <a href="?toggle_admin=<?= $user['id'] ?>" class="btn btn-sm btn-info">
+                                <a href="?toggle_admin=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-info">
                                     <?= $user['is_super_admin'] ? '<i class="fas fa-user-minus"></i>' : '<i class="fas fa-user-plus"></i>' ?>
                                 </a>
                             <?php endif; ?>
