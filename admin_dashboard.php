@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📊 Admin Dashboard – White + Dark Blue Theme
+// 📊 Admin Dashboard – White + Dark Blue Theme (No Extra Top Spacing)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -36,7 +36,7 @@ require_once __DIR__ . '/header.php';
         background: #f8fafc;
         border-radius: 24px;
         padding: 20px 25px;
-        margin: -5px 0 0 0;  /* ✅ थोड़ा ऊपर लाने के लिए */
+        margin: 0;  /* ✅ कोई negative margin नहीं – top से start */
     }
 
     .dashboard-title {
