@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार (Admin Top Spacing Removed)
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (Top nav only on home page)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -8,7 +8,9 @@ require_once __DIR__ . '/functions.php';
 
 // करंट पेज का फ़ाइल नाम
 $current_page = basename($_SERVER['PHP_SELF']);
-$hide_top_nav = ($current_page == 'admin_dashboard.php');
+
+// ✅ Top nav केवल home page (index.php) पर दिखे – बाकी सब जगह छिपा
+$hide_top_nav = ($current_page != 'index.php');
 
 // क्या यूजर लॉगिन है?
 $is_logged_in = isset($_SESSION['user_id']);
@@ -248,13 +250,12 @@ if ($is_logged_in && $role == 'user') {
         }
         .sidebar-overlay.show { display: block; }
 
-        /* ====== मुख्य कंटेंट – Admin top spacing removed ====== */
+        /* ====== मुख्य कंटेंट ====== */
         .main-content {
             padding: 30px 35px;
             min-height: 100vh;
             transition: margin-left 0.3s;
         }
-        /* ✅ Admin के लिए padding-top पूरी तरह हटाई */
         body.role-admin .main-content {
             padding-top: 0 !important;
         }
@@ -272,7 +273,7 @@ if ($is_logged_in && $role == 'user') {
             }
         }
 
-        /* ====== टॉप बार (यूजर इन्फो) – Admin margin bottom कम ====== */
+        /* ====== टॉप बार (यूजर इन्फो) ====== */
         .top-bar {
             padding: 15px 20px;
             border-radius: 20px;
@@ -292,7 +293,7 @@ if ($is_logged_in && $role == 'user') {
             border: 1px solid #e2e8f0;
             color: #1e293b;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            margin-bottom: 10px;  /* ✅ कम किया */
+            margin-bottom: 10px;
         }
         .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
         .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
@@ -456,7 +457,7 @@ if ($is_logged_in && $role == 'user') {
 </head>
 <body class="role-<?= $is_logged_in ? $role : 'guest' ?>">
 
-<!-- ====== स्टिकी नेविगेशन – केवल एडमिन डैशबोर्ड पर न दिखे ====== -->
+<!-- ====== स्टिकी नेविगेशन – केवल Home Page पर दिखे ====== -->
 <?php if (!$hide_top_nav): ?>
 <nav class="top-nav">
     <span class="nav-brand"><i class="fas fa-building"></i> Prime Property India</span>
