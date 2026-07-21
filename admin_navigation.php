@@ -3,26 +3,19 @@
 // 🎯 Navigation Manager (Admin Only)
 // ============================================================
 
-// ✅ session_start() only if not already active
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-// ✅ अब डेटाबेस और functions include करें
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// ✅ अगर admin नहीं है तो redirect करें – इससे पहले कोई output नहीं होना चाहिए
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: login.php");
     exit;
 }
 
-// ---- बाकी सारा कोड (Add/Edit/Delete) ----
-// (यहाँ आपका पिछला admin_navigation.php का पूरा कोड आएगा)
-// मैंने नीचे पूरा कोड फिर से दे दिया है – इसे कॉपी करें और अपनी फाइल में replace करें
-
-// Handle Add/Edit/Delete
+// Add/Edit/Delete handlers
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add'])) {
         $stmt = $pdo->prepare("INSERT INTO navigation_items (label, url, icon, display_order, is_active) VALUES (?, ?, ?, ?, ?)");
@@ -44,7 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get all navigation items
 $items = $pdo->query("SELECT * FROM navigation_items ORDER BY display_order")->fetchAll();
 ?>
 <!DOCTYPE html>
@@ -192,20 +184,18 @@ $items = $pdo->query("SELECT * FROM navigation_items ORDER BY display_order")->f
         <div class="text-muted mt-2"><small>💡 Total: <?= count($items) ?> items</small></div>
     </div>
 
-    <!-- How to Use (Footer) -->
     <div class="card footer-note">
         <h6><i class="fas fa-lightbulb text-warning"></i> How to use:</h6>
         <ul>
             <li>Add/Edit navigation items from this page.</li>
             <li>Set <strong>Active</strong> to show/hide items on the frontend.</li>
             <li><strong>Order</strong> determines the display sequence (lower number = earlier).</li>
-            <li>Icons use <a href="https://fontawesome.com/icons" target="_blank" style="color:#60a5fa;">FontAwesome</a> classes (e.g. <code>fa-solid fa-house</code>).</li>
+            <li>Icons use <a href="https://fontawesome.com/icons" target="_blank" style="color:#60a5fa;">FontAwesome</a> classes.</li>
             <li>Changes reflect instantly on the website after saving.</li>
         </ul>
-        <p class="mb-0 text-muted"><i class="fas fa-info-circle"></i> The top navigation bar is dynamic. Any change here will be visible on all pages.</p>
+        <p class="mb-0 text-muted"><i class="fas fa-info-circle"></i> The top navigation bar is dynamic.</p>
     </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
