@@ -212,13 +212,13 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
             <span class="status-badge text-success">
                 <span class="icon">✅</span> Active
                 <span class="badge bg-success ms-2">⏳ <?= $days_left ?> Days Left</span>
-                <span class="ms-2" style="font-size:0.8rem; opacity:0.7;">Activated: <?= $activation_date_formatted ?></span>
+                <!-- ✅ Activation Date removed from here -->
             </span>
         <?php else: ?>
             <span class="status-badge text-danger">
                 <span class="icon">❌</span> Not Active
                 <a href="user_packages.php" class="btn btn-primary btn-sm ms-2">Buy Plan</a>
-                <span class="ms-2" style="font-size:0.8rem; opacity:0.7;">Activated: Not Active</span>
+                <!-- ✅ Activation Date removed from here -->
             </span>
         <?php endif; ?>
     </div>
@@ -383,7 +383,6 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
         
-        // Random rotation
         const randomSegment = segments[Math.floor(Math.random() * segments.length)];
         const extraSpin = Math.floor(Math.random() * 360);
         const totalRotation = 360 * 5 + randomSegment + extraSpin;
@@ -414,8 +413,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.is_reward) {
                         spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
                         showCoinAnimation(data.coins);
-                        launchStarShower(); // 🌟 New Star Shower Effect
-                        // Update coins in banner
+                        launchStarShower();
                         const coinSpan = document.querySelector('.banner-stats strong:last-child');
                         if (coinSpan) {
                             let current = parseInt(coinSpan.textContent);
@@ -430,7 +428,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             spinBtn.disabled = false;
                         }
                     } else if (data.show_property && data.property) {
-                        // Show property modal
                         const p = data.property;
                         const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
                         const icon = isCar ? '🚗' : '🏠';
@@ -449,7 +446,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         viewPropertyLink.href = `property_detail.php?id=${p.id}&source=auction`;
                         propertyModal.show();
                         spinMessage.innerHTML = data.message || '🏠 Check out this property!';
-                        // Re-enable spin after modal closes
                         propertyModal._element.addEventListener('hidden.bs.modal', function () {
                             spinBtn.disabled = false;
                         });
@@ -483,7 +479,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    // 🌟 ===== WORLD CLASS STAR SHOWER EFFECT =====
     function launchStarShower() {
         const container = document.createElement('div');
         container.className = 'star-shower-container';
@@ -527,7 +522,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, maxDuration * 1000 + 500);
     }
 
-    // Add star shower CSS
     const style = document.createElement('style');
     style.textContent = `
         .star-shower-container {
