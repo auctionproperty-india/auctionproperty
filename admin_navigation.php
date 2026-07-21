@@ -182,7 +182,7 @@ $items = $pdo->query("SELECT * FROM navigation_items ORDER BY display_order")->f
         <div class="text-muted mt-2"><small>💡 Total: <?= count($items) ?> items</small></div>
     </div>
 
-    <!-- How to Use (Footer) – Visible now -->
+    <!-- How to Use (Footer) – अब दिखेगा -->
     <div class="card footer-note">
         <h6><i class="fas fa-lightbulb text-warning"></i> How to use:</h6>
         <ul>
