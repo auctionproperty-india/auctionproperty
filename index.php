@@ -1,12 +1,15 @@
-<?php 
 <?php
 // ============================================================
-// 🏠 Home Page – सिर्फ हेडर इन्क्लूड करें, बाकी अपना कंटेंट रहेगा
+// 🏠 Home Page – Updated with Dynamic Header (No Duplicate Nav)
 // ============================================================
 
+// ✅ नया डायनामिक हेडर – इसमें session_start() और नेविगेशन पहले से हैंडल है
 require_once __DIR__ . '/header.php';
 
-// फिर आपका बचा हुआ index.php का कंटेंट...
+// ============================================================
+// बाकी का original index.php का कंटेंट (navbar हटा दिया गया है)
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -123,15 +126,13 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prime Property – Auction & Customer</title>
+    <title>Prime Property India – Auction & Customer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background: #f4f6fa; color: #1e293b; padding-top: 76px; }
-        .navbar-dark { background: linear-gradient(135deg, #0f172a, #1e293b) !important; box-shadow: 0 4px 20px rgba(0,0,0,0.3); position: fixed; top:0; left:0; right:0; z-index:1030; }
-        .navbar-brand { font-weight:800; font-size:1.6rem; letter-spacing:1px; }
-        .navbar-brand i { color:#fbbf24; }
+        /* ✅ Navbar style हटा दिया गया क्योंकि अब header.php से आ रहा है */
         .search-box { background:#ffffff; padding:25px 30px; border-radius:30px; box-shadow:0 15px 40px -10px rgba(0,0,0,0.08); border:1px solid rgba(255,255,255,0.3); backdrop-filter:blur(10px); margin-bottom:40px; }
         .search-box .form-control { border:none; background:#f1f5f9; border-radius:20px; padding:12px 20px; font-size:0.95rem; }
         .search-box .btn-primary { border-radius:30px; padding:12px 30px; background:linear-gradient(135deg, #1e3a8a, #2563eb); border:none; font-weight:600; transition:all 0.3s; }
@@ -149,29 +150,10 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark fixed-top">
-    <div class="container">
-        <a class="navbar-brand" href="index.php"><i class="fas fa-gavel"></i> Prime Property</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="nav">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="#">Home</a></li>
-                <li class="nav-item"><a class="nav-link" href="#">Auctions</a></li>
-            </ul>
-            <div class="ms-3">
-                <?php if(isset($_SESSION['user_id'])): ?>
-                    <a href="dashboard.php" class="btn btn-outline-light btn-sm me-2"><i class="fas fa-user"></i> Dashboard</a>
-                    <a href="logout.php" class="btn btn-danger btn-sm">Logout</a>
-                <?php else: ?>
-                    <a href="login.php" class="btn btn-outline-light btn-sm me-2">Login</a>
-                    <a href="register.php" class="btn btn-primary btn-sm">Register</a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-</nav>
+<!-- 
+    ✅ नया navbar header.php से आ रहा है – यहाँ कोई duplicate navbar नहीं है
+    ✅ सारा कंटेंट (सर्च, टैब्स, प्रॉपर्टी) नीचे है
+-->
 
 <div class="container mt-4">
     <!-- Search Box -->
