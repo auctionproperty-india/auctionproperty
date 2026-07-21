@@ -1,22 +1,22 @@
 <?php
 // ============================================================
-// ✅ Header – Public & Private (No Redirect)
+// ✅ Header – सार्वजनिक और लॉगिन यूजर दोनों के लिए (कोई रिडायरेक्ट नहीं)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// Check if user is logged in
+// क्या यूजर लॉगिन है?
 $is_logged_in = isset($_SESSION['user_id']);
 $role = $is_logged_in ? ($_SESSION['role'] ?? 'user') : 'guest';
 
-// Super Admin Check (only if logged in)
+// सुपर एडमिन चेक (केवल लॉगिन होने पर)
 $is_super_admin = false;
 if ($is_logged_in) {
     $stmt = $pdo->prepare("SELECT is_super_admin FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $row = $stmt->fetch();
-    if($row && $row['is_super_admin']) {
+    if ($row && $row['is_super_admin']) {
         $is_super_admin = true;
         $_SESSION['is_super_admin'] = true;
     } else {
@@ -24,10 +24,10 @@ if ($is_logged_in) {
     }
 }
 
-// ---- Get Navigation Items from Database ----
+// ---- डेटाबेस से नेविगेशन आइटम लोड करें ----
 $nav_items = $pdo->query("SELECT * FROM navigation_items WHERE is_active = TRUE ORDER BY display_order")->fetchAll();
 
-// ---- User Data for Top Bar (only if logged in) ----
+// ---- लॉगिन यूजर के लिए टॉप बार डेटा ----
 $reg_date = '';
 $activation_date = 'Not Active';
 $expiry_date = null;
@@ -45,7 +45,7 @@ if ($is_logged_in && $role == 'user') {
     $sub = $pdo->prepare("SELECT start_date, end_date FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
     $sub->execute([$user_id]);
     $sub_info = $sub->fetch();
-    if($sub_info) {
+    if ($sub_info) {
         $activation_date = date('d M Y', strtotime($sub_info['start_date']));
         $expiry_date = $sub_info['end_date'];
         $days_left = (int) ((strtotime($expiry_date) - time()) / (60 * 60 * 24));
@@ -67,14 +67,14 @@ if ($is_logged_in && $role == 'user') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* ====== Global Reset & Body ====== */
+        /* ====== ग्लोबल रीसेट और बॉडी ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; transition: background 0.3s; }
         body.role-admin { background: #0f172a; }
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
 
-        /* ====== Sidebar ====== */
+        /* ====== साइडबार (केवल लॉगिन यूजर के लिए) ====== */
         .sidebar { height: 100vh; width: 280px; position: fixed; top:0; left:0; padding: 30px 15px; box-shadow: 4px 0 25px rgba(0,0,0,0.15); z-index: 1050; transition: transform 0.3s ease-in-out, background 0.3s; overflow-y: auto; }
         body.role-admin .sidebar { background: linear-gradient(180deg, #0b1120 0%, #1a2332 100%); color: #94a3b8; }
         body.role-user .sidebar { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); color: #334155; border-right: 1px solid #e2e8f0; }
@@ -105,11 +105,11 @@ if ($is_logged_in && $role == 'user') {
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1040; }
         .sidebar-overlay.show { display: block; }
 
-        /* ====== Main Content ====== */
+        /* ====== मुख्य कंटेंट ====== */
         .main-content { margin-left: 280px; padding: 30px 35px; min-height: 100vh; transition: margin-left 0.3s; }
         @media (max-width: 991px) { .main-content { margin-left: 0; padding: 15px; } }
 
-        /* ====== Top Navigation Bar (Public) ====== */
+        /* ====== टॉप नेविगेशन बार (सार्वजनिक) ====== */
         .top-nav {
             background: #1e293b;
             border-radius: 16px;
@@ -192,7 +192,7 @@ if ($is_logged_in && $role == 'user') {
             .top-nav .nav-right .btn-register { padding: 4px 12px; font-size: 12px; }
         }
 
-        /* ====== Top Bar (User Info) ====== */
+        /* ====== टॉप बार (यूजर इन्फो) – केवल लॉगिन पर ====== */
         .top-bar { padding: 15px 20px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; transition: all 0.3s; }
         body.role-admin .top-bar { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; }
         body.role-user .top-bar { background: #ffffff; border: 1px solid rgba(0,0,0,0.02); box-shadow: 0 4px 15px rgba(0,0,0,0.03); color: #0f172a; }
@@ -208,7 +208,7 @@ if ($is_logged_in && $role == 'user') {
         body.role-user .hamburger-btn { color: #1e293b; }
         @media (max-width: 991px) { .hamburger-btn { display: block; } }
 
-        /* ====== Notification ====== */
+        /* ====== नोटिफिकेशन ====== */
         .notification-dropdown { position: relative; display: inline-block; }
         .notification-dropdown .dropdown-menu { min-width: 350px; max-height: 400px; overflow-y: auto; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 0; margin-top: 8px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
         .notification-dropdown .dropdown-item { color: #e2e8f0; padding: 10px 16px; border-bottom: 1px solid #2d3748; white-space: normal; font-size: 0.85rem; }
@@ -221,7 +221,7 @@ if ($is_logged_in && $role == 'user') {
         .no-notification { color: #94a3b8; padding: 20px; text-align: center; }
         @media (max-width: 576px) { .notification-dropdown .dropdown-menu { min-width: 280px; right: -10px; } }
 
-        /* ====== Cards / Stats (common) ====== */
+        /* ====== कार्ड / स्टेट्स (सामान्य) ====== */
         .card-premium { border-radius: 20px; border: none; padding: 20px 24px; margin-bottom: 20px; transition: transform 0.2s, box-shadow 0.2s; }
         body.role-admin .card-premium { background: #1e293b; color: #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); }
         body.role-user .card-premium { background: #ffffff; color: #0f172a; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
@@ -250,37 +250,37 @@ if ($is_logged_in && $role == 'user') {
 </head>
 <body class="role-<?= $is_logged_in ? $role : 'guest' ?>">
 
-<!-- Sidebar (only for logged-in users) -->
+<!-- साइडबार – केवल लॉगिन यूजर के लिए -->
 <?php if ($is_logged_in): ?>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
     
-    <?php if($role == 'admin'): ?>
+    <?php if ($role == 'admin'): ?>
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        <?php if(hasViewPermission('properties', $pdo)): ?>
+        <?php if (hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
         <?php endif; ?>
-        <?php if($is_super_admin): ?>
+        <?php if ($is_super_admin): ?>
             <a href="admin_dashboard.php#users-section"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
-        <?php if(hasViewPermission('packages', $pdo)): ?>
+        <?php if (hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
         <?php endif; ?>
-        <?php if(hasViewPermission('subscriptions', $pdo)): ?>
+        <?php if (hasViewPermission('subscriptions', $pdo)): ?>
             <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
             <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
         <?php endif; ?>
-        <?php if(hasViewPermission('referrals', $pdo)): ?>
+        <?php if (hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
         <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
         <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
-        <?php if(hasViewPermission('accounting', $pdo)): ?>
+        <?php if (hasViewPermission('accounting', $pdo)): ?>
             <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
         <?php endif; ?>
-        <?php if(hasViewPermission('settings', $pdo)): ?>
+        <?php if (hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
         <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
@@ -290,7 +290,7 @@ if ($is_logged_in && $role == 'user') {
         <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
         
     <?php else: ?>
-        <!-- User Sidebar -->
+        <!-- यूजर साइडबार -->
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
@@ -307,23 +307,19 @@ if ($is_logged_in && $role == 'user') {
 <?php endif; ?>
 
 <div class="main-content">
-    <!-- ====== TOP NAVIGATION BAR (Dynamic) ====== -->
+    <!-- ====== टॉप नेविगेशन बार (डायनामिक – सभी के लिए) ====== -->
     <nav class="top-nav">
         <span class="nav-brand"><i class="fas fa-building"></i> Prime Property India</span>
         <?php foreach ($nav_items as $item): ?>
             <?php
-                // Determine if this link is current page
-                $is_active = (strpos($_SERVER['REQUEST_URI'], $item['url']) !== false);
-                if ($item['url'] == '/' && $_SERVER['REQUEST_URI'] == '/') {
+                // करंट पेज का पता लगाएं
+                $is_active = false;
+                $current_uri = $_SERVER['REQUEST_URI'];
+                if ($item['url'] == '/' && $current_uri == '/') {
+                    $is_active = true;
+                } elseif ($item['url'] != '/' && strpos($current_uri, $item['url']) !== false) {
                     $is_active = true;
                 }
-                if ($item['url'] != '/' && $_SERVER['REQUEST_URI'] == '/') {
-                    $is_active = false;
-                }
-                // For about, faq, contact etc.
-                if ($item['url'] === '/about.php' && strpos($_SERVER['REQUEST_URI'], 'about.php') !== false) $is_active = true;
-                if ($item['url'] === '/faq.php' && strpos($_SERVER['REQUEST_URI'], 'faq.php') !== false) $is_active = true;
-                if ($item['url'] === '/contact.php' && strpos($_SERVER['REQUEST_URI'], 'contact.php') !== false) $is_active = true;
             ?>
             <a href="<?= htmlspecialchars($item['url']) ?>" class="<?= $is_active ? 'active-nav' : '' ?>">
                 <?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?>
@@ -341,7 +337,7 @@ if ($is_logged_in && $role == 'user') {
         </div>
     </nav>
 
-    <!-- ====== TOP BAR (User Info, Notification) – only if logged in ====== -->
+    <!-- ====== टॉप बार (यूजर इन्फो, नोटिफिकेशन) – केवल लॉगिन पर ====== -->
     <?php if ($is_logged_in): ?>
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
@@ -356,11 +352,11 @@ if ($is_logged_in && $role == 'user') {
                     <div class="name"><?= htmlspecialchars($_SESSION['user_name']) ?>
                         <span class="badge-role badge <?= ($role=='admin')?'bg-danger':'bg-success' ?>"><?= strtoupper($role) ?></span>
                     </div>
-                    <?php if($role == 'user'): ?>
+                    <?php if ($role == 'user'): ?>
                         <div class="user-dates">
                             <span>📅 Reg: <?= $reg_date ?></span>
                             <span>✅ Act: 
-                                <?php if($expiry_date): ?>
+                                <?php if ($expiry_date): ?>
                                     <?= $activation_date ?>
                                     <span class="countdown-timer" id="countdownDisplay" data-expiry="<?= $expiry_date ?>">
                                         <i class="fas fa-clock"></i> Loading...
@@ -375,19 +371,19 @@ if ($is_logged_in && $role == 'user') {
             </div>
         </div>
 
-        <!-- Notification Bell (Admin only) -->
-        <?php if($role == 'admin'): ?>
+        <!-- नोटिफिकेशन बेल (केवल एडमिन) -->
+        <?php if ($role == 'admin'): ?>
         <div class="notification-dropdown">
             <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="fas fa-bell"></i>
-                <?php if(isset($notification_count) && $notification_count > 0): ?>
+                <?php if (isset($notification_count) && $notification_count > 0): ?>
                     <span class="badge-notify"><?= $notification_count ?></span>
                 <?php endif; ?>
             </button>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifyToggle">
                 <li class="dropdown-header">🔔 Notifications</li>
-                <?php if(isset($notifications) && count($notifications) > 0): ?>
-                    <?php foreach($notifications as $notif): ?>
+                <?php if (isset($notifications) && count($notifications) > 0): ?>
+                    <?php foreach ($notifications as $notif): ?>
                         <li>
                             <a class="dropdown-item" href="<?= $notif['link'] ?>">
                                 <?= $notif['message'] ?>
@@ -406,6 +402,5 @@ if ($is_logged_in && $role == 'user') {
     <?php endif; ?>
 
 <?php
-// Continue with the page content...
-// Note: The footer should close the main-content and body tags.
+// बाकी पेज का कंटेंट यहाँ आएगा – footer.php में main-content और body बंद करें
 ?>
