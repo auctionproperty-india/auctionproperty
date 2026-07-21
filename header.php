@@ -1,21 +1,18 @@
 <?php
 // ============================================================
-// ✅ Header – Updated with Dynamic Navigation
+// ✅ Header – Public & Private (No Redirect)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-if(!isset($_SESSION['user_id'])) { 
-    header("Location: login.php"); 
-    exit; 
-}
+// Check if user is logged in
+$is_logged_in = isset($_SESSION['user_id']);
+$role = $is_logged_in ? ($_SESSION['role'] ?? 'user') : 'guest';
 
-$role = $_SESSION['role'] ?? 'user';
-
-// Super Admin Check
+// Super Admin Check (only if logged in)
 $is_super_admin = false;
-if(isset($_SESSION['user_id'])) {
+if ($is_logged_in) {
     $stmt = $pdo->prepare("SELECT is_super_admin FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $row = $stmt->fetch();
@@ -30,14 +27,14 @@ if(isset($_SESSION['user_id'])) {
 // ---- Get Navigation Items from Database ----
 $nav_items = $pdo->query("SELECT * FROM navigation_items WHERE is_active = TRUE ORDER BY display_order")->fetchAll();
 
-// ---- User Data for Top Bar ----
+// ---- User Data for Top Bar (only if logged in) ----
 $reg_date = '';
 $activation_date = 'Not Active';
 $expiry_date = null;
 $days_left = 0;
 $user_email = '';
 
-if($role == 'user') {
+if ($is_logged_in && $role == 'user') {
     $user_id = $_SESSION['user_id'];
     $stmt = $pdo->prepare("SELECT name, email, created_at as reg_date FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
@@ -65,16 +62,19 @@ if($role == 'user') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Prime Property India</title> <!-- ✅ Updated -->
+    <title>Prime Property India</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* --- Same as before, keep all styles --- */
+        /* ====== Global Reset & Body ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; transition: background 0.3s; }
         body.role-admin { background: #0f172a; }
         body.role-user { background: #f0f5fa; }
+        body.role-guest { background: #f8fafc; }
+
+        /* ====== Sidebar ====== */
         .sidebar { height: 100vh; width: 280px; position: fixed; top:0; left:0; padding: 30px 15px; box-shadow: 4px 0 25px rgba(0,0,0,0.15); z-index: 1050; transition: transform 0.3s ease-in-out, background 0.3s; overflow-y: auto; }
         body.role-admin .sidebar { background: linear-gradient(180deg, #0b1120 0%, #1a2332 100%); color: #94a3b8; }
         body.role-user .sidebar { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); color: #334155; border-right: 1px solid #e2e8f0; }
@@ -85,7 +85,6 @@ if($role == 'user') {
         body.role-admin .sidebar .brand i { color: #fbbf24; }
         body.role-user .sidebar .brand { color: #0f172a; }
         body.role-user .sidebar .brand i { color: #10b981; }
-        .sidebar .brand span { /* ✅ Updated brand text */ }
         .sidebar a { display: flex; align-items: center; padding: 12px 20px; margin: 4px 0; text-decoration: none; border-radius: 12px; font-weight: 500; font-size: 15px; transition: all 0.3s ease; border-left: 3px solid transparent; }
         body.role-admin .sidebar a { color: #94a3b8; }
         body.role-user .sidebar a { color: #475569; }
@@ -103,26 +102,14 @@ if($role == 'user') {
         .sidebar .logout-link { margin-top: 30px; border-top: 1px solid #2a3a52; padding-top: 20px; color: #ef4444; }
         body.role-user .sidebar .logout-link { border-top-color: #e2e8f0; }
         .sidebar .logout-link i { color: #ef4444; }
-        .main-content { margin-left: 280px; padding: 30px 35px; min-height: 100vh; transition: margin-left 0.3s; }
-        @media (max-width: 991px) { .main-content { margin-left: 0; padding: 15px; } }
-        .top-bar { padding: 15px 20px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; transition: all 0.3s; }
-        body.role-admin .top-bar { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; }
-        body.role-user .top-bar { background: #ffffff; border: 1px solid rgba(0,0,0,0.02); box-shadow: 0 4px 15px rgba(0,0,0,0.03); color: #0f172a; }
-        .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
-        .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
-        body.role-admin .top-bar .user-info .name { color: #f8fafc; }
-        body.role-user .top-bar .user-info .name { color: #0f172a; }
-        .top-bar .badge-role { padding: 4px 14px; border-radius: 30px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
-        .top-bar .user-dates { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; color: inherit; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .top-bar .countdown-timer { font-weight: 700 !important; color: #dc3545 !important; background: rgba(220, 53, 69, 0.1); padding: 2px 12px; border-radius: 20px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; }
-        .hamburger-btn { background: transparent; border: none; font-size: 28px; padding: 5px 10px; display: none; cursor: pointer; }
-        body.role-admin .hamburger-btn { color: #e2e8f0; }
-        body.role-user .hamburger-btn { color: #1e293b; }
-        @media (max-width: 991px) { .hamburger-btn { display: block; } }
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1040; }
         .sidebar-overlay.show { display: block; }
 
-        /* ✅ NEW: Top Navigation Bar Styles */
+        /* ====== Main Content ====== */
+        .main-content { margin-left: 280px; padding: 30px 35px; min-height: 100vh; transition: margin-left 0.3s; }
+        @media (max-width: 991px) { .main-content { margin-left: 0; padding: 15px; } }
+
+        /* ====== Top Navigation Bar (Public) ====== */
         .top-nav {
             background: #1e293b;
             border-radius: 16px;
@@ -191,12 +178,50 @@ if($role == 'user') {
             background: #2563eb;
             color: #fff !important;
         }
+        .top-nav .nav-right .user-badge {
+            color: #94a3b8;
+            font-size: 13px;
+        }
+        .top-nav .nav-right .user-badge i {
+            color: #fbbf24;
+        }
         @media (max-width: 768px) {
             .top-nav .nav-brand { font-size: 16px; }
             .top-nav a { font-size: 13px; padding: 6px 10px; }
             .top-nav .nav-right .btn-login,
             .top-nav .nav-right .btn-register { padding: 4px 12px; font-size: 12px; }
         }
+
+        /* ====== Top Bar (User Info) ====== */
+        .top-bar { padding: 15px 20px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; transition: all 0.3s; }
+        body.role-admin .top-bar { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; }
+        body.role-user .top-bar { background: #ffffff; border: 1px solid rgba(0,0,0,0.02); box-shadow: 0 4px 15px rgba(0,0,0,0.03); color: #0f172a; }
+        .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
+        .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
+        body.role-admin .top-bar .user-info .name { color: #f8fafc; }
+        body.role-user .top-bar .user-info .name { color: #0f172a; }
+        .top-bar .badge-role { padding: 4px 14px; border-radius: 30px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+        .top-bar .user-dates { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; color: inherit; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .top-bar .countdown-timer { font-weight: 700 !important; color: #dc3545 !important; background: rgba(220, 53, 69, 0.1); padding: 2px 12px; border-radius: 20px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; }
+        .hamburger-btn { background: transparent; border: none; font-size: 28px; padding: 5px 10px; display: none; cursor: pointer; }
+        body.role-admin .hamburger-btn { color: #e2e8f0; }
+        body.role-user .hamburger-btn { color: #1e293b; }
+        @media (max-width: 991px) { .hamburger-btn { display: block; } }
+
+        /* ====== Notification ====== */
+        .notification-dropdown { position: relative; display: inline-block; }
+        .notification-dropdown .dropdown-menu { min-width: 350px; max-height: 400px; overflow-y: auto; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 0; margin-top: 8px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        .notification-dropdown .dropdown-item { color: #e2e8f0; padding: 10px 16px; border-bottom: 1px solid #2d3748; white-space: normal; font-size: 0.85rem; }
+        .notification-dropdown .dropdown-item:hover { background: #2d3748; color: #fff; }
+        .notification-dropdown .dropdown-item:last-child { border-bottom: none; }
+        .notification-dropdown .dropdown-header { color: #94a3b8; padding: 10px 16px; font-weight: 600; border-bottom: 1px solid #2d3748; background: #0f172a; border-radius: 12px 12px 0 0; }
+        .notification-dropdown .badge-notify { position: absolute; top: -6px; right: -8px; background: #ef4444; color: #fff; border-radius: 50%; padding: 2px 6px; font-size: 10px; font-weight: 700; min-width: 18px; text-align: center; }
+        .notification-dropdown .btn-notify { background: transparent; border: none; color: #e2e8f0; font-size: 1.4rem; padding: 4px 8px; position: relative; cursor: pointer; }
+        .notification-dropdown .btn-notify:hover { color: #fbbf24; }
+        .no-notification { color: #94a3b8; padding: 20px; text-align: center; }
+        @media (max-width: 576px) { .notification-dropdown .dropdown-menu { min-width: 280px; right: -10px; } }
+
+        /* ====== Cards / Stats (common) ====== */
         .card-premium { border-radius: 20px; border: none; padding: 20px 24px; margin-bottom: 20px; transition: transform 0.2s, box-shadow 0.2s; }
         body.role-admin .card-premium { background: #1e293b; color: #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); }
         body.role-user .card-premium { background: #ffffff; color: #0f172a; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
@@ -221,88 +246,15 @@ if($role == 'user') {
         .user-welcome-banner h2 { font-weight: 800; }
         .user-welcome-banner p { opacity: 0.9; }
         @media (max-width: 576px) { .top-bar .user-info .name { font-size: 14px; } .card-premium { padding: 15px; } .stat-icon { width: 40px; height: 40px; font-size: 18px; } .hide-on-mobile { display: none; } .user-welcome-banner { padding: 20px; } }
-
-        /* Notification Dropdown Styles */
-        .notification-dropdown {
-            position: relative;
-            display: inline-block;
-        }
-        .notification-dropdown .dropdown-menu {
-            min-width: 350px;
-            max-height: 400px;
-            overflow-y: auto;
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 12px;
-            padding: 0;
-            margin-top: 8px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-        }
-        .notification-dropdown .dropdown-item {
-            color: #e2e8f0;
-            padding: 10px 16px;
-            border-bottom: 1px solid #2d3748;
-            white-space: normal;
-            font-size: 0.85rem;
-        }
-        .notification-dropdown .dropdown-item:hover {
-            background: #2d3748;
-            color: #fff;
-        }
-        .notification-dropdown .dropdown-item:last-child {
-            border-bottom: none;
-        }
-        .notification-dropdown .dropdown-header {
-            color: #94a3b8;
-            padding: 10px 16px;
-            font-weight: 600;
-            border-bottom: 1px solid #2d3748;
-            background: #0f172a;
-            border-radius: 12px 12px 0 0;
-        }
-        .notification-dropdown .badge-notify {
-            position: absolute;
-            top: -6px;
-            right: -8px;
-            background: #ef4444;
-            color: #fff;
-            border-radius: 50%;
-            padding: 2px 6px;
-            font-size: 10px;
-            font-weight: 700;
-            min-width: 18px;
-            text-align: center;
-        }
-        .notification-dropdown .btn-notify {
-            background: transparent;
-            border: none;
-            color: #e2e8f0;
-            font-size: 1.4rem;
-            padding: 4px 8px;
-            position: relative;
-            cursor: pointer;
-        }
-        .notification-dropdown .btn-notify:hover {
-            color: #fbbf24;
-        }
-        .no-notification {
-            color: #94a3b8;
-            padding: 20px;
-            text-align: center;
-        }
-        @media (max-width: 576px) {
-            .notification-dropdown .dropdown-menu {
-                min-width: 280px;
-                right: -10px;
-            }
-        }
     </style>
 </head>
-<body class="role-<?= $role ?>">
+<body class="role-<?= $is_logged_in ? $role : 'guest' ?>">
 
+<!-- Sidebar (only for logged-in users) -->
+<?php if ($is_logged_in): ?>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
-    <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div> <!-- ✅ Updated -->
+    <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
     
     <?php if($role == 'admin'): ?>
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
@@ -335,7 +287,6 @@ if($role == 'user') {
         <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
-        <!-- ✅ NEW: Navigation Manager -->
         <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
         
     <?php else: ?>
@@ -353,13 +304,15 @@ if($role == 'user') {
     
     <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
+<?php endif; ?>
 
 <div class="main-content">
-    <!-- ✅ NEW: Top Navigation Bar (Dynamic from Database) -->
+    <!-- ====== TOP NAVIGATION BAR (Dynamic) ====== -->
     <nav class="top-nav">
         <span class="nav-brand"><i class="fas fa-building"></i> Prime Property India</span>
         <?php foreach ($nav_items as $item): ?>
             <?php
+                // Determine if this link is current page
                 $is_active = (strpos($_SERVER['REQUEST_URI'], $item['url']) !== false);
                 if ($item['url'] == '/' && $_SERVER['REQUEST_URI'] == '/') {
                     $is_active = true;
@@ -367,6 +320,10 @@ if($role == 'user') {
                 if ($item['url'] != '/' && $_SERVER['REQUEST_URI'] == '/') {
                     $is_active = false;
                 }
+                // For about, faq, contact etc.
+                if ($item['url'] === '/about.php' && strpos($_SERVER['REQUEST_URI'], 'about.php') !== false) $is_active = true;
+                if ($item['url'] === '/faq.php' && strpos($_SERVER['REQUEST_URI'], 'faq.php') !== false) $is_active = true;
+                if ($item['url'] === '/contact.php' && strpos($_SERVER['REQUEST_URI'], 'contact.php') !== false) $is_active = true;
             ?>
             <a href="<?= htmlspecialchars($item['url']) ?>" class="<?= $is_active ? 'active-nav' : '' ?>">
                 <?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?>
@@ -374,10 +331,8 @@ if($role == 'user') {
             </a>
         <?php endforeach; ?>
         <div class="nav-right">
-            <?php if (isset($_SESSION['user_id'])): ?>
-                <span style="color:#94a3b8; font-size:13px;">
-                    <i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['user_name'] ?? 'User') ?>
-                </span>
+            <?php if ($is_logged_in): ?>
+                <span class="user-badge"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['user_name'] ?? 'User') ?></span>
                 <a href="logout.php" style="color:#ef4444;"><i class="fas fa-sign-out-alt"></i> Logout</a>
             <?php else: ?>
                 <a href="login.php" class="btn-login"><i class="fas fa-sign-in-alt"></i> Login</a>
@@ -386,12 +341,15 @@ if($role == 'user') {
         </div>
     </nav>
 
-    <!-- Remaining top-bar code (user info, notification) -->
+    <!-- ====== TOP BAR (User Info, Notification) – only if logged in ====== -->
+    <?php if ($is_logged_in): ?>
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
+            <?php if ($role == 'admin' || $role == 'user'): ?>
             <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()">
                 <i class="fas fa-bars"></i>
             </button>
+            <?php endif; ?>
             <div class="user-info">
                 <i class="fas fa-user-circle" style="font-size:32px; <?= ($role=='admin')?'color:#60a5fa;':'color:#10b981;' ?>"></i>
                 <div>
@@ -417,7 +375,7 @@ if($role == 'user') {
             </div>
         </div>
 
-        <!-- Notification Bell (Only for Admin) -->
+        <!-- Notification Bell (Admin only) -->
         <?php if($role == 'admin'): ?>
         <div class="notification-dropdown">
             <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -445,8 +403,9 @@ if($role == 'user') {
         </div>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 
 <?php
-// Continue with rest of your page content...
-// Note: You need to close the main-content and body tags in your footer
+// Continue with the page content...
+// Note: The footer should close the main-content and body tags.
 ?>
