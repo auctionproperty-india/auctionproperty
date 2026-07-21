@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📊 Admin Dashboard – Professional Laravel-Style Stats
+// 📊 Admin Dashboard – White + Dark Blue Theme
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -21,159 +21,194 @@ $pending_subs = $pdo->query("SELECT COUNT(*) FROM subscriptions WHERE status = '
 $active_subs = $pdo->query("SELECT COUNT(*) FROM subscriptions WHERE status = 'active' OR status = 'paid'")->fetchColumn();
 $total_revenue = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM subscriptions WHERE status = 'active' OR status = 'paid'")->fetchColumn();
 
-// ---- Recent users (for table) ----
+// ---- Recent users ----
 $recent_users = $pdo->query("SELECT id, name, email, created_at FROM users ORDER BY id DESC LIMIT 5")->fetchAll();
 
-// ---- Recent properties (for table) ----
+// ---- Recent properties ----
 $recent_props = $pdo->query("SELECT id, title, price, created_at FROM properties ORDER BY id DESC LIMIT 5")->fetchAll();
 
 require_once __DIR__ . '/header.php';
 ?>
 
 <style>
-    /* Dashboard specific styles */
-    .dashboard-stats {
+    /* ====== Dashboard Container – Light Theme ====== */
+    .dashboard-container {
+        background: #f8fafc;
+        border-radius: 24px;
+        padding: 20px 25px;
+        margin: -5px 0 0 0;  /* ✅ थोड़ा ऊपर लाने के लिए */
+    }
+
+    .dashboard-title {
+        color: #1e293b;
+        font-weight: 700;
+        margin-bottom: 20px;
+        font-size: 1.5rem;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 12px;
+    }
+    .dashboard-title i {
+        color: #1e3a8a;
+    }
+
+    /* ====== Stats Grid – White Cards ====== */
+    .stats-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
+        gap: 18px;
         margin-bottom: 30px;
     }
-    .stat-card {
-        background: #1e293b;
+    .stat-card-white {
+        background: #ffffff;
         border-radius: 16px;
-        padding: 20px 18px;
-        border: 1px solid #334155;
-        transition: all 0.3s ease;
-        color: #e2e8f0;
+        padding: 18px 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        transition: all 0.25s ease;
+        color: #0f172a;
     }
-    .stat-card:hover {
+    .stat-card-white:hover {
         transform: translateY(-4px);
-        box-shadow: 0 12px 30px rgba(0,0,0,0.3);
-        border-color: #475569;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+        border-color: #b9d0f0;
     }
-    .stat-card .stat-icon {
+    .stat-card-white .stat-icon {
         font-size: 2rem;
-        opacity: 0.7;
-        margin-bottom: 8px;
         display: inline-block;
-        background: #0f172a;
-        padding: 10px;
+        background: #eef2ff;
+        padding: 8px 10px;
         border-radius: 12px;
-        line-height: 1;
+        margin-bottom: 8px;
+        color: #1e3a8a;
     }
-    .stat-card .stat-number {
-        font-size: 2rem;
+    .stat-card-white .stat-number {
+        font-size: 1.8rem;
         font-weight: 800;
-        margin: 8px 0 4px;
+        margin: 4px 0 2px;
         letter-spacing: -0.5px;
+        color: #0f172a;
     }
-    .stat-card .stat-label {
+    .stat-card-white .stat-number.currency {
+        font-size: 1.5rem;
+    }
+    .stat-card-white .stat-label {
         font-size: 0.8rem;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #94a3b8;
+        letter-spacing: 0.4px;
         font-weight: 600;
+        color: #475569;
     }
-    .stat-card .stat-sub {
-        font-size: 0.75rem;
-        color: #64748b;
-        margin-top: 4px;
+    .stat-card-white .stat-sub {
+        font-size: 0.7rem;
+        color: #94a3b8;
+        margin-top: 2px;
     }
-    .stat-card.color-1 .stat-icon { color: #60a5fa; }
-    .stat-card.color-2 .stat-icon { color: #34d399; }
-    .stat-card.color-3 .stat-icon { color: #fbbf24; }
-    .stat-card.color-4 .stat-icon { color: #f472b6; }
-    .stat-card.color-5 .stat-icon { color: #a78bfa; }
-    .stat-card.color-6 .stat-icon { color: #fb923c; }
-    .stat-card.color-7 .stat-icon { color: #22d3ee; }
-    .stat-card.color-8 .stat-icon { color: #f87171; }
-    .stat-card .stat-number.currency {
-        font-size: 1.6rem;
-    }
-    .card-premium {
-        background: #1e293b;
-        border: 1px solid #334155;
+
+    /* ====== Recent Tables – White ====== */
+    .card-table-white {
+        background: #ffffff;
         border-radius: 16px;
-        padding: 20px;
+        padding: 16px 18px;
+        border: 1px solid #e2e8f0;
         margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
-    .card-premium h5 {
-        color: #e2e8f0;
+    .card-table-white h5 {
+        color: #1e293b;
         font-weight: 600;
-        margin-bottom: 15px;
+        margin-bottom: 12px;
     }
-    .table-dark {
-        color: #e2e8f0;
+    .card-table-white h5 i {
+        color: #1e3a8a;
     }
-    .table-dark th {
-        color: #94a3b8;
+    .table-white {
+        color: #0f172a;
+        font-size: 0.9rem;
+    }
+    .table-white th {
+        color: #475569;
         font-weight: 600;
         font-size: 0.75rem;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        border-bottom: 1px solid #334155;
+        letter-spacing: 0.4px;
+        border-bottom: 2px solid #e2e8f0;
+        padding: 10px 8px;
     }
-    .table-dark td {
-        border-bottom: 1px solid #1e293b;
+    .table-white td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #f1f5f9;
         vertical-align: middle;
     }
-    .table-dark tbody tr:hover {
-        background: #2d3748;
+    .table-white tbody tr:hover {
+        background: #f8fafc;
     }
-    .text-muted-light {
-        color: #94a3b8;
+    .table-white .badge-status {
+        font-size: 0.7rem;
+        padding: 3px 12px;
+        border-radius: 30px;
+        font-weight: 600;
     }
-    .gap-4 { gap: 1.5rem; }
+    .badge-status.active { background: #dcfce7; color: #166534; }
+    .badge-status.pending { background: #fef3c7; color: #92400e; }
+
+    /* ====== Responsive ====== */
+    @media (max-width: 768px) {
+        .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .dashboard-container { padding: 15px; margin-top: 0; }
+        .stat-card-white .stat-number { font-size: 1.4rem; }
+    }
 </style>
 
-<div class="container-fluid">
-    <h2 class="mb-4 text-light"><i class="fas fa-chart-pie me-2"></i>Dashboard Overview</h2>
+<div class="dashboard-container">
+    <div class="dashboard-title">
+        <i class="fas fa-chart-pie"></i> Dashboard Overview
+    </div>
 
-    <!-- Stats Grid -->
-    <div class="dashboard-stats">
-        <div class="stat-card color-1">
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card-white">
             <div class="stat-icon"><i class="fas fa-gavel"></i></div>
             <div class="stat-number"><?= number_format($total_properties) ?></div>
             <div class="stat-label">Total Auction Properties</div>
             <div class="stat-sub">All properties listed</div>
         </div>
-        <div class="stat-card color-2">
+        <div class="stat-card-white">
             <div class="stat-icon"><i class="fas fa-users"></i></div>
             <div class="stat-number"><?= number_format($total_users) ?></div>
             <div class="stat-label">Total Users</div>
             <div class="stat-sub">Registered users</div>
         </div>
-        <div class="stat-card color-3">
+        <div class="stat-card-white">
             <div class="stat-icon"><i class="fas fa-home"></i></div>
             <div class="stat-number"><?= number_format($customer_properties) ?></div>
             <div class="stat-label">Customer Properties</div>
             <div class="stat-sub">Approved listings</div>
         </div>
-        <div class="stat-card color-4">
+        <div class="stat-card-white">
             <div class="stat-icon"><i class="fas fa-coins"></i></div>
             <div class="stat-number"><?= number_format($total_coins) ?></div>
             <div class="stat-label">Total Coins</div>
             <div class="stat-sub">All user coins</div>
         </div>
-        <div class="stat-card color-5">
+        <div class="stat-card-white">
             <div class="stat-icon"><i class="fas fa-wallet"></i></div>
             <div class="stat-number currency">₹ <?= number_format($total_wallet, 2) ?></div>
             <div class="stat-label">Total Wallet Balance</div>
             <div class="stat-sub">All users' wallet</div>
         </div>
-        <div class="stat-card color-6">
+        <div class="stat-card-white">
             <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
             <div class="stat-number"><?= number_format($pending_subs) ?></div>
             <div class="stat-label">Pending Subscriptions</div>
             <div class="stat-sub">Awaiting approval</div>
         </div>
-        <div class="stat-card color-7">
+        <div class="stat-card-white">
             <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
             <div class="stat-number"><?= number_format($active_subs) ?></div>
             <div class="stat-label">Active Subscriptions</div>
             <div class="stat-sub">Paid & active</div>
         </div>
-        <div class="stat-card color-8">
+        <div class="stat-card-white">
             <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
             <div class="stat-number currency">₹ <?= number_format($total_revenue, 2) ?></div>
             <div class="stat-label">Total Revenue</div>
@@ -184,10 +219,10 @@ require_once __DIR__ . '/header.php';
     <!-- Recent Activity -->
     <div class="row g-4">
         <div class="col-md-6">
-            <div class="card-premium">
+            <div class="card-table-white">
                 <h5><i class="fas fa-user-plus me-2"></i>Recent Users</h5>
                 <div class="table-responsive">
-                    <table class="table table-dark table-sm">
+                    <table class="table table-white">
                         <thead>
                             <tr><th>ID</th><th>Name</th><th>Email</th><th>Joined</th></tr>
                         </thead>
@@ -206,10 +241,10 @@ require_once __DIR__ . '/header.php';
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card-premium">
+            <div class="card-table-white">
                 <h5><i class="fas fa-gavel me-2"></i>Recent Properties</h5>
                 <div class="table-responsive">
-                    <table class="table table-dark table-sm">
+                    <table class="table table-white">
                         <thead>
                             <tr><th>ID</th><th>Title</th><th>Price</th><th>Added</th></tr>
                         </thead>
