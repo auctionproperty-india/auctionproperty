@@ -20,6 +20,16 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     exit;
 }
 
+// ---- Handle Approve / Reject ----
+if (isset($_GET['action']) && isset($_GET['id'])) {
+    $id = (int)$_GET['id'];
+    $status = $_GET['action'] == 'approve' ? 'approved' : 'rejected';
+    $stmt = $pdo->prepare("UPDATE job_applications SET status = ? WHERE id = ?");
+    $stmt->execute([$status, $id]);
+    header("Location: admin_jobs.php?msg=" . $status);
+    exit;
+}
+
 // ---- Handle Add/Update ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user_id = (int)$_POST['user_id'];
@@ -32,11 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $interview_time = $_POST['interview_time'];
     $edit_id = isset($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
 
-    // Handle file uploads
+    // File uploads
     $resume_path = '';
     $kyc_path = '';
 
-    // Resume
     if (isset($_FILES['resume']) && $_FILES['resume']['error'] == 0) {
         $upload_dir = 'uploads/resumes/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
@@ -46,7 +55,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $resume_path = $upload_dir . $filename;
     }
 
-    // KYC
     if (isset($_FILES['kyc']) && $_FILES['kyc']['error'] == 0) {
         $upload_dir = 'uploads/kyc/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
@@ -57,7 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($edit_id > 0) {
-        // Update
         $sql = "UPDATE job_applications SET 
                     user_id = ?, name = ?, father_name = ?, job_location = ?, city = ?, 
                     mobile = ?, interview_date = ?, interview_time = ?,
@@ -69,9 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$user_id, $name, $father_name, $job_location, $city, $mobile, $interview_date, $interview_time, $resume_path, $kyc_path, $edit_id]);
         $msg = "updated";
     } else {
-        // Insert
         $sql = "INSERT INTO job_applications (user_id, name, father_name, job_location, city, mobile, interview_date, interview_time, resume_path, kyc_path, status, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', NOW())";
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$user_id, $name, $father_name, $job_location, $city, $mobile, $interview_date, $interview_time, $resume_path, $kyc_path]);
         $msg = "added";
@@ -104,7 +110,14 @@ include 'header.php';
     .time-slot-grid .slot-btn { padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white; cursor: pointer; transition: all 0.2s; text-align: center; font-size: 0.85rem; }
     .time-slot-grid .slot-btn:hover { background: #eef2ff; border-color: #2563eb; }
     .time-slot-grid .slot-btn.selected { background: #2563eb; color: white; border-color: #2563eb; }
-    .form-control-sm { font-size: 0.9rem; }
+    .status-badge { padding: 4px 12px; border-radius: 30px; font-size: 0.75rem; font-weight: 600; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-approved { background: #dcfce7; color: #166534; }
+    .status-rejected { background: #fee2e2; color: #991b1b; }
+    .btn-approve { background: #16a34a; color: white; }
+    .btn-approve:hover { background: #15803d; }
+    .btn-reject { background: #dc2626; color: white; }
+    .btn-reject:hover { background: #b91c1c; }
 </style>
 
 <div class="container-fluid">
@@ -117,7 +130,11 @@ include 'header.php';
 
     <?php if (isset($_GET['msg'])): ?>
         <div class="alert alert-success alert-dismissible fade show">
-            <?= $_GET['msg'] == 'added' ? '✅ Interview scheduled successfully!' : ($_GET['msg'] == 'updated' ? '✅ Updated!' : '🗑️ Deleted!') ?>
+            <?= $_GET['msg'] == 'added' ? '✅ Interview scheduled successfully!' : 
+               ($_GET['msg'] == 'updated' ? '✅ Updated!' : 
+               ($_GET['msg'] == 'deleted' ? '🗑️ Deleted!' : 
+               ($_GET['msg'] == 'approved' ? '✅ Application Approved!' : 
+               ($_GET['msg'] == 'rejected' ? '❌ Application Rejected!' : '')))) ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
@@ -143,7 +160,7 @@ include 'header.php';
                 </thead>
                 <tbody>
                     <?php if (empty($jobs)): ?>
-                        <tr><td colspan="12" class="text-center text-muted py-4">No interviews scheduled yet.</td></tr>
+                        <tr><td colspan="12" class="text-center text-muted py-4">No applications yet.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($jobs as $job): ?>
                     <tr>
@@ -169,7 +186,11 @@ include 'header.php';
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
-                        <td><span class="badge bg-info"><?= htmlspecialchars($job['status']) ?></span></td>
+                        <td>
+                            <span class="status-badge status-<?= $job['status'] ?>">
+                                <?= ucfirst($job['status']) ?>
+                            </span>
+                        </td>
                         <td>
                             <button class="btn btn-sm btn-primary edit-btn" 
                                     data-id="<?= $job['id'] ?>"
@@ -186,7 +207,11 @@ include 'header.php';
                                     data-bs-toggle="modal" data-bs-target="#jobModal">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <a href="?delete=<?= $job['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this interview?')"><i class="fas fa-trash"></i></a>
+                            <?php if ($job['status'] == 'pending'): ?>
+                                <a href="?action=approve&id=<?= $job['id'] ?>" class="btn btn-sm btn-approve" onclick="return confirm('Approve this application?')"><i class="fas fa-check"></i></a>
+                                <a href="?action=reject&id=<?= $job['id'] ?>" class="btn btn-sm btn-reject" onclick="return confirm('Reject this application?')"><i class="fas fa-times"></i></a>
+                            <?php endif; ?>
+                            <a href="?delete=<?= $job['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this application?')"><i class="fas fa-trash"></i></a>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -196,7 +221,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- ====== JOB MODAL ====== -->
+<!-- ====== JOB MODAL (Admin) ====== -->
 <div class="modal fade" id="jobModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -273,7 +298,6 @@ include 'header.php';
 </div>
 
 <script>
-// ---- Auto-fill user details ----
 function fillUserDetails(userId) {
     if (!userId) return;
     const users = <?= json_encode($users) ?>;
@@ -284,46 +308,38 @@ function fillUserDetails(userId) {
     }
 }
 
-// ---- Generate time slots (10 AM – 6 PM, 30 min interval, exclude Sundays) ----
 function generateTimeSlots(date) {
     const grid = document.getElementById('timeSlotGrid');
     grid.innerHTML = '';
     document.getElementById('selected_time').value = '';
-
     if (!date) return;
-
     const selectedDate = new Date(date);
-    const dayOfWeek = selectedDate.getDay(); // 0 = Sunday
-    if (dayOfWeek === 0) {
-        grid.innerHTML = '<div class="text-danger">❌ Sundays are not available for interviews. Please select another date.</div>';
+    if (selectedDate.getDay() === 0) {
+        grid.innerHTML = '<div class="text-danger">❌ Sundays are not available. Please select another date.</div>';
         return;
     }
-
-    const startHour = 10;
-    const endHour = 18; // 6 PM
-    const interval = 30;
-
+    const startHour = 10, endHour = 18, interval = 30;
     let slots = [];
     for (let h = startHour; h < endHour; h++) {
         for (let m = 0; m < 60; m += interval) {
-            let hours = h;
-            let minutes = m;
-            if (hours >= 12) {
-                if (hours > 12) hours -= 12;
-                slots.push({ h: h, m: m, display: ('0' + hours).slice(-2) + ':' + ('0' + minutes).slice(-2) + ' PM' });
-            } else {
-                slots.push({ h: h, m: m, display: ('0' + hours).slice(-2) + ':' + ('0' + minutes).slice(-2) + ' AM' });
-            }
+            let hours = h, minutes = m;
+            let ampm = (hours >= 12) ? 'PM' : 'AM';
+            if (hours > 12) hours -= 12;
+            if (hours === 0) hours = 12;
+            slots.push({
+                h: h,
+                m: m,
+                display: ('0' + hours).slice(-2) + ':' + ('0' + minutes).slice(-2) + ' ' + ampm,
+                time: ('0' + h).slice(-2) + ':' + ('0' + m).slice(-2)
+            });
         }
     }
-    // Also include 6:00 PM (18:00) if not already in loop (since loop stops at 18)
-    slots.push({ h: 18, m: 0, display: '06:00 PM' });
-
-    slots.forEach((slot, index) => {
+    slots.push({ h: 18, m: 0, display: '06:00 PM', time: '18:00' });
+    slots.forEach(slot => {
         const btn = document.createElement('div');
         btn.className = 'slot-btn';
         btn.textContent = slot.display;
-        btn.dataset.time = ('0' + slot.h).slice(-2) + ':' + ('0' + slot.m).slice(-2);
+        btn.dataset.time = slot.time;
         btn.onclick = function() {
             document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
             this.classList.add('selected');
@@ -333,13 +349,11 @@ function generateTimeSlots(date) {
     });
 }
 
-// ---- Edit modal fill ----
 document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('jobModal');
     modal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget; // button that triggered the modal
+        const button = event.relatedTarget;
         if (button && button.classList.contains('edit-btn')) {
-            // Edit mode
             document.getElementById('modalTitle').textContent = 'Edit Interview';
             document.getElementById('edit_id').value = button.dataset.id;
             document.getElementById('user_id').value = button.dataset.user_id;
@@ -354,19 +368,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const time = button.dataset.time;
             if (time) {
                 document.getElementById('selected_time').value = time;
-                // Highlight the corresponding slot
                 document.querySelectorAll('.slot-btn').forEach(btn => {
-                    if (btn.dataset.time === time) {
-                        btn.classList.add('selected');
-                    }
+                    if (btn.dataset.time === time) btn.classList.add('selected');
                 });
             }
-            // Show existing files
             document.getElementById('existing_resume').textContent = button.dataset.resume ? 'Current: ' + button.dataset.resume : '';
             document.getElementById('existing_kyc').textContent = button.dataset.kyc ? 'Current: ' + button.dataset.kyc : '';
             document.getElementById('saveBtn').textContent = 'Update';
         } else {
-            // Add mode
             document.getElementById('modalTitle').textContent = 'Schedule Interview';
             document.getElementById('edit_id').value = 0;
             document.getElementById('jobForm').reset();
@@ -375,12 +384,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('existing_resume').textContent = '';
             document.getElementById('existing_kyc').textContent = '';
             document.getElementById('saveBtn').textContent = 'Save';
-            // Set default date to tomorrow
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
-            const dateStr = tomorrow.toISOString().split('T')[0];
-            document.getElementById('interview_date').value = dateStr;
-            generateTimeSlots(dateStr);
+            document.getElementById('interview_date').value = tomorrow.toISOString().split('T')[0];
+            generateTimeSlots(document.getElementById('interview_date').value);
         }
     });
 });
