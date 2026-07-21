@@ -72,7 +72,7 @@ if ($is_logged_in && $role == 'user') {
         /* ====== ग्लोबल ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; padding-top: 70px; }
-        body.role-admin { background: #0f172a; }
+        body.role-admin { background: #0f172a; padding-top: 60px; }  /* ✅ Admin के लिए padding कम */
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
 
