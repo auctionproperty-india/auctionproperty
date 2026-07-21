@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – Top Nav only on Home Page + Proper Spacing
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (Permissions के अनुसार)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -160,7 +160,7 @@ if ($is_logged_in && $role == 'user') {
             .top-nav .nav-right .btn-register { padding: 4px 12px; font-size: 12px; }
         }
 
-        /* ====== साइडबार ====== */
+        /* ====== साइडबार – White/Blue Theme ====== */
         .sidebar {
             height: 100vh;
             width: 280px;
@@ -499,46 +499,88 @@ if ($is_logged_in && $role == 'user') {
 </nav>
 <?php endif; ?>
 
-<!-- ====== साइडबार – केवल लॉगिन यूजर के लिए ====== -->
+<!-- ====== साइडबार – केवल लॉगिन यूजर के लिए, Permissions के अनुसार ====== -->
 <?php if ($is_logged_in): ?>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
     
     <?php if ($role == 'admin'): ?>
+        <!-- ✅ Dashboard – हमेशा दिखे -->
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        
+        <!-- ✅ Manage Properties – अगर permission हो -->
         <?php if (hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
         <?php endif; ?>
+        
+        <!-- ✅ Manage Users – केवल Super Admin -->
         <?php if ($is_super_admin): ?>
-            <!-- ✅ FIX: Manage Users now points to users.php instead of admin_dashboard.php#users-section -->
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
+        
+        <!-- ✅ Packages – अगर permission हो -->
         <?php if (hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
         <?php endif; ?>
+        
+        <!-- ✅ Subscriptions – अगर permission हो -->
         <?php if (hasViewPermission('subscriptions', $pdo)): ?>
             <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
             <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
         <?php endif; ?>
+        
+        <!-- ✅ Referral Payouts – अगर permission हो -->
         <?php if (hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
-        <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
-        <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
+        
+        <!-- ✅ Deductions – अगर permission हो -->
+        <?php if (hasViewPermission('deductions', $pdo)): ?>
+            <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
+        <?php endif; ?>
+        
+        <!-- ✅ Activity Logs – अगर permission हो -->
+        <?php if (hasViewPermission('activity_logs', $pdo)): ?>
+            <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
+        <?php endif; ?>
+        
+        <!-- ✅ Accounting – अगर permission हो -->
         <?php if (hasViewPermission('accounting', $pdo)): ?>
             <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
         <?php endif; ?>
+        
+        <!-- ✅ Settings – अगर permission हो -->
         <?php if (hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
-        <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
-        <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
-        <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
+        
+        <!-- ✅ KYC Verification – अगर permission हो -->
+        <?php if (hasViewPermission('kyc', $pdo)): ?>
+            <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
+        <?php endif; ?>
+        
+        <!-- ✅ Support Tickets – अगर permission हो -->
+        <?php if (hasViewPermission('support', $pdo)): ?>
+            <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
+        <?php endif; ?>
+        
+        <!-- ✅ User Properties – अगर permission हो -->
+        <?php if (hasViewPermission('user_properties', $pdo)): ?>
+            <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
+        <?php endif; ?>
+        
+        <!-- ✅ Dholera Properties – सबको दिखे (कोई permission check नहीं) -->
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
-        <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
+        
+        <!-- ✅ Navigation Manager – केवल Super Admin -->
+        <?php if ($is_super_admin): ?>
+            <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
+        <?php endif; ?>
+        
     <?php else: ?>
+        <!-- ===== USER SIDEBAR (पहले जैसा) ===== -->
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
