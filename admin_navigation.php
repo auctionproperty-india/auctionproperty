@@ -65,6 +65,8 @@ $items = $pdo->query("SELECT * FROM navigation_items ORDER BY display_order")->f
         h1 i { color: #fbbf24; }
         .back-link { color: #94a3b8; text-decoration: none; }
         .back-link:hover { color: #fbbf24; }
+        .footer-note { border-top: 1px solid #334155; padding-top: 20px; margin-top: 20px; color: #94a3b8; }
+        .footer-note a { color: #60a5fa; }
     </style>
 </head>
 <body>
@@ -180,15 +182,17 @@ $items = $pdo->query("SELECT * FROM navigation_items ORDER BY display_order")->f
         <div class="text-muted mt-2"><small>💡 Total: <?= count($items) ?> items</small></div>
     </div>
 
-    <!-- How to use -->
-    <div class="card" style="background: #1e293b;">
+    <!-- How to Use (Footer) – Visible now -->
+    <div class="card footer-note">
         <h6><i class="fas fa-lightbulb text-warning"></i> How to use:</h6>
-        <ul class="text-muted">
-            <li>Add/Edit navigation items from this page</li>
-            <li>Set <strong>Active</strong> to show/hide items</li>
-            <li>Order determines the display sequence</li>
-            <li>Icons use <a href="https://fontawesome.com/icons" target="_blank" style="color:#60a5fa;">FontAwesome</a> classes</li>
+        <ul>
+            <li>Add/Edit navigation items from this page.</li>
+            <li>Set <strong>Active</strong> to show/hide items on the frontend.</li>
+            <li><strong>Order</strong> determines the display sequence (lower number = earlier).</li>
+            <li>Icons use <a href="https://fontawesome.com/icons" target="_blank" style="color:#60a5fa;">FontAwesome</a> classes (e.g. <code>fa-solid fa-house</code>).</li>
+            <li>Changes reflect instantly on the website after saving.</li>
         </ul>
+        <p class="mb-0 text-muted"><i class="fas fa-info-circle"></i> The top navigation bar is dynamic. Any change here will be visible on all pages.</p>
     </div>
 </div>
 
