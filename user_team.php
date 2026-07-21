@@ -102,6 +102,14 @@ function countSubtree($node) {
     return $count;
 }
 
+// ---- Helper function to safely format date ----
+function safeDateFormat($dateStr) {
+    if (empty($dateStr) || strtotime($dateStr) === false) {
+        return 'Not Active';
+    }
+    return date('d M Y', strtotime($dateStr));
+}
+
 // ---- Function to render tree recursively (with search filter support via JS) ----
 function renderTree($nodes, $level = 0) {
     if (empty($nodes)) return '';
@@ -144,7 +152,9 @@ function renderTree($nodes, $level = 0) {
             $html .= ' <span class="badge bg-light text-dark border" style="font-weight:600;">👥 ' . ($totalInSubtree - 1) . ' members</span>';
         }
         
-        $html .= '<span style="font-size:0.7rem; color:#94a3b8; margin-left:auto;">Joined: ' . date('d M Y', strtotime($node['created_at'])) . '</span>';
+        // ✅ Fixed date display – safeDateFormat handles null values
+        $joinedDate = safeDateFormat($node['created_at']);
+        $html .= '<span style="font-size:0.7rem; color:#94a3b8; margin-left:auto;">Joined: ' . $joinedDate . '</span>';
         $html .= '</div>';
         
         if ($hasChildren) {
