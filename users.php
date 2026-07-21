@@ -29,7 +29,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     }
 }
 
-// Block/Unblock User
+// Block/Unblock
 if (isset($_GET['toggle_block']) && is_numeric($_GET['toggle_block'])) {
     $id = (int)$_GET['toggle_block'];
     $stmt = $pdo->prepare("SELECT status FROM users WHERE id = ?");
@@ -64,7 +64,7 @@ if (isset($_GET['toggle_admin']) && is_numeric($_GET['toggle_admin'])) {
     }
 }
 
-// ---- Update User (via POST) ----
+// ---- Update User via POST ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     $id = (int)$_POST['user_id'];
     $name = trim($_POST['name']);
@@ -76,7 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     $status = $_POST['status'];
     $new_password = trim($_POST['new_password']);
 
-    // Start transaction
     $pdo->beginTransaction();
     try {
         // Update users table
@@ -90,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         ");
         $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $id]);
 
-        // Update password if provided
+        // Update password
         if (!empty($new_password)) {
             $hashed = password_hash($new_password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
@@ -133,7 +132,8 @@ $sql = "
         p.name as package_name,
         s.status as sub_status,
         s.start_date as sub_start,
-        s.end_date as sub_end
+        s.end_date as sub_end,
+        s.package_id as current_package_id
     FROM users u
     LEFT JOIN (
         SELECT DISTINCT ON (user_id) user_id, package_id, status, start_date, end_date
@@ -163,7 +163,6 @@ include 'header.php';
     .badge-status.active { background: #dcfce7; color: #166534; }
     .badge-status.inactive { background: #fee2e2; color: #991b1b; }
     .badge-status.blocked { background: #fef3c7; color: #92400e; }
-    .badge-status.pending { background: #fef3c7; color: #92400e; }
 </style>
 
 <div class="container-fluid">
@@ -191,6 +190,7 @@ include 'header.php';
                         <th>Reg. Date</th>
                         <th>Act. Date</th>
                         <th>Package</th>
+                        <th>Expiry</th>
                         <th>Status</th>
                         <th>Admin</th>
                         <th>Actions</th>
@@ -212,6 +212,7 @@ include 'header.php';
                                 <span class="badge bg-secondary">Free</span>
                             <?php endif; ?>
                         </td>
+                        <td><?= $user['sub_end'] ? date('d M Y', strtotime($user['sub_end'])) : 'N/A' ?></td>
                         <td>
                             <?php
                             $status_class = 'inactive';
@@ -298,13 +299,18 @@ include 'header.php';
                                                 <select name="package_id" class="form-control">
                                                     <option value="">Free</option>
                                                     <?php foreach ($packages as $pkg): ?>
-                                                        <option value="<?= $pkg['id'] ?>" <?= ($user['package_id'] == $pkg['id']) ? 'selected' : '' ?>>
+                                                        <option value="<?= $pkg['id'] ?>" <?= ($user['current_package_id'] == $pkg['id']) ? 'selected' : '' ?>>
                                                             <?= htmlspecialchars($pkg['name']) ?>
                                                         </option>
                                                     <?php endforeach; ?>
                                                 </select>
                                             </div>
                                             <div class="col-md-6">
+                                                <label class="form-label">Package Expiry Date</label>
+                                                <input type="text" class="form-control" value="<?= $user['sub_end'] ? date('d M Y', strtotime($user['sub_end'])) : 'No active subscription' ?>" readonly>
+                                                <small class="text-muted">Expiry is auto-calculated; update package to change</small>
+                                            </div>
+                                            <div class="col-md-12">
                                                 <label class="form-label">New Password (leave blank to keep current)</label>
                                                 <input type="text" name="new_password" class="form-control" placeholder="Enter new password">
                                             </div>
