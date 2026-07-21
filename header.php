@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार (White/Blue Admin Theme)
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (Admin Top Spacing Removed)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -72,7 +72,7 @@ if ($is_logged_in && $role == 'user') {
         /* ====== ग्लोबल ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; padding-top: 70px; }
-        body.role-admin { background: #f8fafc; padding-top: 70px; }  /* ✅ Admin background light */
+        body.role-admin { background: #f8fafc; padding-top: 70px; }
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
 
@@ -166,7 +166,6 @@ if ($is_logged_in && $role == 'user') {
             transition: transform 0.3s ease-in-out, background 0.3s;
             overflow-y: auto;
         }
-        /* ✅ Admin sidebar – White background with blue accents */
         body.role-admin .sidebar {
             background: #ffffff;
             color: #1e293b;
@@ -183,7 +182,6 @@ if ($is_logged_in && $role == 'user') {
         }
         @media (min-width: 992px) { .sidebar { transform: translateX(0) !important; } }
 
-        /* Brand */
         .sidebar .brand {
             font-size: 24px;
             font-weight: 800;
@@ -196,7 +194,6 @@ if ($is_logged_in && $role == 'user') {
         }
         .sidebar .brand i { color: #1e3a8a; }
 
-        /* Links */
         .sidebar a {
             display: flex;
             align-items: center;
@@ -228,7 +225,6 @@ if ($is_logged_in && $role == 'user') {
         }
         .sidebar a.active i { color: #1e3a8a; }
 
-        /* Logout link – red */
         .sidebar .logout-link {
             margin-top: 30px;
             border-top: 1px solid #e2e8f0;
@@ -252,15 +248,15 @@ if ($is_logged_in && $role == 'user') {
         }
         .sidebar-overlay.show { display: block; }
 
-        /* ====== मुख्य कंटेंट ====== */
+        /* ====== मुख्य कंटेंट – Admin top spacing removed ====== */
         .main-content {
             padding: 30px 35px;
             min-height: 100vh;
             transition: margin-left 0.3s;
         }
-        /* ✅ Admin के लिए थोड़ा extra top padding – सही spacing */
+        /* ✅ Admin के लिए padding-top पूरी तरह हटाई */
         body.role-admin .main-content {
-            padding-top: 5px;
+            padding-top: 0 !important;
         }
         body.role-admin .main-content,
         body.role-user .main-content {
@@ -274,12 +270,9 @@ if ($is_logged_in && $role == 'user') {
                 margin-left: 0 !important;
                 padding: 15px;
             }
-            body.role-admin .main-content {
-                padding-top: 15px;
-            }
         }
 
-        /* ====== टॉप बार (यूजर इन्फो) ====== */
+        /* ====== टॉप बार (यूजर इन्फो) – Admin margin bottom कम ====== */
         .top-bar {
             padding: 15px 20px;
             border-radius: 20px;
@@ -299,6 +292,7 @@ if ($is_logged_in && $role == 'user') {
             border: 1px solid #e2e8f0;
             color: #1e293b;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin-bottom: 10px;  /* ✅ कम किया */
         }
         .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
         .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
