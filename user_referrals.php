@@ -1,4 +1,8 @@
-<?php 
+<?php
+// ============================================================
+// ✅ Referrals Page – With Safe Date Formatting
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -8,318 +12,313 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 }
 
 $user_id = $_SESSION['user_id'];
-include 'header.php'; 
+include 'header.php';
 
-// ---- Referral Data ----
-$referral_link = getReferralLink($user_id);
-
-// Pending earnings (gross)
-$pending_earnings = getReferralEarnings($pdo, $user_id, 'pending');
-$total_pending_gross = array_sum(array_column($pending_earnings, 'amount'));
-
-// Paid earnings (gross for summary)
-$paid_earnings_all = getReferralEarnings($pdo, $user_id, 'paid');
-$total_paid_gross = array_sum(array_column($paid_earnings_all, 'amount'));
-
-// ---- Group paid earnings by UTR (or by paid_at if UTR empty) ----
-$grouped_paid = [];
-foreach ($paid_earnings_all as $e) {
-    $key = !empty($e['utr_no']) ? $e['utr_no'] : $e['paid_at'];
-    if (!isset($grouped_paid[$key])) {
-        $grouped_paid[$key] = [
-            'utr' => $e['utr_no'] ?? 'N/A',
-            'paid_at' => $e['paid_at'],
-            'total_gross' => 0,
-            'total_tds' => 0,
-            'total_admin' => 0,
-            'total_net' => 0,
-            'items' => []
-        ];
+// ---- Helper function to safely format date ----
+function safeDateFormat($dateStr) {
+    if (empty($dateStr) || strtotime($dateStr) === false) {
+        return 'Not Activated';
     }
-    $grouped_paid[$key]['total_gross'] += $e['amount'];
-    $grouped_paid[$key]['total_tds'] += $e['tds_deducted'] ?? 0;
-    $grouped_paid[$key]['total_admin'] += $e['admin_charge_deducted'] ?? 0;
-    $grouped_paid[$key]['total_net'] += $e['net_amount'] ?? 0;
-    $grouped_paid[$key]['items'][] = $e;
+    return date('d M Y', strtotime($dateStr));
 }
-// Sort by paid_at descending
-usort($grouped_paid, function($a, $b) {
-    return strtotime($b['paid_at']) - strtotime($a['paid_at']);
-});
 
-// Team members and subscription requests (unchanged)
-$team_members = getReferredUsers($pdo, $user_id);
-$user_subs = $pdo->prepare("SELECT s.*, p.name as pkg_name FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.user_id = ? ORDER BY s.created_at DESC");
-$user_subs->execute([$user_id]);
-$user_subs = $user_subs->fetchAll();
+// ---- Get user's referral code ----
+$stmt = $pdo->prepare("SELECT referral_code FROM users WHERE id = ?");
+$stmt->execute([$user_id]);
+$user = $stmt->fetch();
+$referral_code = $user['referral_code'] ?? '';
+
+// ---- Get user's referral earnings summary ----
+$earnings_stmt = $pdo->prepare("
+    SELECT 
+        COUNT(*) as total_referrals,
+        COALESCE(SUM(net_amount), 0) as total_earnings,
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN net_amount ELSE 0 END), 0) as paid_earnings,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN net_amount ELSE 0 END), 0) as pending_earnings
+    FROM user_referral_earnings 
+    WHERE user_id = ?
+");
+$earnings_stmt->execute([$user_id]);
+$earnings = $earnings_stmt->fetch();
+
+// ---- Get all referrals with their status ----
+$referrals_stmt = $pdo->prepare("
+    SELECT 
+        u.id,
+        u.name,
+        u.email,
+        u.phone,
+        u.created_at,
+        u.activation_date,
+        u.status as user_status,
+        p.name as package_name,
+        s.status as sub_status,
+        s.start_date,
+        s.end_date,
+        ure.amount as referral_amount,
+        ure.net_amount as referral_net,
+        ure.status as referral_payment_status,
+        ure.created_at as referral_created_at,
+        ure.paid_at as referral_paid_at
+    FROM users u
+    LEFT JOIN (
+        SELECT DISTINCT ON (user_id) user_id, package_id, status, start_date, end_date
+        FROM subscriptions
+        WHERE status = 'active' OR status = 'paid'
+        ORDER BY user_id, id DESC
+    ) s ON u.id = s.user_id
+    LEFT JOIN packages p ON s.package_id = p.id
+    LEFT JOIN user_referral_earnings ure ON u.id = ure.referred_user_id AND ure.user_id = ?
+    WHERE u.referred_by = ?
+    ORDER BY u.created_at DESC
+");
+$referrals_stmt->execute([$user_id, $user_id]);
+$referrals = $referrals_stmt->fetchAll();
+
+// ---- Get referral link ----
+$base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]";
+$referral_link = $base_url . '/register.php?ref=' . $referral_code;
 ?>
+
 <style>
-    .group-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 16px;
+    .referral-container {
+        background: white;
+        border-radius: 24px;
+        padding: 25px;
+        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
+    }
+    .referral-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    .stat-card {
         background: #f8fafc;
-        transition: 0.2s;
-        cursor: pointer;
+        border-radius: 16px;
+        padding: 18px 20px;
+        text-align: center;
+        border: 1px solid #e2e8f0;
     }
-    .group-card:hover {
-        background: #f1f5f9;
-        border-color: #94a3b8;
-    }
-    .group-card .summary {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        align-items: center;
-        gap: 10px;
-    }
-    .group-card .summary .amount {
+    .stat-card h3 {
         font-weight: 700;
-        color: #0f172a;
+        margin: 0;
+        font-size: 1.5rem;
     }
-    .group-card .summary .net {
-        color: #10b981;
-        font-weight: 800;
-    }
-    .group-card .summary .utr {
-        font-size: 0.85rem;
+    .stat-card p {
+        margin: 0;
+        font-size: 0.8rem;
         color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
-    .breakdown-item {
+    .stat-card .stat-icon {
+        font-size: 1.5rem;
+        opacity: 0.6;
+        margin-bottom: 4px;
+    }
+    .referral-link-box {
+        background: #f1f5f9;
+        border-radius: 12px;
+        padding: 12px 18px;
         display: flex;
-        justify-content: space-between;
-        padding: 4px 0;
-        border-bottom: 1px dashed #e2e8f0;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 25px;
+        border: 1px solid #e2e8f0;
+    }
+    .referral-link-box input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        padding: 6px 0;
+        font-size: 0.9rem;
+        color: #0f172a;
+        outline: none;
+        min-width: 200px;
+    }
+    .referral-link-box .btn-copy {
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 6px 16px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.3s;
+    }
+    .referral-link-box .btn-copy:hover {
+        background: #1d4ed8;
+        transform: scale(1.02);
+    }
+    .table-referrals {
+        margin-top: 15px;
         font-size: 0.9rem;
     }
-    .breakdown-item:last-child {
-        border-bottom: none;
+    .table-referrals th {
+        background: #f1f5f9;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #475569;
+        padding: 10px 12px;
     }
-    .modal-content {
-        border-radius: 20px;
+    .table-referrals td {
+        padding: 10px 12px;
+        vertical-align: middle;
     }
-    .modal-header {
-        background: linear-gradient(135deg, #1e293b, #334155);
-        color: white;
-        border-radius: 20px 20px 0 0;
+    .badge-package {
+        font-size: 0.7rem;
+        padding: 3px 10px;
+        border-radius: 30px;
+        font-weight: 600;
     }
-    .modal-footer {
-        border-top: none;
+    .badge-package.silver { background: #e2e8f0; color: #475569; }
+    .badge-package.gold { background: #fef3c7; color: #92400e; }
+    .badge-package.platinum { background: #dbeafe; color: #1e40af; }
+    .badge-package.diamond { background: #d1fae5; color: #065f46; }
+    .badge-status {
+        font-size: 0.7rem;
+        padding: 3px 12px;
+        border-radius: 30px;
+        font-weight: 600;
+    }
+    .badge-status.active { background: #dcfce7; color: #166534; }
+    .badge-status.inactive { background: #fee2e2; color: #991b1b; }
+    .badge-status.pending { background: #fef3c7; color: #92400e; }
+    .badge-status.paid { background: #dbeafe; color: #1e40af; }
+    .badge-status.not-activated { background: #f1f5f9; color: #64748b; }
+    .text-muted-small { font-size: 0.75rem; color: #94a3b8; }
+    @media (max-width: 768px) {
+        .referral-stats { grid-template-columns: repeat(2, 1fr); }
+        .referral-link-box { flex-direction: column; align-items: stretch; }
+        .table-referrals { font-size: 0.75rem; }
+        .table-referrals th, .table-referrals td { padding: 6px 8px; }
     }
 </style>
 
-<div class="card-premium" style="border:1px solid #10b981; background:#f0fdf4;">
-    <h5><i class="fas fa-link me-2" style="color:#10b981;"></i>Your Referral Link</h5>
-    <div class="input-group">
-        <input type="text" class="form-control border-success" id="refLink" value="<?= $referral_link ?>" readonly>
-        <button class="btn btn-success" onclick="copyRef()"><i class="fas fa-copy"></i> Copy</button>
+<div class="container-fluid">
+    <div class="referral-container">
+        <h4><i class="fas fa-link me-2"></i>Referrals</h4>
+
+        <!-- Stats -->
+        <div class="referral-stats">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <h3><?= number_format($earnings['total_referrals'] ?? 0) ?></h3>
+                <p>Total Referrals</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <h3>₹ <?= number_format($earnings['total_earnings'] ?? 0, 2) ?></h3>
+                <p>Total Earnings</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <h3>₹ <?= number_format($earnings['paid_earnings'] ?? 0, 2) ?></h3>
+                <p>Paid</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏳</div>
+                <h3>₹ <?= number_format($earnings['pending_earnings'] ?? 0, 2) ?></h3>
+                <p>Pending</p>
+            </div>
+        </div>
+
+        <!-- Referral Link -->
+        <div class="referral-link-box">
+            <i class="fas fa-share-alt" style="color:#64748b;"></i>
+            <input type="text" id="referralLink" value="<?= htmlspecialchars($referral_link) ?>" readonly>
+            <button class="btn-copy" onclick="copyReferralLink()"><i class="fas fa-copy"></i> Copy</button>
+        </div>
+
+        <!-- Referrals Table -->
+        <?php if(count($referrals) > 0): ?>
+            <div class="table-responsive">
+                <table class="table table-referrals table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Registered On</th>
+                            <th>Activation Date</th>
+                            <th>Package</th>
+                            <th>Status</th>
+                            <th>Earning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($referrals as $row): 
+                            // ✅ Safe date formatting – no warnings
+                            $registered_on = safeDateFormat($row['created_at']);
+                            $activation_date = safeDateFormat($row['activation_date']);
+                            
+                            // Package badge
+                            $pkg = strtolower($row['package_name'] ?? '');
+                            $pkgBadge = $pkg ? '<span class="badge-package ' . $pkg . '">' . htmlspecialchars($row['package_name']) . '</span>' : '<span class="badge-package" style="background:#f1f5f9;color:#94a3b8;">Free</span>';
+                            
+                            // Status badge
+                            $status = $row['sub_status'] ?? 'inactive';
+                            $statusBadge = '';
+                            if ($status == 'active' || $status == 'paid') {
+                                $statusBadge = '<span class="badge-status active">Active</span>';
+                            } elseif ($status == 'pending') {
+                                $statusBadge = '<span class="badge-status pending">Pending</span>';
+                            } else {
+                                $statusBadge = '<span class="badge-status inactive">Inactive</span>';
+                            }
+                            
+                            // Earning
+                            $earning = $row['referral_net'] ?? 0;
+                            $earningDisplay = $earning > 0 ? '₹ ' . number_format($earning, 2) : '—';
+                        ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($row['name'] ?? 'N/A') ?></strong></td>
+                            <td><?= htmlspecialchars($row['email'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($row['phone'] ?? 'N/A') ?></td>
+                            <td><?= $registered_on ?></td>
+                            <td><?= $activation_date ?></td>
+                            <td><?= $pkgBadge ?></td>
+                            <td><?= $statusBadge ?></td>
+                            <td><?= $earningDisplay ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-muted text-center mt-3">
+                <small>Showing <?= count($referrals) ?> referrals</small>
+            </div>
+        <?php else: ?>
+            <div class="alert alert-info text-center py-4">
+                <i class="fas fa-user-plus" style="font-size:2rem; opacity:0.5;"></i>
+                <p class="mt-2">You haven't referred anyone yet.</p>
+                <p class="text-muted small">Share your referral link and earn rewards!</p>
+            </div>
+        <?php endif; ?>
     </div>
-    <div class="mt-2">
-        <span class="badge bg-warning text-dark">⏳ Pending: ₹ <?= indianCurrencyFormat($total_pending_gross) ?></span>
-        <span class="badge bg-success ms-2">✅ Paid (Gross): ₹ <?= indianCurrencyFormat($total_paid_gross) ?></span>
-    </div>
-</div>
-
-<!-- ===== Pending Earnings (Gross) ===== -->
-<div class="card-premium mt-4">
-    <h5><i class="fas fa-clock me-2"></i>Pending Earnings</h5>
-    <?php if(count($pending_earnings) > 0): ?>
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead><tr><th>Referred User</th><th>Package</th><th>Gross Amount</th><th>Status</th></tr></thead>
-                <tbody>
-                <?php foreach($pending_earnings as $e): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($e['referred_name']) ?></td>
-                        <td><?= htmlspecialchars($e['package_name']) ?></td>
-                        <td>₹<?= indianCurrencyFormat($e['amount']) ?></td>
-                        <td><span class="badge bg-warning">Pending</span></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php else: ?>
-        <p class="text-muted">No pending earnings.</p>
-    <?php endif; ?>
-</div>
-
-<!-- ===== Paid Earnings (Grouped by UTR = Salary Slip Style) ===== -->
-<div class="card-premium mt-4">
-    <h5><i class="fas fa-history me-2"></i>Payment History</h5>
-    <?php if(count($grouped_paid) > 0): ?>
-        <?php foreach($grouped_paid as $group): ?>
-            <div class="group-card" data-bs-toggle="modal" data-bs-target="#detailModal" 
-                 data-utr="<?= htmlspecialchars($group['utr']) ?>"
-                 data-paidat="<?= date('d M Y, h:i A', strtotime($group['paid_at'])) ?>"
-                 data-totalgross="<?= indianCurrencyFormat($group['total_gross']) ?>"
-                 data-totaltds="<?= indianCurrencyFormat($group['total_tds']) ?>"
-                 data-totaladmin="<?= indianCurrencyFormat($group['total_admin']) ?>"
-                 data-totalnet="<?= indianCurrencyFormat($group['total_net']) ?>"
-                 data-items='<?= json_encode($group['items']) ?>'>
-                <div class="summary">
-                    <div>
-                        <span class="badge bg-primary">UTR: <?= htmlspecialchars($group['utr']) ?></span>
-                        <span class="badge bg-secondary"><?= date('d M Y', strtotime($group['paid_at'])) ?></span>
-                    </div>
-                    <div>
-                        <span class="amount">Gross: ₹<?= indianCurrencyFormat($group['total_gross']) ?></span>
-                        <span class="net">| Net: ₹<?= indianCurrencyFormat($group['total_net']) ?></span>
-                        <i class="fas fa-chevron-right ms-2 text-muted"></i>
-                    </div>
-                </div>
-            </div>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <p class="text-muted">No paid earnings yet.</p>
-    <?php endif; ?>
-</div>
-
-<!-- ===== Detail Modal (Salary Slip Style) ===== -->
-<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-receipt me-2"></i>Payment Details</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="detailContent">
-                    <div class="text-center py-3">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ===== Team Members (unchanged) ===== -->
-<div class="card-premium mt-4">
-    <h4><i class="fas fa-users me-2"></i>My Team (<?= count($team_members) ?>)</h4>
-    <?php if(count($team_members) > 0): ?>
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Registered On</th><th>Activation Date</th></tr></thead>
-                <tbody>
-                <?php foreach($team_members as $tm): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($tm['name']) ?></td>
-                        <td><?= htmlspecialchars($tm['email']) ?></td>
-                        <td><?= htmlspecialchars($tm['phone'] ?? 'N/A') ?></td>
-                        <td><?= date('d M Y', strtotime($tm['reg_date'])) ?></td>
-                        <td><?= $tm['activation_date'] ? date('d M Y', strtotime($tm['activation_date'])) : '<span class="text-muted">Not Activated</span>' ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php else: ?>
-        <p class="text-muted">You haven't referred anyone yet. Share your referral link!</p>
-    <?php endif; ?>
-</div>
-
-<!-- ===== Subscription Requests (unchanged) ===== -->
-<div class="card-premium mt-4">
-    <h4><i class="fas fa-history me-2"></i>Your Subscription Requests</h4>
-    <?php if(count($user_subs) > 0): ?>
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead><tr><th>Package</th><th>Amount</th><th>Status</th><th>Payment Method</th><th>UTR</th><th>Request Date</th><th>Activation/Reject Date</th></tr></thead>
-                <tbody>
-                <?php foreach($user_subs as $us): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($us['pkg_name']) ?></td>
-                        <td>₹<?= $us['amount'] ?></td>
-                        <td><span class="badge bg-<?= $us['status']=='active'?'success':($us['status']=='pending'?'warning':'danger') ?>"><?= $us['status'] ?></span></td>
-                        <td><?= $us['payment_method'] ?></td>
-                        <td><?= htmlspecialchars($us['utr'] ?? 'N/A') ?></td>
-                        <td><?= date('d M Y', strtotime($us['created_at'])) ?></td>
-                        <td><?= $us['start_date'] ? date('d M Y', strtotime($us['start_date'])) : ($us['status']=='rejected' ? 'Rejected' : '—') ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php else: ?>
-        <p class="text-muted">No subscription requests yet.</p>
-    <?php endif; ?>
 </div>
 
 <script>
-    function copyRef() { 
-        let inp = document.getElementById('refLink'); 
-        inp.select(); 
-        navigator.clipboard.writeText(inp.value).then(() => alert('Referral Link Copied!')).catch(() => document.execCommand('copy')); 
-    }
-
-    // Populate modal on card click
-    document.querySelectorAll('.group-card').forEach(card => {
-        card.addEventListener('click', function() {
-            const data = this.dataset;
-            const items = JSON.parse(data.items);
-            let html = `
-                <div class="row g-3 mb-3">
-                    <div class="col-md-4"><strong>UTR:</strong> ${data.utr}</div>
-                    <div class="col-md-4"><strong>Date:</strong> ${data.paidat}</div>
-                    <div class="col-md-4"><strong>Total Net:</strong> <span class="text-success fw-bold">₹${data.totalnet}</span></div>
-                </div>
-                <hr>
-                <h6>Breakdown by Referred User</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered">
-                        <thead>
-                            <tr><th>Referred User</th><th>Package</th><th>Gross</th><th>TDS</th><th>Admin Charge</th><th>Net</th></tr>
-                        </thead>
-                        <tbody>
-            `;
-            items.forEach(item => {
-                html += `
-                    <tr>
-                        <td>${item.referred_name || 'N/A'}</td>
-                        <td>${item.package_name || 'N/A'}</td>
-                        <td>₹${indianCurrencyFormat(item.amount)}</td>
-                        <td>₹${indianCurrencyFormat(item.tds_deducted || 0)}</td>
-                        <td>₹${indianCurrencyFormat(item.admin_charge_deducted || 0)}</td>
-                        <td><strong>₹${indianCurrencyFormat(item.net_amount || 0)}</strong></td>
-                    </tr>
-                `;
-            });
-            html += `
-                        </tbody>
-                    </table>
-                </div>
-                <div class="row mt-3">
-                    <div class="col-md-6"><strong>Total Gross:</strong> ₹${data.totalgross}</div>
-                    <div class="col-md-6"><strong>Total TDS:</strong> ₹${data.totaltds}</div>
-                    <div class="col-md-6"><strong>Total Admin Charge:</strong> ₹${data.totaladmin}</div>
-                    <div class="col-md-6"><strong>Net Paid:</strong> <span class="text-success fw-bold">₹${data.totalnet}</span></div>
-                </div>
-            `;
-            document.getElementById('detailContent').innerHTML = html;
-        });
+function copyReferralLink() {
+    const input = document.getElementById('referralLink');
+    input.select();
+    input.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(input.value).then(() => {
+        const btn = document.querySelector('.btn-copy');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+    }).catch(() => {
+        // Fallback
+        document.execCommand('copy');
+        alert('Referral link copied!');
     });
-
-    // Helper function to format currency (if not available in JS, use PHP's function? we'll replicate)
-    function indianCurrencyFormat(num) {
-        if (!num) return '0';
-        num = parseFloat(num);
-        let parts = num.toFixed(2).split('.');
-        let integerPart = parts[0];
-        let decimalPart = parts[1] || '00';
-        let lastThree = integerPart.substring(integerPart.length - 3);
-        let otherNumbers = integerPart.substring(0, integerPart.length - 3);
-        if (otherNumbers != '') {
-            lastThree = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + lastThree;
-        }
-        return lastThree + (decimalPart !== '00' ? '.' + decimalPart : '');
-    }
+}
 </script>
 
 <?php include 'footer.php'; ?>
