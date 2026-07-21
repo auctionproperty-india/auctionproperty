@@ -1,11 +1,14 @@
 <?php
 require_once __DIR__ . '/db.php';
 
-// Create table with UNIQUE constraint on label
+// ✅ Drop existing table to avoid conflicts (safe for first run)
+$pdo->exec("DROP TABLE IF EXISTS navigation_items CASCADE");
+
+// ✅ Create table with UNIQUE constraint on label
 $pdo->exec("
-    CREATE TABLE IF NOT EXISTS navigation_items (
+    CREATE TABLE navigation_items (
         id SERIAL PRIMARY KEY,
-        label VARCHAR(100) NOT NULL UNIQUE,   -- ✅ UNIQUE constraint added
+        label VARCHAR(100) NOT NULL UNIQUE,
         url VARCHAR(255) NOT NULL,
         icon VARCHAR(50),
         is_active BOOLEAN DEFAULT TRUE,
@@ -14,7 +17,7 @@ $pdo->exec("
     )
 ");
 
-// Insert default items – ON CONFLICT अब काम करेगा
+// ✅ Insert default items – ON CONFLICT now works
 $pdo->exec("
     INSERT INTO navigation_items (label, url, icon, display_order, is_active) VALUES
     ('Home', '/', 'fa-solid fa-house', 1, TRUE),
@@ -26,5 +29,5 @@ $pdo->exec("
     ON CONFLICT (label) DO NOTHING;
 ");
 
-echo "✅ Navigation table ready with unique constraint!";
+echo "✅ Navigation table created with default items!";
 ?>
