@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📊 Admin Dashboard – White + Dark Blue Theme (No Extra Top Spacing)
+// 📊 Admin Dashboard – White + Dark Blue Theme
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -9,6 +9,14 @@ require_once __DIR__ . '/functions.php';
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: login.php");
     exit;
+}
+
+// ---- Helper: Safe Date Format ----
+function safeDateFormat($dateStr) {
+    if (empty($dateStr) || strtotime($dateStr) === false) {
+        return 'N/A';
+    }
+    return date('d M Y', strtotime($dateStr));
 }
 
 // ---- Fetch all stats ----
@@ -21,137 +29,34 @@ $pending_subs = $pdo->query("SELECT COUNT(*) FROM subscriptions WHERE status = '
 $active_subs = $pdo->query("SELECT COUNT(*) FROM subscriptions WHERE status = 'active' OR status = 'paid'")->fetchColumn();
 $total_revenue = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM subscriptions WHERE status = 'active' OR status = 'paid'")->fetchColumn();
 
-// ---- Recent users ----
+// ---- Recent users (limit 5) ----
 $recent_users = $pdo->query("SELECT id, name, email, created_at FROM users ORDER BY id DESC LIMIT 5")->fetchAll();
 
-// ---- Recent properties ----
+// ---- Recent properties (limit 5) ----
 $recent_props = $pdo->query("SELECT id, title, price, created_at FROM properties ORDER BY id DESC LIMIT 5")->fetchAll();
 
 require_once __DIR__ . '/header.php';
 ?>
 
 <style>
-    /* ====== Dashboard Container – Light Theme ====== */
-    .dashboard-container {
-        background: #f8fafc;
-        border-radius: 24px;
-        padding: 20px 25px;
-        margin: 0;  /* ✅ कोई negative margin नहीं – top से start */
-    }
-
-    .dashboard-title {
-        color: #1e293b;
-        font-weight: 700;
-        margin-bottom: 20px;
-        font-size: 1.5rem;
-        border-bottom: 2px solid #e2e8f0;
-        padding-bottom: 12px;
-    }
-    .dashboard-title i {
-        color: #1e3a8a;
-    }
-
-    /* ====== Stats Grid – White Cards ====== */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 18px;
-        margin-bottom: 30px;
-    }
-    .stat-card-white {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 18px 16px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        transition: all 0.25s ease;
-        color: #0f172a;
-    }
-    .stat-card-white:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 30px rgba(0,0,0,0.08);
-        border-color: #b9d0f0;
-    }
-    .stat-card-white .stat-icon {
-        font-size: 2rem;
-        display: inline-block;
-        background: #eef2ff;
-        padding: 8px 10px;
-        border-radius: 12px;
-        margin-bottom: 8px;
-        color: #1e3a8a;
-    }
-    .stat-card-white .stat-number {
-        font-size: 1.8rem;
-        font-weight: 800;
-        margin: 4px 0 2px;
-        letter-spacing: -0.5px;
-        color: #0f172a;
-    }
-    .stat-card-white .stat-number.currency {
-        font-size: 1.5rem;
-    }
-    .stat-card-white .stat-label {
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        font-weight: 600;
-        color: #475569;
-    }
-    .stat-card-white .stat-sub {
-        font-size: 0.7rem;
-        color: #94a3b8;
-        margin-top: 2px;
-    }
-
-    /* ====== Recent Tables – White ====== */
-    .card-table-white {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 16px 18px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    }
-    .card-table-white h5 {
-        color: #1e293b;
-        font-weight: 600;
-        margin-bottom: 12px;
-    }
-    .card-table-white h5 i {
-        color: #1e3a8a;
-    }
-    .table-white {
-        color: #0f172a;
-        font-size: 0.9rem;
-    }
-    .table-white th {
-        color: #475569;
-        font-weight: 600;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        border-bottom: 2px solid #e2e8f0;
-        padding: 10px 8px;
-    }
-    .table-white td {
-        padding: 10px 8px;
-        border-bottom: 1px solid #f1f5f9;
-        vertical-align: middle;
-    }
-    .table-white tbody tr:hover {
-        background: #f8fafc;
-    }
-    .table-white .badge-status {
-        font-size: 0.7rem;
-        padding: 3px 12px;
-        border-radius: 30px;
-        font-weight: 600;
-    }
-    .badge-status.active { background: #dcfce7; color: #166534; }
-    .badge-status.pending { background: #fef3c7; color: #92400e; }
-
-    /* ====== Responsive ====== */
+    .dashboard-container { background: #f8fafc; border-radius: 24px; padding: 20px 25px; margin: 0; }
+    .dashboard-title { color: #1e293b; font-weight: 700; margin-bottom: 20px; font-size: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+    .dashboard-title i { color: #1e3a8a; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 30px; }
+    .stat-card-white { background: #ffffff; border-radius: 16px; padding: 18px 16px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: all 0.25s ease; color: #0f172a; }
+    .stat-card-white:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.08); border-color: #b9d0f0; }
+    .stat-card-white .stat-icon { font-size: 2rem; display: inline-block; background: #eef2ff; padding: 8px 10px; border-radius: 12px; margin-bottom: 8px; color: #1e3a8a; }
+    .stat-card-white .stat-number { font-size: 1.8rem; font-weight: 800; margin: 4px 0 2px; letter-spacing: -0.5px; color: #0f172a; }
+    .stat-card-white .stat-number.currency { font-size: 1.5rem; }
+    .stat-card-white .stat-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; color: #475569; }
+    .stat-card-white .stat-sub { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
+    .card-table-white { background: #ffffff; border-radius: 16px; padding: 16px 18px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .card-table-white h5 { color: #1e293b; font-weight: 600; margin-bottom: 12px; }
+    .card-table-white h5 i { color: #1e3a8a; }
+    .table-white { color: #0f172a; font-size: 0.9rem; }
+    .table-white th { color: #475569; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 2px solid #e2e8f0; padding: 10px 8px; }
+    .table-white td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .table-white tbody tr:hover { background: #f8fafc; }
     @media (max-width: 768px) {
         .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
         .dashboard-container { padding: 15px; margin-top: 0; }
@@ -232,7 +137,7 @@ require_once __DIR__ . '/header.php';
                                 <td><?= $u['id'] ?></td>
                                 <td><?= htmlspecialchars($u['name']) ?></td>
                                 <td><?= htmlspecialchars($u['email']) ?></td>
-                                <td><?= date('d M Y', strtotime($u['created_at'])) ?></td>
+                                <td><?= safeDateFormat($u['created_at']) ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -254,7 +159,7 @@ require_once __DIR__ . '/header.php';
                                 <td><?= $p['id'] ?></td>
                                 <td><?= htmlspecialchars($p['title']) ?></td>
                                 <td>₹ <?= number_format($p['price'], 2) ?></td>
-                                <td><?= date('d M Y', strtotime($p['created_at'])) ?></td>
+                                <td><?= safeDateFormat($p['created_at']) ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
