@@ -1,14 +1,14 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (Guest के लिए पूरा पेज)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// करंट पेज का फ़ाइल नाम पता करें
+// करंट पेज का फ़ाइल नाम
 $current_page = basename($_SERVER['PHP_SELF']);
-$hide_top_nav = ($current_page == 'admin_dashboard.php'); // ✅ एडमिन डैशबोर्ड पर नेविगेशन छिपाएँ
+$hide_top_nav = ($current_page == 'admin_dashboard.php'); // एडमिन डैशबोर्ड पर नेविगेशन छिपाएँ
 
 // क्या यूजर लॉगिन है?
 $is_logged_in = isset($_SESSION['user_id']);
@@ -233,12 +233,25 @@ if ($is_logged_in && $role == 'user') {
 
         /* ====== मुख्य कंटेंट ====== */
         .main-content {
-            margin-left: 280px;
             padding: 30px 35px;
             min-height: 100vh;
             transition: margin-left 0.3s;
         }
-        @media (max-width: 991px) { .main-content { margin-left: 0; padding: 15px; } }
+        /* ✅ साइडबार वाले यूजर के लिए margin */
+        body.role-admin .main-content,
+        body.role-user .main-content {
+            margin-left: 280px;
+        }
+        /* ✅ बिना लॉगिन (guest) के लिए margin हटाएँ – पूरा पेज */
+        body.role-guest .main-content {
+            margin-left: 0 !important;
+        }
+        @media (max-width: 991px) {
+            .main-content {
+                margin-left: 0 !important;
+                padding: 15px;
+            }
+        }
 
         /* ====== टॉप बार (यूजर इन्फो) ====== */
         .top-bar {
