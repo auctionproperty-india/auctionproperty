@@ -239,7 +239,7 @@ if ($is_logged_in && $role == 'user') {
         }
         /* ✅ Admin के लिए थोड़ा extra top padding – ताकि content नीचे आ जाए */
         body.role-admin .main-content {
-            padding-top: 5px;
+            padding-top: 2px;
         }
         /* ✅ साइडबार वाले यूजर के लिए margin */
         body.role-admin .main-content,
