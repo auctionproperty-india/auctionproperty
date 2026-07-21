@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार (Guest के लिए पूरा पेज)
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (Admin के लिए padding fix)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -8,7 +8,7 @@ require_once __DIR__ . '/functions.php';
 
 // करंट पेज का फ़ाइल नाम
 $current_page = basename($_SERVER['PHP_SELF']);
-$hide_top_nav = ($current_page == 'admin_dashboard.php'); // एडमिन डैशबोर्ड पर नेविगेशन छिपाएँ
+$hide_top_nav = ($current_page == 'admin_dashboard.php');
 
 // क्या यूजर लॉगिन है?
 $is_logged_in = isset($_SESSION['user_id']);
@@ -72,7 +72,7 @@ if ($is_logged_in && $role == 'user') {
         /* ====== ग्लोबल ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; padding-top: 70px; }
-        body.role-admin { background: #0f172a; padding-top: 60px; }  /* ✅ Admin के लिए padding कम */
+        body.role-admin { background: #0f172a; padding-top: 70px; }  /* ✅ वापस 70px – अच्छा लगता है */
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
 
@@ -237,6 +237,10 @@ if ($is_logged_in && $role == 'user') {
             min-height: 100vh;
             transition: margin-left 0.3s;
         }
+        /* ✅ Admin के लिए थोड़ा extra top padding – ताकि content नीचे आ जाए */
+        body.role-admin .main-content {
+            padding-top: 10px;
+        }
         /* ✅ साइडबार वाले यूजर के लिए margin */
         body.role-admin .main-content,
         body.role-user .main-content {
@@ -250,6 +254,9 @@ if ($is_logged_in && $role == 'user') {
             .main-content {
                 margin-left: 0 !important;
                 padding: 15px;
+            }
+            body.role-admin .main-content {
+                padding-top: 15px;
             }
         }
 
