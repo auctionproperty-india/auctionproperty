@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel
+// 👥 User Management – Admin Panel (With Referrer)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     }
 }
 
-// ---- Fetch all users with package info and coins ----
+// ---- Fetch all users with package info, coins, and referrer ----
 $sql = "
     SELECT 
         u.*,
@@ -132,8 +132,11 @@ $sql = "
         s.start_date as sub_start,
         s.end_date as sub_end,
         s.package_id as current_package_id,
-        u.coins as user_coins
+        u.coins as user_coins,
+        ref.name as referrer_name,
+        ref.email as referrer_email
     FROM users u
+    LEFT JOIN users ref ON u.referred_by = ref.id
     LEFT JOIN (
         SELECT DISTINCT ON (user_id) user_id, package_id, status, start_date, end_date
         FROM subscriptions
@@ -162,6 +165,7 @@ include 'header.php';
     .badge-status.active { background: #dcfce7; color: #166534; }
     .badge-status.inactive { background: #fee2e2; color: #991b1b; }
     .badge-status.blocked { background: #fef3c7; color: #92400e; }
+    .badge-referrer { font-size: 0.75rem; background: #eef2ff; color: #1e3a8a; padding: 2px 10px; border-radius: 30px; }
 </style>
 
 <div class="container-fluid">
@@ -187,6 +191,7 @@ include 'header.php';
                         <th>Email</th>
                         <th>Phone</th>
                         <th>Coins</th>
+                        <th>Referred By</th>
                         <th>Reg. Date</th>
                         <th>Act. Date</th>
                         <th>Package</th>
@@ -204,6 +209,15 @@ include 'header.php';
                         <td><?= htmlspecialchars($user['email']) ?></td>
                         <td><?= htmlspecialchars($user['phone'] ?? 'N/A') ?></td>
                         <td><span class="badge bg-warning text-dark"><?= number_format($user['user_coins'] ?? 0) ?></span></td>
+                        <td>
+                            <?php if ($user['referrer_name'] || $user['referrer_email']): ?>
+                                <span class="badge-referrer">
+                                    <?= htmlspecialchars($user['referrer_name'] ?? $user['referrer_email']) ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="text-muted">—</span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= $user['created_at'] ? date('d M Y', strtotime($user['created_at'])) : 'N/A' ?></td>
                         <td><?= $user['activation_date'] ? date('d M Y', strtotime($user['activation_date'])) : 'Not Active' ?></td>
                         <td>
@@ -227,7 +241,7 @@ include 'header.php';
                             <?= $user['is_super_admin'] ? '<span class="badge bg-danger">Admin</span>' : '<span class="badge bg-secondary">User</span>' ?>
                         </td>
                         <td class="actions">
-                            <!-- Edit Button – Fixed -->
+                            <!-- Edit Button -->
                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal<?= $user['id'] ?>">
                                 <i class="fas fa-edit"></i>
                             </button>
