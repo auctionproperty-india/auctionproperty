@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (Search + Working Modal)
+// 👥 User Management – Admin Panel (Working Edit Modal + Search)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -78,7 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
 
     $pdo->beginTransaction();
     try {
-        // Update users table
         $stmt = $pdo->prepare("
             UPDATE users 
             SET name = ?, email = ?, phone = ?, 
@@ -89,14 +88,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         ");
         $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $id]);
 
-        // Update password
         if (!empty($new_password)) {
             $hashed = password_hash($new_password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
             $stmt->execute([$hashed, $id]);
         }
 
-        // Update package (subscription)
         if ($package_id) {
             $stmt = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
             $stmt->execute([$id]);
@@ -132,7 +129,7 @@ if (!empty($search)) {
     $search_params = ['%' . $search . '%', '%' . $search . '%', '%' . $search . '%'];
 }
 
-// ---- Fetch all users with package info, coins, and referrer ----
+// ---- Fetch users with referrer ----
 $sql = "
     SELECT 
         u.*,
@@ -160,7 +157,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($search_params);
 $users = $stmt->fetchAll();
 
-// ---- Get all packages for dropdown ----
+// ---- Packages for dropdown ----
 $packages = $pdo->query("SELECT id, name FROM packages ORDER BY id")->fetchAll();
 
 include 'header.php';
@@ -189,7 +186,7 @@ include 'header.php';
         <span class="badge bg-primary">Total: <?= count($users) ?> users</span>
     </div>
 
-    <!-- ====== SEARCH BAR ====== -->
+    <!-- Search Bar -->
     <div class="search-box">
         <form method="GET" class="d-flex gap-2 flex-wrap">
             <input type="text" name="search" placeholder="🔍 Search by name, email, or phone..." value="<?= htmlspecialchars($search) ?>">
@@ -271,7 +268,7 @@ include 'header.php';
                         </td>
                         <td class="actions">
                             <!-- ✅ Edit Button – Working -->
-                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal<?= $user['id'] ?>">
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal_<?= $user['id'] ?>">
                                 <i class="fas fa-edit"></i>
                             </button>
 
@@ -298,8 +295,8 @@ include 'header.php';
                         </td>
                     </tr>
 
-                    <!-- ====== EDIT MODAL ====== -->
-                    <div class="modal fade" id="editModal<?= $user['id'] ?>" tabindex="-1" aria-hidden="true">
+                    <!-- ====== EDIT MODAL – Unique ID per user ====== -->
+                    <div class="modal fade" id="editModal_<?= $user['id'] ?>" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
                                 <form method="POST">
