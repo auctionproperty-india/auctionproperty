@@ -1,29 +1,64 @@
-<?php 
+<?php
+// ============================================================
+// 📦 User Packages – Buy Search Engine Access
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') { 
-    header("Location: login.php"); 
-    exit; 
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
+    header("Location: login.php");
+    exit;
 }
 
 $user_id = $_SESSION['user_id'];
-include 'header.php'; 
+include 'header.php';
 
-// ---- Subscription Data ----
-$active_sub = $pdo->prepare("SELECT s.*, p.name as pkg_name, s.start_date, s.end_date, (s.end_date - CURRENT_DATE) as days_left FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE ORDER BY s.id DESC LIMIT 1");
+// ---- Show messages from redirects ----
+if (isset($_GET['msg'])) {
+    $msg = $_GET['msg'];
+    if ($msg == 'request_sent') {
+        echo "<div class='alert alert-success alert-dismissible fade show'><i class='fas fa-check-circle'></i> ✅ Your subscription request has been sent. Admin will review it shortly.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+    } elseif ($msg == 'already_pending') {
+        echo "<div class='alert alert-warning alert-dismissible fade show'><i class='fas fa-clock'></i> ⚠️ You already have a pending request. Please wait for admin approval.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+    } elseif ($msg == 'already_active') {
+        echo "<div class='alert alert-info alert-dismissible fade show'><i class='fas fa-check-circle'></i> ℹ️ You already have an active subscription.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+    }
+}
+
+// ---- Fetch active subscription ----
+$active_sub = $pdo->prepare("
+    SELECT s.*, p.name as pkg_name, s.start_date, s.end_date, (s.end_date - CURRENT_DATE) as days_left 
+    FROM subscriptions s 
+    JOIN packages p ON s.package_id = p.id 
+    WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE 
+    ORDER BY s.id DESC LIMIT 1
+");
 $active_sub->execute([$user_id]);
 $sub_info = $active_sub->fetch();
 $is_subscribed = $sub_info ? true : false;
 $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
+
+// ---- Fetch pending subscription check (for display) ----
+$pending_check = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'pending'");
+$pending_check->execute([$user_id]);
+$has_pending = $pending_check->rowCount() > 0;
 ?>
+
 <div id="packages" class="card-premium" style="border:2px solid #fbbf24; background:#fffbeb;">
     <h4><i class="fas fa-search-dollar me-2" style="color: #f59e0b;"></i>Buy Search Engine Access</h4>
     <p class="text-muted">Subscribe to view full details of all auction properties.</p>
+
+    <?php if ($has_pending): ?>
+        <div class="alert alert-warning">
+            <i class="fas fa-clock"></i> You have a pending request. Please wait for admin approval before making a new request.
+        </div>
+    <?php endif; ?>
+
     <div class="row">
         <?php
         $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
-        foreach($packages as $pkg) {
+        foreach ($packages as $pkg) {
             $is_active = ($is_subscribed && $sub_info['package_id'] == $pkg['id']);
             $discount_price = $pkg['discount_price'] ?? null;
             $regular_price = $pkg['price'];
@@ -34,7 +69,7 @@ $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
                     <div class="card-body">
                         <h5 class="fw-bold"><?= htmlspecialchars($pkg['name']) ?></h5>
                         <div class="my-2">
-                            <?php if($show_discount): ?>
+                            <?php if ($show_discount): ?>
                                 <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">
                                     <span style="font-size: 22px; font-weight: 700; color: #dc3545; text-decoration: line-through; background: #fee2e2; padding: 0 12px; border-radius: 8px;">
                                         ₹ <?= indianCurrencyFormat($regular_price) ?>
@@ -51,8 +86,10 @@ $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
                             <?php endif; ?>
                         </div>
                         <small><?= $pkg['duration_months'] ?> Months</small>
-                        <?php if($is_active): ?>
+                        <?php if ($is_active): ?>
                             <div class="badge bg-success w-100 mt-2">✅ Active (<?= $days_left ?> days left)</div>
+                        <?php elseif ($has_pending): ?>
+                            <div class="badge bg-warning text-dark w-100 mt-2">⏳ Pending Request</div>
                         <?php else: ?>
                             <a href="buy_subscription.php?package_id=<?= $pkg['id'] ?>" class="btn btn-primary w-100 btn-sm mt-2">Buy Now</a>
                         <?php endif; ?>
@@ -63,4 +100,5 @@ $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
     </div>
     <small class="text-muted">* After payment, admin will activate your subscription.</small>
 </div>
+
 <?php include 'footer.php'; ?>
