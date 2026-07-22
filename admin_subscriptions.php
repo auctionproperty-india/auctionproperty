@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📋 Admin – Pending Subscriptions (Fixed)
+// 📋 Admin – Pending Subscriptions (Full Updated)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -30,11 +30,13 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
     }
 
     // Fetch subscription data
-    $sub_stmt = $pdo->prepare("SELECT s.*, p.duration_months, p.referral_bonus, u.referred_by, u.id as user_id 
-                               FROM subscriptions s 
-                               JOIN packages p ON s.package_id = p.id 
-                               JOIN users u ON s.user_id = u.id 
-                               WHERE s.id = ?");
+    $sub_stmt = $pdo->prepare("
+        SELECT s.*, p.duration_months, p.referral_bonus, u.referred_by, u.id as user_id 
+        FROM subscriptions s 
+        JOIN packages p ON s.package_id = p.id 
+        JOIN users u ON s.user_id = u.id 
+        WHERE s.id = ?
+    ");
     $sub_stmt->execute([$sub_id]);
     $data = $sub_stmt->fetch();
 
@@ -67,7 +69,11 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
         $pdo->prepare("UPDATE subscriptions SET status = 'cancelled' WHERE user_id = ? AND id != ? AND status = 'pending'")
             ->execute([$data['user_id'], $sub_id]);
 
-        // 4. Referral Bonus (if applicable)
+        // 4. Update user's activation_date
+        $pdo->prepare("UPDATE users SET activation_date = ? WHERE id = ?")
+            ->execute([$start_date, $data['user_id']]);
+
+        // 5. Referral Bonus (if applicable)
         if ($data['referred_by'] && $data['referral_bonus'] > 0) {
             $check = $pdo->prepare("SELECT id FROM user_referral_earnings WHERE user_id = ? AND referred_user_id = ? AND package_id = ?");
             $check->execute([$data['referred_by'], $data['user_id'], $package_id]);
@@ -78,7 +84,7 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
             }
         }
 
-        // 5. Add Income Entry (if function exists)
+        // 6. Add Income Entry (if function exists)
         if (function_exists('addAccountEntry')) {
             $user_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
             $user_stmt->execute([$data['user_id']]);
@@ -95,7 +101,6 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
         exit;
     } catch (Exception $e) {
         $pdo->rollBack();
-        // Log error and show user-friendly message
         error_log("Approval error: " . $e->getMessage());
         die("❌ Error approving subscription. Please try again or contact support. Error: " . $e->getMessage());
     }
@@ -163,11 +168,23 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
                             <td>₹<?= $p['amount'] ?></td>
                             <td><?= htmlspecialchars($p['utr'] ?? 'N/A') ?></td>
                             <td>
-                                <?php if (!empty($p['slip_path']) && file_exists($p['slip_path'])): ?>
-                                    <a href="<?= $p['slip_path'] ?>" target="_blank" class="btn btn-sm btn-info">📷 View</a>
-                                <?php else: ?>
-                                    <span class="text-muted">No slip</span>
-                                <?php endif; ?>
+                                <?php 
+                                $slip_url = '';
+                                $slip_display = '<span class="text-muted">No slip</span>';
+                                if (!empty($p['slip_path'])) {
+                                    // Build absolute URL
+                                    $base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
+                                    $slip_url = $base_url . '/' . ltrim($p['slip_path'], '/');
+                                    // Check if file exists on server
+                                    $full_path = __DIR__ . '/' . $p['slip_path'];
+                                    if (file_exists($full_path)) {
+                                        $slip_display = '<a href="' . $slip_url . '" target="_blank" class="btn btn-sm btn-info">📷 View</a>';
+                                    } else {
+                                        $slip_display = '<span class="text-danger">File missing</span>';
+                                    }
+                                }
+                                echo $slip_display;
+                                ?>
                             </td>
                             <?php if (hasEditPermission('subscriptions', $pdo)): ?>
                                 <td>
