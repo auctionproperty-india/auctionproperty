@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार (Permissions के अनुसार)
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (Mobile Sidebar Fix)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -160,7 +160,7 @@ if ($is_logged_in && $role == 'user') {
             .top-nav .nav-right .btn-register { padding: 4px 12px; font-size: 12px; }
         }
 
-        /* ====== साइडबार – White/Blue Theme ====== */
+        /* ====== साइडबार – Mobile Friendly ====== */
         .sidebar {
             height: 100vh;
             width: 280px;
@@ -189,11 +189,21 @@ if ($is_logged_in && $role == 'user') {
             color: #334155;
             border-right: 1px solid #e2e8f0;
         }
+        /* ✅ Mobile: sidebar hidden by default */
         @media (max-width: 991px) {
-            .sidebar { transform: translateX(-100%); top: 0 !important; }
-            .sidebar.show { transform: translateX(0); }
+            .sidebar {
+                transform: translateX(-100%);
+                top: 0 !important;
+            }
+            .sidebar.show {
+                transform: translateX(0);
+            }
         }
-        @media (min-width: 992px) { .sidebar { transform: translateX(0) !important; } }
+        @media (min-width: 992px) {
+            .sidebar {
+                transform: translateX(0) !important;
+            }
+        }
 
         .sidebar .brand {
             font-size: 24px;
@@ -344,12 +354,17 @@ if ($is_logged_in && $role == 'user') {
             border: none;
             font-size: 28px;
             padding: 5px 10px;
-            display: none;
             cursor: pointer;
+            display: inline-block;
         }
         body.role-admin .hamburger-btn { color: #1e293b; }
         body.role-user .hamburger-btn { color: #1e293b; }
-        @media (max-width: 991px) { .hamburger-btn { display: block; } }
+        /* ✅ Desktop पर hamburger छिपाएँ */
+        @media (min-width: 992px) {
+            .hamburger-btn {
+                display: none !important;
+            }
+        }
 
         /* ====== नोटिफिकेशन ====== */
         .notification-dropdown { position: relative; display: inline-block; }
@@ -499,92 +514,60 @@ if ($is_logged_in && $role == 'user') {
 </nav>
 <?php endif; ?>
 
-<!-- ====== साइडबार – केवल लॉगिन यूजर के लिए, Permissions के अनुसार ====== -->
+<!-- ====== साइडबार ====== -->
 <?php if ($is_logged_in): ?>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
     
     <?php if ($role == 'admin'): ?>
-        <!-- ✅ Dashboard – हमेशा दिखे -->
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        
-        <!-- ✅ Manage Properties – अगर permission हो -->
         <?php if (hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
         <?php endif; ?>
-
-    <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
-    
-        <!-- ✅ Manage Users – केवल Super Admin -->
         <?php if ($is_super_admin): ?>
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ Packages – अगर permission हो -->
         <?php if (hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ Subscriptions – अगर permission हो -->
         <?php if (hasViewPermission('subscriptions', $pdo)): ?>
             <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
             <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ Referral Payouts – अगर permission हो -->
         <?php if (hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ Deductions – अगर permission हो -->
         <?php if (hasViewPermission('deductions', $pdo)): ?>
             <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ Activity Logs – अगर permission हो -->
         <?php if (hasViewPermission('activity_logs', $pdo)): ?>
             <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ Accounting – अगर permission हो -->
         <?php if (hasViewPermission('accounting', $pdo)): ?>
             <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ Settings – अगर permission हो -->
         <?php if (hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ KYC Verification – अगर permission हो -->
         <?php if (hasViewPermission('kyc', $pdo)): ?>
             <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ Support Tickets – अगर permission हो -->
         <?php if (hasViewPermission('support', $pdo)): ?>
             <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ User Properties – अगर permission हो -->
         <?php if (hasViewPermission('user_properties', $pdo)): ?>
             <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
         <?php endif; ?>
-        
-        <!-- ✅ Dholera Properties – सबको दिखे (कोई permission check नहीं) -->
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
-        
-        <!-- ✅ Navigation Manager – केवल Super Admin -->
         <?php if ($is_super_admin): ?>
             <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
         <?php endif; ?>
+        <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         
     <?php else: ?>
-        <!-- ===== USER SIDEBAR (पहले जैसा) ===== -->
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        <a href="user_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
         <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
@@ -593,6 +576,7 @@ if ($is_logged_in && $role == 'user') {
         <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
         <a href="user_properties.php"><i class="fas fa-home"></i> <span>My Properties</span></a>
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
+        <a href="user_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
     <?php endif; ?>
     
     <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
@@ -604,6 +588,7 @@ if ($is_logged_in && $role == 'user') {
     <?php if ($is_logged_in): ?>
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
+            <!-- ✅ Hamburger Button – Mobile Sidebar Toggle -->
             <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()">
                 <i class="fas fa-bars"></i>
             </button>
@@ -661,3 +646,44 @@ if ($is_logged_in && $role == 'user') {
 <?php
 // बाकी पेज का कंटेंट यहाँ आएगा – footer.php में main-content और body बंद करें
 ?>
+
+<!-- ====== ✅ MOBILE SIDEBAR TOGGLE SCRIPT ====== -->
+<script>
+function toggleSidebar() {
+    const sidebar = document.getElementById('mainSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar) {
+        sidebar.classList.toggle('show');
+        if (overlay) overlay.classList.toggle('show');
+    }
+}
+
+// Overlay click पर sidebar close
+document.addEventListener('DOMContentLoaded', function() {
+    const overlay = document.getElementById('sidebarOverlay');
+    if (overlay) {
+        overlay.addEventListener('click', function() {
+            toggleSidebar();
+        });
+    }
+});
+
+// 🔄 Countdown Timer for Subscription
+document.addEventListener('DOMContentLoaded', function() {
+    const countdownEl = document.getElementById('countdownDisplay');
+    if (countdownEl && countdownEl.dataset.expiry) {
+        const expiry = new Date(countdownEl.dataset.expiry);
+        function updateTimer() {
+            const now = new Date();
+            const diff = Math.max(0, Math.floor((expiry - now) / (1000 * 60 * 60 * 24)));
+            if (diff > 0) {
+                countdownEl.innerHTML = '<i class="fas fa-clock"></i> ' + diff + ' days left';
+            } else {
+                countdownEl.innerHTML = '<i class="fas fa-clock"></i> Expired';
+            }
+        }
+        updateTimer();
+        setInterval(updateTimer, 60000);
+    }
+});
+</script>
