@@ -1,10 +1,20 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (Working Edit Modal + Search)
+// 👥 User Management – Admin Panel (with safeDateFormat)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
+
+// ---- Safe Date Formatter ----
+if (!function_exists('safeDateFormat')) {
+    function safeDateFormat($dateStr) {
+        if (empty($dateStr) || strtotime($dateStr) === false) {
+            return 'N/A';
+        }
+        return date('d M Y', strtotime($dateStr));
+    }
+}
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: login.php");
@@ -244,8 +254,8 @@ include 'header.php';
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
-                        <td><?= $user['created_at'] ? date('d M Y', strtotime($user['created_at'])) : 'N/A' ?></td>
-                        <td><?= $user['activation_date'] ? date('d M Y', strtotime($user['activation_date'])) : 'Not Active' ?></td>
+                        <td><?= safeDateFormat($user['created_at']) ?></td>
+                        <td><?= safeDateFormat($user['activation_date']) ?></td>
                         <td>
                             <?php if ($user['package_name']): ?>
                                 <span class="badge bg-primary"><?= htmlspecialchars($user['package_name']) ?></span>
@@ -253,7 +263,7 @@ include 'header.php';
                                 <span class="badge bg-secondary">Free</span>
                             <?php endif; ?>
                         </td>
-                        <td><?= $user['sub_end'] ? date('d M Y', strtotime($user['sub_end'])) : 'N/A' ?></td>
+                        <td><?= safeDateFormat($user['sub_end']) ?></td>
                         <td>
                             <?php
                             $status_class = 'inactive';
@@ -267,27 +277,17 @@ include 'header.php';
                             <?= $user['is_super_admin'] ? '<span class="badge bg-danger">Admin</span>' : '<span class="badge bg-secondary">User</span>' ?>
                         </td>
                         <td class="actions">
-                            <!-- ✅ Edit Button – Working -->
                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal_<?= $user['id'] ?>">
                                 <i class="fas fa-edit"></i>
                             </button>
 
-                            <!-- Delete -->
                             <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                 <a href="?delete=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">
                                     <i class="fas fa-trash"></i>
                                 </a>
-                            <?php endif; ?>
-
-                            <!-- Block/Unblock -->
-                            <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                 <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-warning">
                                     <?= $user['status'] == 'blocked' ? '<i class="fas fa-unlock"></i>' : '<i class="fas fa-lock"></i>' ?>
                                 </a>
-                            <?php endif; ?>
-
-                            <!-- Toggle Admin -->
-                            <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                 <a href="?toggle_admin=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-info">
                                     <?= $user['is_super_admin'] ? '<i class="fas fa-user-minus"></i>' : '<i class="fas fa-user-plus"></i>' ?>
                                 </a>
@@ -295,7 +295,7 @@ include 'header.php';
                         </td>
                     </tr>
 
-                    <!-- ====== EDIT MODAL – Unique ID per user ====== -->
+                    <!-- EDIT MODAL -->
                     <div class="modal fade" id="editModal_<?= $user['id'] ?>" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
@@ -348,7 +348,7 @@ include 'header.php';
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Package Expiry Date</label>
-                                                <input type="text" class="form-control" value="<?= $user['sub_end'] ? date('d M Y', strtotime($user['sub_end'])) : 'No active subscription' ?>" readonly>
+                                                <input type="text" class="form-control" value="<?= safeDateFormat($user['sub_end']) ?>" readonly>
                                                 <small class="text-muted">Expiry is auto-calculated; update package to change</small>
                                             </div>
                                             <div class="col-md-12">
