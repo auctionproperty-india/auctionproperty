@@ -25,10 +25,13 @@ if($source == 'auction') {
 }
 if(!$prop) { die("Property not found!"); }
 
+// ✅ Define $has_subscription and $show_images based on source
 if($source == 'auction') {
     $has_subscription = userHasActiveSubscription($pdo, $user_id);
+    $show_images = $has_subscription; // show images only if subscribed
 } else {
     $has_subscription = true; // customer properties are always visible
+    $show_images = true; // customer properties always show images
 }
 
 include 'header.php'; 
@@ -245,7 +248,7 @@ if($source == 'auction') {
                     <!-- Image Section -->
                     <div class="mt-5">
                         <h5 class="text-warning"><i class="fas fa-image me-2"></i>Property Image</h5>
-                        <?php if(!empty($image_url)): ?>
+                        <?php if(!empty($image_url) && $show_images): ?>
                             <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.05);">
                                 <a href="<?= htmlspecialchars($image_url) ?>" target="_blank">
                                     <img src="<?= htmlspecialchars($image_url) ?>" class="img-fluid" style="width:100%; max-height:400px; object-fit:contain; cursor:pointer;">
@@ -258,7 +261,7 @@ if($source == 'auction') {
                             <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; height:200px;">
                                 <div class="text-center p-4">
                                     <i class="fas fa-image" style="font-size:60px; opacity:0.3;"></i>
-                                    <p class="mt-2 opacity-75">No Image Available</p>
+                                    <p class="mt-2 opacity-75"><?= ($show_images ? 'No Image Available' : 'Subscribe to view image') ?></p>
                                 </div>
                             </div>
                         <?php endif; ?>
