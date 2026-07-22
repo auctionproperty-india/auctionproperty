@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📋 User Subscription History – Safe Date Formatting
+// 📋 User Subscription History – Safe Date Formatting (No updated_at)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -25,14 +25,14 @@ if (!function_exists('safeDateFormat')) {
 }
 
 // ---- Fetch user's subscription history ----
+// Removed s.updated_at since it doesn't exist in the table.
 $stmt = $pdo->prepare("
     SELECT 
         s.*,
         p.name as package_name,
         s.start_date,
         s.end_date,
-        s.created_at as request_date,
-        s.updated_at as action_date
+        s.created_at as request_date
     FROM subscriptions s
     LEFT JOIN packages p ON s.package_id = p.id
     WHERE s.user_id = ?
@@ -83,13 +83,19 @@ $subscriptions = $stmt->fetchAll();
                                 <td><?= safeDateFormat($sub['request_date']) ?></td>
                                 <td>
                                     <?php
+                                    // Determine action date:
+                                    // If status is active -> show start_date
+                                    // If status is rejected -> we don't have a reject date column, so show N/A or use created_at as fallback
+                                    // If status is pending -> N/A
                                     $actionDate = null;
                                     if ($sub['status'] == 'active') {
                                         $actionDate = $sub['start_date'];
                                     } elseif ($sub['status'] == 'rejected') {
-                                        $actionDate = $sub['action_date'];
+                                        // No reject timestamp; we can show created_at (request date) or N/A.
+                                        // Let's show N/A because we don't have a reject date.
+                                        $actionDate = null;
                                     } else {
-                                        $actionDate = $sub['updated_at'] ?? null;
+                                        $actionDate = null;
                                     }
                                     echo safeDateFormat($actionDate);
                                     ?>
