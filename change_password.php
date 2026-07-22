@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🔑 Change Password – OTP Display on Screen (No Email)
+// 🔑 Change Password – OTP Based (No Current Password)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -19,17 +19,11 @@ $otp = '';
 
 // ---- Step 1: Generate OTP and Display ----
 if (isset($_POST['generate_otp'])) {
-    $old_password = $_POST['old_password'] ?? '';
     $new_password = $_POST['new_password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
 
-    // Validate old password
-    $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
-    $stmt->execute([$user_id]);
-    $user = $stmt->fetch();
-    if (!password_verify($old_password, $user['password'])) {
-        $error = "❌ Current password is incorrect.";
-    } elseif (strlen($new_password) < 6) {
+    // Validate new password
+    if (strlen($new_password) < 6) {
         $error = "❌ New password must be at least 6 characters.";
     } elseif ($new_password !== $confirm_password) {
         $error = "❌ New passwords do not match.";
@@ -85,16 +79,13 @@ include 'header.php';
                     <div class="alert alert-danger"><?= $error ?></div>
                 <?php endif; ?>
 
-                <!-- Step 1: Old + New Password -->
+                <!-- Step 1: New Password + Confirm -->
                 <?php if (!$otp_generated && !isset($_POST['verify_otp'])): ?>
                 <form method="POST">
                     <div class="mb-3">
-                        <label class="form-label">Current Password *</label>
-                        <input type="password" name="old_password" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
                         <label class="form-label">New Password *</label>
                         <input type="password" name="new_password" class="form-control" required minlength="6">
+                        <small class="text-muted">Minimum 6 characters</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Confirm New Password *</label>
@@ -114,7 +105,7 @@ include 'header.php';
                     <form method="POST">
                         <div class="mb-3">
                             <label class="form-label">Enter OTP *</label>
-                            <input type="text" name="otp" class="form-control" placeholder="Enter 6-digit OTP" required maxlength="6">
+                            <input type="text" name="otp" class="form-control" placeholder="Enter 6-digit OTP" required maxlength="6" pattern="[0-9]{6}">
                         </div>
                         <button type="submit" name="verify_otp" class="btn btn-success">Verify & Change Password</button>
                         <a href="change_password.php" class="btn btn-secondary">Cancel</a>
