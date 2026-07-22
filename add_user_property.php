@@ -9,22 +9,9 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 
 $user_id = $_SESSION['user_id'];
 
-// Check limit
-$pkg = $pdo->prepare("SELECT p.max_properties FROM users u 
-                      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active' AND s.end_date >= CURRENT_DATE
-                      LEFT JOIN packages p ON s.package_id = p.id
-                      WHERE u.id = ? ORDER BY s.id DESC LIMIT 1");
-$pkg->execute([$user_id]);
-$max_props = $pkg->fetchColumn();
-if(!$max_props) $max_props = 1;
-
-$count_stmt = $pdo->prepare("SELECT COUNT(*) FROM user_properties WHERE user_id = ?");
-$count_stmt->execute([$user_id]);
-$used = $count_stmt->fetchColumn();
-if($used >= $max_props) {
-    header("Location: user_properties.php?msg=limit_reached");
-    exit;
-}
+// ✅ Unlimited Properties – No limit check
+// The following limit check has been removed to allow unlimited properties.
+// You can now add as many properties as you want.
 
 $message = '';
 $error = '';
@@ -112,7 +99,7 @@ include 'header.php';
                     <label class="form-label">Area (Sq Ft)</label>
                     <input type="number" step="0.01" name="sqft" class="form-control" placeholder="e.g. 1200">
                 </div>
-                <!-- ✅ NEW: Construction Area -->
+                <!-- Construction Area -->
                 <div class="col-md-3">
                     <label class="form-label">Construction Area (Sq Ft)</label>
                     <input type="number" step="0.01" name="construction_sqft" class="form-control" placeholder="e.g. 800">
