@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 Buy Subscription – Prevent Duplicate
+// 📦 Buy Subscription – Discount Price Pre-filled
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -22,16 +22,22 @@ if (!$package) {
     die("Invalid package selected.");
 }
 
-// ---- Check if user already has a pending subscription for any package ----
+// ---- Determine the price to display ----
+// Use discount price if available and less than regular price
+$display_price = $package['price'];
+if (!empty($package['discount_price']) && $package['discount_price'] > 0 && $package['discount_price'] < $package['price']) {
+    $display_price = $package['discount_price'];
+}
+
+// ---- Check if user already has a pending subscription ----
 $pending_check = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'pending'");
 $pending_check->execute([$user_id]);
 if ($pending_check->rowCount() > 0) {
-    // User already has a pending request – redirect with message
     header("Location: user_packages.php?msg=already_pending");
     exit;
 }
 
-// ---- Also check if user already has an active subscription ----
+// ---- Check if user already has an active subscription ----
 $active_check = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE");
 $active_check->execute([$user_id]);
 if ($active_check->rowCount() > 0) {
@@ -42,7 +48,7 @@ if ($active_check->rowCount() > 0) {
 // ---- If form submitted ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Sanitize inputs
-    $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : $package['price'];
+    $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : $display_price;
     $utr = trim($_POST['utr'] ?? '');
     $slip_path = '';
 
@@ -63,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ");
     $stmt->execute([$user_id, $package_id, $amount, $utr, $slip_path]);
 
-    // ✅ Redirect to user_packages with success message (prevent duplicate on refresh)
+    // Redirect with success
     header("Location: user_packages.php?msg=request_sent");
     exit;
 }
@@ -76,11 +82,18 @@ include 'header.php';
     <div class="card-premium" style="max-width: 600px; margin: auto;">
         <h4><i class="fas fa-shopping-cart me-2"></i>Buy Package: <?= htmlspecialchars($package['name']) ?></h4>
         <p class="text-muted">Fill the details below to request subscription.</p>
+
+        <?php if ($display_price < $package['price']): ?>
+            <div class="alert alert-info">
+                <i class="fas fa-tags"></i> You get a discount! Regular price: ₹<?= number_format($package['price'], 2) ?> → <strong>Pay only ₹<?= number_format($display_price, 2) ?></strong>
+            </div>
+        <?php endif; ?>
+
         <form method="POST" enctype="multipart/form-data">
             <div class="mb-3">
                 <label class="form-label">Amount (₹)</label>
-                <input type="number" step="0.01" name="amount" class="form-control" value="<?= $package['price'] ?>" required>
-                <small class="text-muted">You can edit amount if you have offer.</small>
+                <input type="number" step="0.01" name="amount" class="form-control" value="<?= number_format($display_price, 2) ?>" required>
+                <small class="text-muted">You can edit the amount if you have any special offer.</small>
             </div>
             <div class="mb-3">
                 <label class="form-label">UTR / Transaction ID</label>
