@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📊 Admin Dashboard – White + Dark Blue Theme
+// 📊 Admin Dashboard – Safe Date Formatting
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -11,12 +11,14 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit;
 }
 
-// ---- Helper: Safe Date Format ----
-function safeDateFormat($dateStr) {
-    if (empty($dateStr) || strtotime($dateStr) === false) {
-        return 'N/A';
+// ---- Safe Date Formatter ----
+if (!function_exists('safeDateFormat')) {
+    function safeDateFormat($dateStr) {
+        if (empty($dateStr) || strtotime($dateStr) === false) {
+            return 'N/A';
+        }
+        return date('d M Y', strtotime($dateStr));
     }
-    return date('d M Y', strtotime($dateStr));
 }
 
 // ---- Fetch all stats ----
@@ -29,10 +31,10 @@ $pending_subs = $pdo->query("SELECT COUNT(*) FROM subscriptions WHERE status = '
 $active_subs = $pdo->query("SELECT COUNT(*) FROM subscriptions WHERE status = 'active' OR status = 'paid'")->fetchColumn();
 $total_revenue = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM subscriptions WHERE status = 'active' OR status = 'paid'")->fetchColumn();
 
-// ---- Recent users (limit 5) ----
+// ---- Recent users ----
 $recent_users = $pdo->query("SELECT id, name, email, created_at FROM users ORDER BY id DESC LIMIT 5")->fetchAll();
 
-// ---- Recent properties (limit 5) ----
+// ---- Recent properties ----
 $recent_props = $pdo->query("SELECT id, title, price, created_at FROM properties ORDER BY id DESC LIMIT 5")->fetchAll();
 
 require_once __DIR__ . '/header.php';
