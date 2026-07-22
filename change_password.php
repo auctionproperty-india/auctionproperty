@@ -1,138 +1,128 @@
 <?php
+// ============================================================
+// 🔑 Change Password – OTP Display on Screen (No Email)
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
 
 $user_id = $_SESSION['user_id'];
-$role = $_SESSION['role'];
-$target_user_id = $_GET['user_id'] ?? $user_id;
-
-// अगर Admin किसी और का बदल रहा है
-$is_admin_mode = ($role == 'admin' && $target_user_id != $user_id);
-
-// Target User Data - Explicit Columns
-$stmt = $pdo->prepare("SELECT id, name, email, password, otp_code, otp_expiry FROM users WHERE id = ?");
-$stmt->execute([$target_user_id]);
-$target_user = $stmt->fetch();
-if(!$target_user) { die("User not found!"); }
-
 $message = '';
-$otp_sent = false;
+$error = '';
+$otp_generated = false;
+$otp = '';
 
-// Email Send Function
-function send_mail($to, $subject, $body) {
-    $headers = "MIME-Version: 1.0" . "\r\n";
-    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-    $headers .= "From: Prime Property <noreply@primeproperty.com>" . "\r\n";
-    return mail($to, $subject, $body, $headers);
-}
+// ---- Step 1: Generate OTP and Display ----
+if (isset($_POST['generate_otp'])) {
+    $old_password = $_POST['old_password'] ?? '';
+    $new_password = $_POST['new_password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
 
-// ---- ADMIN DIRECT CHANGE (बिना OTP) ----
-if($is_admin_mode && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['admin_change_pass'])) {
-    $new_pass = $_POST['new_password'];
-    if(strlen($new_pass) < 6) { $message = "❌ Password must be at least 6 characters."; 
+    // Validate old password
+    $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    $user = $stmt->fetch();
+    if (!password_verify($old_password, $user['password'])) {
+        $error = "❌ Current password is incorrect.";
+    } elseif (strlen($new_password) < 6) {
+        $error = "❌ New password must be at least 6 characters.";
+    } elseif ($new_password !== $confirm_password) {
+        $error = "❌ New passwords do not match.";
     } else {
-        $hashed = password_hash($new_pass, PASSWORD_BCRYPT);
-        $pdo->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed, $target_user_id]);
-        send_mail($target_user['email'], "Password Changed by Admin", "Your password has been changed by Admin. New password: <strong>$new_pass</strong>");
-        $message = "✅ Password for <strong>{$target_user['email']}</strong> changed successfully!";
-    }
-}
-
-// ---- USER SELF CHANGE (OTP Flow) ----
-if(!$is_admin_mode) {
-    // Step A: Send OTP
-    if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_otp'])) {
+        // Generate OTP (6 digits)
         $otp = rand(100000, 999999);
-        $expiry = date('Y-m-d H:i:s', strtotime('+10 minutes'));
-        $pdo->prepare("UPDATE users SET otp_code = ?, otp_expiry = ? WHERE id = ?")->execute([$otp, $expiry, $user_id]);
-        
-        $body = "Your OTP for password change is: <h2>$otp</h2><p>This OTP is valid for 10 minutes.</p>";
-        if(send_mail($target_user['email'], "Your OTP for Password Change", $body)) {
-            $otp_sent = true;
-            $message = "✅ OTP sent to your email!";
-        } else {
-            $message = "❌ Failed to send email. Please check your mail settings.";
-        }
-    }
-
-    // Step B: Verify OTP and Change Password
-    if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['verify_otp_change'])) {
-        $otp_input = $_POST['otp_code'];
-        $new_pass = $_POST['new_password'];
-        
-        // ✅ Explicit columns for OTP check
-        $check = $pdo->prepare("SELECT id FROM users WHERE id = ? AND otp_code = ? AND otp_expiry > NOW()");
-        $check->execute([$user_id, $otp_input]);
-        if($check->rowCount() > 0) {
-            if(strlen($new_pass) < 6) { 
-                $message = "❌ Password must be at least 6 characters.";
-            } else {
-                $hashed = password_hash($new_pass, PASSWORD_BCRYPT);
-                $pdo->prepare("UPDATE users SET password = ?, otp_code = NULL, otp_expiry = NULL WHERE id = ?")->execute([$hashed, $user_id]);
-                send_mail($target_user['email'], "Password Changed Successfully", "Your password has been changed successfully.");
-                $message = "✅ Password changed successfully! <a href='dashboard.php'>Go to Dashboard</a>";
-            }
-        } else {
-            $message = "❌ Invalid or Expired OTP!";
-        }
+        $_SESSION['change_pass_otp'] = $otp;
+        $_SESSION['change_pass_new'] = $new_password; // store temporarily
+        $_SESSION['change_pass_otp_time'] = time();
+        $otp_generated = true;
+        $message = "✅ OTP generated successfully! Please enter it below.";
     }
 }
+
+// ---- Step 2: Verify OTP and Change Password ----
+if (isset($_POST['verify_otp'])) {
+    $user_otp = $_POST['otp'] ?? '';
+    $stored_otp = $_SESSION['change_pass_otp'] ?? null;
+    $new_pass = $_SESSION['change_pass_new'] ?? null;
+    $otp_time = $_SESSION['change_pass_otp_time'] ?? 0;
+
+    // Check OTP expiry (5 minutes)
+    if (time() - $otp_time > 300) {
+        $error = "❌ OTP has expired. Please generate a new one.";
+        unset($_SESSION['change_pass_otp'], $_SESSION['change_pass_new'], $_SESSION['change_pass_otp_time']);
+    } elseif ($user_otp != $stored_otp) {
+        $error = "❌ Invalid OTP. Please try again.";
+    } else {
+        // OTP verified – update password
+        $hashed = password_hash($new_pass, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
+        $stmt->execute([$hashed, $user_id]);
+        $message = "✅ Password changed successfully!";
+        unset($_SESSION['change_pass_otp'], $_SESSION['change_pass_new'], $_SESSION['change_pass_otp_time']);
+        // Optionally redirect after a few seconds
+        // header("Refresh: 2; url=dashboard.php");
+    }
+}
+
+include 'header.php';
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Change Password</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        body { background: #f4f7fc; font-family: 'Inter', sans-serif; }
-        .container { max-width: 500px; margin-top: 80px; }
-        .card { border-radius: 20px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-        .btn-primary { background: #2563eb; border: none; }
-        .btn-primary:hover { background: #1d4ed8; }
-    </style>
-</head>
-<body>
-<div class="container">
-    <div class="card p-4 shadow-sm">
-        <h3 class="mb-3">🔑 Change Password</h3>
-        <?php if($message) echo "<div class='alert alert-info'>$message</div>"; ?>
 
-        <?php if($is_admin_mode): ?>
-            <form method="POST">
-                <p><strong>User:</strong> <?= htmlspecialchars($target_user['email']) ?></p>
-                <div class="mb-3">
-                    <label>New Password</label>
-                    <input type="text" name="new_password" class="form-control" required>
-                </div>
-                <button type="submit" name="admin_change_pass" class="btn btn-primary w-100">Update Password</button>
-                <a href="dashboard.php" class="btn btn-link mt-2 d-block text-center">⬅ Back to Dashboard</a>
-            </form>
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card-premium">
+                <h4><i class="fas fa-key me-2"></i>Change Password</h4>
 
-        <?php else: ?>
-            <?php if(!$otp_sent): ?>
-                <form method="POST">
-                    <p>An OTP will be sent to <strong><?= htmlspecialchars($target_user['email']) ?></strong></p>
-                    <button type="submit" name="send_otp" class="btn btn-primary w-100">📧 Send OTP</button>
-                </form>
-            <?php else: ?>
+                <?php if ($message): ?>
+                    <div class="alert alert-success"><?= $message ?></div>
+                <?php endif; ?>
+                <?php if ($error): ?>
+                    <div class="alert alert-danger"><?= $error ?></div>
+                <?php endif; ?>
+
+                <!-- Step 1: Old + New Password -->
+                <?php if (!$otp_generated && !isset($_POST['verify_otp'])): ?>
                 <form method="POST">
                     <div class="mb-3">
-                        <label>Enter OTP (6 digits)</label>
-                        <input type="text" name="otp_code" class="form-control" required maxlength="6">
+                        <label class="form-label">Current Password *</label>
+                        <input type="password" name="old_password" class="form-control" required>
                     </div>
                     <div class="mb-3">
-                        <label>New Password</label>
-                        <input type="text" name="new_password" class="form-control" required minlength="6">
+                        <label class="form-label">New Password *</label>
+                        <input type="password" name="new_password" class="form-control" required minlength="6">
                     </div>
-                    <button type="submit" name="verify_otp_change" class="btn btn-success w-100">✅ Verify & Change Password</button>
+                    <div class="mb-3">
+                        <label class="form-label">Confirm New Password *</label>
+                        <input type="password" name="confirm_password" class="form-control" required>
+                    </div>
+                    <button type="submit" name="generate_otp" class="btn btn-primary">Generate OTP</button>
                 </form>
-            <?php endif; ?>
-            <a href="dashboard.php" class="btn btn-link mt-2 d-block text-center">⬅ Back to Dashboard</a>
-        <?php endif; ?>
+                <?php endif; ?>
+
+                <!-- Step 2: Enter OTP (displayed on screen) -->
+                <?php if ($otp_generated || isset($_POST['generate_otp']) && !$error): ?>
+                    <!-- Show OTP on screen -->
+                    <div class="alert alert-info text-center mt-3" style="font-size: 1.5rem; font-weight: bold; background: #f0f9ff; border: 2px dashed #0284c7;">
+                        🔑 Your OTP: <span style="color: #dc2626; letter-spacing: 4px;"><?= $otp ?></span>
+                        <br><small class="text-muted" style="font-size: 0.8rem;">(This OTP is valid for 5 minutes)</small>
+                    </div>
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Enter OTP *</label>
+                            <input type="text" name="otp" class="form-control" placeholder="Enter 6-digit OTP" required maxlength="6">
+                        </div>
+                        <button type="submit" name="verify_otp" class="btn btn-success">Verify & Change Password</button>
+                        <a href="change_password.php" class="btn btn-secondary">Cancel</a>
+                    </form>
+                <?php endif; ?>
+            </div>
+        </div>
     </div>
 </div>
-</body>
-</html>
+
+<?php include 'footer.php'; ?>
