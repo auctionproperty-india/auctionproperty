@@ -15,17 +15,10 @@ $stmt = $pdo->prepare("SELECT * FROM user_properties WHERE user_id = ? ORDER BY 
 $stmt->execute([$user_id]);
 $props = $stmt->fetchAll();
 
-// Get allowed properties count based on package
-$pkg = $pdo->prepare("SELECT p.max_properties FROM users u 
-                      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active' AND s.end_date >= CURRENT_DATE
-                      LEFT JOIN packages p ON s.package_id = p.id
-                      WHERE u.id = ? ORDER BY s.id DESC LIMIT 1");
-$pkg->execute([$user_id]);
-$max_props = $pkg->fetchColumn();
-if(!$max_props) $max_props = 1;
-
-$used_props = count($props);
-$can_add = ($used_props < $max_props);
+// ✅ Unlimited properties – no limit check
+$total_props = count($props);
+// Always allow adding more properties
+$can_add = true; // Always true
 ?>
 <style>
     .property-card {
@@ -46,12 +39,10 @@ $can_add = ($used_props < $max_props);
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4><i class="fas fa-building me-2"></i>My Properties</h4>
         <div>
-            <span class="badge bg-secondary me-2">Used: <?= $used_props ?> / <?= $max_props ?></span>
-            <?php if($can_add): ?>
-                <a href="add_user_property.php" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Property</a>
-            <?php else: ?>
-                <button class="btn btn-secondary btn-sm" disabled>Limit Reached</button>
-            <?php endif; ?>
+            <!-- ✅ Show total count only, no limit -->
+            <span class="badge bg-secondary me-2">Total: <?= $total_props ?></span>
+            <!-- ✅ Always show Add Property button -->
+            <a href="add_user_property.php" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Property</a>
         </div>
     </div>
 
@@ -100,9 +91,8 @@ $can_add = ($used_props < $max_props);
         <div class="alert alert-info text-center py-4">
             <i class="fas fa-home fa-2x"></i>
             <p class="mt-2">You haven't added any properties yet.</p>
-            <?php if($can_add): ?>
-                <a href="add_user_property.php" class="btn btn-primary">Add Your First Property</a>
-            <?php endif; ?>
+            <!-- ✅ Always show Add button in empty state -->
+            <a href="add_user_property.php" class="btn btn-primary">Add Your First Property</a>
         </div>
     <?php endif; ?>
 </div>
