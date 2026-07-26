@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📝 Add User Property – Auto Approve/Reject on Mobile Number
+// 📝 Add User Property – Auto Approve/Reject + created_at NOW()
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -15,9 +15,7 @@ $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
 
-// Function to check if description contains an Indian mobile number
 function containsMobileNumber($text) {
-    // Match 10-digit numbers starting with 6,7,8,9
     return preg_match('/[6-9][0-9]{9}/', $text);
 }
 
@@ -35,12 +33,10 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
     if(empty($title) || $price <= 0) {
         $error = "❌ Title and Price are required.";
     } else {
-        // Check for mobile number in description
         $has_mobile = containsMobileNumber($description);
         $status = $has_mobile ? 'rejected' : 'approved';
         $admin_remarks = $has_mobile ? 'Mobile number not allowed in description.' : null;
 
-        // Handle image upload
         if(isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
             $upload_dir = 'uploads/user_properties/';
             if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
@@ -50,13 +46,14 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
             if(move_uploaded_file($_FILES['image']['tmp_name'], $target_path)) {
                 $image_url = $target_path;
             } else {
-                $error = "❌ Failed to upload image. Please check directory permissions.";
+                $error = "❌ Failed to upload image.";
             }
         }
 
         if(empty($error)) {
-            $stmt = $pdo->prepare("INSERT INTO user_properties (user_id, title, description, price, city, state, type, sqft, construction_sqft, image_url, status, admin_remarks) 
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            // ✅ Explicitly set created_at = NOW()
+            $stmt = $pdo->prepare("INSERT INTO user_properties (user_id, title, description, price, city, state, type, sqft, construction_sqft, image_url, status, admin_remarks, created_at) 
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
             $stmt->execute([$user_id, $title, $description, $price, $city, $state, $type, $sqft, $construction_sqft, $image_url, $status, $admin_remarks]);
             
             if ($status == 'approved') {
@@ -88,7 +85,7 @@ include 'header.php';
                 <div class="col-md-12">
                     <label class="form-label">Description *</label>
                     <textarea name="description" class="form-control" rows="3" required></textarea>
-                    <small class="text-danger">⚠️ Mobile numbers are not allowed in description. If found, your property will be rejected automatically.</small>
+                    <small class="text-danger">⚠️ Mobile numbers are not allowed in description.</small>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">City</label>
@@ -122,7 +119,7 @@ include 'header.php';
                 <div class="col-md-12">
                     <label class="form-label">Upload Image (1 photo)</label>
                     <input type="file" name="image" class="form-control" accept="image/*">
-                    <small class="text-muted">Max file size: 5MB. Supported: JPG, PNG, GIF.</small>
+                    <small class="text-muted">Max file size: 5MB.</small>
                 </div>
             </div>
             <button type="submit" name="add_property" class="btn btn-primary mt-3">Submit Property</button>
