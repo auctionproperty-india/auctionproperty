@@ -585,7 +585,6 @@ if ($is_logged_in && $role == 'user') {
     
     <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
-<?php endif; ?>
 
 <div class="main-content">
     <!-- ====== टॉप बार (यूजर इन्फो) – सभी लॉगिन पेजों पर ====== -->
