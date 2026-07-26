@@ -1,4 +1,8 @@
 <?php
+// ============================================================
+// 📝 Add User Property – Auto Approve/Reject on Mobile Number
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -8,13 +12,14 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 }
 
 $user_id = $_SESSION['user_id'];
-
-// ✅ Unlimited Properties – No limit check
-// The following limit check has been removed to allow unlimited properties.
-// You can now add as many properties as you want.
-
 $message = '';
 $error = '';
+
+// Function to check if description contains an Indian mobile number
+function containsMobileNumber($text) {
+    // Match 10-digit numbers starting with 6,7,8,9
+    return preg_match('/[6-9][0-9]{9}/', $text);
+}
 
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
     $title = trim($_POST['title']);
@@ -30,6 +35,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
     if(empty($title) || $price <= 0) {
         $error = "❌ Title and Price are required.";
     } else {
+        // Check for mobile number in description
+        $has_mobile = containsMobileNumber($description);
+        $status = $has_mobile ? 'rejected' : 'approved';
+        $admin_remarks = $has_mobile ? 'Mobile number not allowed in description.' : null;
+
         // Handle image upload
         if(isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
             $upload_dir = 'uploads/user_properties/';
@@ -45,10 +55,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
         }
 
         if(empty($error)) {
-            $stmt = $pdo->prepare("INSERT INTO user_properties (user_id, title, description, price, city, state, type, sqft, construction_sqft, image_url, status) 
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
-            $stmt->execute([$user_id, $title, $description, $price, $city, $state, $type, $sqft, $construction_sqft, $image_url]);
-            header("Location: user_properties.php?msg=added");
+            $stmt = $pdo->prepare("INSERT INTO user_properties (user_id, title, description, price, city, state, type, sqft, construction_sqft, image_url, status, admin_remarks) 
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$user_id, $title, $description, $price, $city, $state, $type, $sqft, $construction_sqft, $image_url, $status, $admin_remarks]);
+            
+            if ($status == 'approved') {
+                header("Location: user_properties.php?msg=auto_approved");
+            } else {
+                header("Location: user_properties.php?msg=auto_rejected");
+            }
             exit;
         }
     }
@@ -71,8 +86,9 @@ include 'header.php';
                     <input type="number" step="0.01" name="price" class="form-control" required>
                 </div>
                 <div class="col-md-12">
-                    <label class="form-label">Description</label>
-                    <textarea name="description" class="form-control" rows="3"></textarea>
+                    <label class="form-label">Description *</label>
+                    <textarea name="description" class="form-control" rows="3" required></textarea>
+                    <small class="text-danger">⚠️ Mobile numbers are not allowed in description. If found, your property will be rejected automatically.</small>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">City</label>
@@ -99,7 +115,6 @@ include 'header.php';
                     <label class="form-label">Area (Sq Ft)</label>
                     <input type="number" step="0.01" name="sqft" class="form-control" placeholder="e.g. 1200">
                 </div>
-                <!-- Construction Area -->
                 <div class="col-md-3">
                     <label class="form-label">Construction Area (Sq Ft)</label>
                     <input type="number" step="0.01" name="construction_sqft" class="form-control" placeholder="e.g. 800">
