@@ -571,7 +571,6 @@ if ($is_logged_in && $role == 'user') {
         ...
     <?php endif; ?>
             
-    <?php else: ?>
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
