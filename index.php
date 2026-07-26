@@ -1,11 +1,21 @@
 <?php
 // ============================================================
-// 🏠 Home Page – पूरी फाइल
+// 🏠 Home Page – Updated with safeDateFormat for Customer Properties
 // ============================================================
 
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
+
+// ---- Safe Date Formatter ----
+if (!function_exists('safeDateFormat')) {
+    function safeDateFormat($dateStr) {
+        if (empty($dateStr) || strtotime($dateStr) === false) {
+            return 'N/A';
+        }
+        return date('d M Y', strtotime($dateStr));
+    }
+}
 
 $user_id = $_SESSION['user_id'] ?? null;
 $show_images = userHasActiveSubscription($pdo, $user_id);
@@ -58,7 +68,7 @@ $customer_stmt = $pdo->prepare($customer_sql);
 $customer_stmt->execute($params);
 $customer_props = $customer_stmt->fetchAll();
 
-// ---- Render Property Card ----
+// ---- Render Property Card (with safeDateFormat) ----
 function renderPropertyCard($prop, $show_images, $is_today = false) {
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
@@ -84,7 +94,8 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                     <?php if($prop['source'] == 'auction' && !empty($prop['auction_start_time'])): ?>
                         <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                     <?php elseif($prop['source'] == 'customer'): ?>
-                        <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;">📅 <?= date('d M Y', strtotime($prop['created_at'])) ?></span>
+                        <!-- ✅ Use safeDateFormat for customer property created_at -->
+                        <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;">📅 <?= safeDateFormat($prop['created_at']) ?></span>
                     <?php endif; ?>
                 </div>
                 <h5 style="font-size:1.2rem; font-weight:700; margin:12px 0 6px; color:<?= $text_color ?>;"><?= htmlspecialchars($prop['title']) ?></h5>
