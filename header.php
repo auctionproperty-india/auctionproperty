@@ -557,7 +557,7 @@ if ($is_logged_in && $role == 'user') {
         <?php if (hasViewPermission('support', $pdo)): ?>
             <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <?php endif; ?>
-        
+        <?php if (hasViewPermission('user_properties', $pdo)): ?>
             <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
         <?php endif; ?>
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
