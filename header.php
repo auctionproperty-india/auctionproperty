@@ -565,7 +565,7 @@ if ($is_logged_in && $role == 'user') {
             <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
         <?php endif; ?>
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
-        
+      <?php endif; ?>  
     <?php else: ?>
         <!-- User Sidebar -->
         ...
