@@ -523,7 +523,7 @@ if ($is_logged_in && $role == 'user') {
     <?php if ($role == 'admin'): ?>
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <?php if (hasViewPermission('properties', $pdo)): ?>
-            <a href="properties.php"><i class="fas fa-edit"></i> <span>Manage Properties</span></a>
+            <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
         <?php endif; ?>
         <?php if ($is_super_admin): ?>
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
@@ -557,7 +557,7 @@ if ($is_logged_in && $role == 'user') {
         <?php if (hasViewPermission('support', $pdo)): ?>
             <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <?php endif; ?>
-        <?php if (hasViewPermission('user_properties', $pdo)): ?>
+        
             <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
         <?php endif; ?>
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
