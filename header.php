@@ -519,7 +519,6 @@ if ($is_logged_in && $role == 'user') {
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
-    
     <?php if ($role == 'admin'): ?>
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <?php if (hasViewPermission('properties', $pdo)): ?>
@@ -557,15 +556,21 @@ if ($is_logged_in && $role == 'user') {
         <?php if (hasViewPermission('support', $pdo)): ?>
             <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <?php endif; ?>
-        <?php if (hasViewPermission('user_properties', $pdo)): ?>
-            <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
-        <?php endif; ?>
+        
+        <!-- ✅ User Properties – अब permission check नहीं, सीधा दिखेगा -->
+        <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
+        
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
         <?php if ($is_super_admin): ?>
             <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
         <?php endif; ?>
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         
+    <?php else: ?>
+        <!-- User Sidebar -->
+        ...
+    <?php endif; ?>
+            
     <?php else: ?>
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
