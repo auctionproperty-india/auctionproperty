@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार (Mobile Sidebar Fix)
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (Complete)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -359,7 +359,6 @@ if ($is_logged_in && $role == 'user') {
         }
         body.role-admin .hamburger-btn { color: #1e293b; }
         body.role-user .hamburger-btn { color: #1e293b; }
-        /* ✅ Desktop पर hamburger छिपाएँ */
         @media (min-width: 992px) {
             .hamburger-btn {
                 display: none !important;
@@ -514,11 +513,12 @@ if ($is_logged_in && $role == 'user') {
 </nav>
 <?php endif; ?>
 
-<!-- ====== साइडबार ====== -->
+<!-- ====== साइडबार – केवल लॉगिन यूजर के लिए ====== -->
 <?php if ($is_logged_in): ?>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
+    
     <?php if ($role == 'admin'): ?>
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <?php if (hasViewPermission('properties', $pdo)): ?>
@@ -556,21 +556,16 @@ if ($is_logged_in && $role == 'user') {
         <?php if (hasViewPermission('support', $pdo)): ?>
             <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <?php endif; ?>
-        
         <!-- ✅ User Properties – अब permission check नहीं, सीधा दिखेगा -->
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
-        
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
         <?php if ($is_super_admin): ?>
             <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
         <?php endif; ?>
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
-      <?php endif; ?>  
+        
     <?php else: ?>
         <!-- User Sidebar -->
-        ...
-    <?php endif; ?>
-            
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
@@ -581,17 +576,17 @@ if ($is_logged_in && $role == 'user') {
         <a href="user_properties.php"><i class="fas fa-home"></i> <span>My Properties</span></a>
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
         <a href="user_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
-    
+    <?php endif; ?>
     
     <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
+<?php endif; ?>
 
 <div class="main-content">
     <!-- ====== टॉप बार (यूजर इन्फो) – सभी लॉगिन पेजों पर ====== -->
     <?php if ($is_logged_in): ?>
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
-            <!-- ✅ Hamburger Button – Mobile Sidebar Toggle -->
             <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()">
                 <i class="fas fa-bars"></i>
             </button>
@@ -690,3 +685,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+</body>
+</html>
