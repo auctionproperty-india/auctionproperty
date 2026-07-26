@@ -1,4 +1,8 @@
 <?php
+// ============================================================
+// 🏠 My Properties – User Panel (Unlimited + Auto Messages)
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -10,16 +14,24 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php';
 
+// ---- Show messages ----
+if (isset($_GET['msg'])) {
+    if ($_GET['msg'] == 'auto_approved') {
+        echo "<div class='alert alert-success alert-dismissible fade show'><i class='fas fa-check-circle'></i> ✅ Your property has been auto-approved and is now visible to all.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+    } elseif ($_GET['msg'] == 'auto_rejected') {
+        echo "<div class='alert alert-danger alert-dismissible fade show'><i class='fas fa-times-circle'></i> ❌ Your property was rejected because the description contains a mobile number. Please remove it and try again.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+    } elseif ($_GET['msg'] == 'added') {
+        echo "<div class='alert alert-success alert-dismissible fade show'><i class='fas fa-check-circle'></i> ✅ Property added successfully!<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+    }
+}
+
 // Fetch user's properties
 $stmt = $pdo->prepare("SELECT * FROM user_properties WHERE user_id = ? ORDER BY created_at DESC");
 $stmt->execute([$user_id]);
 $props = $stmt->fetchAll();
-
-// ✅ Unlimited properties – no limit check
 $total_props = count($props);
-// Always allow adding more properties
-$can_add = true; // Always true
 ?>
+
 <style>
     .property-card {
         border-radius: 16px;
@@ -39,14 +51,12 @@ $can_add = true; // Always true
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4><i class="fas fa-building me-2"></i>My Properties</h4>
         <div>
-            <!-- ✅ Show total count only, no limit -->
             <span class="badge bg-secondary me-2">Total: <?= $total_props ?></span>
-            <!-- ✅ Always show Add Property button -->
             <a href="add_user_property.php" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Property</a>
         </div>
     </div>
 
-    <?php if(count($props) > 0): ?>
+    <?php if($total_props > 0): ?>
         <div class="row">
             <?php foreach($props as $p): 
                 $status_class = $p['status'] == 'approved' ? 'approved' : ($p['status'] == 'pending' ? 'pending' : 'rejected');
@@ -80,7 +90,7 @@ $can_add = true; // Always true
                             <?php endif; ?>
                             <div class="mt-2">
                                 <a href="edit_user_property.php?id=<?= $p['id'] ?>" class="btn btn-sm btn-outline-primary">Edit</a>
-                                <a href="delete_user_property.php?id=<?= $p['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?')">Delete</a>
+                                <a href="delete_user_property.php?id=<?= $p['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this property?')">Delete</a>
                             </div>
                         </div>
                     </div>
@@ -91,7 +101,6 @@ $can_add = true; // Always true
         <div class="alert alert-info text-center py-4">
             <i class="fas fa-home fa-2x"></i>
             <p class="mt-2">You haven't added any properties yet.</p>
-            <!-- ✅ Always show Add button in empty state -->
             <a href="add_user_property.php" class="btn btn-primary">Add Your First Property</a>
         </div>
     <?php endif; ?>
