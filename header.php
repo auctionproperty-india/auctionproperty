@@ -581,7 +581,7 @@ if ($is_logged_in && $role == 'user') {
         <a href="user_properties.php"><i class="fas fa-home"></i> <span>My Properties</span></a>
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
         <a href="user_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
-    <?php endif; ?>
+    
     
     <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
