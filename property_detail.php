@@ -1,51 +1,53 @@
 <?php
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
-if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+
+// ✅ No login redirect – all users can view property details
 
 $property_id = $_GET['id'] ?? 0;
-$source = $_GET['source'] ?? 'auction'; // default auction
-$user_id = $_SESSION['user_id'];
+$source = $_GET['source'] ?? 'auction';
+$viewer_id = $_SESSION['user_id'] ?? 0; // 0 means guest
 
-// Log property view
-if ($property_id) {
-    logActivity($pdo, $user_id, 'property_view', 'Property ID: ' . $property_id . ', Source: ' . $source);
+// Log activity only if logged in
+if ($property_id && $viewer_id > 0) {
+    logActivity($pdo, $viewer_id, 'property_view', 'Property ID: ' . $property_id . ', Source: ' . $source);
 }
 
-if($source == 'auction') {
+// Fetch property
+if ($source == 'auction') {
     $stmt = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
     $stmt->execute([$property_id]);
     $prop = $stmt->fetch();
     $is_customer = false;
 } else {
-    // ✅ Include user_id for notification
     $stmt = $pdo->prepare("SELECT * FROM user_properties WHERE id = ? AND status = 'approved'");
     $stmt->execute([$property_id]);
     $prop = $stmt->fetch();
     $is_customer = true;
 }
-if(!$prop) { die("Property not found!"); }
+if (!$prop) { die("Property not found!"); }
 
-if($source == 'auction') {
-    $has_subscription = userHasActiveSubscription($pdo, $user_id);
+// ---- Subscription status (only for auction) ----
+if ($source == 'auction') {
+    $has_subscription = ($viewer_id > 0) ? userHasActiveSubscription($pdo, $viewer_id) : false;
 } else {
-    $has_subscription = true; // customer properties are always visible
+    $has_subscription = true; // customer properties always visible
 }
 
-// ---- Add notification if viewing a customer property and viewer is not the owner ----
-if ($source == 'customer' && $is_customer && isset($_SESSION['user_id'])) {
-    $viewer_id = $_SESSION['user_id'];
+// ---- ✅ NOTIFICATION LOGIC – Every view gets a notification ----
+if ($source == 'customer' && $is_customer) {
     $owner_id = $prop['user_id'] ?? 0;
-    
-    if ($viewer_id != $owner_id && $owner_id > 0) {
-        // Avoid spam: check if notification for this property and viewer already sent in last 24 hours
-        $check = $pdo->prepare("SELECT id FROM notifications WHERE user_id = ? AND message LIKE ? AND created_at > NOW() - INTERVAL '1 day'");
-        $check->execute([$owner_id, '%' . $prop['title'] . '%']);
-        if ($check->rowCount() == 0) {
-            $message = "Your property '{$prop['title']}' was viewed by a potential buyer. Upgrade your package to get buyer contact details ASAP!";
-            $link = "user_packages.php";
+    // Notify owner if viewer is not the owner (guest viewer -> 0 != owner)
+    if ($owner_id > 0 && $viewer_id != $owner_id) {
+        // ✅ No duplicate check – each view creates a new notification
+        $message = "Your property '{$prop['title']}' was viewed by someone. Upgrade your package to get buyer contact details!";
+        $link = "user_packages.php";
+        try {
             $stmt = $pdo->prepare("INSERT INTO notifications (user_id, message, link, created_at) VALUES (?, ?, ?, NOW())");
             $stmt->execute([$owner_id, $message, $link]);
+        } catch (Exception $e) {
+            // Silent fail – you can enable error_log for debugging
+            // error_log("Notification insert failed: " . $e->getMessage());
         }
     }
 }
@@ -53,7 +55,7 @@ if ($source == 'customer' && $is_customer && isset($_SESSION['user_id'])) {
 include 'header.php'; 
 
 // ---- IF NOT SUBSCRIBED (only for auction) ----
-if(!$has_subscription && $source == 'auction') {
+if (!$has_subscription && $source == 'auction') {
     ?>
     <div class="container py-5">
         <div class="row justify-content-center">
@@ -110,17 +112,18 @@ if(!$has_subscription && $source == 'auction') {
     exit;
 }
 
-// ----- SUBSCRIBED or CUSTOMER: Show ALL Details ----
+// ----- SUBSCRIBED (for auction) or CUSTOMER: Show ALL Details ----
 $gradient = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
 $image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image_url'] ?? '');
+$show_images = ($source == 'auction') ? $has_subscription : true; // customer images always visible
 
-// ---- Similar Properties (only for auction, based on city and price) ----
+// ---- Similar Properties (only for auction) ----
 $similar_props = [];
-if($source == 'auction') {
+if ($source == 'auction') {
     $city = $prop['city'] ?? '';
     $price = (float)$prop['price'];
-    $min_price = $price * 0.7; // 30% less
-    $max_price = $price * 1.3; // 30% more
+    $min_price = $price * 0.7;
+    $max_price = $price * 1.3;
     $sql = "SELECT id, title, price, city, image_url, bank_name, auction_date 
             FROM properties 
             WHERE status = 'available' 
@@ -175,7 +178,6 @@ if($source == 'auction') {
                             </div>
                         </div>
 
-                        <!-- Area and Construction Area (for customer properties) -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75"><i class="fas fa-map-pin"></i> City</small>
@@ -281,7 +283,7 @@ if($source == 'auction') {
                         <?php endif; ?>
                     </div>
 
-                    <!-- ===== SIMILAR PROPERTIES SECTION (only for auction) ===== -->
+                    <!-- Similar Properties -->
                     <?php if($source == 'auction' && count($similar_props) > 0): ?>
                     <div class="mt-5">
                         <h5 class="text-warning"><i class="fas fa-list-ul me-2"></i>Similar Properties</h5>
@@ -309,7 +311,6 @@ if($source == 'auction') {
                         </div>
                     </div>
                     <?php endif; ?>
-                    <!-- ===== END SIMILAR PROPERTIES ===== -->
 
                 </div>
             </div>
