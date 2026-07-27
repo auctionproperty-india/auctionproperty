@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार (Complete with Notifications)
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (No Notifications)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -59,20 +59,6 @@ if ($is_logged_in && $role == 'user') {
         $expiry_date = null;
         $days_left = 0;
     }
-}
-
-// ---- Fetch notifications for user ----
-$notifications = [];
-$unread_count = 0;
-if ($is_logged_in && $role == 'user') {
-    $user_id = $_SESSION['user_id'];
-    $notif_stmt = $pdo->prepare("SELECT id, message, link, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
-    $notif_stmt->execute([$user_id]);
-    $notifications = $notif_stmt->fetchAll();
-    
-    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = FALSE");
-    $count_stmt->execute([$user_id]);
-    $unread_count = $count_stmt->fetchColumn();
 }
 ?>
 <!DOCTYPE html>
@@ -378,67 +364,6 @@ if ($is_logged_in && $role == 'user') {
             }
         }
 
-        /* ====== नोटिफिकेशन ====== */
-        .notification-dropdown {
-            position: relative;
-            display: inline-block;
-        }
-        .notification-dropdown .dropdown-menu {
-            min-width: 350px;
-            max-height: 400px;
-            overflow-y: auto;
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 0;
-            margin-top: 8px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-        }
-        .notification-dropdown .dropdown-item {
-            color: #1e293b;
-            padding: 10px 16px;
-            border-bottom: 1px solid #f1f5f9;
-            white-space: normal;
-            font-size: 0.85rem;
-        }
-        .notification-dropdown .dropdown-item:hover { background: #f8fafc; color: #0f172a; }
-        .notification-dropdown .dropdown-item:last-child { border-bottom: none; }
-        .notification-dropdown .dropdown-header {
-            color: #475569;
-            padding: 10px 16px;
-            font-weight: 600;
-            border-bottom: 1px solid #e2e8f0;
-            background: #f8fafc;
-            border-radius: 12px 12px 0 0;
-        }
-        .notification-dropdown .badge-notify {
-            position: absolute;
-            top: -6px;
-            right: -8px;
-            background: #dc2626;
-            color: #fff;
-            border-radius: 50%;
-            padding: 2px 6px;
-            font-size: 10px;
-            font-weight: 700;
-            min-width: 18px;
-            text-align: center;
-        }
-        .notification-dropdown .btn-notify {
-            background: transparent;
-            border: none;
-            color: #1e293b;
-            font-size: 1.4rem;
-            padding: 4px 8px;
-            position: relative;
-            cursor: pointer;
-        }
-        .notification-dropdown .btn-notify:hover { color: #1e3a8a; }
-        .no-notification { color: #94a3b8; padding: 20px; text-align: center; }
-        @media (max-width: 576px) {
-            .notification-dropdown .dropdown-menu { min-width: 280px; right: -10px; }
-        }
-
         /* ====== कार्ड / स्टेट्स ====== */
         .card-premium {
             border-radius: 20px;
@@ -629,54 +554,25 @@ if ($is_logged_in && $role == 'user') {
             </div>
         </div>
 
-        <!-- ====== NOTIFICATION BELL (User Only) ====== -->
-        <?php if ($role == 'user'): ?>
-        <div class="notification-dropdown">
-            <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="fas fa-bell"></i>
-                <?php if ($unread_count > 0): ?>
-                    <span class="badge-notify"><?= $unread_count ?></span>
-                <?php endif; ?>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifyToggle">
-                <li class="dropdown-header">🔔 Notifications</li>
-                <?php if (count($notifications) > 0): ?>
-                    <?php foreach ($notifications as $notif): ?>
-                        <li>
-                            <a class="dropdown-item <?= $notif['is_read'] ? '' : 'fw-bold' ?>" href="<?= htmlspecialchars($notif['link'] ?? '#') ?>">
-                                <?= htmlspecialchars($notif['message']) ?>
-                                <br><small class="text-muted"><?= time_ago($notif['created_at']) ?></small>
-                            </a>
-                        </li>
-                    <?php endforeach; ?>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-center text-muted small" href="#" id="markAllRead">Mark all as read</a></li>
-                <?php else: ?>
-                    <li class="no-notification">✨ No notifications</li>
-                <?php endif; ?>
-            </ul>
-        </div>
-        <?php endif; ?>
-
-        <!-- नोटिफिकेशन बेल (केवल एडमिन) – पहले से है -->
+        <!-- Notification Bell (Admin only) – No user notification bell -->
         <?php if ($role == 'admin'): ?>
-        <div class="notification-dropdown">
-            <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <div class="notification-dropdown" style="position:relative; display:inline-block;">
+            <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="background:transparent; border:none; color:#1e293b; font-size:1.4rem; padding:4px 8px; position:relative; cursor:pointer;">
                 <i class="fas fa-bell"></i>
                 <?php if (isset($notification_count) && $notification_count > 0): ?>
-                    <span class="badge-notify"><?= $notification_count ?></span>
+                    <span class="badge-notify" style="position:absolute; top:-6px; right:-8px; background:#dc2626; color:#fff; border-radius:50%; padding:2px 6px; font-size:10px; font-weight:700; min-width:18px; text-align:center;"><?= $notification_count ?></span>
                 <?php endif; ?>
             </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifyToggle">
-                <li class="dropdown-header">🔔 Notifications</li>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifyToggle" style="min-width:350px; max-height:400px; overflow-y:auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:0; margin-top:8px; box-shadow:0 20px 40px rgba(0,0,0,0.1);">
+                <li class="dropdown-header" style="color:#475569; padding:10px 16px; font-weight:600; border-bottom:1px solid #e2e8f0; background:#f8fafc; border-radius:12px 12px 0 0;">🔔 Notifications</li>
                 <?php if (isset($notifications) && count($notifications) > 0): ?>
                     <?php foreach ($notifications as $notif): ?>
-                        <li><a class="dropdown-item" href="<?= $notif['link'] ?>"><?= $notif['message'] ?></a></li>
+                        <li><a class="dropdown-item" href="<?= $notif['link'] ?>" style="color:#1e293b; padding:10px 16px; border-bottom:1px solid #f1f5f9; white-space:normal; font-size:0.85rem;"><?= $notif['message'] ?></a></li>
                     <?php endforeach; ?>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-center text-muted small" href="#">Mark all as read</a></li>
                 <?php else: ?>
-                    <li class="no-notification">✨ No new notifications</li>
+                    <li class="no-notification" style="color:#94a3b8; padding:20px; text-align:center;">✨ No new notifications</li>
                 <?php endif; ?>
             </ul>
         </div>
@@ -725,24 +621,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         updateTimer();
         setInterval(updateTimer, 60000);
-    }
-});
-
-// Mark all notifications as read
-document.addEventListener('DOMContentLoaded', function() {
-    const markBtn = document.getElementById('markAllRead');
-    if (markBtn) {
-        markBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            fetch('mark_notifications_read.php', { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    }
-                })
-                .catch(err => console.error(err));
-        });
     }
 });
 </script>
