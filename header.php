@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – स्टिकी नेविगेशन + साइडबार (Complete)
+// ✅ Header – स्टिकी नेविगेशन + साइडबार (Complete with Notifications)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -59,6 +59,20 @@ if ($is_logged_in && $role == 'user') {
         $expiry_date = null;
         $days_left = 0;
     }
+}
+
+// ---- Fetch notifications for user ----
+$notifications = [];
+$unread_count = 0;
+if ($is_logged_in && $role == 'user') {
+    $user_id = $_SESSION['user_id'];
+    $notif_stmt = $pdo->prepare("SELECT id, message, link, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
+    $notif_stmt->execute([$user_id]);
+    $notifications = $notif_stmt->fetchAll();
+    
+    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = FALSE");
+    $count_stmt->execute([$user_id]);
+    $unread_count = $count_stmt->fetchColumn();
 }
 ?>
 <!DOCTYPE html>
@@ -189,7 +203,6 @@ if ($is_logged_in && $role == 'user') {
             color: #334155;
             border-right: 1px solid #e2e8f0;
         }
-        /* ✅ Mobile: sidebar hidden by default */
         @media (max-width: 991px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -366,7 +379,10 @@ if ($is_logged_in && $role == 'user') {
         }
 
         /* ====== नोटिफिकेशन ====== */
-        .notification-dropdown { position: relative; display: inline-block; }
+        .notification-dropdown {
+            position: relative;
+            display: inline-block;
+        }
         .notification-dropdown .dropdown-menu {
             min-width: 350px;
             max-height: 400px;
@@ -556,7 +572,6 @@ if ($is_logged_in && $role == 'user') {
         <?php if (hasViewPermission('support', $pdo)): ?>
             <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <?php endif; ?>
-        <!-- ✅ User Properties – अब permission check नहीं, सीधा दिखेगा -->
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
         <?php if ($is_super_admin): ?>
@@ -565,7 +580,6 @@ if ($is_logged_in && $role == 'user') {
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         
     <?php else: ?>
-        <!-- User Sidebar -->
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
@@ -615,7 +629,36 @@ if ($is_logged_in && $role == 'user') {
             </div>
         </div>
 
-        <!-- नोटिफिकेशन बेल (केवल एडमिन) -->
+        <!-- ====== NOTIFICATION BELL (User Only) ====== -->
+        <?php if ($role == 'user'): ?>
+        <div class="notification-dropdown">
+            <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-bell"></i>
+                <?php if ($unread_count > 0): ?>
+                    <span class="badge-notify"><?= $unread_count ?></span>
+                <?php endif; ?>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifyToggle">
+                <li class="dropdown-header">🔔 Notifications</li>
+                <?php if (count($notifications) > 0): ?>
+                    <?php foreach ($notifications as $notif): ?>
+                        <li>
+                            <a class="dropdown-item <?= $notif['is_read'] ? '' : 'fw-bold' ?>" href="<?= htmlspecialchars($notif['link'] ?? '#') ?>">
+                                <?= htmlspecialchars($notif['message']) ?>
+                                <br><small class="text-muted"><?= time_ago($notif['created_at']) ?></small>
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-center text-muted small" href="#" id="markAllRead">Mark all as read</a></li>
+                <?php else: ?>
+                    <li class="no-notification">✨ No notifications</li>
+                <?php endif; ?>
+            </ul>
+        </div>
+        <?php endif; ?>
+
+        <!-- नोटिफिकेशन बेल (केवल एडमिन) – पहले से है -->
         <?php if ($role == 'admin'): ?>
         <div class="notification-dropdown">
             <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -682,6 +725,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         updateTimer();
         setInterval(updateTimer, 60000);
+    }
+});
+
+// Mark all notifications as read
+document.addEventListener('DOMContentLoaded', function() {
+    const markBtn = document.getElementById('markAllRead');
+    if (markBtn) {
+        markBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            fetch('mark_notifications_read.php', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    }
+                })
+                .catch(err => console.error(err));
+        });
     }
 });
 </script>
