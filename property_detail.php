@@ -18,6 +18,7 @@ if($source == 'auction') {
     $prop = $stmt->fetch();
     $is_customer = false;
 } else {
+    // ✅ Include user_id for notification
     $stmt = $pdo->prepare("SELECT * FROM user_properties WHERE id = ? AND status = 'approved'");
     $stmt->execute([$property_id]);
     $prop = $stmt->fetch();
@@ -25,13 +26,28 @@ if($source == 'auction') {
 }
 if(!$prop) { die("Property not found!"); }
 
-// ✅ Define $has_subscription and $show_images based on source
 if($source == 'auction') {
     $has_subscription = userHasActiveSubscription($pdo, $user_id);
-    $show_images = $has_subscription; // show images only if subscribed
 } else {
     $has_subscription = true; // customer properties are always visible
-    $show_images = true; // customer properties always show images
+}
+
+// ---- Add notification if viewing a customer property and viewer is not the owner ----
+if ($source == 'customer' && $is_customer && isset($_SESSION['user_id'])) {
+    $viewer_id = $_SESSION['user_id'];
+    $owner_id = $prop['user_id'] ?? 0;
+    
+    if ($viewer_id != $owner_id && $owner_id > 0) {
+        // Avoid spam: check if notification for this property and viewer already sent in last 24 hours
+        $check = $pdo->prepare("SELECT id FROM notifications WHERE user_id = ? AND message LIKE ? AND created_at > NOW() - INTERVAL '1 day'");
+        $check->execute([$owner_id, '%' . $prop['title'] . '%']);
+        if ($check->rowCount() == 0) {
+            $message = "Your property '{$prop['title']}' was viewed by a potential buyer. Upgrade your package to get buyer contact details ASAP!";
+            $link = "user_packages.php";
+            $stmt = $pdo->prepare("INSERT INTO notifications (user_id, message, link, created_at) VALUES (?, ?, ?, NOW())");
+            $stmt->execute([$owner_id, $message, $link]);
+        }
+    }
 }
 
 include 'header.php'; 
@@ -174,7 +190,6 @@ if($source == 'auction') {
                         </div>
 
                         <?php if($source == 'customer'): ?>
-                            <!-- Customer Property: Show both Area and Construction Area -->
                             <div class="col-md-4">
                                 <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                     <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
@@ -190,7 +205,6 @@ if($source == 'auction') {
                             </div>
                             <?php endif; ?>
                         <?php else: ?>
-                            <!-- Auction Property: just area -->
                             <div class="col-md-4">
                                 <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
                                     <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
