@@ -1,12 +1,17 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (with safeDateFormat)
+// 👥 User Management – Admin Panel (With Referral Change)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// ---- Safe Date Formatter ----
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
+    header("Location: login.php");
+    exit;
+}
+
+// ---- Helper: Safe Date Format ----
 if (!function_exists('safeDateFormat')) {
     function safeDateFormat($dateStr) {
         if (empty($dateStr) || strtotime($dateStr) === false) {
@@ -14,11 +19,6 @@ if (!function_exists('safeDateFormat')) {
         }
         return date('d M Y', strtotime($dateStr));
     }
-}
-
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    header("Location: login.php");
-    exit;
 }
 
 // ---- Handle Actions ----
@@ -85,25 +85,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     $package_id = $_POST['package_id'] ? (int)$_POST['package_id'] : null;
     $status = $_POST['status'];
     $new_password = trim($_POST['new_password']);
+    // ✅ New referrer ID from dropdown
+    $new_referrer_id = isset($_POST['new_referrer']) ? (int)$_POST['new_referrer'] : null;
 
     $pdo->beginTransaction();
     try {
+        // Update users table
         $stmt = $pdo->prepare("
             UPDATE users 
             SET name = ?, email = ?, phone = ?, 
                 created_at = COALESCE(?, created_at),
                 activation_date = COALESCE(?, activation_date),
-                status = ?
+                status = ?,
+                referred_by = COALESCE(?, referred_by)
             WHERE id = ?
         ");
-        $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $id]);
+        $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $new_referrer_id, $id]);
 
+        // Update password
         if (!empty($new_password)) {
             $hashed = password_hash($new_password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
             $stmt->execute([$hashed, $id]);
         }
 
+        // Update package (subscription)
         if ($package_id) {
             $stmt = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
             $stmt->execute([$id]);
@@ -167,6 +173,9 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($search_params);
 $users = $stmt->fetchAll();
 
+// ---- Get all users for referrer dropdown (excluding current user) ----
+$all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
+
 // ---- Packages for dropdown ----
 $packages = $pdo->query("SELECT id, name FROM packages ORDER BY id")->fetchAll();
 
@@ -188,6 +197,7 @@ include 'header.php';
     .search-box { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
     .search-box input { border-radius: 30px; padding: 8px 20px; border: 1px solid #e2e8f0; min-width: 250px; }
     .search-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .referral-change-note { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
 </style>
 
 <div class="container-fluid">
@@ -277,6 +287,7 @@ include 'header.php';
                             <?= $user['is_super_admin'] ? '<span class="badge bg-danger">Admin</span>' : '<span class="badge bg-secondary">User</span>' ?>
                         </td>
                         <td class="actions">
+                            <!-- Edit Button -->
                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal_<?= $user['id'] ?>">
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -295,7 +306,7 @@ include 'header.php';
                         </td>
                     </tr>
 
-                    <!-- EDIT MODAL -->
+                    <!-- ====== EDIT MODAL – With Referral Change ====== -->
                     <div class="modal fade" id="editModal_<?= $user['id'] ?>" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
@@ -351,6 +362,33 @@ include 'header.php';
                                                 <input type="text" class="form-control" value="<?= safeDateFormat($user['sub_end']) ?>" readonly>
                                                 <small class="text-muted">Expiry is auto-calculated; update package to change</small>
                                             </div>
+
+                                            <!-- ====== REFERRAL CHANGE SECTION ====== -->
+                                            <div class="col-md-12 mt-3">
+                                                <div class="card p-3" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+                                                    <h6 class="fw-bold"><i class="fas fa-link me-2"></i>Change Referrer (Team Shift)</h6>
+                                                    <p class="small text-muted">
+                                                        Changing the referrer will move this user and their entire downline team to the new referrer.
+                                                        The new referrer must be an existing user.
+                                                    </p>
+                                                    <div class="mb-2">
+                                                        <label class="form-label">New Referrer</label>
+                                                        <select name="new_referrer" class="form-control">
+                                                            <option value="">— No Referrer (None) —</option>
+                                                            <?php foreach ($all_users as $u): ?>
+                                                                <?php if ($u['id'] == $user['id']) continue; // skip self ?>
+                                                                <option value="<?= $u['id'] ?>" <?= ($user['referred_by'] == $u['id']) ? 'selected' : '' ?>>
+                                                                    <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                        <small class="referral-change-note">
+                                                            Current referrer: <?= $user['referrer_name'] ? htmlspecialchars($user['referrer_name']) : 'None' ?>
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div class="col-md-12">
                                                 <label class="form-label">New Password (leave blank to keep current)</label>
                                                 <input type="text" name="new_password" class="form-control" placeholder="Enter new password">
