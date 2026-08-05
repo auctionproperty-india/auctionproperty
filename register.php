@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📝 Register – Prevent Duplicate Email
+// 📝 Register – With City Field
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     $phone = trim($_POST['phone']);
+    $city = trim($_POST['city']); // ✅ City field
     $password = $_POST['password'];
     $confirm = $_POST['confirm_password'];
     $ref_code_post = trim($_POST['ref_code'] ?? '');
@@ -28,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 6) {
         $error = "❌ Password must be at least 6 characters.";
     } else {
-        // ✅ CHECK DUPLICATE EMAIL (Most Important)
+        // ✅ CHECK DUPLICATE EMAIL
         $check_stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
         $check_stmt->execute([$email]);
         if ($check_stmt->rowCount() > 0) {
@@ -48,12 +49,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($ref_user) $referred_by = $ref_user['id'];
             }
 
-            // Insert new user
+            // ✅ Insert with city
             $stmt = $pdo->prepare("
-                INSERT INTO users (name, email, phone, password, referral_code, referred_by, role, status, created_at, coins)
-                VALUES (?, ?, ?, ?, ?, ?, 'user', 'active', NOW(), 0)
+                INSERT INTO users (name, email, phone, password, referral_code, referred_by, role, status, created_at, coins, city)
+                VALUES (?, ?, ?, ?, ?, ?, 'user', 'active', NOW(), 0, ?)
             ");
-            $stmt->execute([$name, $email, $phone, $hashed, $referral_code, $referred_by]);
+            $stmt->execute([$name, $email, $phone, $hashed, $referral_code, $referred_by, $city]);
 
             $success = "✅ Registration successful! You can now <a href='login.php'>login</a>.";
             // Optionally, automatically log in or redirect
@@ -88,6 +89,12 @@ include 'header.php';
                     <div class="mb-3">
                         <label class="form-label">Phone</label>
                         <input type="text" name="phone" class="form-control">
+                    </div>
+                    <!-- ✅ City Field -->
+                    <div class="mb-3">
+                        <label class="form-label">City</label>
+                        <input type="text" name="city" class="form-control" placeholder="Enter your city (e.g. Indore, Mumbai, Delhi)">
+                        <small class="text-muted">Properties from your city will appear on your dashboard.</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Password *</label>
