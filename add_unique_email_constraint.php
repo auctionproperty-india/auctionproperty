@@ -1,4 +1,8 @@
 <?php
+// ============================================================
+// 🔒 Add Unique Constraint on users.email
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 
 try {
@@ -12,12 +16,13 @@ try {
     if ($exists) {
         echo "✅ Unique constraint on email already exists.<br>";
     } else {
-        // Add unique constraint on email column
+        // Add unique constraint
         $pdo->exec("ALTER TABLE users ADD CONSTRAINT unique_email UNIQUE (email)");
         echo "✅ Unique constraint added on email column.<br>";
     }
 } catch (PDOException $e) {
     echo "❌ Error: " . $e->getMessage() . "<br>";
     echo "If you already have duplicate emails, you need to remove them first.<br>";
+    echo "Run remove_duplicate_users.php to clean duplicates, then retry this script.<br>";
 }
 ?>
