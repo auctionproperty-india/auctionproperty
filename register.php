@@ -1,13 +1,12 @@
 <?php
 // ============================================================
-// 📝 Register – All Fields Required + 100 Coins + Auto-Login
+// 📝 Register – All Fields Required + 100 Coins (User + Referrer)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
 $error = '';
-$success = '';
 
 // ---- Check if referral code exists in URL ----
 $ref_code = isset($_GET['ref']) ? trim($_GET['ref']) : '';
@@ -24,7 +23,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ---- Validation ----
     $errors = [];
 
-    // 1. All fields required
     if (empty($name)) $errors[] = "Name is required.";
     if (empty($email)) $errors[] = "Email is required.";
     if (empty($phone)) $errors[] = "Phone number is required.";
@@ -32,27 +30,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($password)) $errors[] = "Password is required.";
     if (empty($confirm)) $errors[] = "Please confirm your password.";
 
-    // 2. Password match
-    if ($password !== $confirm) {
-        $errors[] = "Passwords do not match.";
-    }
+    if ($password !== $confirm) $errors[] = "Passwords do not match.";
+    if (strlen($password) < 6) $errors[] = "Password must be at least 6 characters.";
 
-    // 3. Password length
-    if (strlen($password) < 6) {
-        $errors[] = "Password must be at least 6 characters.";
-    }
-
-    // 4. Mobile number must be exactly 10 digits (starting with 6-9)
+    // Mobile number must be exactly 10 digits (starting with 6-9)
     if (!preg_match('/^[6-9][0-9]{9}$/', $phone)) {
         $errors[] = "Phone number must be a valid 10-digit Indian mobile number (starting with 6,7,8,9).";
     }
 
-    // 5. Validate email format
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = "Please enter a valid email address.";
     }
 
-    // 6. Check duplicate email
+    // Check duplicate email
     if (empty($errors)) {
         $check_stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
         $check_stmt->execute([$email]);
@@ -63,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ---- If no errors, proceed ----
     if (empty($errors)) {
-        // Generate referral code
+        // Generate referral code for new user
         $referral_code = strtoupper(substr(md5(uniqid()), 0, 8));
         $hashed = password_hash($password, PASSWORD_DEFAULT);
         $referred_by = null;
@@ -74,10 +64,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ref_stmt = $pdo->prepare("SELECT id FROM users WHERE referral_code = ?");
             $ref_stmt->execute([$ref_to_use]);
             $ref_user = $ref_stmt->fetch();
-            if ($ref_user) $referred_by = $ref_user['id'];
+            if ($ref_user) {
+                $referred_by = $ref_user['id'];
+                // ✅ Give referrer 100 coins
+                $update_ref = $pdo->prepare("UPDATE users SET coins = coins + 100 WHERE id = ?");
+                $update_ref->execute([$referred_by]);
+            }
         }
 
-        // ✅ Insert with 100 coins
+        // Insert new user with 100 coins
         $stmt = $pdo->prepare("
             INSERT INTO users (name, email, phone, password, referral_code, referred_by, role, status, created_at, coins, city)
             VALUES (?, ?, ?, ?, ?, ?, 'user', 'active', NOW(), 100, ?)
@@ -89,8 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['user_name'] = $name;
         $_SESSION['role'] = 'user';
 
-        // ✅ Set success message in session for dashboard
-        $_SESSION['registration_success'] = "✅ Welcome! You have received 100 bonus coins.";
+        // ✅ Set success message
+        $msg = "🎉 Welcome! You received 100 bonus coins.";
+        if ($referred_by) {
+            $msg .= " Your referrer also received 100 coins!";
+        }
+        $_SESSION['registration_success'] = $msg;
 
         // ✅ Redirect to user dashboard
         header("Location: user_dashboard.php");
@@ -109,9 +108,6 @@ include 'header.php';
                 <h4><i class="fas fa-user-plus me-2"></i>Register</h4>
                 <?php if ($error): ?>
                     <div class="alert alert-danger"><?= $error ?></div>
-                <?php endif; ?>
-                <?php if ($success): ?>
-                    <div class="alert alert-success"><?= $success ?></div>
                 <?php endif; ?>
                 <form method="POST">
                     <div class="mb-3">
