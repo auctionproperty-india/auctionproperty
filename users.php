@@ -184,11 +184,27 @@ include 'header.php';
     .user-table td { vertical-align: middle; }
     .user-table .actions .btn { padding: 2px 8px; font-size: 0.75rem; }
     
-    /* ====== MODAL FIX – NO BLANK ISSUE ====== */
+    /* ====== MODAL FIX – FORCE VISIBILITY ====== */
+    .modal {
+        z-index: 1050 !important;
+    }
+    .modal-backdrop {
+        z-index: 1040 !important;
+    }
     .modal-content {
         background: #ffffff !important;
         color: #0f172a !important;
         border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+        /* Prevent any hover effect from changing background */
+        transition: none !important;
+    }
+    .modal-content:hover,
+    .modal-content:focus,
+    .modal-content:active {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #e2e8f0 !important;
         box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
     }
     .modal-header {
@@ -212,13 +228,6 @@ include 'header.php';
         background: #ffffff !important;
         border-top: 1px solid #e2e8f0 !important;
     }
-    .modal-backdrop {
-        z-index: 1040 !important;
-    }
-    .modal {
-        z-index: 1050 !important;
-    }
-    /* Ensure all form elements inside modal are visible */
     .modal-body .form-control,
     .modal-body .form-select {
         background: #ffffff !important;
@@ -245,24 +254,32 @@ include 'header.php';
     .modal-body .small {
         color: #64748b !important;
     }
-    /* Override any hover effects that might hide content */
-    .modal-content:hover,
-    .modal-body:hover,
-    .modal-header:hover,
-    .modal-footer:hover {
-        background: #ffffff !important;
-        color: #0f172a !important;
-    }
     .modal-body .form-control:focus,
     .modal-body .form-select:focus {
         background: #ffffff !important;
         border-color: #2563eb !important;
         box-shadow: 0 0 0 3px rgba(37,99,235,0.1) !important;
     }
-    /* Ensure dropdown options are visible */
     .modal-body .form-select option {
         background: #ffffff !important;
         color: #0f172a !important;
+    }
+    /* Ensure no hover effect hides content */
+    .modal-body:hover,
+    .modal-body:focus,
+    .modal-body:active,
+    .modal-header:hover,
+    .modal-header:focus,
+    .modal-header:active,
+    .modal-footer:hover,
+    .modal-footer:focus,
+    .modal-footer:active {
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+    /* Prevent any transition or animation that might cause flicker */
+    .modal * {
+        transition: none !important;
     }
 
     /* ====== OTHER STYLES ====== */
