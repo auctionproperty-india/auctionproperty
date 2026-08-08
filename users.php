@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (With Referral Change)
+// 👥 User Management – Admin Panel (With Edit Link)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -74,64 +74,6 @@ if (isset($_GET['toggle_admin']) && is_numeric($_GET['toggle_admin'])) {
     }
 }
 
-// ---- Update User via POST ----
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
-    $id = (int)$_POST['user_id'];
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);
-    $registration_date = $_POST['registration_date'] ?: null;
-    $activation_date = $_POST['activation_date'] ?: null;
-    $package_id = $_POST['package_id'] ? (int)$_POST['package_id'] : null;
-    $status = $_POST['status'];
-    $new_password = trim($_POST['new_password']);
-    $new_referrer_id = isset($_POST['new_referrer']) ? (int)$_POST['new_referrer'] : null;
-
-    $pdo->beginTransaction();
-    try {
-        $stmt = $pdo->prepare("
-            UPDATE users 
-            SET name = ?, email = ?, phone = ?, 
-                created_at = COALESCE(?, created_at),
-                activation_date = COALESCE(?, activation_date),
-                status = ?,
-                referred_by = COALESCE(?, referred_by)
-            WHERE id = ?
-        ");
-        $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $new_referrer_id, $id]);
-
-        if (!empty($new_password)) {
-            $hashed = password_hash($new_password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $stmt->execute([$hashed, $id]);
-        }
-
-        if ($package_id) {
-            $stmt = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
-            $stmt->execute([$id]);
-            $sub = $stmt->fetch();
-            if ($sub) {
-                $stmt = $pdo->prepare("UPDATE subscriptions SET package_id = ? WHERE id = ?");
-                $stmt->execute([$package_id, $sub['id']]);
-            } else {
-                $stmt = $pdo->prepare("
-                    INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at)
-                    VALUES (?, ?, 0, 'active', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', NOW())
-                ");
-                $stmt->execute([$id, $package_id]);
-            }
-        }
-
-        $pdo->commit();
-        $message = "User updated successfully!";
-        $message_type = "success";
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $message = "Error updating user: " . $e->getMessage();
-        $message_type = "danger";
-    }
-}
-
 // ---- Search ----
 $search = trim($_GET['search'] ?? '');
 $search_condition = "";
@@ -169,151 +111,13 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($search_params);
 $users = $stmt->fetchAll();
 
-// ---- Get all users for referrer dropdown (excluding current user) ----
-$all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
-
-// ---- Packages for dropdown ----
-$packages = $pdo->query("SELECT id, name FROM packages ORDER BY id")->fetchAll();
-
 include 'header.php';
 ?>
 
 <style>
-    /* ====== USER TABLE STYLES ====== */
     .user-table th { background: #f1f5f9; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.4px; color: #475569; }
     .user-table td { vertical-align: middle; }
     .user-table .actions .btn { padding: 2px 8px; font-size: 0.75rem; }
-
-    /* ====== ✅ MODAL FIX – Always Visible ====== */
-    /* Force modal content to always be visible */
-    .modal-content,
-    .modal-content * {
-        transition: none !important;
-        animation: none !important;
-        backface-visibility: visible !important;
-        -webkit-backface-visibility: visible !important;
-    }
-
-    .modal-content {
-        background: #ffffff !important;
-        color: #0f172a !important;
-        border: 1px solid #e2e8f0 !important;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
-        opacity: 1 !important;
-        display: block !important;
-        visibility: visible !important;
-        pointer-events: auto !important;
-    }
-
-    /* Prevent any hover effect from hiding content */
-    .modal-content:hover,
-    .modal-content:focus,
-    .modal-content:active,
-    .modal-content *:hover,
-    .modal-content *:focus,
-    .modal-content *:active {
-        background: inherit !important;
-        color: inherit !important;
-        opacity: 1 !important;
-        display: block !important;
-        visibility: visible !important;
-        pointer-events: auto !important;
-    }
-
-    .modal-header {
-        background: #ffffff !important;
-        border-bottom: 1px solid #e2e8f0 !important;
-        color: #0f172a !important;
-        padding: 15px 20px !important;
-    }
-    .modal-header .btn-close {
-        filter: none !important;
-        opacity: 0.5 !important;
-    }
-    .modal-header .btn-close:hover {
-        opacity: 1 !important;
-    }
-
-    .modal-body {
-        background: #ffffff !important;
-        color: #0f172a !important;
-        padding: 20px !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-    }
-
-    .modal-footer {
-        background: #ffffff !important;
-        border-top: 1px solid #e2e8f0 !important;
-        padding: 15px 20px !important;
-    }
-
-    /* Form elements inside modal */
-    .modal-body .form-control,
-    .modal-body .form-select {
-        background: #ffffff !important;
-        color: #0f172a !important;
-        border: 1px solid #e2e8f0 !important;
-        opacity: 1 !important;
-        display: block !important;
-        visibility: visible !important;
-    }
-
-    .modal-body .form-label {
-        color: #0f172a !important;
-        font-weight: 600 !important;
-        opacity: 1 !important;
-        display: block !important;
-        visibility: visible !important;
-    }
-
-    .modal-body .card {
-        background: #f8fafc !important;
-        border: 1px solid #e2e8f0 !important;
-        opacity: 1 !important;
-        display: block !important;
-        visibility: visible !important;
-    }
-
-    .modal-body .card h6 {
-        color: #0f172a !important;
-    }
-
-    .modal-body .text-muted {
-        color: #64748b !important;
-    }
-
-    .modal-body .form-check-label {
-        color: #0f172a !important;
-    }
-
-    .modal-body .small {
-        color: #64748b !important;
-    }
-
-    .modal-body .form-control:focus,
-    .modal-body .form-select:focus {
-        background: #ffffff !important;
-        border-color: #2563eb !important;
-        box-shadow: 0 0 0 3px rgba(37,99,235,0.1) !important;
-    }
-
-    .modal-body .form-select option {
-        background: #ffffff !important;
-        color: #0f172a !important;
-    }
-
-    /* Modal backdrop */
-    .modal-backdrop {
-        z-index: 1040 !important;
-        background: rgba(0,0,0,0.5) !important;
-    }
-    .modal {
-        z-index: 1050 !important;
-    }
-
-    /* ====== OTHER STYLES ====== */
     .badge-status { padding: 4px 12px; border-radius: 30px; font-size: 0.7rem; font-weight: 600; }
     .badge-status.active { background: #dcfce7; color: #166534; }
     .badge-status.inactive { background: #fee2e2; color: #991b1b; }
@@ -322,7 +126,6 @@ include 'header.php';
     .search-box { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
     .search-box input { border-radius: 30px; padding: 8px 20px; border: 1px solid #e2e8f0; min-width: 250px; }
     .search-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-    .referral-change-note { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
 </style>
 
 <div class="container-fluid">
@@ -412,10 +215,10 @@ include 'header.php';
                             <?= $user['is_super_admin'] ? '<span class="badge bg-danger">Admin</span>' : '<span class="badge bg-secondary">User</span>' ?>
                         </td>
                         <td class="actions">
-                            <!-- Edit Button -->
-                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal_<?= $user['id'] ?>">
+                            <!-- ✅ Edit Button – Now links to separate page -->
+                            <a href="admin_edit_user.php?id=<?= $user['id'] ?>" class="btn btn-sm btn-primary">
                                 <i class="fas fa-edit"></i>
-                            </button>
+                            </a>
 
                             <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                 <a href="?delete=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">
@@ -430,104 +233,6 @@ include 'header.php';
                             <?php endif; ?>
                         </td>
                     </tr>
-
-                    <!-- ====== EDIT MODAL ====== -->
-                    <div class="modal fade" id="editModal_<?= $user['id'] ?>" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-lg">
-                            <div class="modal-content">
-                                <form method="POST">
-                                    <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Edit User: <?= htmlspecialchars($user['name']) ?></h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">Name</label>
-                                                <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($user['name']) ?>" required>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Email</label>
-                                                <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>" required>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Phone</label>
-                                                <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($user['phone']) ?>">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Status</label>
-                                                <select name="status" class="form-control">
-                                                    <option value="active" <?= $user['status'] == 'active' ? 'selected' : '' ?>>Active</option>
-                                                    <option value="blocked" <?= $user['status'] == 'blocked' ? 'selected' : '' ?>>Blocked</option>
-                                                    <option value="inactive" <?= $user['status'] == 'inactive' ? 'selected' : '' ?>>Inactive</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Registration Date</label>
-                                                <input type="date" name="registration_date" class="form-control" value="<?= $user['created_at'] ? date('Y-m-d', strtotime($user['created_at'])) : '' ?>">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Activation Date</label>
-                                                <input type="date" name="activation_date" class="form-control" value="<?= $user['activation_date'] ? date('Y-m-d', strtotime($user['activation_date'])) : '' ?>">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Package</label>
-                                                <select name="package_id" class="form-control">
-                                                    <option value="">Free</option>
-                                                    <?php foreach ($packages as $pkg): ?>
-                                                        <option value="<?= $pkg['id'] ?>" <?= ($user['current_package_id'] == $pkg['id']) ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars($pkg['name']) ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Package Expiry Date</label>
-                                                <input type="text" class="form-control" value="<?= safeDateFormat($user['sub_end']) ?>" readonly>
-                                                <small class="text-muted">Expiry is auto-calculated; update package to change</small>
-                                            </div>
-
-                                            <!-- ====== REFERRAL CHANGE SECTION ====== -->
-                                            <div class="col-md-12 mt-3">
-                                                <div class="card p-3" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
-                                                    <h6 class="fw-bold"><i class="fas fa-link me-2"></i>Change Referrer (Team Shift)</h6>
-                                                    <p class="small text-muted">
-                                                        Changing the referrer will move this user and their entire downline team to the new referrer.
-                                                        The new referrer must be an existing user.
-                                                    </p>
-                                                    <div class="mb-2">
-                                                        <label class="form-label">New Referrer</label>
-                                                        <select name="new_referrer" class="form-control">
-                                                            <option value="">— No Referrer (None) —</option>
-                                                            <?php foreach ($all_users as $u): ?>
-                                                                <?php if ($u['id'] == $user['id']) continue; // skip self ?>
-                                                                <option value="<?= $u['id'] ?>" <?= ($user['referred_by'] == $u['id']) ? 'selected' : '' ?>>
-                                                                    <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)
-                                                                </option>
-                                                            <?php endforeach; ?>
-                                                        </select>
-                                                        <small class="referral-change-note">
-                                                            Current referrer: <?= $user['referrer_name'] ? htmlspecialchars($user['referrer_name']) : 'None' ?>
-                                                        </small>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="col-md-12">
-                                                <label class="form-label">New Password (leave blank to keep current)</label>
-                                                <input type="text" name="new_password" class="form-control" placeholder="Enter new password">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                        <button type="submit" name="update_user" class="btn btn-primary">Save Changes</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
                     <?php endforeach; ?>
                 </tbody>
             </table>
