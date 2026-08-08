@@ -183,34 +183,48 @@ include 'header.php';
     .user-table th { background: #f1f5f9; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.4px; color: #475569; }
     .user-table td { vertical-align: middle; }
     .user-table .actions .btn { padding: 2px 8px; font-size: 0.75rem; }
-    
-    /* ====== MODAL FIX – FORCE VISIBILITY ====== */
-    .modal {
-        z-index: 1050 !important;
+
+    /* ====== ✅ MODAL FIX – Always Visible ====== */
+    /* Force modal content to always be visible */
+    .modal-content,
+    .modal-content * {
+        transition: none !important;
+        animation: none !important;
+        backface-visibility: visible !important;
+        -webkit-backface-visibility: visible !important;
     }
-    .modal-backdrop {
-        z-index: 1040 !important;
-    }
+
     .modal-content {
         background: #ffffff !important;
         color: #0f172a !important;
         border: 1px solid #e2e8f0 !important;
         box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
-        /* Prevent any hover effect from changing background */
-        transition: none !important;
+        opacity: 1 !important;
+        display: block !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
     }
+
+    /* Prevent any hover effect from hiding content */
     .modal-content:hover,
     .modal-content:focus,
-    .modal-content:active {
-        background: #ffffff !important;
-        color: #0f172a !important;
-        border-color: #e2e8f0 !important;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+    .modal-content:active,
+    .modal-content *:hover,
+    .modal-content *:focus,
+    .modal-content *:active {
+        background: inherit !important;
+        color: inherit !important;
+        opacity: 1 !important;
+        display: block !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
     }
+
     .modal-header {
         background: #ffffff !important;
         border-bottom: 1px solid #e2e8f0 !important;
         color: #0f172a !important;
+        padding: 15px 20px !important;
     }
     .modal-header .btn-close {
         filter: none !important;
@@ -219,67 +233,84 @@ include 'header.php';
     .modal-header .btn-close:hover {
         opacity: 1 !important;
     }
+
     .modal-body {
         background: #ffffff !important;
         color: #0f172a !important;
         padding: 20px !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
     }
+
     .modal-footer {
         background: #ffffff !important;
         border-top: 1px solid #e2e8f0 !important;
+        padding: 15px 20px !important;
     }
+
+    /* Form elements inside modal */
     .modal-body .form-control,
     .modal-body .form-select {
         background: #ffffff !important;
         color: #0f172a !important;
         border: 1px solid #e2e8f0 !important;
+        opacity: 1 !important;
+        display: block !important;
+        visibility: visible !important;
     }
+
     .modal-body .form-label {
         color: #0f172a !important;
         font-weight: 600 !important;
+        opacity: 1 !important;
+        display: block !important;
+        visibility: visible !important;
     }
+
     .modal-body .card {
         background: #f8fafc !important;
         border: 1px solid #e2e8f0 !important;
+        opacity: 1 !important;
+        display: block !important;
+        visibility: visible !important;
     }
+
     .modal-body .card h6 {
         color: #0f172a !important;
     }
+
     .modal-body .text-muted {
         color: #64748b !important;
     }
+
     .modal-body .form-check-label {
         color: #0f172a !important;
     }
+
     .modal-body .small {
         color: #64748b !important;
     }
+
     .modal-body .form-control:focus,
     .modal-body .form-select:focus {
         background: #ffffff !important;
         border-color: #2563eb !important;
         box-shadow: 0 0 0 3px rgba(37,99,235,0.1) !important;
     }
+
     .modal-body .form-select option {
         background: #ffffff !important;
         color: #0f172a !important;
     }
-    /* Ensure no hover effect hides content */
-    .modal-body:hover,
-    .modal-body:focus,
-    .modal-body:active,
-    .modal-header:hover,
-    .modal-header:focus,
-    .modal-header:active,
-    .modal-footer:hover,
-    .modal-footer:focus,
-    .modal-footer:active {
-        background: #ffffff !important;
-        color: #0f172a !important;
+
+    /* Modal backdrop */
+    .modal-backdrop {
+        z-index: 1040 !important;
+        background: rgba(0,0,0,0.5) !important;
     }
-    /* Prevent any transition or animation that might cause flicker */
-    .modal * {
-        transition: none !important;
+    .modal {
+        z-index: 1050 !important;
     }
 
     /* ====== OTHER STYLES ====== */
