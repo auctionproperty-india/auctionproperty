@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✏️ Edit User – Separate Page (With Searchable Referrer)
+// ✏️ Edit User – With Admin Password Confirmation
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -55,66 +55,84 @@ function safeDateFormat($dateStr) {
 
 // ---- Handle Update ----
 $error = '';
+$success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);
-    $registration_date = $_POST['registration_date'] ?: null;
-    $activation_date = $_POST['activation_date'] ?: null;
-    $package_id = $_POST['package_id'] ? (int)$_POST['package_id'] : null;
-    $status = $_POST['status'];
-    $new_password = trim($_POST['new_password']);
-    $new_referrer_id = isset($_POST['new_referrer']) ? (int)$_POST['new_referrer'] : null;
+    $admin_password = $_POST['admin_password'] ?? '';
 
-    $pdo->beginTransaction();
-    try {
-        $stmt = $pdo->prepare("
-            UPDATE users 
-            SET name = ?, email = ?, phone = ?, 
-                created_at = COALESCE(?, created_at),
-                activation_date = COALESCE(?, activation_date),
-                status = ?,
-                referred_by = COALESCE(?, referred_by)
-            WHERE id = ?
-        ");
-        $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $new_referrer_id, $user_id]);
+    // ---- Verify admin password ----
+    $admin_id = $_SESSION['user_id'];
+    $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+    $stmt->execute([$admin_id]);
+    $admin = $stmt->fetch();
+    if (!$admin || !password_verify($admin_password, $admin['password'])) {
+        $error = "❌ Invalid admin password. Changes not saved.";
+    } else {
+        // ---- Collect form data ----
+        $name = trim($_POST['name']);
+        $email = trim($_POST['email']);
+        $phone = trim($_POST['phone']);
+        $registration_date = $_POST['registration_date'] ?: null;
+        $activation_date = $_POST['activation_date'] ?: null;
+        $package_id = $_POST['package_id'] ? (int)$_POST['package_id'] : null;
+        $status = $_POST['status'];
+        $new_password = trim($_POST['new_password']);
+        $new_referrer_id = isset($_POST['new_referrer']) ? (int)$_POST['new_referrer'] : null;
 
-        if (!empty($new_password)) {
-            $hashed = password_hash($new_password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $stmt->execute([$hashed, $user_id]);
-        }
+        $pdo->beginTransaction();
+        try {
+            // ---- Update user ----
+            $stmt = $pdo->prepare("
+                UPDATE users 
+                SET name = ?, email = ?, phone = ?, 
+                    created_at = COALESCE(?, created_at),
+                    activation_date = COALESCE(?, activation_date),
+                    status = ?,
+                    referred_by = COALESCE(?, referred_by)
+                WHERE id = ?
+            ");
+            $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $new_referrer_id, $user_id]);
 
-        if ($package_id) {
-            $sub_stmt = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
-            $sub_stmt->execute([$user_id]);
-            $sub = $sub_stmt->fetch();
-            if ($sub) {
-                $stmt = $pdo->prepare("UPDATE subscriptions SET package_id = ? WHERE id = ?");
-                $stmt->execute([$package_id, $sub['id']]);
-                // Update end_date based on new package
-                $duration = $pdo->prepare("SELECT duration_months FROM packages WHERE id = ?");
-                $duration->execute([$package_id]);
-                $months = $duration->fetchColumn();
-                if ($months) {
-                    $new_end = date('Y-m-d', strtotime("+$months months", strtotime($sub['start_date'])));
-                    $pdo->prepare("UPDATE subscriptions SET end_date = ? WHERE id = ?")->execute([$new_end, $sub['id']]);
-                }
-            } else {
-                $stmt = $pdo->prepare("
-                    INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at)
-                    VALUES (?, ?, 0, 'active', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', NOW())
-                ");
-                $stmt->execute([$user_id, $package_id]);
+            // ---- Update password if provided ----
+            if (!empty($new_password)) {
+                $hashed = password_hash($new_password, PASSWORD_DEFAULT);
+                $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
+                $stmt->execute([$hashed, $user_id]);
             }
-        }
 
-        $pdo->commit();
-        header("Location: users.php?msg=updated");
-        exit;
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $error = "Error updating user: " . $e->getMessage();
+            // ---- Update package ----
+            if ($package_id) {
+                $sub_stmt = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
+                $sub_stmt->execute([$user_id]);
+                $sub = $sub_stmt->fetch();
+                if ($sub) {
+                    $stmt = $pdo->prepare("UPDATE subscriptions SET package_id = ? WHERE id = ?");
+                    $stmt->execute([$package_id, $sub['id']]);
+                    // Update end_date based on new package
+                    $duration = $pdo->prepare("SELECT duration_months FROM packages WHERE id = ?");
+                    $duration->execute([$package_id]);
+                    $months = $duration->fetchColumn();
+                    if ($months) {
+                        $new_end = date('Y-m-d', strtotime("+$months months", strtotime($sub['start_date'])));
+                        $pdo->prepare("UPDATE subscriptions SET end_date = ? WHERE id = ?")->execute([$new_end, $sub['id']]);
+                    }
+                } else {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at)
+                        VALUES (?, ?, 0, 'active', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', NOW())
+                    ");
+                    $stmt->execute([$user_id, $package_id]);
+                }
+            }
+
+            $pdo->commit();
+            $success = "✅ User updated successfully!";
+            // Optional: redirect with success message
+            // header("Location: users.php?msg=updated");
+            // exit;
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $error = "❌ Error updating user: " . $e->getMessage();
+        }
     }
 }
 
@@ -128,7 +146,6 @@ include 'header.php';
     .referral-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
     .referral-card h6 { color: #1e293b; font-weight: 700; }
     .referral-card .text-muted { color: #64748b !important; font-size: 0.85rem; }
-    /* Search box styling */
     #referrerSearch {
         margin-bottom: 8px;
     }
@@ -136,6 +153,7 @@ include 'header.php';
         max-height: 200px;
         overflow-y: auto;
     }
+    .password-confirm { border-left: 4px solid #ef4444; }
 </style>
 
 <div class="container-fluid">
@@ -147,6 +165,9 @@ include 'header.php';
                     <a href="users.php" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Back to Users</a>
                 </div>
 
+                <?php if ($success): ?>
+                    <div class="alert alert-success"><?= $success ?></div>
+                <?php endif; ?>
                 <?php if ($error): ?>
                     <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
@@ -234,6 +255,13 @@ include 'header.php';
                             <input type="text" name="new_password" class="form-control" placeholder="Enter new password">
                             <small class="text-muted">Minimum 6 characters recommended.</small>
                         </div>
+
+                        <!-- ====== ADMIN PASSWORD CONFIRMATION ====== -->
+                        <div class="col-md-12 password-confirm">
+                            <label class="form-label">Admin Password <span class="text-danger">*</span></label>
+                            <input type="password" name="admin_password" class="form-control" required>
+                            <small class="text-muted">Enter your admin password to confirm changes.</small>
+                        </div>
                     </div>
 
                     <div class="mt-4 d-flex gap-2">
@@ -263,10 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 opt.style.display = 'none';
             }
         });
-        // Also auto-select first visible option? Not needed.
     });
-
-    // Optional: clear filter when select changes? Not needed.
 });
 </script>
 
