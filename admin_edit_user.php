@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✏️ Edit User – With Admin Password Confirmation
+// ✏️ Edit User – With Referrer Name Display + Change Option
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -24,6 +24,17 @@ $user = $stmt->fetch();
 if (!$user) {
     header("Location: users.php?msg=user_not_found");
     exit;
+}
+
+// ---- Get current referrer name ----
+$referrer_name = 'None';
+if ($user['referred_by']) {
+    $ref_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
+    $ref_stmt->execute([$user['referred_by']]);
+    $ref = $ref_stmt->fetch();
+    if ($ref) {
+        $referrer_name = $ref['name'] . ' (' . $ref['email'] . ')';
+    }
 }
 
 // ---- Get current package ----
@@ -56,6 +67,7 @@ function safeDateFormat($dateStr) {
 // ---- Handle Update ----
 $error = '';
 $success = '';
+$new_referrer_name = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     $admin_password = $_POST['admin_password'] ?? '';
 
@@ -77,6 +89,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         $status = $_POST['status'];
         $new_password = trim($_POST['new_password']);
         $new_referrer_id = isset($_POST['new_referrer']) ? (int)$_POST['new_referrer'] : null;
+
+        // ---- Get new referrer name for success message ----
+        if ($new_referrer_id) {
+            $ref_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
+            $ref_stmt->execute([$new_referrer_id]);
+            $ref = $ref_stmt->fetch();
+            if ($ref) {
+                $new_referrer_name = $ref['name'] . ' (' . $ref['email'] . ')';
+            }
+        } else {
+            $new_referrer_name = 'None';
+        }
 
         $pdo->beginTransaction();
         try {
@@ -107,7 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                 if ($sub) {
                     $stmt = $pdo->prepare("UPDATE subscriptions SET package_id = ? WHERE id = ?");
                     $stmt->execute([$package_id, $sub['id']]);
-                    // Update end_date based on new package
                     $duration = $pdo->prepare("SELECT duration_months FROM packages WHERE id = ?");
                     $duration->execute([$package_id]);
                     $months = $duration->fetchColumn();
@@ -125,10 +148,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
             }
 
             $pdo->commit();
+
+            // ---- Update the referrer name for display after successful save ----
+            $referrer_name = $new_referrer_name;
+
+            // ---- Refresh user data ----
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+            $stmt->execute([$user_id]);
+            $user = $stmt->fetch();
+
             $success = "✅ User updated successfully!";
-            // Optional: redirect with success message
-            // header("Location: users.php?msg=updated");
-            // exit;
+            if (!empty($new_referrer_name) && $new_referrer_name != 'None') {
+                $success .= " New Referrer: <strong>" . htmlspecialchars($new_referrer_name) . "</strong>";
+            } else {
+                $success .= " Referrer removed.";
+            }
         } catch (Exception $e) {
             $pdo->rollBack();
             $error = "❌ Error updating user: " . $e->getMessage();
@@ -146,14 +180,11 @@ include 'header.php';
     .referral-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
     .referral-card h6 { color: #1e293b; font-weight: 700; }
     .referral-card .text-muted { color: #64748b !important; font-size: 0.85rem; }
-    #referrerSearch {
-        margin-bottom: 8px;
-    }
-    #referrerSelect {
-        max-height: 200px;
-        overflow-y: auto;
-    }
-    .password-confirm { border-left: 4px solid #ef4444; }
+    .current-referrer { background: #eef2ff; border-radius: 8px; padding: 8px 14px; display: inline-block; margin-top: 4px; }
+    .current-referrer strong { color: #1e3a8a; }
+    #referrerSearch { margin-bottom: 8px; }
+    #referrerSelect { max-height: 200px; overflow-y: auto; }
+    .password-confirm { border-left: 4px solid #ef4444; background: #fef2f2; padding-left: 12px; border-radius: 4px; }
 </style>
 
 <div class="container-fluid">
@@ -219,13 +250,18 @@ include 'header.php';
                             <small class="text-muted">Expiry is auto-calculated</small>
                         </div>
 
-                        <!-- ====== REFERRAL CHANGE SECTION (SEARCHABLE) ====== -->
+                        <!-- ====== REFERRAL SECTION ====== -->
                         <div class="col-md-12">
                             <div class="referral-card">
-                                <h6><i class="fas fa-link me-2"></i>Change Referrer (Team Shift)</h6>
-                                <p class="text-muted">
-                                    Changing the referrer will move this user and their entire downline team to the new referrer.
-                                </p>
+                                <h6><i class="fas fa-link me-2"></i>Referrer Management</h6>
+
+                                <!-- Current Referrer Display -->
+                                <div class="mb-3">
+                                    <label class="form-label">Current Referrer</label>
+                                    <div class="current-referrer">
+                                        <strong><?= htmlspecialchars($referrer_name) ?></strong>
+                                    </div>
+                                </div>
 
                                 <!-- Search Box -->
                                 <div class="mb-2">
@@ -233,10 +269,10 @@ include 'header.php';
                                     <input type="text" id="referrerSearch" class="form-control" placeholder="Type name or email to filter...">
                                 </div>
 
-                                <!-- Dropdown -->
-                                <label class="form-label">Select New Referrer</label>
+                                <!-- Dropdown to Change Referrer -->
+                                <label class="form-label">Change Referrer (Team Shift)</label>
                                 <select name="new_referrer" id="referrerSelect" class="form-control" size="5">
-                                    <option value="">— No Referrer (None) —</option>
+                                    <option value="">— Remove Referrer (None) —</option>
                                     <?php foreach ($all_users as $u): ?>
                                         <?php if ($u['id'] == $user_id) continue; ?>
                                         <option value="<?= $u['id'] ?>" <?= ($user['referred_by'] == $u['id']) ? 'selected' : '' ?>>
@@ -245,7 +281,7 @@ include 'header.php';
                                     <?php endforeach; ?>
                                 </select>
                                 <small class="text-muted">
-                                    Current referrer: <?= $user['referrer_name'] ?? 'None' ?>
+                                    Changing the referrer will move this user and their entire downline team to the new referrer.
                                 </small>
                             </div>
                         </div>
@@ -259,8 +295,8 @@ include 'header.php';
                         <!-- ====== ADMIN PASSWORD CONFIRMATION ====== -->
                         <div class="col-md-12 password-confirm">
                             <label class="form-label">Admin Password <span class="text-danger">*</span></label>
-                            <input type="password" name="admin_password" class="form-control" required>
-                            <small class="text-muted">Enter your admin password to confirm changes.</small>
+                            <input type="password" name="admin_password" class="form-control" required placeholder="Enter your admin password to confirm changes">
+                            <small class="text-muted">Admin password is required to save any changes.</small>
                         </div>
                     </div>
 
