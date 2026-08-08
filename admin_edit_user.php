@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✏️ Edit User – Separate Page (No Modal Blank Issue)
+// ✏️ Edit User – Separate Page (With Searchable Referrer)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -128,6 +128,14 @@ include 'header.php';
     .referral-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
     .referral-card h6 { color: #1e293b; font-weight: 700; }
     .referral-card .text-muted { color: #64748b !important; font-size: 0.85rem; }
+    /* Search box styling */
+    #referrerSearch {
+        margin-bottom: 8px;
+    }
+    #referrerSelect {
+        max-height: 200px;
+        overflow-y: auto;
+    }
 </style>
 
 <div class="container-fluid">
@@ -190,28 +198,34 @@ include 'header.php';
                             <small class="text-muted">Expiry is auto-calculated</small>
                         </div>
 
-                        <!-- Referrer Change -->
+                        <!-- ====== REFERRAL CHANGE SECTION (SEARCHABLE) ====== -->
                         <div class="col-md-12">
                             <div class="referral-card">
                                 <h6><i class="fas fa-link me-2"></i>Change Referrer (Team Shift)</h6>
                                 <p class="text-muted">
                                     Changing the referrer will move this user and their entire downline team to the new referrer.
                                 </p>
+
+                                <!-- Search Box -->
                                 <div class="mb-2">
-                                    <label class="form-label">New Referrer</label>
-                                    <select name="new_referrer" class="form-control">
-                                        <option value="">— No Referrer (None) —</option>
-                                        <?php foreach ($all_users as $u): ?>
-                                            <?php if ($u['id'] == $user_id) continue; ?>
-                                            <option value="<?= $u['id'] ?>" <?= ($user['referred_by'] == $u['id']) ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <small class="text-muted">
-                                        Current referrer: <?= $user['referrer_name'] ?? 'None' ?>
-                                    </small>
+                                    <label class="form-label">Search Referrer</label>
+                                    <input type="text" id="referrerSearch" class="form-control" placeholder="Type name or email to filter...">
                                 </div>
+
+                                <!-- Dropdown -->
+                                <label class="form-label">Select New Referrer</label>
+                                <select name="new_referrer" id="referrerSelect" class="form-control" size="5">
+                                    <option value="">— No Referrer (None) —</option>
+                                    <?php foreach ($all_users as $u): ?>
+                                        <?php if ($u['id'] == $user_id) continue; ?>
+                                        <option value="<?= $u['id'] ?>" <?= ($user['referred_by'] == $u['id']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">
+                                    Current referrer: <?= $user['referrer_name'] ?? 'None' ?>
+                                </small>
                             </div>
                         </div>
 
@@ -231,5 +245,29 @@ include 'header.php';
         </div>
     </div>
 </div>
+
+<script>
+// JavaScript to filter the dropdown options based on search input
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('referrerSearch');
+    const select = document.getElementById('referrerSelect');
+    const options = select.querySelectorAll('option');
+
+    searchInput.addEventListener('input', function() {
+        const filter = this.value.toLowerCase().trim();
+        options.forEach(opt => {
+            const text = opt.textContent.toLowerCase();
+            if (text.includes(filter) || filter === '') {
+                opt.style.display = '';
+            } else {
+                opt.style.display = 'none';
+            }
+        });
+        // Also auto-select first visible option? Not needed.
+    });
+
+    // Optional: clear filter when select changes? Not needed.
+});
+</script>
 
 <?php include 'footer.php'; ?>
