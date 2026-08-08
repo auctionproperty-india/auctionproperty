@@ -85,12 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     $package_id = $_POST['package_id'] ? (int)$_POST['package_id'] : null;
     $status = $_POST['status'];
     $new_password = trim($_POST['new_password']);
-    // ✅ New referrer ID from dropdown
     $new_referrer_id = isset($_POST['new_referrer']) ? (int)$_POST['new_referrer'] : null;
 
     $pdo->beginTransaction();
     try {
-        // Update users table
         $stmt = $pdo->prepare("
             UPDATE users 
             SET name = ?, email = ?, phone = ?, 
@@ -102,14 +100,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         ");
         $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $new_referrer_id, $id]);
 
-        // Update password
         if (!empty($new_password)) {
             $hashed = password_hash($new_password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
             $stmt->execute([$hashed, $id]);
         }
 
-        // Update package (subscription)
         if ($package_id) {
             $stmt = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
             $stmt->execute([$id]);
@@ -306,7 +302,7 @@ include 'header.php';
                         </td>
                     </tr>
 
-                    <!-- ====== EDIT MODAL – With Referral Change ====== -->
+                    <!-- ====== EDIT MODAL ====== -->
                     <div class="modal fade" id="editModal_<?= $user['id'] ?>" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
