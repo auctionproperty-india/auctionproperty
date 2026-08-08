@@ -179,12 +179,93 @@ include 'header.php';
 ?>
 
 <style>
+    /* ====== USER TABLE STYLES ====== */
     .user-table th { background: #f1f5f9; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.4px; color: #475569; }
     .user-table td { vertical-align: middle; }
     .user-table .actions .btn { padding: 2px 8px; font-size: 0.75rem; }
-    .modal-content { background: #fff; color: #0f172a; }
-    .modal-header { border-bottom: 1px solid #e2e8f0; }
-    .modal-footer { border-top: 1px solid #e2e8f0; }
+    
+    /* ====== MODAL FIX – NO BLANK ISSUE ====== */
+    .modal-content {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+    }
+    .modal-header {
+        background: #ffffff !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        color: #0f172a !important;
+    }
+    .modal-header .btn-close {
+        filter: none !important;
+        opacity: 0.5 !important;
+    }
+    .modal-header .btn-close:hover {
+        opacity: 1 !important;
+    }
+    .modal-body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        padding: 20px !important;
+    }
+    .modal-footer {
+        background: #ffffff !important;
+        border-top: 1px solid #e2e8f0 !important;
+    }
+    .modal-backdrop {
+        z-index: 1040 !important;
+    }
+    .modal {
+        z-index: 1050 !important;
+    }
+    /* Ensure all form elements inside modal are visible */
+    .modal-body .form-control,
+    .modal-body .form-select {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    .modal-body .form-label {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+    .modal-body .card {
+        background: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    .modal-body .card h6 {
+        color: #0f172a !important;
+    }
+    .modal-body .text-muted {
+        color: #64748b !important;
+    }
+    .modal-body .form-check-label {
+        color: #0f172a !important;
+    }
+    .modal-body .small {
+        color: #64748b !important;
+    }
+    /* Override any hover effects that might hide content */
+    .modal-content:hover,
+    .modal-body:hover,
+    .modal-header:hover,
+    .modal-footer:hover {
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+    .modal-body .form-control:focus,
+    .modal-body .form-select:focus {
+        background: #ffffff !important;
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.1) !important;
+    }
+    /* Ensure dropdown options are visible */
+    .modal-body .form-select option {
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+
+    /* ====== OTHER STYLES ====== */
     .badge-status { padding: 4px 12px; border-radius: 30px; font-size: 0.7rem; font-weight: 600; }
     .badge-status.active { background: #dcfce7; color: #166534; }
     .badge-status.inactive { background: #fee2e2; color: #991b1b; }
