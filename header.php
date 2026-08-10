@@ -467,6 +467,7 @@ if ($is_logged_in && $role == 'user') {
         <?php endif; ?>
         <?php if ($is_super_admin): ?>
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
+            <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
         <?php if (hasViewPermission('packages', $pdo)): ?>
