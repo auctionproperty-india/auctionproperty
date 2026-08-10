@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (With View Team Button)
+// 👥 User Management – Admin Panel (With Referral Filter)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -74,13 +74,26 @@ if (isset($_GET['toggle_admin']) && is_numeric($_GET['toggle_admin'])) {
     }
 }
 
-// ---- Search ----
+// ---- Search & Filter ----
 $search = trim($_GET['search'] ?? '');
+$referral_filter = trim($_GET['referral_filter'] ?? 'all'); // all, with_referrer, without_referrer
+
 $search_condition = "";
 $search_params = [];
+
+// Search by name, email, or phone
 if (!empty($search)) {
-    $search_condition = " WHERE u.name ILIKE ? OR u.email ILIKE ? OR u.phone ILIKE ?";
-    $search_params = ['%' . $search . '%', '%' . $search . '%', '%' . $search . '%'];
+    $search_condition .= " AND (u.name ILIKE ? OR u.email ILIKE ? OR u.phone ILIKE ?)";
+    $search_params[] = '%' . $search . '%';
+    $search_params[] = '%' . $search . '%';
+    $search_params[] = '%' . $search . '%';
+}
+
+// Filter by referral status
+if ($referral_filter == 'with_referrer') {
+    $search_condition .= " AND u.referred_by IS NOT NULL";
+} elseif ($referral_filter == 'without_referrer') {
+    $search_condition .= " AND u.referred_by IS NULL";
 }
 
 // ---- Fetch users with referrer ----
@@ -104,6 +117,7 @@ $sql = "
         ORDER BY user_id, id DESC
     ) s ON u.id = s.user_id
     LEFT JOIN packages p ON s.package_id = p.id
+    WHERE 1=1
     " . $search_condition . "
     ORDER BY u.id DESC
 ";
@@ -126,6 +140,8 @@ include 'header.php';
     .search-box { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
     .search-box input { border-radius: 30px; padding: 8px 20px; border: 1px solid #e2e8f0; min-width: 250px; }
     .search-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .search-box select { border-radius: 30px; padding: 8px 16px; border: 1px solid #e2e8f0; background: #fff; }
+    .search-box select:focus { outline: none; border-color: #2563eb; }
 </style>
 
 <div class="container-fluid">
@@ -134,12 +150,21 @@ include 'header.php';
         <span class="badge bg-primary">Total: <?= count($users) ?> users</span>
     </div>
 
-    <!-- Search Bar -->
+    <!-- Search + Filter Bar -->
     <div class="search-box">
         <form method="GET" class="d-flex gap-2 flex-wrap">
+            <!-- Search Input -->
             <input type="text" name="search" placeholder="🔍 Search by name, email, or phone..." value="<?= htmlspecialchars($search) ?>">
+
+            <!-- ✅ Referral Filter Dropdown -->
+            <select name="referral_filter">
+                <option value="all" <?= $referral_filter == 'all' ? 'selected' : '' ?>>All Users</option>
+                <option value="with_referrer" <?= $referral_filter == 'with_referrer' ? 'selected' : '' ?>>With Referrer</option>
+                <option value="without_referrer" <?= $referral_filter == 'without_referrer' ? 'selected' : '' ?>>⚠️ Without Referrer</option>
+            </select>
+
             <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Search</button>
-            <?php if (!empty($search)): ?>
+            <?php if (!empty($search) || $referral_filter != 'all'): ?>
                 <a href="users.php" class="btn btn-secondary btn-sm"><i class="fas fa-times"></i> Clear</a>
             <?php endif; ?>
         </form>
@@ -220,19 +245,19 @@ include 'header.php';
                                 <i class="fas fa-edit"></i>
                             </a>
 
-                            <!-- ✅ View Team Button -->
+                            <!-- View Team Button -->
                             <a href="admin_team.php?id=<?= $user['id'] ?>" class="btn btn-sm btn-info" title="View Team">
                                 <i class="fas fa-sitemap"></i>
                             </a>
 
                             <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                <a href="?delete=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">
+                                <a href="?delete=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">
                                     <i class="fas fa-trash"></i>
                                 </a>
-                                <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-warning">
+                                <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" class="btn btn-sm btn-warning">
                                     <?= $user['status'] == 'blocked' ? '<i class="fas fa-unlock"></i>' : '<i class="fas fa-lock"></i>' ?>
                                 </a>
-                                <a href="?toggle_admin=<?= $user['id'] ?>&search=<?= urlencode($search) ?>" class="btn btn-sm btn-info">
+                                <a href="?toggle_admin=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" class="btn btn-sm btn-info">
                                     <?= $user['is_super_admin'] ? '<i class="fas fa-user-minus"></i>' : '<i class="fas fa-user-plus"></i>' ?>
                                 </a>
                             <?php endif; ?>
