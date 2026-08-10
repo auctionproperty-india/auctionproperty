@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (With Edit Link)
+// 👥 User Management – Admin Panel (With View Team Button)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -215,9 +215,14 @@ include 'header.php';
                             <?= $user['is_super_admin'] ? '<span class="badge bg-danger">Admin</span>' : '<span class="badge bg-secondary">User</span>' ?>
                         </td>
                         <td class="actions">
-                            <!-- ✅ Edit Button – Now links to separate page -->
+                            <!-- Edit Button -->
                             <a href="admin_edit_user.php?id=<?= $user['id'] ?>" class="btn btn-sm btn-primary">
                                 <i class="fas fa-edit"></i>
+                            </a>
+
+                            <!-- ✅ View Team Button -->
+                            <a href="admin_team.php?id=<?= $user['id'] ?>" class="btn btn-sm btn-info" title="View Team">
+                                <i class="fas fa-sitemap"></i>
                             </a>
 
                             <?php if ($user['id'] != $_SESSION['user_id']): ?>
