@@ -13,32 +13,60 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 
 $user_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($user_id <= 0) {
-    // If no user selected, show a dropdown to select a user
+    // ---- No user selected: show search + dropdown ----
     $all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
     include 'header.php';
     ?>
     <div class="container-fluid">
         <div class="card-premium">
             <h4><i class="fas fa-users me-2"></i>View Team</h4>
-            <p class="text-muted">Select a user to view their entire downline team.</p>
+            <p class="text-muted">Search for a user by name or email, then select to view their downline team.</p>
             <form method="GET">
-                <div class="row g-3">
+                <div class="row g-3 align-items-end">
+                    <!-- Search Box -->
                     <div class="col-md-6">
+                        <label class="form-label">Search User</label>
+                        <input type="text" id="teamUserSearch" class="form-control" placeholder="Type name or email to filter...">
+                    </div>
+                    <!-- Dropdown (filtered by search) -->
+                    <div class="col-md-4">
                         <label class="form-label">Select User</label>
-                        <select name="id" class="form-control" required>
+                        <select name="id" id="teamUserSelect" class="form-control" required>
                             <option value="">— Choose a user —</option>
                             <?php foreach ($all_users as $u): ?>
                                 <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)</option>
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary">View Team</button>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">View Team</button>
                     </div>
                 </div>
             </form>
         </div>
     </div>
+
+    <script>
+    // JavaScript to filter the dropdown options based on search input
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('teamUserSearch');
+        const select = document.getElementById('teamUserSelect');
+        const options = select.querySelectorAll('option');
+
+        searchInput.addEventListener('input', function() {
+            const filter = this.value.toLowerCase().trim();
+            options.forEach(opt => {
+                const text = opt.textContent.toLowerCase();
+                if (text.includes(filter) || filter === '') {
+                    opt.style.display = '';
+                } else {
+                    opt.style.display = 'none';
+                }
+            });
+        });
+    });
+    </script>
+
     <?php include 'footer.php'; exit;
 }
 
