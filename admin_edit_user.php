@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✏️ Edit User – With Referrer Name Display + Change Option
+// ✏️ Edit User – With Referrer Search + Admin Password Confirmation
 // ============================================================
 
 require_once __DIR__ . '/db.php';
