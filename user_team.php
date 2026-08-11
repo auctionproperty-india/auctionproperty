@@ -1,4 +1,8 @@
 <?php
+// ============================================================
+// 👥 My Team – Show Downline with City
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -10,7 +14,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php'; 
 
-// ---- Fetch the entire referral tree with package info and active flag ----
+// ---- Fetch the entire referral tree with package info, active flag, and city ----
 $sql = "
 WITH RECURSIVE team_tree AS (
     SELECT 
@@ -20,6 +24,7 @@ WITH RECURSIVE team_tree AS (
         u.phone,
         u.created_at,
         u.referred_by,
+        u.city,  -- ✅ Added city
         0 as level,
         ARRAY[u.id] as path,
         p.name as package_name,
@@ -44,6 +49,7 @@ WITH RECURSIVE team_tree AS (
         u.phone,
         u.created_at,
         u.referred_by,
+        u.city,  -- ✅ Added city
         t.level + 1,
         t.path || u.id,
         p.name as package_name,
@@ -91,7 +97,7 @@ function buildTree($members, $parentId = null) {
 $tree = buildTree($team_members, $user_id);
 $total_members = count($team_members);
 
-// ---- Function to count total members in a subtree ----
+// ---- Helper function to count total members in a subtree ----
 function countSubtree($node) {
     $count = 1;
     if (isset($node['children']) && count($node['children']) > 0) {
@@ -110,7 +116,7 @@ function safeDateFormat($dateStr) {
     return date('d M Y', strtotime($dateStr));
 }
 
-// ---- Function to render tree recursively (with search filter support via JS) ----
+// ---- Function to render tree recursively (with city display) ----
 function renderTree($nodes, $level = 0) {
     if (empty($nodes)) return '';
     $html = '<ul style="list-style:none; padding-left:' . ($level > 0 ? '25px' : '0') . ';">';
@@ -140,6 +146,10 @@ function renderTree($nodes, $level = 0) {
         
         // Add data attributes for search filtering
         $searchData = 'data-name="' . strtolower(htmlspecialchars($node['name'])) . '" data-email="' . strtolower(htmlspecialchars($node['email'])) . '"';
+        
+        // City display
+        $cityDisplay = !empty($node['city']) ? htmlspecialchars($node['city']) : '—';
+        
         $html .= '<li style="margin-bottom:8px; border-left:2px solid #e2e8f0; padding-left:12px;" ' . $searchData . '>';
         $html .= '<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:'.($level==0?'#f1f5f9':'transparent').'; border-radius:8px; flex-wrap:wrap;">';
         $html .= '<span style="font-size:1.2rem;">' . $icon . '</span>';
@@ -152,9 +162,10 @@ function renderTree($nodes, $level = 0) {
             $html .= ' <span class="badge bg-light text-dark border" style="font-weight:600;">👥 ' . ($totalInSubtree - 1) . ' members</span>';
         }
         
-        // ✅ Fixed date display – safeDateFormat handles null values
-        $joinedDate = safeDateFormat($node['created_at']);
-        $html .= '<span style="font-size:0.7rem; color:#94a3b8; margin-left:auto;">Joined: ' . $joinedDate . '</span>';
+        // ✅ City display
+        $html .= ' <span class="badge bg-light text-dark" style="font-weight:400;"><i class="fas fa-map-pin"></i> ' . $cityDisplay . '</span>';
+        
+        $html .= '<span style="font-size:0.7rem; color:#94a3b8; margin-left:auto;">Joined: ' . safeDateFormat($node['created_at']) . '</span>';
         $html .= '</div>';
         
         if ($hasChildren) {
