@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 My Team – Show Downline with City
+// 👥 My Team – Show Downline with City + City Search
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -24,7 +24,7 @@ WITH RECURSIVE team_tree AS (
         u.phone,
         u.created_at,
         u.referred_by,
-        u.city,  -- ✅ Added city
+        u.city,
         0 as level,
         ARRAY[u.id] as path,
         p.name as package_name,
@@ -49,7 +49,7 @@ WITH RECURSIVE team_tree AS (
         u.phone,
         u.created_at,
         u.referred_by,
-        u.city,  -- ✅ Added city
+        u.city,
         t.level + 1,
         t.path || u.id,
         p.name as package_name,
@@ -144,8 +144,10 @@ function renderTree($nodes, $level = 0) {
         
         $icon = $hasChildren ? '📂' : '👤';
         
-        // Add data attributes for search filtering
-        $searchData = 'data-name="' . strtolower(htmlspecialchars($node['name'])) . '" data-email="' . strtolower(htmlspecialchars($node['email'])) . '"';
+        // Add data attributes for search filtering (including city)
+        $searchData = 'data-name="' . strtolower(htmlspecialchars($node['name'])) . '" 
+                        data-email="' . strtolower(htmlspecialchars($node['email'])) . '" 
+                        data-city="' . strtolower(htmlspecialchars($node['city'] ?? '')) . '"';
         
         // City display
         $cityDisplay = !empty($node['city']) ? htmlspecialchars($node['city']) : '—';
@@ -162,7 +164,7 @@ function renderTree($nodes, $level = 0) {
             $html .= ' <span class="badge bg-light text-dark border" style="font-weight:600;">👥 ' . ($totalInSubtree - 1) . ' members</span>';
         }
         
-        // ✅ City display
+        // City display
         $html .= ' <span class="badge bg-light text-dark" style="font-weight:400;"><i class="fas fa-map-pin"></i> ' . $cityDisplay . '</span>';
         
         $html .= '<span style="font-size:0.7rem; color:#94a3b8; margin-left:auto;">Joined: ' . safeDateFormat($node['created_at']) . '</span>';
@@ -243,7 +245,7 @@ function renderTree($nodes, $level = 0) {
         <div class="team-header">
             <h4><i class="fas fa-users me-2"></i>My Team</h4>
             <div class="team-search">
-                <input type="text" id="teamSearch" placeholder="🔍 Search by name or email..." onkeyup="filterTeam(this.value)">
+                <input type="text" id="teamSearch" placeholder="🔍 Search by name, email, or city..." onkeyup="filterTeam(this.value)">
                 <span class="badge bg-primary rounded-pill"><?= $total_members ?> Members</span>
             </div>
         </div>
@@ -273,7 +275,8 @@ function filterTeam(searchText) {
     items.forEach(el => {
         const name = el.getAttribute('data-name') || '';
         const email = el.getAttribute('data-email') || '';
-        if (name.includes(query) || email.includes(query)) {
+        const city = el.getAttribute('data-city') || '';
+        if (name.includes(query) || email.includes(query) || city.includes(query)) {
             el.classList.remove('hidden-item');
         } else {
             el.classList.add('hidden-item');
