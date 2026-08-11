@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 My Team – City Dashboard + City Filter
+// 👥 My Team – City Dashboard + City-wise Full List
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -104,7 +104,6 @@ foreach ($team_members as $m) {
         $city_counts[$city] = ($city_counts[$city] ?? 0) + 1;
     }
 }
-// Sort by count descending
 arsort($city_counts);
 
 // ---- Helper functions ----
@@ -174,6 +173,169 @@ function renderTree($nodes, $level = 0) {
     $html .= '</ul>';
     return $html;
 }
+
+// ============================================================
+// 🏙️ CITY DETAIL VIEW (if city parameter is set)
+// ============================================================
+$selected_city = isset($_GET['city']) ? trim($_GET['city']) : '';
+if (!empty($selected_city)) {
+    // Filter members from this city
+    $city_members = array_filter($team_members, function($m) use ($selected_city) {
+        return trim($m['city'] ?? '') == $selected_city;
+    });
+    // Sort by name
+    usort($city_members, function($a, $b) {
+        return strcmp($a['name'], $b['name']);
+    });
+    $city_count = count($city_members);
+    ?>
+    <style>
+        .city-detail-container {
+            background: white;
+            border-radius: 24px;
+            padding: 25px;
+            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
+        }
+        .city-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .city-detail-header h4 {
+            font-weight: 700;
+            margin: 0;
+        }
+        .city-detail-header h4 i {
+            color: #2563eb;
+        }
+        .city-detail-header .badge {
+            font-size: 1rem;
+            padding: 6px 16px;
+        }
+        .back-btn {
+            background: #e2e8f0;
+            border: none;
+            border-radius: 30px;
+            padding: 8px 20px;
+            font-weight: 600;
+            color: #1e293b;
+            text-decoration: none;
+            transition: 0.2s;
+        }
+        .back-btn:hover {
+            background: #cbd5e1;
+            text-decoration: none;
+            color: #0f172a;
+        }
+        .city-member-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .city-member-table th {
+            background: #f1f5f9;
+            font-weight: 600;
+            color: #475569;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            padding: 10px 12px;
+            text-align: left;
+        }
+        .city-member-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+        .city-member-table tr:hover td {
+            background: #f8fafc;
+        }
+        .no-members-msg {
+            padding: 30px;
+            text-align: center;
+            color: #94a3b8;
+        }
+        @media (max-width: 768px) {
+            .city-member-table {
+                font-size: 0.75rem;
+            }
+            .city-member-table th,
+            .city-member-table td {
+                padding: 6px 8px;
+            }
+            .city-detail-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+    </style>
+    <div class="container-fluid">
+        <div class="city-detail-container">
+            <div class="city-detail-header">
+                <h4><i class="fas fa-map-pin"></i> <?= htmlspecialchars($selected_city) ?> (<?= $city_count ?> members)</h4>
+                <div>
+                    <a href="user_team.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to My Team</a>
+                </div>
+            </div>
+            <?php if ($city_count > 0): ?>
+                <div class="table-responsive">
+                    <table class="city-member-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>City</th>
+                                <th>Package</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($city_members as $m): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($m['name']) ?></strong></td>
+                                <td><?= htmlspecialchars($m['email']) ?></td>
+                                <td><?= htmlspecialchars($m['phone'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars($m['city'] ?? '—') ?></td>
+                                <td>
+                                    <?php if (!empty($m['package_name']) && $m['sub_status'] == 'active'): ?>
+                                        <span class="badge bg-primary"><?= htmlspecialchars($m['package_name']) ?></span>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary">Free</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($m['is_active_sub']): ?>
+                                        <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= safeDateFormat($m['created_at']) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="no-members-msg">No members found in this city.</div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
+    include 'footer.php';
+    exit;
+}
+
+// ============================================================
+// 👥 DEFAULT VIEW (Tree + City Dashboard)
+// ============================================================
 ?>
 <style>
     .team-container {
@@ -200,6 +362,7 @@ function renderTree($nodes, $level = 0) {
         display: flex;
         gap: 8px;
         align-items: center;
+        flex-wrap: wrap;
     }
     .team-search input {
         border-radius: 30px;
@@ -230,7 +393,6 @@ function renderTree($nodes, $level = 0) {
         display: none !important;
     }
 
-    /* City Dashboard Styles */
     .city-dashboard {
         display: flex;
         flex-wrap: wrap;
@@ -276,10 +438,12 @@ function renderTree($nodes, $level = 0) {
         padding: 2px 8px;
         border-radius: 20px;
         transition: 0.2s;
+        text-decoration: none;
     }
     .city-card .view-all-btn:hover {
         background: #2563eb;
         color: white;
+        text-decoration: none;
     }
     .clear-filter-btn {
         background: #e2e8f0;
@@ -318,7 +482,7 @@ function renderTree($nodes, $level = 0) {
                 <div class="city-card">
                     <span class="city-name"><i class="fas fa-map-pin" style="color:#2563eb;"></i> <?= htmlspecialchars($city) ?></span>
                     <span class="city-count"><?= $count ?></span>
-                    <button class="view-all-btn" data-city="<?= htmlspecialchars($city) ?>" onclick="filterByCity(this)">View All</button>
+                    <a href="?city=<?= urlencode($city) ?>" class="view-all-btn">View All</a>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -365,13 +529,6 @@ function filterTeam(searchText) {
     } else {
         clearBtn.classList.remove('show');
     }
-}
-
-function filterByCity(btn) {
-    const city = btn.getAttribute('data-city');
-    const searchInput = document.getElementById('teamSearch');
-    searchInput.value = city;
-    filterTeam(city);
 }
 
 function clearFilter() {
