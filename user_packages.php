@@ -39,7 +39,7 @@ $sub_info = $active_sub->fetch();
 $is_subscribed = $sub_info ? true : false;
 $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 
-// ---- Fetch pending subscription check (for display) ----
+// ---- Fetch pending subscription check ----
 $pending_check = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'pending'");
 $pending_check->execute([$user_id]);
 $has_pending = $pending_check->rowCount() > 0;
@@ -91,7 +91,7 @@ $has_pending = $pending_check->rowCount() > 0;
                         <?php elseif ($has_pending): ?>
                             <div class="badge bg-warning text-dark w-100 mt-2">⏳ Pending Request</div>
                         <?php else: ?>
-                            <!-- 🔥 यहाँ लिंक बदला – अब payment_info.php पर जाएगा -->
+                            <!-- 🔥 यहाँ बदलाव – अब सीधा Payment Page पर भेजेगा -->
                             <a href="payment_info.php?package_id=<?= $pkg['id'] ?>" class="btn btn-primary w-100 btn-sm mt-2">Buy Now</a>
                         <?php endif; ?>
                     </div>
