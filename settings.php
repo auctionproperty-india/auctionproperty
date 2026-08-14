@@ -1,140 +1,157 @@
 <?php
+session_start();
 require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/functions.php';
 
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    header("Location: dashboard.php");
-    exit;
-}
-if(!hasViewPermission('settings', $pdo)) {
-    die("Permission denied.");
-}
-
-$message = '';
-$settings_keys = ['default_contact', 'company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent', 'spin_min_coins', 'spin_max_coins'];
-
-// Handle QR upload
-if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
-    if(!hasEditPermission('settings', $pdo)) {
-        die("You don't have permission to edit settings.");
+// 1. यदि 'Save' किया गया है और Session में 'edit_allowed' है तो UPDATE करें
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings']) && isset($_SESSION['edit_allowed']) && $_SESSION['edit_allowed'] === true) {
+    
+    $tds = $_POST['tds'] ?? '';
+    $bank_details = $_POST['bank_details'] ?? '';
+    $admin_charge = $_POST['admin_charge'] ?? '';
+    
+    // File Upload Handle
+    $scanner_image = null;
+    if (isset($_FILES['scanner_image']) && $_FILES['scanner_image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = __DIR__ . '/uploads/';
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+        
+        $ext = pathinfo($_FILES['scanner_image']['name'], PATHINFO_EXTENSION);
+        $filename = 'scanner_' . time() . '.' . $ext;
+        $target = $upload_dir . $filename;
+        if (move_uploaded_file($_FILES['scanner_image']['tmp_name'], $target)) {
+            $scanner_image = 'uploads/' . $filename;
+        }
     }
-    $admin_password = $_POST['admin_password'] ?? '';
-    $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
-    $stmt->execute([$_SESSION['user_id']]);
-    $admin = $stmt->fetch();
-    if(!$admin || !password_verify($admin_password, $admin['password'])) {
-        $message = "<div class='alert alert-danger'>❌ Incorrect admin password!</div>";
+    
+    // यदि कोई नई Image नहीं आई तो पुरानी Image retain करें
+    if ($scanner_image === null) {
+        // पुरानी Image लें
+        $stmt = $pdo->query("SELECT scanner_image FROM settings LIMIT 1");
+        $old = $stmt->fetch(PDO::FETCH_ASSOC);
+        $scanner_image = $old['scanner_image'] ?? '';
+    }
+    
+    // UPDATE Query
+    $sql = "UPDATE settings 
+            SET tds = ?, bank_details = ?, admin_charge = ?, scanner_image = ? 
+            WHERE id = 1"; // मान लिया कि settings की id = 1 है
+    $stmt = $pdo->prepare($sql);
+    $result = $stmt->execute([$tds, $bank_details, $admin_charge, $scanner_image]);
+    
+    if ($result) {
+        $success = "✅ Settings सफलतापूर्वक Save हो गईं!";
+        // Edit permission खत्म करें (ताकि दोबारा Edit के लिए Password माँगे)
+        unset($_SESSION['edit_allowed']);
     } else {
-        // Save text fields
-        foreach($settings_keys as $key) {
-            $val = trim($_POST[$key] ?? '');
-            $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?")->execute([$val, $key]);
-        }
-        // Save QR code if uploaded
-        if(isset($_FILES['qr_code']) && $_FILES['qr_code']['error'] == 0) {
-            $upload_dir = 'uploads/';
-            if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $ext = pathinfo($_FILES['qr_code']['name'], PATHINFO_EXTENSION);
-            $filename = 'qr_' . time() . '.' . $ext;
-            move_uploaded_file($_FILES['qr_code']['tmp_name'], $upload_dir . $filename);
-            $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'company_qr_code'")->execute([$upload_dir . $filename]);
-        }
-        $message = "<div class='alert alert-success'>✅ Settings updated!</div>";
+        $error = "❌ Save करने में त्रुटि: " . implode(" ", $stmt->errorInfo());
     }
 }
 
-include 'header.php';
-// Fetch current values
-$settings = [];
-foreach($settings_keys as $key) {
-    $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
-    $stmt->execute([$key]);
-    $settings[$key] = $stmt->fetchColumn() ?: '';
+// 2. यदि 'Edit' बटन दबाया (Password Verify)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_password'])) {
+    $entered_password = $_POST['password'] ?? '';
+    // यहाँ अपना Admin Password (Hash) डालें – मान लिया password = 'admin123'
+    // बेहतर होगा कि आप किसी Admin User से verify करें
+    if (password_verify($entered_password, password_hash('admin123', PASSWORD_DEFAULT))) {
+        $_SESSION['edit_allowed'] = true;
+        $edit_mode = true;
+    } else {
+        $error = "❌ गलत Password!";
+    }
 }
-$qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
+
+// 3. Current Settings Load करें
+$stmt = $pdo->query("SELECT tds, bank_details, admin_charge, scanner_image FROM settings LIMIT 1");
+$settings = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$settings) {
+    // अगर पहली बार Settings नहीं हैं तो डिफॉल्ट डालें
+    $pdo->exec("INSERT INTO settings (tds, bank_details, admin_charge, scanner_image) VALUES ('0', '', '0', '')");
+    $settings = ['tds'=>'0', 'bank_details'=>'', 'admin_charge'=>'0', 'scanner_image'=>''];
+}
+
+$edit_mode = isset($_SESSION['edit_allowed']) && $_SESSION['edit_allowed'] === true;
 ?>
-<div class="card-premium">
-    <h4><i class="fas fa-university me-2"></i>Company Bank Details & QR Code</h4>
-    <?= $message ?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Settings</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 30px auto; padding: 20px; }
+        .readonly { background: #f1f5f9; color: #475569; }
+        input[type="text"], textarea { width: 100%; padding: 8px; margin: 5px 0 15px; border: 1px solid #cbd5e1; border-radius: 6px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .field-group { margin-bottom: 20px; }
+        .msg { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .success { background: #dcfce7; border: 1px solid #22c55e; }
+        .error { background: #fee2e2; border: 1px solid #dc2626; }
+        .hidden { display: none; }
+        .password-box { background: #f8fafc; border: 1px dashed #94a3b8; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>⚙️ Settings</h1>
+
+    <?php if (isset($success)): ?>
+        <div class="msg success"><?= $success ?></div>
+    <?php endif; ?>
+    <?php if (isset($error)): ?>
+        <div class="msg error"><?= $error ?></div>
+    <?php endif; ?>
+
+    <!-- Password Verification Box -->
+    <?php if (!$edit_mode): ?>
+        <div class="password-box">
+            <h3>🔒 Edit Settings</h3>
+            <p>Settings को Edit करने के लिए कृपया Password दर्ज करें:</p>
+            <form method="POST">
+                <input type="password" name="password" placeholder="Enter Admin Password" required style="width: 300px; padding: 8px; border:1px solid #94a3b8; border-radius:6px;">
+                <button type="submit" name="verify_password" class="btn btn-primary">🔓 Unlock Edit</button>
+            </form>
+        </div>
+    <?php endif; ?>
+
+    <!-- Settings Form -->
     <form method="POST" enctype="multipart/form-data">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="fw-bold">Bank Name</label>
-                <input type="text" name="company_bank_name" class="form-control" value="<?= htmlspecialchars($settings['company_bank_name']) ?>">
-            </div>
-            <div class="col-md-6">
-                <label class="fw-bold">Account Number</label>
-                <input type="text" name="company_account_number" class="form-control" value="<?= htmlspecialchars($settings['company_account_number']) ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="fw-bold">IFSC Code</label>
-                <input type="text" name="company_ifsc" class="form-control" value="<?= htmlspecialchars($settings['company_ifsc']) ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="fw-bold">Branch</label>
-                <input type="text" name="company_branch" class="form-control" value="<?= htmlspecialchars($settings['company_branch']) ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="fw-bold">Default Contact Number</label>
-                <input type="text" name="default_contact" class="form-control" value="<?= htmlspecialchars($settings['default_contact']) ?>">
-            </div>
+        <div class="field-group">
+            <label><strong>TDS (%)</strong></label>
+            <input type="text" name="tds" value="<?= htmlspecialchars($settings['tds']) ?>" <?= $edit_mode ? '' : 'disabled class="readonly"' ?>>
         </div>
-        <hr>
-        <h5><i class="fas fa-percent me-2"></i>Referral Payout Deductions</h5>
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="fw-bold">TDS %</label>
-                <input type="number" step="0.01" name="tds_percent" class="form-control" value="<?= htmlspecialchars($settings['tds_percent']) ?>">
-                <small class="text-muted">Default TDS percentage for referral payouts.</small>
-            </div>
-            <div class="col-md-6">
-                <label class="fw-bold">Admin Charge %</label>
-                <input type="number" step="0.01" name="admin_charge_percent" class="form-control" value="<?= htmlspecialchars($settings['admin_charge_percent']) ?>">
-                <small class="text-muted">Default Admin Charge percentage for referral payouts.</small>
-            </div>
+        <div class="field-group">
+            <label><strong>Bank Details</strong></label>
+            <textarea name="bank_details" rows="3" <?= $edit_mode ? '' : 'disabled class="readonly"' ?>><?= htmlspecialchars($settings['bank_details']) ?></textarea>
         </div>
-        <hr>
-        <h5><i class="fas fa-coins me-2"></i>Daily Spin Coin Settings</h5>
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="fw-bold">Min Coins per Spin</label>
-                <input type="number" step="0.01" name="spin_min_coins" class="form-control" value="<?= htmlspecialchars($settings['spin_min_coins']) ?>">
-                <small class="text-muted">Minimum coins user gets on each spin.</small>
-            </div>
-            <div class="col-md-6">
-                <label class="fw-bold">Max Coins per Spin</label>
-                <input type="number" step="0.01" name="spin_max_coins" class="form-control" value="<?= htmlspecialchars($settings['spin_max_coins']) ?>">
-                <small class="text-muted">Maximum coins user gets on each spin.</small>
-            </div>
-            <div class="col-12">
-                <small class="text-muted">Per slot total is capped at 22 coins. Adjust min/max to control average.</small>
-            </div>
+        <div class="field-group">
+            <label><strong>Admin Charge (₹)</strong></label>
+            <input type="text" name="admin_charge" value="<?= htmlspecialchars($settings['admin_charge']) ?>" <?= $edit_mode ? '' : 'disabled class="readonly"' ?>>
         </div>
-        <hr>
-        <div class="row g-3">
-            <div class="col-12">
-                <label class="fw-bold">UPI QR Code (for Payment Page)</label>
-                <input type="file" name="qr_code" class="form-control" accept="image/*">
-                <?php if($qr && file_exists($qr)): ?>
-                    <div class="mt-3 text-center">
-                        <p class="text-muted">Current QR Code:</p>
-                        <img src="<?= $qr ?>" style="max-height:250px; border:1px solid #ddd; border-radius:12px; padding:10px; background:white;">
-                    </div>
-                <?php else: ?>
-                    <div class="mt-3 text-center">
-                        <p class="text-muted">No QR code uploaded yet.</p>
-                    </div>
-                <?php endif; ?>
-                <small class="text-muted">Upload a QR code image (PNG, JPG). This will appear on the subscription payment page.</small>
-            </div>
+        <div class="field-group">
+            <label><strong>Scanner Image</strong></label>
+            <?php if (!empty($settings['scanner_image'])): ?>
+                <div><img src="<?= htmlspecialchars($settings['scanner_image']) ?>" style="max-height:150px; border:1px solid #ccc; padding:5px;"></div>
+            <?php endif; ?>
+            <input type="file" name="scanner_image" accept="image/*" <?= $edit_mode ? '' : 'disabled' ?>>
+            <?php if (!$edit_mode): ?>
+                <p style="color:#64748b; font-size:0.9em;">(Edit mode में Enable होगा)</p>
+            <?php endif; ?>
         </div>
-        <div class="row mt-3">
-            <div class="col-md-4">
-                <label class="fw-bold">Verify Admin Password *</label>
-                <input type="password" name="admin_password" class="form-control" placeholder="Enter password to save" required>
-            </div>
-        </div>
-        <button type="submit" name="update_settings" class="btn btn-primary mt-3">Save Settings</button>
+        
+        <?php if ($edit_mode): ?>
+            <button type="submit" name="save_settings" class="btn btn-success">💾 Save Settings</button>
+            <a href="settings.php" class="btn btn-warning">↩️ Cancel (Exit Edit)</a>
+        <?php else: ?>
+            <p style="color:#94a3b8; font-style:italic;">Settings को Edit करने के लिए ऊपर Unlock करें।</p>
+        <?php endif; ?>
     </form>
-</div>
-<?php include 'footer.php'; ?>
+
+    <?php if ($edit_mode): ?>
+        <script>
+            // Edit mode में Cancel पर Edit permission हटाने के लिए
+            // हम सिर्फ URL में ?exit=1 डालकर session destroy कर सकते हैं
+        </script>
+    <?php endif; ?>
+</body>
+</html>
