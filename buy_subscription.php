@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 Buy Subscription – Discount Price Pre-filled
+// 📦 Buy Subscription – Discount Price Pre-filled + Bank Details
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -23,7 +23,6 @@ if (!$package) {
 }
 
 // ---- Determine the price to display ----
-// Use discount price if available and less than regular price
 $display_price = $package['price'];
 if (!empty($package['discount_price']) && $package['discount_price'] > 0 && $package['discount_price'] < $package['price']) {
     $display_price = $package['discount_price'];
@@ -45,14 +44,24 @@ if ($active_check->rowCount() > 0) {
     exit;
 }
 
+// ============================================================
+// 🔥 नया: Settings से Bank Details और QR Code लें
+// ============================================================
+$bank_keys = ['company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'default_contact'];
+$bank_data = [];
+foreach ($bank_keys as $key) {
+    $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
+    $stmt->execute([$key]);
+    $bank_data[$key] = $stmt->fetchColumn() ?: '';
+}
+$qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
+
 // ---- If form submitted ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Sanitize inputs
     $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : $display_price;
     $utr = trim($_POST['utr'] ?? '');
     $slip_path = '';
 
-    // Handle slip upload
     if (isset($_FILES['slip']) && $_FILES['slip']['error'] == 0) {
         $upload_dir = 'uploads/slips/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
@@ -62,14 +71,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $slip_path = $upload_dir . $filename;
     }
 
-    // Insert subscription – status = pending
     $stmt = $pdo->prepare("
         INSERT INTO subscriptions (user_id, package_id, amount, payment_method, utr, slip_path, status, start_date, end_date, created_at)
         VALUES (?, ?, ?, 'bank', ?, ?, 'pending', NULL, NULL, NOW())
     ");
     $stmt->execute([$user_id, $package_id, $amount, $utr, $slip_path]);
 
-    // Redirect with success
     header("Location: user_packages.php?msg=request_sent");
     exit;
 }
@@ -78,8 +85,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 include 'header.php';
 ?>
 
+<style>
+.bank-detail-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+.bank-detail-box .label {
+    font-weight: 600;
+    color: #475569;
+    font-size: 0.9em;
+}
+.bank-detail-box .value {
+    font-weight: 500;
+    color: #0f172a;
+    font-size: 1em;
+}
+.qr-box {
+    text-align: center;
+    padding: 15px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+.qr-box img {
+    max-height: 200px;
+    border-radius: 8px;
+}
+.payment-section {
+    background: #f1f5f9;
+    padding: 20px;
+    border-radius: 12px;
+    margin: 15px 0;
+}
+</style>
+
 <div class="container-fluid">
-    <div class="card-premium" style="max-width: 600px; margin: auto;">
+    <div class="card-premium" style="max-width: 750px; margin: auto;">
         <h4><i class="fas fa-shopping-cart me-2"></i>Buy Package: <?= htmlspecialchars($package['name']) ?></h4>
         <p class="text-muted">Fill the details below to request subscription.</p>
 
@@ -89,6 +133,36 @@ include 'header.php';
             </div>
         <?php endif; ?>
 
+        <!-- 🔥 Bank Details + QR Code Display -->
+        <div class="payment-section">
+            <div class="row">
+                <div class="col-md-7">
+                    <h6 class="fw-bold"><i class="fas fa-university me-2"></i>Bank Details</h6>
+                    <div class="bank-detail-box">
+                        <div><span class="label">Bank Name:</span> <span class="value"><?= htmlspecialchars($bank_data['company_bank_name'] ?: 'Not set') ?></span></div>
+                        <div><span class="label">Account Number:</span> <span class="value"><?= htmlspecialchars($bank_data['company_account_number'] ?: 'Not set') ?></span></div>
+                        <div><span class="label">IFSC Code:</span> <span class="value"><?= htmlspecialchars($bank_data['company_ifsc'] ?: 'Not set') ?></span></div>
+                        <div><span class="label">Branch:</span> <span class="value"><?= htmlspecialchars($bank_data['company_branch'] ?: 'Not set') ?></span></div>
+                        <div><span class="label">Contact:</span> <span class="value"><?= htmlspecialchars($bank_data['default_contact'] ?: 'Not set') ?></span></div>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <h6 class="fw-bold"><i class="fas fa-qrcode me-2"></i>QR Code</h6>
+                    <div class="qr-box">
+                        <?php if ($qr && file_exists($qr)): ?>
+                            <img src="<?= htmlspecialchars($qr) ?>" alt="QR Code">
+                            <p class="text-muted small mt-2">Scan to pay via UPI</p>
+                        <?php else: ?>
+                            <p class="text-muted">No QR code uploaded yet.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- ---- आपका Original Form – बिल्कुल वैसा ही ---- -->
         <form method="POST" enctype="multipart/form-data">
             <div class="mb-3">
                 <label class="form-label">Amount (₹)</label>
