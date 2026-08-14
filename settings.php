@@ -13,6 +13,24 @@ if(!hasViewPermission('settings', $pdo)) {
 $message = '';
 $settings_keys = ['default_contact', 'company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent', 'spin_min_coins', 'spin_max_coins'];
 
+// ============================================================
+// 🔥 नया: सुनिश्चित करें कि सभी setting_key के लिए row मौजूद हो
+// ============================================================
+foreach ($settings_keys as $key) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM settings WHERE setting_key = ?");
+    $stmt->execute([$key]);
+    if ($stmt->fetchColumn() == 0) {
+        // Row नहीं है – डिफॉल्ट मान '' के साथ INSERT करें
+        $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, '')")->execute([$key]);
+    }
+}
+// QR कोड के लिए भी
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM settings WHERE setting_key = 'company_qr_code'");
+$stmt->execute();
+if ($stmt->fetchColumn() == 0) {
+    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('company_qr_code', '')")->execute();
+}
+
 // Handle QR upload
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
     if(!hasEditPermission('settings', $pdo)) {
@@ -25,10 +43,12 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
     if(!$admin || !password_verify($admin_password, $admin['password'])) {
         $message = "<div class='alert alert-danger'>❌ Incorrect admin password!</div>";
     } else {
-        // Save text fields
+        // Save text fields – केवल POST में आए हुए keys को अपडेट करें
         foreach($settings_keys as $key) {
-            $val = trim($_POST[$key] ?? '');
-            $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?")->execute([$val, $key]);
+            if (isset($_POST[$key])) {
+                $val = trim($_POST[$key] ?? '');
+                $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?")->execute([$val, $key]);
+            }
         }
         // Save QR code if uploaded
         if(isset($_FILES['qr_code']) && $_FILES['qr_code']['error'] == 0) {
