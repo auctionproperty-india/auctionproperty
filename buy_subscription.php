@@ -44,7 +44,9 @@ if ($active_check->rowCount() > 0) {
     exit;
 }
 
-// ---- 🔥 नया: Settings से Bank Details और QR Code लें ----
+// ============================================================
+// 🔥 नया हिस्सा – Settings से Bank Details और QR Code लें
+// ============================================================
 $bank_details = [];
 $setting_keys = ['company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'default_contact'];
 foreach ($setting_keys as $key) {
@@ -54,8 +56,10 @@ foreach ($setting_keys as $key) {
 }
 $qr_code = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
 
+// ============================================================
 // ---- If form submitted ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Sanitize inputs
     $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : $display_price;
     $utr = trim($_POST['utr'] ?? '');
     $slip_path = '';
@@ -77,10 +81,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ");
     $stmt->execute([$user_id, $package_id, $amount, $utr, $slip_path]);
 
+    // Redirect with success
     header("Location: user_packages.php?msg=request_sent");
     exit;
 }
 
+// ============================================================
 // ---- Show form ----
 include 'header.php';
 ?>
@@ -114,10 +120,16 @@ include 'header.php';
     max-height: 200px;
     border-radius: 8px;
 }
+.payment-section {
+    background: #f1f5f9;
+    padding: 20px;
+    border-radius: 12px;
+    margin: 15px 0;
+}
 </style>
 
 <div class="container-fluid">
-    <div class="card-premium" style="max-width: 700px; margin: auto;">
+    <div class="card-premium" style="max-width: 750px; margin: auto;">
         <h4><i class="fas fa-shopping-cart me-2"></i>Buy Package: <?= htmlspecialchars($package['name']) ?></h4>
         <p class="text-muted">Fill the details below to request subscription.</p>
 
@@ -128,26 +140,28 @@ include 'header.php';
         <?php endif; ?>
 
         <!-- 🔥 Bank Details Display -->
-        <div class="row">
-            <div class="col-md-7">
-                <h6 class="fw-bold"><i class="fas fa-university me-2"></i>Bank Details</h6>
-                <div class="bank-detail-box">
-                    <div><span class="label">Bank Name:</span> <span class="value"><?= htmlspecialchars($bank_details['company_bank_name'] ?: 'Not set') ?></span></div>
-                    <div><span class="label">Account Number:</span> <span class="value"><?= htmlspecialchars($bank_details['company_account_number'] ?: 'Not set') ?></span></div>
-                    <div><span class="label">IFSC Code:</span> <span class="value"><?= htmlspecialchars($bank_details['company_ifsc'] ?: 'Not set') ?></span></div>
-                    <div><span class="label">Branch:</span> <span class="value"><?= htmlspecialchars($bank_details['company_branch'] ?: 'Not set') ?></span></div>
-                    <div><span class="label">Contact:</span> <span class="value"><?= htmlspecialchars($bank_details['default_contact'] ?: 'Not set') ?></span></div>
+        <div class="payment-section">
+            <div class="row">
+                <div class="col-md-7">
+                    <h6 class="fw-bold"><i class="fas fa-university me-2"></i>Bank Details</h6>
+                    <div class="bank-detail-box">
+                        <div><span class="label">Bank Name:</span> <span class="value"><?= htmlspecialchars($bank_details['company_bank_name'] ?: 'Not set') ?></span></div>
+                        <div><span class="label">Account Number:</span> <span class="value"><?= htmlspecialchars($bank_details['company_account_number'] ?: 'Not set') ?></span></div>
+                        <div><span class="label">IFSC Code:</span> <span class="value"><?= htmlspecialchars($bank_details['company_ifsc'] ?: 'Not set') ?></span></div>
+                        <div><span class="label">Branch:</span> <span class="value"><?= htmlspecialchars($bank_details['company_branch'] ?: 'Not set') ?></span></div>
+                        <div><span class="label">Contact:</span> <span class="value"><?= htmlspecialchars($bank_details['default_contact'] ?: 'Not set') ?></span></div>
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-5">
-                <h6 class="fw-bold"><i class="fas fa-qrcode me-2"></i>QR Code</h6>
-                <div class="qr-box">
-                    <?php if ($qr_code && file_exists($qr_code)): ?>
-                        <img src="<?= htmlspecialchars($qr_code) ?>" alt="QR Code">
-                        <p class="text-muted small mt-2">Scan to pay via UPI</p>
-                    <?php else: ?>
-                        <p class="text-muted">No QR code uploaded yet.</p>
-                    <?php endif; ?>
+                <div class="col-md-5">
+                    <h6 class="fw-bold"><i class="fas fa-qrcode me-2"></i>QR Code</h6>
+                    <div class="qr-box">
+                        <?php if ($qr_code && file_exists($qr_code)): ?>
+                            <img src="<?= htmlspecialchars($qr_code) ?>" alt="QR Code">
+                            <p class="text-muted small mt-2">Scan to pay via UPI</p>
+                        <?php else: ?>
+                            <p class="text-muted">No QR code uploaded yet.</p>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
