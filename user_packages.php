@@ -14,19 +14,17 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php';
 
-// ---- Show messages from redirects ----
+// ---- Show messages ----
 if (isset($_GET['msg'])) {
     $msg = $_GET['msg'];
     if ($msg == 'request_sent') {
-        echo "<div class='alert alert-success alert-dismissible fade show'><i class='fas fa-check-circle'></i> ✅ Your subscription request has been sent. Admin will review it shortly.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        echo "<div class='alert alert-success'><i class='fas fa-check-circle'></i> ✅ Payment request sent. Admin will review it.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
     } elseif ($msg == 'already_pending') {
-        echo "<div class='alert alert-warning alert-dismissible fade show'><i class='fas fa-clock'></i> ⚠️ You already have a pending request. Please wait for admin approval.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
-    } elseif ($msg == 'already_active') {
-        echo "<div class='alert alert-info alert-dismissible fade show'><i class='fas fa-check-circle'></i> ℹ️ You already have an active subscription.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        echo "<div class='alert alert-warning'><i class='fas fa-clock'></i> ⚠️ You already have a pending request.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
     }
 }
 
-// ---- Fetch active subscription ----
+// ---- Active subscription ----
 $active_sub = $pdo->prepare("
     SELECT s.*, p.name as pkg_name, s.start_date, s.end_date, (s.end_date - CURRENT_DATE) as days_left 
     FROM subscriptions s 
@@ -39,7 +37,7 @@ $sub_info = $active_sub->fetch();
 $is_subscribed = $sub_info ? true : false;
 $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 
-// ---- Fetch pending subscription check ----
+// ---- Pending check ----
 $pending_check = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'pending'");
 $pending_check->execute([$user_id]);
 $has_pending = $pending_check->rowCount() > 0;
@@ -51,7 +49,7 @@ $has_pending = $pending_check->rowCount() > 0;
 
     <?php if ($has_pending): ?>
         <div class="alert alert-warning">
-            <i class="fas fa-clock"></i> You have a pending request. Please wait for admin approval before making a new request.
+            <i class="fas fa-clock"></i> You have a pending request. Please wait for admin approval.
         </div>
     <?php endif; ?>
 
@@ -91,7 +89,7 @@ $has_pending = $pending_check->rowCount() > 0;
                         <?php elseif ($has_pending): ?>
                             <div class="badge bg-warning text-dark w-100 mt-2">⏳ Pending Request</div>
                         <?php else: ?>
-                            <!-- 🔥 यहाँ बदलाव – अब सीधा Payment Page पर भेजेगा -->
+                            <!-- ✅ यहाँ सही लिंक – सीधा payment_info.php पर -->
                             <a href="payment_info.php?package_id=<?= $pkg['id'] ?>" class="btn btn-primary w-100 btn-sm mt-2">Buy Now</a>
                         <?php endif; ?>
                     </div>
