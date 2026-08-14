@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 Buy Subscription – Discount Price Pre-filled + Bank Details
+// 📦 Buy Subscription – Discount Price Pre-filled
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -10,11 +10,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
     header("Location: login.php");
     exit;
 }
-// Debug – कंडीशन जाँचें
-echo "Session User ID: " . ($_SESSION['user_id'] ?? 'Not Set') . "<br>";
-echo "Session Role: " . ($_SESSION['role'] ?? 'Not Set') . "<br>";
-echo "Package ID: " . ($package_id ?? 'Not Set') . "<br>";
-exit;
+
 $user_id = $_SESSION['user_id'];
 $package_id = isset($_GET['package_id']) ? (int)$_GET['package_id'] : 0;
 
@@ -49,7 +45,7 @@ if ($active_check->rowCount() > 0) {
 }
 
 // ============================================================
-// 🔥 नया हिस्सा – Settings से Bank Details और QR Code लें
+// 🔥 नया हिस्सा – Bank Details और QR Code लें (Settings से)
 // ============================================================
 $bank_details = [];
 $setting_keys = ['company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'default_contact'];
@@ -60,7 +56,6 @@ foreach ($setting_keys as $key) {
 }
 $qr_code = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
 
-// ============================================================
 // ---- If form submitted ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Sanitize inputs
@@ -90,7 +85,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// ============================================================
 // ---- Show form ----
 include 'header.php';
 ?>
@@ -143,7 +137,7 @@ include 'header.php';
             </div>
         <?php endif; ?>
 
-        <!-- 🔥 Bank Details Display -->
+        <!-- 🔥 Bank Details Display (यह नया है, बाकी सब वही) -->
         <div class="payment-section">
             <div class="row">
                 <div class="col-md-7">
@@ -172,6 +166,7 @@ include 'header.php';
 
         <hr>
 
+        <!-- ---- आपका Original Form – बिल्कुल वैसा ही ---- -->
         <form method="POST" enctype="multipart/form-data">
             <div class="mb-3">
                 <label class="form-label">Amount (₹)</label>
