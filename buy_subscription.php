@@ -10,7 +10,11 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
     header("Location: login.php");
     exit;
 }
-
+// Debug – कंडीशन जाँचें
+echo "Session User ID: " . ($_SESSION['user_id'] ?? 'Not Set') . "<br>";
+echo "Session Role: " . ($_SESSION['role'] ?? 'Not Set') . "<br>";
+echo "Package ID: " . ($package_id ?? 'Not Set') . "<br>";
+exit;
 $user_id = $_SESSION['user_id'];
 $package_id = isset($_GET['package_id']) ? (int)$_GET['package_id'] : 0;
 
