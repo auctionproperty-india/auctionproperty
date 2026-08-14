@@ -91,7 +91,7 @@ $has_pending = $pending_check->rowCount() > 0;
                         <?php elseif ($has_pending): ?>
                             <div class="badge bg-warning text-dark w-100 mt-2">⏳ Pending Request</div>
                         <?php else: ?>
-                            <!-- 🔁 CHANGE: "Buy Now" अब payment_info.php पर जाएगा -->
+                            <!-- 🔥 यहाँ लिंक बदला – अब payment_info.php पर जाएगा -->
                             <a href="payment_info.php?package_id=<?= $pkg['id'] ?>" class="btn btn-primary w-100 btn-sm mt-2">Buy Now</a>
                         <?php endif; ?>
                     </div>
