@@ -47,23 +47,23 @@ try {
     echo "<p>✅ payment_requests टेबल (यदि नहीं थी तो) बना दी गई।</p>";
 
     // ----- सफलता संदेश -----
-    echo "<div style='background:#dcfce7; padding:15px; border-left:5px solid #22c55e; margin-top:20px;'>
-            <strong style='color:#166534;'>✅ सभी टेबल और कॉलम सफलतापूर्वक बना दिए गए हैं!</strong><br>
-            अब आप <strong>Settings</strong> में Bank Details डाल सकते हैं और <strong>User Packages</strong> से "Buy Now" करके Payment Page देख सकते हैं।
-          </div>";
+    echo "<div style='background:#dcfce7; padding:15px; border-left:5px solid #22c55e; margin-top:20px;'>";
+    echo "<strong style='color:#166534;'>✅ सभी टेबल और कॉलम सफलतापूर्वक बना दिए गए हैं!</strong><br>";
+    echo "अब आप <strong>Settings</strong> में Bank Details डाल सकते हैं और <strong>User Packages</strong> से 'Buy Now' करके Payment Page देख सकते हैं।";
+    echo "</div>";
 
-    echo "<p style='margin-top:20px;'>
-            <a href='settings.php' style='color:#2563eb;'>⚙️ Settings पर जाएँ</a> | 
-            <a href='user_packages.php' style='color:#2563eb;'>📦 Packages पर जाएँ</a> | 
-            <a href='payment_info.php?package_id=1' style='color:#2563eb;'>💳 Payment Page (Demo)</a>
-          </p>";
+    echo "<p style='margin-top:20px;'>";
+    echo "<a href='settings.php' style='color:#2563eb;'>⚙️ Settings पर जाएँ</a> | ";
+    echo "<a href='user_packages.php' style='color:#2563eb;'>📦 Packages पर जाएँ</a> | ";
+    echo "<a href='payment_info.php?package_id=1' style='color:#2563eb;'>💳 Payment Page (Demo)</a>";
+    echo "</p>";
 
     echo "<p style='color:red; font-weight:bold;'>⚠️ सुरक्षा कारणों से इस फाइल (<strong>setup_tables.php</strong>) को अभी डिलीट कर दें!</p>";
 
 } catch (PDOException $e) {
-    echo "<div style='background:#fee2e2; padding:15px; border-left:5px solid #dc2626; margin-top:10px;'>
-            <strong style='color:#dc2626;'>❌ त्रुटि:</strong> " . $e->getMessage() . "
-          </div>";
+    echo "<div style='background:#fee2e2; padding:15px; border-left:5px solid #dc2626; margin-top:10px;'>";
+    echo "<strong style='color:#dc2626;'>❌ त्रुटि:</strong> " . $e->getMessage();
+    echo "</div>";
 }
 echo "</div>";
 ?>
