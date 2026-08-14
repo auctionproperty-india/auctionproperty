@@ -2,23 +2,40 @@
 session_start();
 require_once __DIR__ . '/db.php';
 
+// अगर User लॉगिन नहीं है तो Login पर भेजें
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
+
+$user_id = $_SESSION['user_id'];
+
 // 1. Settings से Bank Details और अन्य जानकारी लें
 $stmt = $pdo->query("SELECT bank_details, admin_charge, scanner_image FROM settings WHERE id = 1");
 $settings = $stmt->fetch(PDO::FETCH_ASSOC);
-
-// अगर settings नहीं हैं तो डिफॉल्ट
 if (!$settings) {
     $settings = ['bank_details' => 'कृपया Bank Details अपडेट करें।', 'admin_charge' => '0', 'scanner_image' => ''];
 }
 
-// 2. Package ID (आपके सिस्टम के अनुसार) – मान लिया GET से आ रहा है
+// 2. Package ID (GET से)
 $package_id = isset($_GET['package_id']) ? (int)$_GET['package_id'] : 0;
+if ($package_id == 0) {
+    die("❌ Package ID not provided.");
+}
+
+// Package details लें (amount के लिए)
+$pkg_stmt = $pdo->prepare("SELECT name, price, discount_price FROM packages WHERE id = ?");
+$pkg_stmt->execute([$package_id]);
+$pkg = $pkg_stmt->fetch();
+if (!$pkg) {
+    die("❌ Package not found.");
+}
+$amount = $pkg['discount_price'] ?? $pkg['price'];
 
 // 3. यदि Slip Upload का फॉर्म सबमिट हुआ
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
-    $user_id = $_SESSION['user_id'] ?? 0;
-    $amount = $_POST['amount'] ?? 0;
-    $package_id = $_POST['package_id'] ?? 0;
+    $amount_post = $_POST['amount'] ?? 0;
+    $package_id_post = $_POST['package_id'] ?? 0;
     
     // File Upload
     $slip_path = '';
@@ -33,24 +50,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
         }
     }
     
-    // यहाँ आप payment_requests टेबल में insert करें
+    // Insert into payment_requests
     $sql = "INSERT INTO payment_requests (user_id, package_id, amount, slip_image, status, created_at) 
             VALUES (?, ?, ?, ?, 'pending', NOW())";
     $stmt = $pdo->prepare($sql);
-    $result = $stmt->execute([$user_id, $package_id, $amount, $slip_path]);
+    $result = $stmt->execute([$user_id, $package_id_post, $amount_post, $slip_path]);
     
     if ($result) {
-        $success = "✅ आपकी Payment Request सबमिट कर दी गई है। Admin जल्द ही approve करेंगे।";
+        $success = "✅ आपकी Payment Request सबमिट कर दी गई है। Admin जल्दी ही approve करेंगे।";
+        // यहाँ पर आप चाहें तो redirect कर सकते हैं
+        // header("Location: user_packages.php?msg=request_sent");
+        // exit;
     } else {
         $error = "❌ Payment Request सबमिट करने में त्रुटि: " . implode(" ", $stmt->errorInfo());
     }
 }
 
-// 4. अगर User Logged In नहीं है तो Login पर भेजें
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit;
-}
 ?>
 <!DOCTYPE html>
 <html>
@@ -80,7 +95,7 @@ if (!isset($_SESSION['user_id'])) {
 <div class="payment-container">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold"><i class="bi bi-credit-card-2-front me-2"></i>Payment Instructions</h2>
-        <a href="dashboard.php" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+        <a href="user_packages.php" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back to Packages</a>
     </div>
 
     <?php if (isset($success)): ?>
@@ -96,11 +111,9 @@ if (!isset($_SESSION['user_id'])) {
             <div class="bank-card h-100">
                 <h5 class="fw-bold mb-3"><i class="bi bi-bank me-2"></i>Bank Details</h5>
                 <?php
-                // मान लिया bank_details में HTML या plain text है – आप nl2br कर सकते हैं
                 $bank_lines = explode("\n", $settings['bank_details']);
                 foreach ($bank_lines as $line):
                     if (trim($line) == '') continue;
-                    // स्मार्ट पार्सिंग – अगर लाइन में ':' है तो label और value अलग करें
                     if (strpos($line, ':') !== false) {
                         list($label, $value) = explode(':', $line, 2);
                         $label = trim($label);
@@ -136,8 +149,11 @@ if (!isset($_SESSION['user_id'])) {
                     <input type="hidden" name="package_id" value="<?= $package_id ?>">
                     
                     <div class="mb-3">
+                        <label class="form-label fw-semibold">Package: <?= htmlspecialchars($pkg['name']) ?></label>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label fw-semibold">Amount (₹)</label>
-                        <input type="number" name="amount" class="form-control" placeholder="Enter amount you paid" required min="1">
+                        <input type="number" name="amount" class="form-control" value="<?= $amount ?>" required readonly>
                         <small class="text-muted">Admin Charge: ₹<?= $settings['admin_charge'] ?? '0' ?></small>
                     </div>
 
@@ -159,7 +175,6 @@ if (!isset($_SESSION['user_id'])) {
         </div>
     </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
