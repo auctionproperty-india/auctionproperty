@@ -126,25 +126,27 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         opacity: 0.9;
         margin-bottom: 6px;
     }
+    /* ===== PRICE BOX – UPDATED ===== */
     .card-top .price-box {
         display: flex;
         align-items: baseline;
         justify-content: center;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 8px 12px;
         margin-top: 2px;
     }
     .card-top .price-box .regular-price {
-        font-size: 1rem;
-        color: rgba(255,255,255,0.7);
-        text-decoration: line-through;
-        font-weight: 400;
+        font-size: 2.8rem;      /* बड़ा */
+        font-weight: 800;        /* Bold */
+        color: #ffffff;          /* सफेद पर गहरा नहीं, इसलिए सफेद ही रखा */
+        text-decoration: none;   /* Strike-through नहीं */
+        letter-spacing: -0.5px;
     }
     .card-top .price-box .offer-price {
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: #ffffff;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        font-size: 1.6rem;       /* छोटा */
+        font-weight: 600;
+        color: rgba(255,255,255,0.8);
+        text-decoration: line-through;
     }
     .card-top .price-box .save-badge {
         padding: 3px 12px;
@@ -367,8 +369,11 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         .card-top .package-name {
             font-size: 1.6rem;
         }
+        .card-top .price-box .regular-price {
+            font-size: 2.2rem;
+        }
         .card-top .price-box .offer-price {
-            font-size: 2rem;
+            font-size: 1.4rem;
         }
     }
     @media (max-width: 576px) {
@@ -452,14 +457,17 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                             <div class="package-duration"><?= $pkg['duration_months'] ?> Months Access</div>
                             <div class="price-box">
                                 <?php if ($show_discount): ?>
+                                    <!-- Original Price – बड़ा, Bold -->
                                     <span class="regular-price">₹<?= number_format($regular_price, 0) ?></span>
+                                    <!-- Discount Price – छोटा, Strike-through -->
                                     <span class="offer-price">₹<?= number_format($discount_price, 0) ?></span>
                                     <?php 
                                     $saved = round((($regular_price - $discount_price)/$regular_price)*100);
                                     ?>
                                     <span class="save-badge">🔥 Save <?= $saved ?>%</span>
                                 <?php else: ?>
-                                    <span class="offer-price">₹<?= number_format($regular_price, 0) ?></span>
+                                    <!-- अगर कोई discount नहीं, तो सिर्फ original price बड़ा दिखाएँ -->
+                                    <span class="regular-price">₹<?= number_format($regular_price, 0) ?></span>
                                 <?php endif; ?>
                             </div>
                         </div>
