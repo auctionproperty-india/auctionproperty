@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – Tricolor Theme + Starry Background
+// 📦 User Packages – Independence Day Special (Tricolor + Ashok Chakra)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -46,107 +46,92 @@ $has_pending = $pending_check->rowCount() > 0;
 
 $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
 
-// Tricolor theme packages
-// Silver = Saffron (#ff9933), Gold = White (#ffffff), Platinum = Green (#138808), Diamond = Saffron+Green
+// Tricolor theme for each package (Saffron, White, Green)
 $color_schemes = [
-    'Silver' => ['bg' => '#fff8f0', 'border' => '#ff9933', 'title' => '#cc7a00', 'accent' => '#ff9933', 'btn' => '#ff9933', 'btn_hover' => '#e68900'],
-    'Gold' => ['bg' => '#ffffff', 'border' => '#ffd700', 'title' => '#2d2d2d', 'accent' => '#ffd700', 'btn' => '#fbbf24', 'btn_hover' => '#f59e0b'],
-    'Platinum' => ['bg' => '#f0fff0', 'border' => '#138808', 'title' => '#0a5c0a', 'accent' => '#138808', 'btn' => '#138808', 'btn_hover' => '#0a5c0a'],
-    'Diamond' => ['bg' => '#fff8f0', 'border' => '#ff9933', 'title' => '#0a5c0a', 'accent' => '#138808', 'btn' => '#ff9933', 'btn_hover' => '#e68900']
+    'Silver' => ['bg' => '#fff8f0', 'border' => '#ff9933', 'title' => '#cc7a00', 'accent' => '#ff9933', 'btn' => '#ff9933', 'btn_hover' => '#e68900', 'chakra_color' => 'rgba(255,153,51,0.08)'],
+    'Gold'   => ['bg' => '#ffffff', 'border' => '#ffd700', 'title' => '#2d2d2d', 'accent' => '#fbbf24', 'btn' => '#fbbf24', 'btn_hover' => '#f59e0b', 'chakra_color' => 'rgba(251,191,36,0.10)'],
+    'Platinum' => ['bg' => '#f0fff0', 'border' => '#138808', 'title' => '#0a5c0a', 'accent' => '#138808', 'btn' => '#138808', 'btn_hover' => '#0a5c0a', 'chakra_color' => 'rgba(19,136,8,0.08)'],
+    'Diamond' => ['bg' => '#fff8f0', 'border' => '#ff9933', 'title' => '#0a5c0a', 'accent' => '#138808', 'btn' => '#ff9933', 'btn_hover' => '#e68900', 'chakra_color' => 'rgba(255,153,51,0.08)']
 ];
 ?>
 
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-    /* Starry Background */
     .tricolor-section {
         font-family: 'Inter', sans-serif;
-        background: linear-gradient(180deg, #fdf6f0 0%, #f0f7f0 50%, #fdf6f0 100%);
+        background: linear-gradient(180deg, #fdf6f0 0%, #f7faf7 50%, #fdf6f0 100%);
         padding: 40px 0;
         border-radius: 0;
         position: relative;
-        overflow: hidden;
         min-height: 100vh;
     }
-    /* Star effect */
-    .tricolor-section::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-image: 
-            radial-gradient(2px 2px at 20px 30px, #ff9933, transparent),
-            radial-gradient(2px 2px at 40px 70px, #138808, transparent),
-            radial-gradient(2px 2px at 50px 160px, #ff9933, transparent),
-            radial-gradient(2px 2px at 90px 40px, #138808, transparent),
-            radial-gradient(2px 2px at 130px 80px, #ff9933, transparent),
-            radial-gradient(2px 2px at 160px 30px, #138808, transparent),
-            radial-gradient(3px 3px at 200px 120px, #ff9933, transparent),
-            radial-gradient(2px 2px at 250px 50px, #138808, transparent),
-            radial-gradient(2px 2px at 300px 180px, #ff9933, transparent),
-            radial-gradient(2px 2px at 350px 90px, #138808, transparent),
-            radial-gradient(3px 3px at 400px 60px, #ff9933, transparent),
-            radial-gradient(2px 2px at 450px 140px, #138808, transparent),
-            radial-gradient(2px 2px at 500px 30px, #ff9933, transparent),
-            radial-gradient(2px 2px at 550px 100px, #138808, transparent),
-            radial-gradient(2px 2px at 600px 170px, #ff9933, transparent);
-        background-size: 600px 200px;
-        opacity: 0.2;
-        pointer-events: none;
-        z-index: 0;
-    }
-    /* Saffron, White, Green stripes at top */
-    .tricolor-section .tricolor-strip {
-        position: relative;
-        z-index: 1;
+    .tricolor-strip {
         height: 4px;
         background: linear-gradient(90deg, #ff9933 0%, #ff9933 33%, #ffffff 33%, #ffffff 66%, #138808 66%, #138808 100%);
-        margin-bottom: 25px;
-        border-radius: 2px;
+        margin-bottom: 30px;
         width: 80%;
         margin-left: auto;
         margin-right: auto;
+        border-radius: 2px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
-    .tricolor-section .section-title {
+    .section-title {
         font-weight: 800;
         font-size: 2.6rem;
         color: #1e293b;
         letter-spacing: -0.5px;
-        position: relative;
-        z-index: 1;
     }
-    .tricolor-section .section-title .saffron { color: #ff9933; }
-    .tricolor-section .section-title .green { color: #138808; }
-    .tricolor-section .section-subtitle {
+    .section-title .saffron { color: #ff9933; }
+    .section-title .green { color: #138808; }
+    .section-subtitle {
         color: #64748b;
         font-size: 1.1rem;
         font-weight: 400;
-        position: relative;
-        z-index: 1;
     }
 
+    /* Card Styles */
     .pricing-card {
         background: #ffffff;
-        border-radius: 24px;
-        padding: 28px 24px 28px;
+        border-radius: 28px;
+        padding: 30px 20px 28px;
         transition: all 0.4s ease;
         height: 100%;
         position: relative;
         box-shadow: 0 8px 30px rgba(0,0,0,0.06);
         display: flex;
         flex-direction: column;
-        border-top: 5px solid #e2e8f0;
-        position: relative;
-        z-index: 1;
+        align-items: center;
+        text-align: center;
+        border-top: 6px solid #e2e8f0;
+        overflow: hidden;
     }
     .pricing-card:hover {
         transform: translateY(-8px);
         box-shadow: 0 20px 50px rgba(0,0,0,0.12);
     }
+    /* Ashok Chakra Background */
+    .pricing-card .chakra-bg {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        height: auto;
+        opacity: 0.08;
+        z-index: 0;
+        pointer-events: none;
+    }
+    .pricing-card .chakra-bg svg {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    .pricing-card > * {
+        position: relative;
+        z-index: 1;
+    }
+
     .pricing-card .badge-recommended {
         position: absolute;
         top: -12px;
@@ -160,22 +145,17 @@ $color_schemes = [
         letter-spacing: 0.5px;
         background: #ff9933;
         box-shadow: 0 2px 10px rgba(255,153,51,0.3);
+        z-index: 2;
     }
-    .pricing-card .pkg-top {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        width: 100%;
-        margin-bottom: 12px;
-    }
+
     .pricing-card .package-name {
-        font-size: 1.8rem;
+        font-size: 2rem;
         font-weight: 800;
         letter-spacing: -0.5px;
         margin-bottom: 2px;
     }
     .pricing-card .package-duration {
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         font-weight: 500;
         color: #64748b;
         margin-bottom: 6px;
@@ -183,9 +163,10 @@ $color_schemes = [
     .pricing-card .price-box {
         display: flex;
         align-items: baseline;
+        justify-content: center;
         flex-wrap: wrap;
         gap: 8px;
-        margin-top: 2px;
+        margin: 4px 0 12px;
     }
     .pricing-card .price-box .regular-price {
         font-size: 1rem;
@@ -194,7 +175,7 @@ $color_schemes = [
         font-weight: 400;
     }
     .pricing-card .price-box .offer-price {
-        font-size: 2.2rem;
+        font-size: 2.4rem;
         font-weight: 800;
         color: #0f172a;
     }
@@ -208,43 +189,40 @@ $color_schemes = [
         display: inline-block;
     }
 
-    /* Features Grid with Icons */
+    /* Features Grid – Centered */
     .pricing-card .features-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 2px 12px;
-        margin: 16px 0 20px;
+        gap: 2px 16px;
+        margin: 16px 0 22px;
         width: 100%;
         font-size: 0.9rem;
         flex: 1;
+        justify-items: center;
+        align-items: center;
     }
     .pricing-card .feature-item {
         display: flex;
         align-items: center;
-        padding: 5px 0;
-        border-bottom: 1px solid #f1f5f9;
+        justify-content: center;
         gap: 6px;
-        min-height: 34px;
+        padding: 5px 8px;
+        border-bottom: 1px solid #f1f5f9;
+        width: 100%;
+        flex-wrap: wrap;
     }
     .pricing-card .feature-item .feature-icon {
-        width: 22px;
         font-size: 0.9rem;
-        text-align: center;
         flex-shrink: 0;
-        color: #ff9933;
     }
     .pricing-card .feature-item .feature-label {
         font-weight: 600;
         color: #475569;
         font-size: 0.85rem;
-        white-space: nowrap;
     }
     .pricing-card .feature-item .feature-value {
         font-weight: 500;
         color: #1e293b;
-        margin-left: auto;
-        text-align: right;
-        word-break: break-word;
         font-size: 0.85rem;
     }
 
@@ -262,7 +240,6 @@ $color_schemes = [
         margin-top: auto;
         color: white;
         letter-spacing: 0.3px;
-        border: none;
     }
     .pricing-card .btn-buy:hover {
         transform: scale(1.02);
@@ -286,45 +263,49 @@ $color_schemes = [
     .badge-status.active { background: #dcfce7; color: #166534; }
     .badge-status.pending { background: #fef3c7; color: #92400e; }
 
-    /* Package Specific Colors */
-    .pkg-silver .pricing-card { border-top-color: #ff9933; }
+    /* Package Specific Overrides – Tricolor */
+    .pkg-silver .pricing-card { border-top-color: #ff9933; background: #fff8f0; }
     .pkg-silver .pricing-card .package-name { color: #cc7a00; }
     .pkg-silver .pricing-card .btn-buy { background: #ff9933; }
     .pkg-silver .pricing-card .btn-buy:hover { background: #e68900; }
     .pkg-silver .pricing-card .feature-icon { color: #ff9933; }
     .pkg-silver .badge-recommended { background: #ff9933; }
 
-    .pkg-gold .pricing-card { border-top-color: #ffd700; background: #fefefe; }
+    .pkg-gold .pricing-card { border-top-color: #ffd700; background: #ffffff; }
     .pkg-gold .pricing-card .package-name { color: #2d2d2d; }
     .pkg-gold .pricing-card .btn-buy { background: #fbbf24; color: #1e293b; }
     .pkg-gold .pricing-card .btn-buy:hover { background: #f59e0b; color: #1e293b; }
     .pkg-gold .pricing-card .feature-icon { color: #f59e0b; }
     .pkg-gold .badge-recommended { background: #f59e0b; }
 
-    .pkg-platinum .pricing-card { border-top-color: #138808; }
+    .pkg-platinum .pricing-card { border-top-color: #138808; background: #f0fff0; }
     .pkg-platinum .pricing-card .package-name { color: #0a5c0a; }
     .pkg-platinum .pricing-card .btn-buy { background: #138808; }
     .pkg-platinum .pricing-card .btn-buy:hover { background: #0a5c0a; }
     .pkg-platinum .pricing-card .feature-icon { color: #138808; }
     .pkg-platinum .badge-recommended { background: #138808; }
 
-    .pkg-diamond .pricing-card { border-top-color: #ff9933; background: #fffefc; }
+    .pkg-diamond .pricing-card { border-top-color: #ff9933; background: #fff8f0; }
     .pkg-diamond .pricing-card .package-name { color: #0a5c0a; }
     .pkg-diamond .pricing-card .btn-buy { background: #ff9933; }
     .pkg-diamond .pricing-card .btn-buy:hover { background: #e68900; }
     .pkg-diamond .pricing-card .feature-icon { color: #138808; }
     .pkg-diamond .badge-recommended { background: #ff9933; }
 
+    /* Responsive */
     @media (max-width: 768px) {
         .pricing-card .features-grid {
             grid-template-columns: 1fr;
+            gap: 0;
         }
-        .pricing-card .feature-item .feature-value {
-            text-align: left;
-            margin-left: 0;
-        }
-        .tricolor-section .section-title {
+        .section-title {
             font-size: 1.8rem;
+        }
+        .pricing-card .package-name {
+            font-size: 1.6rem;
+        }
+        .pricing-card .price-box .offer-price {
+            font-size: 2rem;
         }
     }
 </style>
@@ -336,7 +317,7 @@ $color_schemes = [
             <h2 class="section-title">
                 <span class="saffron">✦</span> Choose Your <span class="saffron">Plan</span> <span class="green">✦</span>
             </h2>
-            <p class="section-subtitle">Select the best package to unlock all auction properties</p>
+            <p class="section-subtitle">Celebrate Independence with the best property deals 🇮🇳</p>
         </div>
 
         <?php if ($has_pending): ?>
@@ -362,6 +343,7 @@ $color_schemes = [
                     $pkg_class = 'pkg-silver';
                 }
 
+                // Fields
                 $fields = [
                     ['label' => 'Validity', 'icon' => 'fa-clock', 'key' => 'validity'],
                     ['label' => 'Property Search', 'icon' => 'fa-search', 'key' => 'property_search'],
@@ -380,6 +362,35 @@ $color_schemes = [
                             <span class="badge-recommended">⭐ Recommended</span>
                         <?php endif; ?>
                         
+                        <!-- Ashok Chakra SVG Background -->
+                        <div class="chakra-bg">
+                            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#1e293b" stroke-width="1.5" opacity="0.5"/>
+                                <circle cx="50" cy="50" r="42" fill="none" stroke="#1e293b" stroke-width="0.8" opacity="0.3"/>
+                                <circle cx="50" cy="50" r="12" fill="none" stroke="#1e293b" stroke-width="1.2" opacity="0.6"/>
+                                <!-- 24 spokes -->
+                                <?php for ($i = 0; $i < 24; $i++): 
+                                    $angle = $i * 15 - 7.5;
+                                    $rad = deg2rad($angle);
+                                    $x1 = 50 + 16 * cos($rad);
+                                    $y1 = 50 + 16 * sin($rad);
+                                    $x2 = 50 + 42 * cos($rad);
+                                    $y2 = 50 + 42 * sin($rad);
+                                ?>
+                                    <line x1="<?= $x1 ?>" y1="<?= $y1 ?>" x2="<?= $x2 ?>" y2="<?= $y2 ?>" stroke="#1e293b" stroke-width="0.8" opacity="0.4"/>
+                                <?php endfor; ?>
+                                <!-- dots around chakra -->
+                                <?php for ($i = 0; $i < 24; $i++): 
+                                    $angle = $i * 15;
+                                    $rad = deg2rad($angle);
+                                    $x = 50 + 40 * cos($rad);
+                                    $y = 50 + 40 * sin($rad);
+                                ?>
+                                    <circle cx="<?= $x ?>" cy="<?= $y ?>" r="1.2" fill="#1e293b" opacity="0.5"/>
+                                <?php endfor; ?>
+                            </svg>
+                        </div>
+
                         <div class="pkg-top">
                             <div class="package-name"><?= htmlspecialchars($name) ?></div>
                             <div class="package-duration"><?= $pkg['duration_months'] ?> Months Access</div>
@@ -398,7 +409,7 @@ $color_schemes = [
                             </div>
                         </div>
 
-                        <!-- Features Grid with Icons -->
+                        <!-- Features Grid -->
                         <div class="features-grid">
                             <?php foreach ($fields as $field): 
                                 $value = trim($pkg[$field['key']] ?? '');
