@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – Independence Day Special (Boxed Description)
+// 📦 User Packages – Tricolor Theme on Every Card
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -58,6 +58,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         position: relative;
         min-height: 100vh;
     }
+    /* Top tricolor strip */
     .tricolor-strip {
         height: 4px;
         background: linear-gradient(90deg, #ff9933 0%, #ff9933 33%, #ffffff 33%, #ffffff 66%, #138808 66%, #138808 100%);
@@ -95,15 +96,29 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         flex-direction: column;
         align-items: center;
         text-align: center;
-        border-top: 6px solid #e2e8f0;
         overflow: hidden;
+        /* Tricolor background gradient – subtle */
+        background: linear-gradient(180deg, rgba(255,153,51,0.08) 0%, rgba(255,255,255,0.5) 50%, rgba(19,136,8,0.08) 100%);
+        border: 2px solid #e2e8f0;
+        border-top: 6px solid transparent;
+    }
+    /* Tricolor top border using pseudo element */
+    .pricing-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: linear-gradient(90deg, #ff9933 0%, #ff9933 33%, #ffffff 33%, #ffffff 66%, #138808 66%, #138808 100%);
+        border-radius: 28px 28px 0 0;
     }
     .pricing-card:hover {
         transform: translateY(-8px);
         box-shadow: 0 20px 50px rgba(0,0,0,0.12);
     }
 
-    /* ===== HIGHLIGHTED ASHOK CHAKRA ===== */
+    /* Ashok Chakra Background */
     .pricing-card .chakra-bg {
         position: absolute;
         top: 50%;
@@ -111,13 +126,13 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         transform: translate(-50%, -50%);
         width: 85%;
         height: auto;
-        opacity: 0.15; /* अब ज्यादा दिखेगा */
+        opacity: 0.12;
         z-index: 0;
         pointer-events: none;
         transition: opacity 0.3s ease;
     }
     .pricing-card:hover .chakra-bg {
-        opacity: 0.20;
+        opacity: 0.18;
     }
     .pricing-card .chakra-bg svg {
         width: 100%;
@@ -132,21 +147,21 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
     .pricing-card .chakra-bg svg .chakra-circle-outer {
         stroke: #1e293b;
         stroke-width: 2;
-        opacity: 0.6;
+        opacity: 0.5;
     }
     .pricing-card .chakra-bg svg .chakra-circle-inner {
         stroke: #1e293b;
         stroke-width: 1.5;
-        opacity: 0.4;
+        opacity: 0.3;
     }
     .pricing-card .chakra-bg svg .chakra-spoke {
         stroke: #1e293b;
         stroke-width: 1.2;
-        opacity: 0.5;
+        opacity: 0.4;
     }
     .pricing-card .chakra-bg svg .chakra-dot {
         fill: #1e293b;
-        opacity: 0.6;
+        opacity: 0.5;
     }
 
     .pricing-card > * {
@@ -156,17 +171,18 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
 
     .pricing-card .badge-recommended {
         position: absolute;
-        top: -12px;
-        right: 20px;
+        top: 12px;
+        right: 16px;
         color: white;
-        padding: 4px 18px;
+        padding: 4px 16px;
         border-radius: 30px;
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         z-index: 2;
         box-shadow: 0 2px 10px rgba(255,153,51,0.3);
+        background: #ff9933;
     }
 
     .pricing-card .package-name {
@@ -174,6 +190,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         font-weight: 800;
         letter-spacing: -0.5px;
         margin-bottom: 2px;
+        margin-top: 8px;
     }
     .pricing-card .package-duration {
         font-size: 0.9rem;
@@ -210,7 +227,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         display: inline-block;
     }
 
-    /* ===== BOXED DESCRIPTION ===== */
+    /* Boxed Description */
     .pricing-card .features-box {
         width: 100%;
         border-radius: 16px;
@@ -252,6 +269,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         flex-shrink: 0;
         width: 20px;
         text-align: center;
+        color: #ff9933; /* Default, will be overridden per package */
     }
     .pricing-card .feature-item .feature-label {
         font-weight: 600;
@@ -305,41 +323,25 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
     .badge-status.active { background: #dcfce7; color: #166534; }
     .badge-status.pending { background: #fef3c7; color: #92400e; }
 
-    /* ===== TRICOLOR PACKAGE THEMES ===== */
-    /* Silver – Saffron */
-    .pkg-silver .pricing-card { border-top-color: #ff9933; background: #fffaf0; }
-    .pkg-silver .pricing-card .package-name { color: #cc7a00; }
+    /* Package Specific Accents (overrides) */
+    .pkg-silver .pricing-card .feature-icon { color: #ff9933; }
     .pkg-silver .pricing-card .btn-buy { background: #ff9933; }
     .pkg-silver .pricing-card .btn-buy:hover { background: #e68900; }
-    .pkg-silver .pricing-card .feature-icon { color: #ff9933; }
-    .pkg-silver .pricing-card .features-box { border-color: #ffb366; background: rgba(255,153,51,0.06); }
     .pkg-silver .badge-recommended { background: #ff9933; }
 
-    /* Gold – White/Golden */
-    .pkg-gold .pricing-card { border-top-color: #ffd700; background: #ffffff; }
-    .pkg-gold .pricing-card .package-name { color: #2d2d2d; }
-    .pkg-gold .pricing-card .btn-buy { background: #fbbf24; color: #1e293b; }
-    .pkg-gold .pricing-card .btn-buy:hover { background: #f59e0b; color: #1e293b; }
     .pkg-gold .pricing-card .feature-icon { color: #f59e0b; }
-    .pkg-gold .pricing-card .features-box { border-color: #fcd34d; background: rgba(251,191,36,0.08); }
+    .pkg-gold .pricing-card .btn-buy { background: #f59e0b; color: #1e293b; }
+    .pkg-gold .pricing-card .btn-buy:hover { background: #d97706; color: #1e293b; }
     .pkg-gold .badge-recommended { background: #f59e0b; }
 
-    /* Platinum – Green */
-    .pkg-platinum .pricing-card { border-top-color: #138808; background: #f5fff5; }
-    .pkg-platinum .pricing-card .package-name { color: #0a5c0a; }
+    .pkg-platinum .pricing-card .feature-icon { color: #138808; }
     .pkg-platinum .pricing-card .btn-buy { background: #138808; }
     .pkg-platinum .pricing-card .btn-buy:hover { background: #0a5c0a; }
-    .pkg-platinum .pricing-card .feature-icon { color: #138808; }
-    .pkg-platinum .pricing-card .features-box { border-color: #4CAF50; background: rgba(19,136,8,0.06); }
     .pkg-platinum .badge-recommended { background: #138808; }
 
-    /* Diamond – Saffron + Green (Tricolor Mix) */
-    .pkg-diamond .pricing-card { border-top: 6px solid #ff9933; background: #fffaf0; }
-    .pkg-diamond .pricing-card .package-name { color: #0a5c0a; }
+    .pkg-diamond .pricing-card .feature-icon { color: #ff9933; }
     .pkg-diamond .pricing-card .btn-buy { background: #ff9933; }
     .pkg-diamond .pricing-card .btn-buy:hover { background: #e68900; }
-    .pkg-diamond .pricing-card .feature-icon { color: #138808; }
-    .pkg-diamond .pricing-card .features-box { border-color: #ff9933; background: rgba(19,136,8,0.05); }
     .pkg-diamond .badge-recommended { background: #ff9933; }
 
     /* Responsive */
@@ -438,13 +440,12 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                             <span class="badge-recommended">⭐ Recommended</span>
                         <?php endif; ?>
                         
-                        <!-- HIGHLIGHTED ASHOK CHAKRA Background -->
+                        <!-- ASHOK CHAKRA Background -->
                         <div class="chakra-bg">
                             <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                                 <circle cx="50" cy="50" r="44" fill="none" class="chakra-circle-outer"/>
                                 <circle cx="50" cy="50" r="40" fill="none" stroke="#1e293b" stroke-width="0.8" opacity="0.3"/>
                                 <circle cx="50" cy="50" r="14" fill="none" class="chakra-circle-inner"/>
-                                <!-- 24 Spokes -->
                                 <?php for ($i = 0; $i < 24; $i++): 
                                     $angle = $i * 15 - 7.5;
                                     $rad = deg2rad($angle);
@@ -455,7 +456,6 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                                 ?>
                                     <line x1="<?= $x1 ?>" y1="<?= $y1 ?>" x2="<?= $x2 ?>" y2="<?= $y2 ?>" class="chakra-spoke"/>
                                 <?php endfor; ?>
-                                <!-- 24 Dots -->
                                 <?php for ($i = 0; $i < 24; $i++): 
                                     $angle = $i * 15;
                                     $rad = deg2rad($angle);
