@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 Admin: Manage Packages (Laravel Style + Edit Fixed)
+// 📦 Admin: Manage Packages (with Free Property Visit + 0 fix)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -35,27 +35,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $team_refer_incentive = trim($_POST['team_refer_incentive'] ?? '');
     $property_sale_incentive = trim($_POST['property_sale_incentive'] ?? '');
     $team_sale_incentive = trim($_POST['team_sale_incentive'] ?? '');
+    $free_property_visit = trim($_POST['free_property_visit'] ?? ''); // नया
 
     if ($id > 0) {
         $sql = "UPDATE packages SET 
             name = ?, price = ?, discount_price = ?, duration_months = ?,
             validity = ?, property_search = ?, company_support = ?, sales_team_support = ?,
-            self_refer_incentive = ?, team_refer_incentive = ?, property_sale_incentive = ?, team_sale_incentive = ?
+            self_refer_incentive = ?, team_refer_incentive = ?, property_sale_incentive = ?, team_sale_incentive = ?,
+            free_property_visit = ?
             WHERE id = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$name, $price, $discount_price, $duration_months,
             $validity, $property_search, $company_support, $sales_team_support,
-            $self_refer_incentive, $team_refer_incentive, $property_sale_incentive, $team_sale_incentive, $id]);
+            $self_refer_incentive, $team_refer_incentive, $property_sale_incentive, $team_sale_incentive,
+            $free_property_visit, $id]);
         $message = "<div class='alert alert-success'>✅ Package updated.</div>";
     } else {
         $sql = "INSERT INTO packages (name, price, discount_price, duration_months,
             validity, property_search, company_support, sales_team_support,
-            self_refer_incentive, team_refer_incentive, property_sale_incentive, team_sale_incentive)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            self_refer_incentive, team_refer_incentive, property_sale_incentive, team_sale_incentive,
+            free_property_visit)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$name, $price, $discount_price, $duration_months,
             $validity, $property_search, $company_support, $sales_team_support,
-            $self_refer_incentive, $team_refer_incentive, $property_sale_incentive, $team_sale_incentive]);
+            $self_refer_incentive, $team_refer_incentive, $property_sale_incentive, $team_sale_incentive,
+            $free_property_visit]);
         $message = "<div class='alert alert-success'>✅ Package added.</div>";
     }
 }
@@ -71,14 +76,12 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
     .btn-edit:hover { background: #d97706; color: white; }
     .btn-delete { background: #ef4444; color: white; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; }
     .btn-delete:hover { background: #dc2626; color: white; }
-    .badge-feature { background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
 </style>
 
 <div class="card-premium">
     <h4><i class="fas fa-boxes me-2"></i>Manage Packages</h4>
     <?= $message ?>
 
-    <!-- Add/Edit Form -->
     <div class="package-form" id="package-form">
         <h5 id="form-title"><i class="fas fa-plus-circle me-2"></i>Add New Package</h5>
         <form method="POST" id="package-form-element">
@@ -86,7 +89,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Package Name</label>
-                    <input type="text" name="name" id="pkg-name" class="form-control" required placeholder="e.g. Silver">
+                    <input type="text" name="name" id="pkg-name" class="form-control" required>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label fw-semibold">Price (₹)</label>
@@ -126,11 +129,15 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Property Sale Incentive</label>
-                    <input type="text" name="property_sale_incentive" id="pkg-property_sale_incentive" class="form-control" placeholder="e.g. 1%">
+                    <input type="text" name="property_sale_incentive" id="pkg-property_sale_incentive" class="form-control" placeholder="e.g. 1% or 0%">
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Team Sale Incentive</label>
                     <input type="text" name="team_sale_incentive" id="pkg-team_sale_incentive" class="form-control" placeholder="e.g. 0">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Free Property Visit</label>
+                    <input type="text" name="free_property_visit" id="pkg-free_property_visit" class="form-control" placeholder="e.g. 1 or Unlimited">
                 </div>
                 <div class="col-12 mt-3">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save Package</button>
@@ -140,7 +147,6 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         </form>
     </div>
 
-    <!-- Package Table -->
     <div class="table-responsive">
         <table class="table package-table table-bordered table-hover">
             <thead>
@@ -158,7 +164,8 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                     <th>Team Refer</th>
                     <th>Property Sale</th>
                     <th>Team Sale</th>
-                    <th style="min-width:120px;">Actions</th>
+                    <th>Free Visit</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -177,6 +184,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                         <td><?= htmlspecialchars($pkg['team_refer_incentive'] ?? '') ?></td>
                         <td><?= htmlspecialchars($pkg['property_sale_incentive'] ?? '') ?></td>
                         <td><?= htmlspecialchars($pkg['team_sale_incentive'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($pkg['free_property_visit'] ?? '') ?></td>
                         <td>
                             <button class="btn-edit" onclick="editPackage(<?= htmlspecialchars(json_encode($pkg)) ?>)">
                                 <i class="fas fa-edit"></i> Edit
@@ -207,6 +215,7 @@ function editPackage(data) {
     document.getElementById('pkg-team_refer_incentive').value = data.team_refer_incentive || '';
     document.getElementById('pkg-property_sale_incentive').value = data.property_sale_incentive || '';
     document.getElementById('pkg-team_sale_incentive').value = data.team_sale_incentive || '';
+    document.getElementById('pkg-free_property_visit').value = data.free_property_visit || '';
     document.getElementById('form-title').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Package';
     document.getElementById('package-form').scrollIntoView({ behavior: 'smooth' });
 }
@@ -225,6 +234,7 @@ function resetForm() {
     document.getElementById('pkg-team_refer_incentive').value = '';
     document.getElementById('pkg-property_sale_incentive').value = '';
     document.getElementById('pkg-team_sale_incentive').value = '';
+    document.getElementById('pkg-free_property_visit').value = '';
     document.getElementById('form-title').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Add New Package';
 }
 </script>
