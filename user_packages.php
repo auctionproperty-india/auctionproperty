@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – Tricolor 3 Bands per Card + Ashok Chakra
+// 📦 User Packages – Tricolor Bands + Ashok Chakra in White Band
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -92,61 +92,12 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         display: flex;
         flex-direction: column;
         position: relative;
-        background: #ffffff; /* fallback */
+        background: #ffffff;
         border: 2px solid #e2e8f0;
     }
     .pricing-card:hover {
         transform: translateY(-8px);
         box-shadow: 0 20px 50px rgba(0,0,0,0.12);
-    }
-
-    /* Ashok Chakra as overlay background */
-    .pricing-card .chakra-bg {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 90%;
-        height: auto;
-        opacity: 0.08;
-        z-index: 0;
-        pointer-events: none;
-    }
-    .pricing-card:hover .chakra-bg {
-        opacity: 0.14;
-    }
-    .pricing-card .chakra-bg svg {
-        width: 100%;
-        height: auto;
-        display: block;
-    }
-    .pricing-card .chakra-bg svg circle,
-    .pricing-card .chakra-bg svg line {
-        stroke-width: 1.8 !important;
-    }
-    .pricing-card .chakra-bg svg .chakra-circle-outer {
-        stroke: #1e293b;
-        stroke-width: 2.5;
-        opacity: 0.6;
-    }
-    .pricing-card .chakra-bg svg .chakra-circle-inner {
-        stroke: #1e293b;
-        stroke-width: 2;
-        opacity: 0.4;
-    }
-    .pricing-card .chakra-bg svg .chakra-spoke {
-        stroke: #1e293b;
-        stroke-width: 1.5;
-        opacity: 0.5;
-    }
-    .pricing-card .chakra-bg svg .chakra-dot {
-        fill: #1e293b;
-        opacity: 0.6;
-    }
-
-    .pricing-card > * {
-        position: relative;
-        z-index: 1;
     }
 
     /* ---- Top Band (Saffron) ---- */
@@ -159,6 +110,8 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         display: flex;
         flex-direction: column;
         justify-content: center;
+        position: relative;
+        z-index: 2;
     }
     .card-top .package-name {
         font-size: 2rem;
@@ -203,20 +156,72 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         display: inline-block;
     }
 
-    /* ---- Middle Band (White) ---- */
+    /* ---- Middle Band (White) – Contains Ashok Chakra ---- */
     .card-middle {
         background: #ffffff;
         padding: 16px 16px 12px;
         flex: 1;
         display: flex;
         flex-direction: column;
+        position: relative;
+        z-index: 1;
+        overflow: hidden;
+        min-height: 180px;
     }
+    /* Ashok Chakra inside white band */
+    .card-middle .chakra-bg {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        height: auto;
+        opacity: 0.12;
+        z-index: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    .pricing-card:hover .card-middle .chakra-bg {
+        opacity: 0.18;
+    }
+    .card-middle .chakra-bg svg {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    .card-middle .chakra-bg svg circle,
+    .card-middle .chakra-bg svg line {
+        stroke-width: 1.8 !important;
+    }
+    .card-middle .chakra-bg svg .chakra-circle-outer {
+        stroke: #1e293b;
+        stroke-width: 2.5;
+        opacity: 0.4;
+    }
+    .card-middle .chakra-bg svg .chakra-circle-inner {
+        stroke: #1e293b;
+        stroke-width: 2;
+        opacity: 0.3;
+    }
+    .card-middle .chakra-bg svg .chakra-spoke {
+        stroke: #1e293b;
+        stroke-width: 1.5;
+        opacity: 0.4;
+    }
+    .card-middle .chakra-bg svg .chakra-dot {
+        fill: #1e293b;
+        opacity: 0.5;
+    }
+
+    /* Features box – positioned above chakra */
     .card-middle .features-box {
+        position: relative;
+        z-index: 1;
         width: 100%;
         border-radius: 16px;
         padding: 12px 12px;
         border: 2px solid #e2e8f0;
-        background: rgba(255,255,255,0.8);
+        background: rgba(255,255,255,0.85);
         backdrop-filter: blur(2px);
         box-shadow: 0 2px 8px rgba(0,0,0,0.03);
         transition: all 0.3s ease;
@@ -250,7 +255,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         flex-shrink: 0;
         width: 20px;
         text-align: center;
-        color: #ff9933; /* default, overridden by package class */
+        color: #ff9933; /* default */
     }
     .card-middle .feature-item .feature-label {
         font-weight: 600;
@@ -277,6 +282,8 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         flex-direction: column;
         justify-content: center;
         align-items: center;
+        position: relative;
+        z-index: 2;
     }
     .card-bottom .btn-buy {
         background: #ffffff;
@@ -318,7 +325,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
     .badge-status.active { background: #ffffff; color: #166534; border-color: #166534; }
     .badge-status.pending { background: #ffffff; color: #92400e; border-color: #f59e0b; }
 
-    /* Recommended badge – position top right */
+    /* Recommended badge – positioned absolutely on card */
     .badge-recommended {
         position: absolute;
         top: 12px;
@@ -331,7 +338,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        z-index: 5;
+        z-index: 10;
         box-shadow: 0 2px 10px rgba(0,0,0,0.15);
         border: 1px solid #ff9933;
     }
@@ -380,7 +387,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         }
     }
 
-    /* Override feature icon colors per package (optional) */
+    /* Package specific icon colors */
     .pkg-silver .card-middle .feature-icon { color: #ff9933; }
     .pkg-gold .card-middle .feature-icon { color: #f59e0b; }
     .pkg-platinum .card-middle .feature-icon { color: #138808; }
@@ -439,33 +446,6 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                             <span class="badge-recommended">⭐ Recommended</span>
                         <?php endif; ?>
 
-                        <!-- Ashok Chakra Background -->
-                        <div class="chakra-bg">
-                            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="50" cy="50" r="44" fill="none" class="chakra-circle-outer"/>
-                                <circle cx="50" cy="50" r="40" fill="none" stroke="#1e293b" stroke-width="0.8" opacity="0.3"/>
-                                <circle cx="50" cy="50" r="14" fill="none" class="chakra-circle-inner"/>
-                                <?php for ($i = 0; $i < 24; $i++): 
-                                    $angle = $i * 15 - 7.5;
-                                    $rad = deg2rad($angle);
-                                    $x1 = 50 + 18 * cos($rad);
-                                    $y1 = 50 + 18 * sin($rad);
-                                    $x2 = 50 + 42 * cos($rad);
-                                    $y2 = 50 + 42 * sin($rad);
-                                ?>
-                                    <line x1="<?= $x1 ?>" y1="<?= $y1 ?>" x2="<?= $x2 ?>" y2="<?= $y2 ?>" class="chakra-spoke"/>
-                                <?php endfor; ?>
-                                <?php for ($i = 0; $i < 24; $i++): 
-                                    $angle = $i * 15;
-                                    $rad = deg2rad($angle);
-                                    $x = 50 + 38 * cos($rad);
-                                    $y = 50 + 38 * sin($rad);
-                                ?>
-                                    <circle cx="<?= $x ?>" cy="<?= $y ?>" r="1.5" class="chakra-dot"/>
-                                <?php endfor; ?>
-                            </svg>
-                        </div>
-
                         <!-- ===== TOP BAND: SAFFRON ===== -->
                         <div class="card-top">
                             <div class="package-name"><?= htmlspecialchars($name) ?></div>
@@ -484,8 +464,35 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                             </div>
                         </div>
 
-                        <!-- ===== MIDDLE BAND: WHITE ===== -->
+                        <!-- ===== MIDDLE BAND: WHITE (with Ashok Chakra) ===== -->
                         <div class="card-middle">
+                            <!-- Ashok Chakra Background -->
+                            <div class="chakra-bg">
+                                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="50" cy="50" r="44" fill="none" class="chakra-circle-outer"/>
+                                    <circle cx="50" cy="50" r="40" fill="none" stroke="#1e293b" stroke-width="0.8" opacity="0.3"/>
+                                    <circle cx="50" cy="50" r="14" fill="none" class="chakra-circle-inner"/>
+                                    <?php for ($i = 0; $i < 24; $i++): 
+                                        $angle = $i * 15 - 7.5;
+                                        $rad = deg2rad($angle);
+                                        $x1 = 50 + 18 * cos($rad);
+                                        $y1 = 50 + 18 * sin($rad);
+                                        $x2 = 50 + 42 * cos($rad);
+                                        $y2 = 50 + 42 * sin($rad);
+                                    ?>
+                                        <line x1="<?= $x1 ?>" y1="<?= $y1 ?>" x2="<?= $x2 ?>" y2="<?= $y2 ?>" class="chakra-spoke"/>
+                                    <?php endfor; ?>
+                                    <?php for ($i = 0; $i < 24; $i++): 
+                                        $angle = $i * 15;
+                                        $rad = deg2rad($angle);
+                                        $x = 50 + 38 * cos($rad);
+                                        $y = 50 + 38 * sin($rad);
+                                    ?>
+                                        <circle cx="<?= $x ?>" cy="<?= $y ?>" r="1.5" class="chakra-dot"/>
+                                    <?php endfor; ?>
+                                </svg>
+                            </div>
+
                             <div class="features-box">
                                 <div class="features-grid">
                                     <?php foreach ($fields as $field): 
