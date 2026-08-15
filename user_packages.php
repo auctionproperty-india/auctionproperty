@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – Buy Search Engine Access (with Features)
+// 📦 User Packages – with all Incentives & Features
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -63,12 +63,9 @@ $has_pending = $pending_check->rowCount() > 0;
             $discount_price = $pkg['discount_price'] ?? null;
             $regular_price = $pkg['price'];
             $show_discount = $discount_price && $discount_price < $regular_price;
-
-            // Format features for display
-            $features = array_filter(explode("\n", $pkg['features'] ?? ''));
         ?>
-            <div class="col-md-3 mb-3">
-                <div class="card h-100 text-center shadow-sm" style="border-radius: 16px; <?= $is_active ? 'border: 2px solid #10b981; background: #f0fdf4;' : '' ?>">
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 shadow-sm" style="border-radius: 16px; <?= $is_active ? 'border: 2px solid #10b981; background: #f0fdf4;' : '' ?>">
                     <div class="card-body">
                         <h5 class="fw-bold"><?= htmlspecialchars($pkg['name']) ?></h5>
                         <div class="my-2">
@@ -90,16 +87,35 @@ $has_pending = $pending_check->rowCount() > 0;
                         </div>
                         <small><?= $pkg['duration_months'] ?> Months</small>
 
-                        <!-- 🔥 Features Display -->
-                        <?php if (!empty($features)): ?>
-                            <div class="text-start mt-2" style="font-size: 0.85rem;">
-                                <ul class="list-unstyled">
-                                    <?php foreach ($features as $feature): ?>
-                                        <li><i class="fas fa-check-circle text-success me-1"></i> <?= htmlspecialchars(trim($feature)) ?></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        <?php endif; ?>
+                        <!-- 🔥 All Features & Incentives -->
+                        <div class="text-start mt-3" style="font-size: 0.9rem;">
+                            <ul class="list-unstyled">
+                                <?php if (!empty($pkg['validity'])): ?>
+                                    <li><i class="fas fa-check-circle text-success me-1"></i> <strong>Validity:</strong> <?= htmlspecialchars($pkg['validity']) ?></li>
+                                <?php endif; ?>
+                                <?php if (!empty($pkg['property_search'])): ?>
+                                    <li><i class="fas fa-check-circle text-success me-1"></i> <strong>Property Search:</strong> <?= htmlspecialchars($pkg['property_search']) ?></li>
+                                <?php endif; ?>
+                                <?php if (!empty($pkg['company_support'])): ?>
+                                    <li><i class="fas fa-check-circle text-success me-1"></i> <strong>Company Support:</strong> <?= htmlspecialchars($pkg['company_support']) ?></li>
+                                <?php endif; ?>
+                                <?php if (!empty($pkg['sales_team_support'])): ?>
+                                    <li><i class="fas fa-check-circle text-success me-1"></i> <strong>Sales Team Support:</strong> <?= htmlspecialchars($pkg['sales_team_support']) ?></li>
+                                <?php endif; ?>
+                                <?php if (!empty($pkg['self_refer_incentive'])): ?>
+                                    <li><i class="fas fa-coins text-warning me-1"></i> <strong>Self Refer Incentive:</strong> <?= htmlspecialchars($pkg['self_refer_incentive']) ?></li>
+                                <?php endif; ?>
+                                <?php if (!empty($pkg['team_refer_incentive'])): ?>
+                                    <li><i class="fas fa-users text-info me-1"></i> <strong>Team Refer Incentive:</strong> <?= htmlspecialchars($pkg['team_refer_incentive']) ?></li>
+                                <?php endif; ?>
+                                <?php if (!empty($pkg['property_sale_incentive'])): ?>
+                                    <li><i class="fas fa-percent text-primary me-1"></i> <strong>Property Sale Incentive:</strong> <?= htmlspecialchars($pkg['property_sale_incentive']) ?></li>
+                                <?php endif; ?>
+                                <?php if (!empty($pkg['team_sale_incentive'])): ?>
+                                    <li><i class="fas fa-percent text-secondary me-1"></i> <strong>Team Sale Incentive:</strong> <?= htmlspecialchars($pkg['team_sale_incentive']) ?></li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
 
                         <?php if ($is_active): ?>
                             <div class="badge bg-success w-100 mt-2">✅ Active (<?= $days_left ?> days left)</div>
