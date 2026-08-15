@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – Buy Search Engine Access
+// 📦 User Packages – Buy Search Engine Access (with Features)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -14,19 +14,19 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php';
 
-// ---- Show messages from redirects ----
+// ---- Show messages ----
 if (isset($_GET['msg'])) {
     $msg = $_GET['msg'];
     if ($msg == 'request_sent') {
-        echo "<div class='alert alert-success alert-dismissible fade show'><i class='fas fa-check-circle'></i> ✅ Your subscription request has been sent. Admin will review it shortly.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        echo "<div class='alert alert-success'><i class='fas fa-check-circle'></i> ✅ Your subscription request has been sent. Admin will review it shortly.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
     } elseif ($msg == 'already_pending') {
-        echo "<div class='alert alert-warning alert-dismissible fade show'><i class='fas fa-clock'></i> ⚠️ You already have a pending request. Please wait for admin approval.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        echo "<div class='alert alert-warning'><i class='fas fa-clock'></i> ⚠️ You already have a pending request.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
     } elseif ($msg == 'already_active') {
-        echo "<div class='alert alert-info alert-dismissible fade show'><i class='fas fa-check-circle'></i> ℹ️ You already have an active subscription.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        echo "<div class='alert alert-info'><i class='fas fa-check-circle'></i> ℹ️ You already have an active subscription.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
     }
 }
 
-// ---- Fetch active subscription ----
+// ---- Active subscription ----
 $active_sub = $pdo->prepare("
     SELECT s.*, p.name as pkg_name, s.start_date, s.end_date, (s.end_date - CURRENT_DATE) as days_left 
     FROM subscriptions s 
@@ -39,7 +39,7 @@ $sub_info = $active_sub->fetch();
 $is_subscribed = $sub_info ? true : false;
 $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 
-// ---- Fetch pending subscription check (for display) ----
+// ---- Pending check ----
 $pending_check = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'pending'");
 $pending_check->execute([$user_id]);
 $has_pending = $pending_check->rowCount() > 0;
@@ -51,7 +51,7 @@ $has_pending = $pending_check->rowCount() > 0;
 
     <?php if ($has_pending): ?>
         <div class="alert alert-warning">
-            <i class="fas fa-clock"></i> You have a pending request. Please wait for admin approval before making a new request.
+            <i class="fas fa-clock"></i> You have a pending request. Please wait for admin approval.
         </div>
     <?php endif; ?>
 
@@ -63,6 +63,9 @@ $has_pending = $pending_check->rowCount() > 0;
             $discount_price = $pkg['discount_price'] ?? null;
             $regular_price = $pkg['price'];
             $show_discount = $discount_price && $discount_price < $regular_price;
+
+            // Format features for display
+            $features = array_filter(explode("\n", $pkg['features'] ?? ''));
         ?>
             <div class="col-md-3 mb-3">
                 <div class="card h-100 text-center shadow-sm" style="border-radius: 16px; <?= $is_active ? 'border: 2px solid #10b981; background: #f0fdf4;' : '' ?>">
@@ -86,6 +89,18 @@ $has_pending = $pending_check->rowCount() > 0;
                             <?php endif; ?>
                         </div>
                         <small><?= $pkg['duration_months'] ?> Months</small>
+
+                        <!-- 🔥 Features Display -->
+                        <?php if (!empty($features)): ?>
+                            <div class="text-start mt-2" style="font-size: 0.85rem;">
+                                <ul class="list-unstyled">
+                                    <?php foreach ($features as $feature): ?>
+                                        <li><i class="fas fa-check-circle text-success me-1"></i> <?= htmlspecialchars(trim($feature)) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
+
                         <?php if ($is_active): ?>
                             <div class="badge bg-success w-100 mt-2">✅ Active (<?= $days_left ?> days left)</div>
                         <?php elseif ($has_pending): ?>
