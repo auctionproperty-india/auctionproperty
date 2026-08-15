@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – with all Incentives & Features
+// 📦 User Packages – World-Class Laravel Style
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -18,11 +18,11 @@ include 'header.php';
 if (isset($_GET['msg'])) {
     $msg = $_GET['msg'];
     if ($msg == 'request_sent') {
-        echo "<div class='alert alert-success'><i class='fas fa-check-circle'></i> ✅ Your subscription request has been sent. Admin will review it shortly.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        echo "<div class='alert alert-success'><i class='fas fa-check-circle'></i> ✅ Your subscription request has been sent. Admin will review it shortly.</div>";
     } elseif ($msg == 'already_pending') {
-        echo "<div class='alert alert-warning'><i class='fas fa-clock'></i> ⚠️ You already have a pending request.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        echo "<div class='alert alert-warning'><i class='fas fa-clock'></i> ⚠️ You already have a pending request.</div>";
     } elseif ($msg == 'already_active') {
-        echo "<div class='alert alert-info'><i class='fas fa-check-circle'></i> ℹ️ You already have an active subscription.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        echo "<div class='alert alert-info'><i class='fas fa-check-circle'></i> ℹ️ You already have an active subscription.</div>";
     }
 }
 
@@ -43,93 +43,230 @@ $days_left = $is_subscribed ? (int)$sub_info['days_left'] : 0;
 $pending_check = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'pending'");
 $pending_check->execute([$user_id]);
 $has_pending = $pending_check->rowCount() > 0;
+
+$packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
 ?>
 
-<div id="packages" class="card-premium" style="border:2px solid #fbbf24; background:#fffbeb;">
-    <h4><i class="fas fa-search-dollar me-2" style="color: #f59e0b;"></i>Buy Search Engine Access</h4>
-    <p class="text-muted">Subscribe to view full details of all auction properties.</p>
+<style>
+    .pricing-card {
+        border-radius: 20px;
+        padding: 25px 20px 30px;
+        background: #ffffff;
+        transition: all 0.3s ease;
+        border: 1px solid #e9edf4;
+        height: 100%;
+        position: relative;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    .pricing-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+        border-color: #cbd5e1;
+    }
+    .pricing-card.recommended {
+        border: 2px solid #3b82f6;
+        background: #f8faff;
+    }
+    .pricing-card .badge-recommended {
+        position: absolute;
+        top: -12px;
+        right: 20px;
+        background: #3b82f6;
+        color: white;
+        padding: 4px 16px;
+        border-radius: 30px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    .pricing-card .package-name {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }
+    .pricing-card .package-duration {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-bottom: 12px;
+    }
+    .pricing-card .price-box {
+        margin: 12px 0 16px;
+    }
+    .pricing-card .price-box .regular-price {
+        font-size: 1.2rem;
+        color: #94a3b8;
+        text-decoration: line-through;
+        font-weight: 500;
+    }
+    .pricing-card .price-box .offer-price {
+        font-size: 2.4rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-left: 8px;
+    }
+    .pricing-card .price-box .offer-badge {
+        background: #dcfce7;
+        color: #166534;
+        padding: 2px 10px;
+        border-radius: 30px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        margin-left: 8px;
+        display: inline-block;
+    }
+    .pricing-card .features-list {
+        list-style: none;
+        padding: 0;
+        margin: 16px 0 20px;
+        text-align: left;
+        font-size: 0.9rem;
+    }
+    .pricing-card .features-list li {
+        padding: 6px 0;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .pricing-card .features-list li:last-child {
+        border-bottom: none;
+    }
+    .pricing-card .features-list .feature-icon {
+        width: 20px;
+        color: #3b82f6;
+        font-size: 0.85rem;
+    }
+    .pricing-card .btn-buy {
+        background: #0f172a;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 40px;
+        font-weight: 600;
+        width: 100%;
+        transition: 0.3s;
+        font-size: 0.95rem;
+    }
+    .pricing-card .btn-buy:hover {
+        background: #1e293b;
+        transform: scale(1.02);
+    }
+    .pricing-card .btn-buy:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+        transform: none;
+    }
+    .pricing-card .badge-status {
+        display: inline-block;
+        padding: 4px 14px;
+        border-radius: 30px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-top: 8px;
+    }
+    .badge-status.active { background: #dcfce7; color: #166534; }
+    .badge-status.pending { background: #fef3c7; color: #92400e; }
+    .badge-status.inactive { background: #f1f5f9; color: #475569; }
+    .section-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 6px;
+    }
+    .section-subtitle {
+        color: #64748b;
+        font-size: 1.05rem;
+        margin-bottom: 30px;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="text-center mb-4">
+        <h2 class="section-title">🚀 Choose Your Plan</h2>
+        <p class="section-subtitle">Select the best package to unlock all auction properties</p>
+    </div>
 
     <?php if ($has_pending): ?>
-        <div class="alert alert-warning">
+        <div class="alert alert-warning text-center">
             <i class="fas fa-clock"></i> You have a pending request. Please wait for admin approval.
         </div>
     <?php endif; ?>
 
-    <div class="row">
-        <?php
-        $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
-        foreach ($packages as $pkg) {
+    <div class="row g-4 justify-content-center">
+        <?php 
+        $count = count($packages);
+        foreach ($packages as $index => $pkg):
             $is_active = ($is_subscribed && $sub_info['package_id'] == $pkg['id']);
             $discount_price = $pkg['discount_price'] ?? null;
             $regular_price = $pkg['price'];
             $show_discount = $discount_price && $discount_price < $regular_price;
+            $col_size = $count == 4 ? 'col-lg-3' : ($count == 3 ? 'col-lg-4' : 'col-lg-4');
+            $is_recommended = ($index == 1 && $count > 2); // Gold as recommended
         ?>
-            <div class="col-md-4 mb-3">
-                <div class="card h-100 shadow-sm" style="border-radius: 16px; <?= $is_active ? 'border: 2px solid #10b981; background: #f0fdf4;' : '' ?>">
-                    <div class="card-body">
-                        <h5 class="fw-bold"><?= htmlspecialchars($pkg['name']) ?></h5>
-                        <div class="my-2">
-                            <?php if ($show_discount): ?>
-                                <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">
-                                    <span style="font-size: 22px; font-weight: 700; color: #dc3545; text-decoration: line-through; background: #fee2e2; padding: 0 12px; border-radius: 8px;">
-                                        ₹ <?= indianCurrencyFormat($regular_price) ?>
-                                    </span>
-                                    <span style="font-size: 18px; font-weight: 800; color: #10b981; background: #d1fae5; padding: 2px 10px; border-radius: 8px;">
-                                        🔥 Offer
-                                    </span>
-                                    <span style="font-size: 32px; font-weight: 800; color: #0f172a;">
-                                        ₹ <?= indianCurrencyFormat($discount_price) ?>
-                                    </span>
-                                </div>
-                            <?php else: ?>
-                                <h4 class="text-success">₹ <?= indianCurrencyFormat($regular_price) ?></h4>
-                            <?php endif; ?>
-                        </div>
-                        <small><?= $pkg['duration_months'] ?> Months</small>
+            <div class="<?= $col_size ?> col-md-6 mb-4">
+                <div class="pricing-card <?= $is_recommended ? 'recommended' : '' ?> <?= $is_active ? 'border border-success' : '' ?>">
+                    <?php if ($is_recommended): ?>
+                        <span class="badge-recommended">⭐ Recommended</span>
+                    <?php endif; ?>
+                    
+                    <div class="package-name"><?= htmlspecialchars($pkg['name']) ?></div>
+                    <div class="package-duration"><?= $pkg['duration_months'] ?> Months Access</div>
 
-                        <!-- 🔥 All Features & Incentives -->
-                        <div class="text-start mt-3" style="font-size: 0.9rem;">
-                            <ul class="list-unstyled">
-                                <?php if (!empty($pkg['validity'])): ?>
-                                    <li><i class="fas fa-check-circle text-success me-1"></i> <strong>Validity:</strong> <?= htmlspecialchars($pkg['validity']) ?></li>
-                                <?php endif; ?>
-                                <?php if (!empty($pkg['property_search'])): ?>
-                                    <li><i class="fas fa-check-circle text-success me-1"></i> <strong>Property Search:</strong> <?= htmlspecialchars($pkg['property_search']) ?></li>
-                                <?php endif; ?>
-                                <?php if (!empty($pkg['company_support'])): ?>
-                                    <li><i class="fas fa-check-circle text-success me-1"></i> <strong>Company Support:</strong> <?= htmlspecialchars($pkg['company_support']) ?></li>
-                                <?php endif; ?>
-                                <?php if (!empty($pkg['sales_team_support'])): ?>
-                                    <li><i class="fas fa-check-circle text-success me-1"></i> <strong>Sales Team Support:</strong> <?= htmlspecialchars($pkg['sales_team_support']) ?></li>
-                                <?php endif; ?>
-                                <?php if (!empty($pkg['self_refer_incentive'])): ?>
-                                    <li><i class="fas fa-coins text-warning me-1"></i> <strong>Self Refer Incentive:</strong> <?= htmlspecialchars($pkg['self_refer_incentive']) ?></li>
-                                <?php endif; ?>
-                                <?php if (!empty($pkg['team_refer_incentive'])): ?>
-                                    <li><i class="fas fa-users text-info me-1"></i> <strong>Team Refer Incentive:</strong> <?= htmlspecialchars($pkg['team_refer_incentive']) ?></li>
-                                <?php endif; ?>
-                                <?php if (!empty($pkg['property_sale_incentive'])): ?>
-                                    <li><i class="fas fa-percent text-primary me-1"></i> <strong>Property Sale Incentive:</strong> <?= htmlspecialchars($pkg['property_sale_incentive']) ?></li>
-                                <?php endif; ?>
-                                <?php if (!empty($pkg['team_sale_incentive'])): ?>
-                                    <li><i class="fas fa-percent text-secondary me-1"></i> <strong>Team Sale Incentive:</strong> <?= htmlspecialchars($pkg['team_sale_incentive']) ?></li>
-                                <?php endif; ?>
-                            </ul>
-                        </div>
-
-                        <?php if ($is_active): ?>
-                            <div class="badge bg-success w-100 mt-2">✅ Active (<?= $days_left ?> days left)</div>
-                        <?php elseif ($has_pending): ?>
-                            <div class="badge bg-warning text-dark w-100 mt-2">⏳ Pending Request</div>
+                    <div class="price-box">
+                        <?php if ($show_discount): ?>
+                            <span class="regular-price">₹<?= number_format($regular_price, 0) ?></span>
+                            <span class="offer-price">₹<?= number_format($discount_price, 0) ?></span>
+                            <span class="offer-badge">🔥 Save <?= round((($regular_price - $discount_price)/$regular_price)*100) ?>%</span>
                         <?php else: ?>
-                            <a href="buy_subscription.php?package_id=<?= $pkg['id'] ?>" class="btn btn-primary w-100 btn-sm mt-2">Buy Now</a>
+                            <span class="offer-price" style="font-size:2rem;">₹<?= number_format($regular_price, 0) ?></span>
                         <?php endif; ?>
                     </div>
+
+                    <ul class="features-list">
+                        <?php if (!empty($pkg['validity'])): ?>
+                            <li><span class="feature-icon"><i class="fas fa-check-circle"></i></span> <?= htmlspecialchars($pkg['validity']) ?></li>
+                        <?php endif; ?>
+                        <?php if (!empty($pkg['property_search'])): ?>
+                            <li><span class="feature-icon"><i class="fas fa-search"></i></span> <?= htmlspecialchars($pkg['property_search']) ?></li>
+                        <?php endif; ?>
+                        <?php if (!empty($pkg['company_support'])): ?>
+                            <li><span class="feature-icon"><i class="fas fa-headset"></i></span> <?= htmlspecialchars($pkg['company_support']) ?></li>
+                        <?php endif; ?>
+                        <?php if (!empty($pkg['sales_team_support'])): ?>
+                            <li><span class="feature-icon"><i class="fas fa-users"></i></span> <?= htmlspecialchars($pkg['sales_team_support']) ?></li>
+                        <?php endif; ?>
+                        <?php if (!empty($pkg['self_refer_incentive'])): ?>
+                            <li><span class="feature-icon"><i class="fas fa-coins"></i></span> Self Refer: <?= htmlspecialchars($pkg['self_refer_incentive']) ?></li>
+                        <?php endif; ?>
+                        <?php if (!empty($pkg['team_refer_incentive'])): ?>
+                            <li><span class="feature-icon"><i class="fas fa-handshake"></i></span> Team Refer: <?= htmlspecialchars($pkg['team_refer_incentive']) ?></li>
+                        <?php endif; ?>
+                        <?php if (!empty($pkg['property_sale_incentive'])): ?>
+                            <li><span class="feature-icon"><i class="fas fa-percent"></i></span> Property Sale: <?= htmlspecialchars($pkg['property_sale_incentive']) ?></li>
+                        <?php endif; ?>
+                        <?php if (!empty($pkg['team_sale_incentive'])): ?>
+                            <li><span class="feature-icon"><i class="fas fa-percent"></i></span> Team Sale: <?= htmlspecialchars($pkg['team_sale_incentive']) ?></li>
+                        <?php endif; ?>
+                    </ul>
+
+                    <?php if ($is_active): ?>
+                        <span class="badge-status active">✅ Active (<?= $days_left ?> days left)</span>
+                        <button class="btn-buy" disabled>Currently Active</button>
+                    <?php elseif ($has_pending): ?>
+                        <span class="badge-status pending">⏳ Pending Approval</span>
+                        <button class="btn-buy" disabled>Request Pending</button>
+                    <?php else: ?>
+                        <a href="buy_subscription.php?package_id=<?= $pkg['id'] ?>" class="btn-buy d-block text-center text-decoration-none">
+                            <i class="fas fa-arrow-right me-1"></i> Buy Now
+                        </a>
+                    <?php endif; ?>
                 </div>
             </div>
-        <?php } ?>
+        <?php endforeach; ?>
     </div>
-    <small class="text-muted">* After payment, admin will activate your subscription.</small>
+
+    <p class="text-center text-muted mt-4"><small>* After payment, admin will activate your subscription within 24 hours.</small></p>
 </div>
 
 <?php include 'footer.php'; ?>
