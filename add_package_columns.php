@@ -6,14 +6,14 @@
 require_once __DIR__ . '/db.php';
 
 $columns = [
-    'validity' => 'VARCHAR(100)',
-    'property_search' => 'VARCHAR(100)',
-    'company_support' => 'VARCHAR(100)',
-    'sales_team_support' => 'VARCHAR(100)',
-    'self_refer_incentive' => 'VARCHAR(100)',
-    'team_refer_incentive' => 'VARCHAR(100)',
-    'property_sale_incentive' => 'VARCHAR(100)',
-    'team_sale_incentive' => 'VARCHAR(100)'
+    'Validity' => 'VARCHAR(100)',
+    'Property_Search' => 'VARCHAR(100)',
+    'Company_Support' => 'VARCHAR(100)',
+    'Sales_Team_Support' => 'VARCHAR(100)',
+    'Self_Refer_Incentive' => 'VARCHAR(100)',
+    'Team_Refer_Incentive' => 'VARCHAR(100)',
+    'Property_Sale_Incentive' => 'VARCHAR(100)',
+    'Team_Sale_Incentive' => 'VARCHAR(100)'
 ];
 
 try {
