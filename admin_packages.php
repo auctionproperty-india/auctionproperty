@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 Admin: Manage Packages (with Free Property Visit + 0 fix)
+// 📦 Admin: Manage Packages (No .00, Center Align)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $team_refer_incentive = trim($_POST['team_refer_incentive'] ?? '');
     $property_sale_incentive = trim($_POST['property_sale_incentive'] ?? '');
     $team_sale_incentive = trim($_POST['team_sale_incentive'] ?? '');
-    $free_property_visit = trim($_POST['free_property_visit'] ?? ''); // नया
+    $free_property_visit = trim($_POST['free_property_visit'] ?? '');
 
     if ($id > 0) {
         $sql = "UPDATE packages SET 
@@ -70,8 +70,8 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
 
 <style>
     .package-form { background: #f8fafc; padding: 25px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 30px; }
-    .package-table th { background: #f1f5f9; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #475569; }
-    .package-table td { vertical-align: middle; font-size: 0.9rem; }
+    .package-table th { background: #f1f5f9; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #475569; text-align: center; vertical-align: middle; }
+    .package-table td { vertical-align: middle; text-align: center; font-size: 0.9rem; }
     .btn-edit { background: #f59e0b; color: white; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; }
     .btn-edit:hover { background: #d97706; color: white; }
     .btn-delete { background: #ef4444; color: white; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; }
@@ -173,8 +173,9 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                     <tr>
                         <td><?= $pkg['id'] ?></td>
                         <td><strong><?= htmlspecialchars($pkg['name']) ?></strong></td>
-                        <td>₹<?= number_format($pkg['price'], 2) ?></td>
-                        <td><?= $pkg['discount_price'] ? '₹'.number_format($pkg['discount_price'], 2) : '-' ?></td>
+                        <!-- .00 हटाने के लिए number_format में 0 decimal -->
+                        <td>₹<?= number_format($pkg['price'], 0) ?></td>
+                        <td><?= $pkg['discount_price'] ? '₹'.number_format($pkg['discount_price'], 0) : '-' ?></td>
                         <td><?= $pkg['duration_months'] ?> mo</td>
                         <td><?= htmlspecialchars($pkg['validity'] ?? '') ?></td>
                         <td><?= htmlspecialchars($pkg['property_search'] ?? '') ?></td>
