@@ -14,24 +14,23 @@ $message = '';
 $settings_keys = ['default_contact', 'company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent', 'spin_min_coins', 'spin_max_coins'];
 
 // ============================================================
-// 🔥 नया: सुनिश्चित करें कि सभी setting_key के लिए row मौजूद हो
+// 🔒 सुनिश्चित करें कि सभी setting_key की rows मौजूद हैं
 // ============================================================
 foreach ($settings_keys as $key) {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM settings WHERE setting_key = ?");
     $stmt->execute([$key]);
     if ($stmt->fetchColumn() == 0) {
-        // Row नहीं है – डिफॉल्ट मान '' के साथ INSERT करें
         $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, '')")->execute([$key]);
     }
 }
-// QR कोड के लिए भी
+// QR code key भी check करें
 $stmt = $pdo->prepare("SELECT COUNT(*) FROM settings WHERE setting_key = 'company_qr_code'");
 $stmt->execute();
 if ($stmt->fetchColumn() == 0) {
     $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('company_qr_code', '')")->execute();
 }
 
-// Handle QR upload
+// ---- Handle POST ----
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
     if(!hasEditPermission('settings', $pdo)) {
         die("You don't have permission to edit settings.");
@@ -43,28 +42,49 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
     if(!$admin || !password_verify($admin_password, $admin['password'])) {
         $message = "<div class='alert alert-danger'>❌ Incorrect admin password!</div>";
     } else {
-        // Save text fields – केवल POST में आए हुए keys को अपडेट करें
+        // ---- 1. Save text fields ----
         foreach($settings_keys as $key) {
             if (isset($_POST[$key])) {
                 $val = trim($_POST[$key] ?? '');
                 $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?")->execute([$val, $key]);
             }
         }
-        // Save QR code if uploaded
+
+        // ---- 2. Handle QR Code Upload ----
+        $qr_updated = false;
         if(isset($_FILES['qr_code']) && $_FILES['qr_code']['error'] == 0) {
+            // New file uploaded – process it
             $upload_dir = 'uploads/';
             if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
             $ext = pathinfo($_FILES['qr_code']['name'], PATHINFO_EXTENSION);
             $filename = 'qr_' . time() . '.' . $ext;
-            move_uploaded_file($_FILES['qr_code']['tmp_name'], $upload_dir . $filename);
-            $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'company_qr_code'")->execute([$upload_dir . $filename]);
+            if (move_uploaded_file($_FILES['qr_code']['tmp_name'], $upload_dir . $filename)) {
+                // Delete old QR file if exists (optional)
+                $old_qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
+                if ($old_qr && file_exists($old_qr)) {
+                    unlink($old_qr); // Remove old image
+                }
+                // Save new path
+                $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'company_qr_code'")->execute([$upload_dir . $filename]);
+                $qr_updated = true;
+            } else {
+                $message = "<div class='alert alert-danger'>❌ QR Code upload failed.</div>";
+            }
         }
-        $message = "<div class='alert alert-success'>✅ Settings updated!</div>";
+        // If no new file, do nothing – keep existing QR code.
+
+        if (!$qr_updated && empty($message)) {
+            // No QR update, but other fields saved successfully
+        }
+        if (empty($message)) {
+            $message = "<div class='alert alert-success'>✅ Settings updated!</div>";
+        }
     }
 }
 
 include 'header.php';
-// Fetch current values
+
+// ---- Fetch current values ----
 $settings = [];
 foreach($settings_keys as $key) {
     $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
