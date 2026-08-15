@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – 2 per Row, Color Scheme by Package Name
+// 📦 User Packages – 2 per Row, Package Name Color Scheme
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -18,11 +18,11 @@ include 'header.php';
 if (isset($_GET['msg'])) {
     $msg = $_GET['msg'];
     if ($msg == 'request_sent') {
-        echo "<div class='alert alert-success'><i class='fas fa-check-circle'></i> ✅ Your subscription request has been sent. Admin will review it shortly.</div>";
+        echo "<div class='alert alert-success text-center'><i class='fas fa-check-circle'></i> ✅ Your subscription request has been sent. Admin will review it shortly.</div>";
     } elseif ($msg == 'already_pending') {
-        echo "<div class='alert alert-warning'><i class='fas fa-clock'></i> ⚠️ You already have a pending request.</div>";
+        echo "<div class='alert alert-warning text-center'><i class='fas fa-clock'></i> ⚠️ You already have a pending request.</div>";
     } elseif ($msg == 'already_active') {
-        echo "<div class='alert alert-info'><i class='fas fa-check-circle'></i> ℹ️ You already have an active subscription.</div>";
+        echo "<div class='alert alert-info text-center'><i class='fas fa-check-circle'></i> ℹ️ You already have an active subscription.</div>";
     }
 }
 
@@ -46,196 +46,243 @@ $has_pending = $pending_check->rowCount() > 0;
 
 $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
 
-// Package color schemes
+// Package color schemes (darker, more vibrant)
 $color_schemes = [
     'Silver' => [
-        'border' => '#c0c0c0',
-        'bg' => '#f9f9f9',
-        'accent' => '#a8a8a8',
-        'gradient' => 'linear-gradient(135deg, #f0f0f0, #e0e0e0)',
-        'badge' => '#6b7280'
+        'bg' => 'linear-gradient(145deg, #f0f0f0, #d1d5db)',
+        'border' => '#9ca3af',
+        'title' => '#374151',
+        'accent' => '#6b7280',
+        'btn' => '#4b5563',
+        'btn_hover' => '#374151',
+        'badge' => '#9ca3af'
     ],
     'Gold' => [
-        'border' => '#fbbf24',
-        'bg' => '#fffbeb',
-        'accent' => '#f59e0b',
-        'gradient' => 'linear-gradient(135deg, #fef3c7, #fde68a)',
+        'bg' => 'linear-gradient(145deg, #fef3c7, #fcd34d)',
+        'border' => '#f59e0b',
+        'title' => '#78350f',
+        'accent' => '#d97706',
+        'btn' => '#b45309',
+        'btn_hover' => '#92400e',
         'badge' => '#d97706'
     ],
     'Platinum' => [
-        'border' => '#94a3b8',
-        'bg' => '#f1f5f9',
-        'accent' => '#64748b',
-        'gradient' => 'linear-gradient(135deg, #e2e8f0, #cbd5e1)',
+        'bg' => 'linear-gradient(145deg, #e2e8f0, #94a3b8)',
+        'border' => '#64748b',
+        'title' => '#1e293b',
+        'accent' => '#475569',
+        'btn' => '#334155',
+        'btn_hover' => '#1e293b',
         'badge' => '#475569'
     ],
     'Diamond' => [
-        'border' => '#3b82f6',
-        'bg' => '#eff6ff',
-        'accent' => '#2563eb',
-        'gradient' => 'linear-gradient(135deg, #dbeafe, #93c5fd)',
-        'badge' => '#1d4ed8'
+        'bg' => 'linear-gradient(145deg, #dbeafe, #60a5fa)',
+        'border' => '#2563eb',
+        'title' => '#1e3a8a',
+        'accent' => '#1d4ed8',
+        'btn' => '#1d4ed8',
+        'btn_hover' => '#1e40af',
+        'badge' => '#2563eb'
     ]
 ];
 ?>
 
 <style>
     .pricing-card {
-        border-radius: 20px;
-        padding: 25px 20px 30px;
-        background: #ffffff;
-        transition: all 0.3s ease;
+        border-radius: 24px;
+        padding: 30px 20px 30px;
+        transition: all 0.4s ease;
         border: 2px solid #e9edf4;
         height: 100%;
         position: relative;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
         display: flex;
         flex-direction: column;
+        align-items: center;
+        text-align: center;
+        background: #ffffff;
     }
     .pricing-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+        transform: translateY(-10px);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.15);
     }
     .pricing-card .badge-recommended {
         position: absolute;
         top: -12px;
         right: 20px;
         color: white;
-        padding: 4px 16px;
+        padding: 5px 18px;
         border-radius: 30px;
         font-size: 0.75rem;
-        font-weight: 600;
+        font-weight: 700;
         letter-spacing: 0.5px;
+        text-transform: uppercase;
+        background: #3b82f6;
     }
     .pricing-card .package-name {
-        font-size: 1.6rem;
-        font-weight: 700;
-        color: #0f172a;
+        font-size: 2rem;
+        font-weight: 800;
         margin-bottom: 2px;
+        letter-spacing: -0.5px;
     }
     .pricing-card .package-duration {
-        font-size: 0.85rem;
-        color: #64748b;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #4b5563;
         margin-bottom: 12px;
     }
     .pricing-card .price-box {
         margin: 12px 0 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: wrap;
     }
     .pricing-card .price-box .regular-price {
         font-size: 1.1rem;
-        color: #94a3b8;
+        color: #9ca3af;
         text-decoration: line-through;
         font-weight: 500;
     }
     .pricing-card .price-box .offer-price {
-        font-size: 2.2rem;
+        font-size: 2.4rem;
         font-weight: 800;
         color: #0f172a;
-        margin-left: 8px;
     }
     .pricing-card .price-box .offer-badge {
-        padding: 2px 10px;
+        padding: 4px 12px;
         border-radius: 30px;
-        font-size: 0.7rem;
-        font-weight: 600;
-        margin-left: 8px;
-        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 700;
         background: #dcfce7;
         color: #166534;
+        display: inline-block;
     }
     .pricing-card .features-list {
         list-style: none;
         padding: 0;
         margin: 16px 0 20px;
-        text-align: left;
+        width: 100%;
         font-size: 0.9rem;
         flex: 1;
+        text-align: left;
     }
     .pricing-card .features-list li {
-        padding: 4px 0;
+        padding: 5px 0;
         border-bottom: 1px solid #f1f5f9;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
     }
     .pricing-card .features-list li:last-child {
         border-bottom: none;
     }
     .pricing-card .features-list .feature-icon {
-        width: 24px;
-        color: #3b82f6;
-        font-size: 0.9rem;
+        width: 26px;
+        font-size: 1rem;
         text-align: center;
+        flex-shrink: 0;
     }
     .pricing-card .features-list .feature-label {
-        font-weight: 600;
-        color: #1e293b;
+        font-weight: 700;
         min-width: 110px;
+        flex-shrink: 0;
     }
     .pricing-card .features-list .feature-value {
-        color: #475569;
+        font-weight: 500;
+        color: #1e293b;
     }
     .pricing-card .btn-buy {
-        background: #0f172a;
-        color: white;
         border: none;
-        padding: 10px 20px;
+        padding: 12px 20px;
         border-radius: 40px;
-        font-weight: 600;
+        font-weight: 700;
         width: 100%;
         transition: 0.3s;
-        font-size: 0.95rem;
+        font-size: 1rem;
         text-align: center;
         display: block;
         text-decoration: none;
         margin-top: auto;
+        color: white;
+        letter-spacing: 0.5px;
     }
     .pricing-card .btn-buy:hover {
         transform: scale(1.02);
         color: white;
     }
     .pricing-card .btn-buy:disabled {
-        background: #94a3b8;
+        background: #94a3b8 !important;
         cursor: not-allowed;
         transform: none;
     }
     .pricing-card .badge-status {
         display: inline-block;
-        padding: 4px 14px;
+        padding: 6px 18px;
         border-radius: 30px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: 0.8rem;
+        font-weight: 700;
         margin-top: 8px;
     }
     .badge-status.active { background: #dcfce7; color: #166534; }
     .badge-status.pending { background: #fef3c7; color: #92400e; }
     .section-title {
-        font-size: 2rem;
+        font-size: 2.4rem;
         font-weight: 800;
         color: #0f172a;
         margin-bottom: 6px;
     }
     .section-subtitle {
         color: #64748b;
-        font-size: 1.05rem;
+        font-size: 1.1rem;
         margin-bottom: 30px;
     }
-    /* Package specific overrides */
-    .pkg-silver .pricing-card { border-color: #c0c0c0; background: #fafafa; }
-    .pkg-silver .pricing-card .package-name { color: #4b5563; }
+
+    /* Package Specific Overrides – Darker & More Distinct */
+    .pkg-silver .pricing-card {
+        background: linear-gradient(145deg, #f0f0f0, #d1d5db);
+        border-color: #9ca3af;
+    }
+    .pkg-silver .pricing-card .package-name { color: #374151; }
+    .pkg-silver .pricing-card .btn-buy { background: #4b5563; }
+    .pkg-silver .pricing-card .btn-buy:hover { background: #374151; }
     .pkg-silver .badge-recommended { background: #6b7280; }
 
-    .pkg-gold .pricing-card { border-color: #fbbf24; background: #fffbeb; }
-    .pkg-gold .pricing-card .package-name { color: #92400e; }
+    .pkg-gold .pricing-card {
+        background: linear-gradient(145deg, #fef3c7, #fcd34d);
+        border-color: #f59e0b;
+    }
+    .pkg-gold .pricing-card .package-name { color: #78350f; }
+    .pkg-gold .pricing-card .btn-buy { background: #b45309; }
+    .pkg-gold .pricing-card .btn-buy:hover { background: #92400e; }
     .pkg-gold .badge-recommended { background: #d97706; }
 
-    .pkg-platinum .pricing-card { border-color: #94a3b8; background: #f1f5f9; }
-    .pkg-platinum .pricing-card .package-name { color: #334155; }
+    .pkg-platinum .pricing-card {
+        background: linear-gradient(145deg, #e2e8f0, #94a3b8);
+        border-color: #64748b;
+    }
+    .pkg-platinum .pricing-card .package-name { color: #1e293b; }
+    .pkg-platinum .pricing-card .btn-buy { background: #334155; }
+    .pkg-platinum .pricing-card .btn-buy:hover { background: #1e293b; }
     .pkg-platinum .badge-recommended { background: #475569; }
 
-    .pkg-diamond .pricing-card { border-color: #3b82f6; background: #eff6ff; }
+    .pkg-diamond .pricing-card {
+        background: linear-gradient(145deg, #dbeafe, #60a5fa);
+        border-color: #2563eb;
+    }
     .pkg-diamond .pricing-card .package-name { color: #1e3a8a; }
+    .pkg-diamond .pricing-card .btn-buy { background: #1d4ed8; }
+    .pkg-diamond .pricing-card .btn-buy:hover { background: #1e40af; }
     .pkg-diamond .badge-recommended { background: #2563eb; }
+
+    .pricing-card .feature-icon {
+        color: #3b82f6;
+    }
+    .pkg-silver .pricing-card .feature-icon { color: #6b7280; }
+    .pkg-gold .pricing-card .feature-icon { color: #d97706; }
+    .pkg-platinum .pricing-card .feature-icon { color: #475569; }
+    .pkg-diamond .pricing-card .feature-icon { color: #2563eb; }
 </style>
 
 <div class="container-fluid py-4">
@@ -258,17 +305,17 @@ $color_schemes = [
             $discount_price = $pkg['discount_price'] ?? null;
             $regular_price = $pkg['price'];
             $show_discount = $discount_price && $discount_price < $regular_price;
-            $col_size = 'col-lg-6 col-md-6'; // 2 per row
+            $col_size = 'col-lg-6 col-md-6';
             $is_recommended = ($index == 1 && $count > 2);
 
             // Package specific CSS class
-            $pkg_class = 'pkg-' . strtolower($pkg['name']);
-            // fallback
-            if (!in_array($pkg['name'], ['Silver','Gold','Platinum','Diamond'])) {
+            $name = $pkg['name'];
+            $pkg_class = 'pkg-' . strtolower($name);
+            if (!in_array($name, ['Silver','Gold','Platinum','Diamond'])) {
                 $pkg_class = 'pkg-silver';
             }
 
-            // Fields with labels, icons, and keys
+            // Fields
             $fields = [
                 ['label' => 'Validity', 'icon' => 'fa-clock', 'key' => 'validity'],
                 ['label' => 'Property Search', 'icon' => 'fa-search', 'key' => 'property_search'],
@@ -287,7 +334,7 @@ $color_schemes = [
                         <span class="badge-recommended">⭐ Recommended</span>
                     <?php endif; ?>
                     
-                    <div class="package-name"><?= htmlspecialchars($pkg['name']) ?></div>
+                    <div class="package-name"><?= htmlspecialchars($name) ?></div>
                     <div class="package-duration"><?= $pkg['duration_months'] ?> Months Access</div>
 
                     <div class="price-box">
@@ -296,7 +343,7 @@ $color_schemes = [
                             <span class="offer-price">₹<?= number_format($discount_price, 0) ?></span>
                             <span class="offer-badge">🔥 Save <?= round((($regular_price - $discount_price)/$regular_price)*100) ?>%</span>
                         <?php else: ?>
-                            <span class="offer-price" style="font-size:2rem;">₹<?= number_format($regular_price, 0) ?></span>
+                            <span class="offer-price" style="font-size:2.4rem;">₹<?= number_format($regular_price, 0) ?></span>
                         <?php endif; ?>
                     </div>
 
