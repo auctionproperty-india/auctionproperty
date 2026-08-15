@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – World-Class Laravel Style
+// 📦 User Packages – World-Class Laravel Style (with Labels)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -133,9 +133,18 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         border-bottom: none;
     }
     .pricing-card .features-list .feature-icon {
-        width: 20px;
+        width: 24px;
         color: #3b82f6;
-        font-size: 0.85rem;
+        font-size: 0.9rem;
+        text-align: center;
+    }
+    .pricing-card .features-list .feature-label {
+        font-weight: 600;
+        color: #1e293b;
+        min-width: 120px;
+    }
+    .pricing-card .features-list .feature-value {
+        color: #475569;
     }
     .pricing-card .btn-buy {
         background: #0f172a;
@@ -147,10 +156,14 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         width: 100%;
         transition: 0.3s;
         font-size: 0.95rem;
+        text-align: center;
+        display: block;
+        text-decoration: none;
     }
     .pricing-card .btn-buy:hover {
         background: #1e293b;
         transform: scale(1.02);
+        color: white;
     }
     .pricing-card .btn-buy:disabled {
         background: #94a3b8;
@@ -202,7 +215,19 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
             $regular_price = $pkg['price'];
             $show_discount = $discount_price && $discount_price < $regular_price;
             $col_size = $count == 4 ? 'col-lg-3' : ($count == 3 ? 'col-lg-4' : 'col-lg-4');
-            $is_recommended = ($index == 1 && $count > 2); // Gold as recommended
+            $is_recommended = ($index == 1 && $count > 2);
+
+            // Define all fields with their labels, icons, and database columns
+            $fields = [
+                ['label' => 'Validity', 'icon' => 'fa-clock', 'key' => 'validity'],
+                ['label' => 'Property Search', 'icon' => 'fa-search', 'key' => 'property_search'],
+                ['label' => 'Company Support', 'icon' => 'fa-headset', 'key' => 'company_support'],
+                ['label' => 'Sales Team Support', 'icon' => 'fa-users', 'key' => 'sales_team_support'],
+                ['label' => 'Self Refer Incentive', 'icon' => 'fa-coins', 'key' => 'self_refer_incentive'],
+                ['label' => 'Team Refer Incentive', 'icon' => 'fa-handshake', 'key' => 'team_refer_incentive'],
+                ['label' => 'Property Sale Incentive', 'icon' => 'fa-percent', 'key' => 'property_sale_incentive'],
+                ['label' => 'Team Sale Incentive', 'icon' => 'fa-percent', 'key' => 'team_sale_incentive']
+            ];
         ?>
             <div class="<?= $col_size ?> col-md-6 mb-4">
                 <div class="pricing-card <?= $is_recommended ? 'recommended' : '' ?> <?= $is_active ? 'border border-success' : '' ?>">
@@ -223,31 +248,18 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                         <?php endif; ?>
                     </div>
 
+                    <!-- Features with Labels -->
                     <ul class="features-list">
-                        <?php if (!empty($pkg['validity'])): ?>
-                            <li><span class="feature-icon"><i class="fas fa-check-circle"></i></span> <?= htmlspecialchars($pkg['validity']) ?></li>
-                        <?php endif; ?>
-                        <?php if (!empty($pkg['property_search'])): ?>
-                            <li><span class="feature-icon"><i class="fas fa-search"></i></span> <?= htmlspecialchars($pkg['property_search']) ?></li>
-                        <?php endif; ?>
-                        <?php if (!empty($pkg['company_support'])): ?>
-                            <li><span class="feature-icon"><i class="fas fa-headset"></i></span> <?= htmlspecialchars($pkg['company_support']) ?></li>
-                        <?php endif; ?>
-                        <?php if (!empty($pkg['sales_team_support'])): ?>
-                            <li><span class="feature-icon"><i class="fas fa-users"></i></span> <?= htmlspecialchars($pkg['sales_team_support']) ?></li>
-                        <?php endif; ?>
-                        <?php if (!empty($pkg['self_refer_incentive'])): ?>
-                            <li><span class="feature-icon"><i class="fas fa-coins"></i></span> Self Refer: <?= htmlspecialchars($pkg['self_refer_incentive']) ?></li>
-                        <?php endif; ?>
-                        <?php if (!empty($pkg['team_refer_incentive'])): ?>
-                            <li><span class="feature-icon"><i class="fas fa-handshake"></i></span> Team Refer: <?= htmlspecialchars($pkg['team_refer_incentive']) ?></li>
-                        <?php endif; ?>
-                        <?php if (!empty($pkg['property_sale_incentive'])): ?>
-                            <li><span class="feature-icon"><i class="fas fa-percent"></i></span> Property Sale: <?= htmlspecialchars($pkg['property_sale_incentive']) ?></li>
-                        <?php endif; ?>
-                        <?php if (!empty($pkg['team_sale_incentive'])): ?>
-                            <li><span class="feature-icon"><i class="fas fa-percent"></i></span> Team Sale: <?= htmlspecialchars($pkg['team_sale_incentive']) ?></li>
-                        <?php endif; ?>
+                        <?php foreach ($fields as $field): 
+                            $value = trim($pkg[$field['key']] ?? '');
+                            if (!empty($value)):
+                        ?>
+                            <li>
+                                <span class="feature-icon"><i class="fas <?= $field['icon'] ?>"></i></span>
+                                <span class="feature-label"><?= $field['label'] ?>:</span>
+                                <span class="feature-value"><?= htmlspecialchars($value) ?></span>
+                            </li>
+                        <?php endif; endforeach; ?>
                     </ul>
 
                     <?php if ($is_active): ?>
@@ -257,7 +269,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                         <span class="badge-status pending">⏳ Pending Approval</span>
                         <button class="btn-buy" disabled>Request Pending</button>
                     <?php else: ?>
-                        <a href="buy_subscription.php?package_id=<?= $pkg['id'] ?>" class="btn-buy d-block text-center text-decoration-none">
+                        <a href="buy_subscription.php?package_id=<?= $pkg['id'] ?>" class="btn-buy">
                             <i class="fas fa-arrow-right me-1"></i> Buy Now
                         </a>
                     <?php endif; ?>
