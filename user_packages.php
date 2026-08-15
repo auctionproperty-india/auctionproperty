@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – World-Class Laravel Style (0% fix + Free Visit)
+// 📦 User Packages – 2 per Row, Color Scheme by Package Name
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -45,6 +45,38 @@ $pending_check->execute([$user_id]);
 $has_pending = $pending_check->rowCount() > 0;
 
 $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
+
+// Package color schemes
+$color_schemes = [
+    'Silver' => [
+        'border' => '#c0c0c0',
+        'bg' => '#f9f9f9',
+        'accent' => '#a8a8a8',
+        'gradient' => 'linear-gradient(135deg, #f0f0f0, #e0e0e0)',
+        'badge' => '#6b7280'
+    ],
+    'Gold' => [
+        'border' => '#fbbf24',
+        'bg' => '#fffbeb',
+        'accent' => '#f59e0b',
+        'gradient' => 'linear-gradient(135deg, #fef3c7, #fde68a)',
+        'badge' => '#d97706'
+    ],
+    'Platinum' => [
+        'border' => '#94a3b8',
+        'bg' => '#f1f5f9',
+        'accent' => '#64748b',
+        'gradient' => 'linear-gradient(135deg, #e2e8f0, #cbd5e1)',
+        'badge' => '#475569'
+    ],
+    'Diamond' => [
+        'border' => '#3b82f6',
+        'bg' => '#eff6ff',
+        'accent' => '#2563eb',
+        'gradient' => 'linear-gradient(135deg, #dbeafe, #93c5fd)',
+        'badge' => '#1d4ed8'
+    ]
+];
 ?>
 
 <style>
@@ -53,25 +85,21 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         padding: 25px 20px 30px;
         background: #ffffff;
         transition: all 0.3s ease;
-        border: 1px solid #e9edf4;
+        border: 2px solid #e9edf4;
         height: 100%;
         position: relative;
         box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+        display: flex;
+        flex-direction: column;
     }
     .pricing-card:hover {
         transform: translateY(-6px);
         box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-        border-color: #cbd5e1;
-    }
-    .pricing-card.recommended {
-        border: 2px solid #3b82f6;
-        background: #f8faff;
     }
     .pricing-card .badge-recommended {
         position: absolute;
         top: -12px;
         right: 20px;
-        background: #3b82f6;
         color: white;
         padding: 4px 16px;
         border-radius: 30px;
@@ -80,10 +108,10 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         letter-spacing: 0.5px;
     }
     .pricing-card .package-name {
-        font-size: 1.4rem;
+        font-size: 1.6rem;
         font-weight: 700;
         color: #0f172a;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
     .pricing-card .package-duration {
         font-size: 0.85rem;
@@ -94,26 +122,26 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         margin: 12px 0 16px;
     }
     .pricing-card .price-box .regular-price {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         color: #94a3b8;
         text-decoration: line-through;
         font-weight: 500;
     }
     .pricing-card .price-box .offer-price {
-        font-size: 2.4rem;
+        font-size: 2.2rem;
         font-weight: 800;
         color: #0f172a;
         margin-left: 8px;
     }
     .pricing-card .price-box .offer-badge {
-        background: #dcfce7;
-        color: #166534;
         padding: 2px 10px;
         border-radius: 30px;
         font-size: 0.7rem;
         font-weight: 600;
         margin-left: 8px;
         display: inline-block;
+        background: #dcfce7;
+        color: #166534;
     }
     .pricing-card .features-list {
         list-style: none;
@@ -121,9 +149,10 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         margin: 16px 0 20px;
         text-align: left;
         font-size: 0.9rem;
+        flex: 1;
     }
     .pricing-card .features-list li {
-        padding: 6px 0;
+        padding: 4px 0;
         border-bottom: 1px solid #f1f5f9;
         display: flex;
         align-items: center;
@@ -141,7 +170,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
     .pricing-card .features-list .feature-label {
         font-weight: 600;
         color: #1e293b;
-        min-width: 120px;
+        min-width: 110px;
     }
     .pricing-card .features-list .feature-value {
         color: #475569;
@@ -159,9 +188,9 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         text-align: center;
         display: block;
         text-decoration: none;
+        margin-top: auto;
     }
     .pricing-card .btn-buy:hover {
-        background: #1e293b;
         transform: scale(1.02);
         color: white;
     }
@@ -180,7 +209,6 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
     }
     .badge-status.active { background: #dcfce7; color: #166534; }
     .badge-status.pending { background: #fef3c7; color: #92400e; }
-    .badge-status.inactive { background: #f1f5f9; color: #475569; }
     .section-title {
         font-size: 2rem;
         font-weight: 800;
@@ -192,6 +220,22 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
         font-size: 1.05rem;
         margin-bottom: 30px;
     }
+    /* Package specific overrides */
+    .pkg-silver .pricing-card { border-color: #c0c0c0; background: #fafafa; }
+    .pkg-silver .pricing-card .package-name { color: #4b5563; }
+    .pkg-silver .badge-recommended { background: #6b7280; }
+
+    .pkg-gold .pricing-card { border-color: #fbbf24; background: #fffbeb; }
+    .pkg-gold .pricing-card .package-name { color: #92400e; }
+    .pkg-gold .badge-recommended { background: #d97706; }
+
+    .pkg-platinum .pricing-card { border-color: #94a3b8; background: #f1f5f9; }
+    .pkg-platinum .pricing-card .package-name { color: #334155; }
+    .pkg-platinum .badge-recommended { background: #475569; }
+
+    .pkg-diamond .pricing-card { border-color: #3b82f6; background: #eff6ff; }
+    .pkg-diamond .pricing-card .package-name { color: #1e3a8a; }
+    .pkg-diamond .badge-recommended { background: #2563eb; }
 </style>
 
 <div class="container-fluid py-4">
@@ -214,10 +258,17 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
             $discount_price = $pkg['discount_price'] ?? null;
             $regular_price = $pkg['price'];
             $show_discount = $discount_price && $discount_price < $regular_price;
-            $col_size = $count == 4 ? 'col-lg-3' : ($count == 3 ? 'col-lg-4' : 'col-lg-4');
+            $col_size = 'col-lg-6 col-md-6'; // 2 per row
             $is_recommended = ($index == 1 && $count > 2);
 
-            // Define all fields with labels, icons, and database columns
+            // Package specific CSS class
+            $pkg_class = 'pkg-' . strtolower($pkg['name']);
+            // fallback
+            if (!in_array($pkg['name'], ['Silver','Gold','Platinum','Diamond'])) {
+                $pkg_class = 'pkg-silver';
+            }
+
+            // Fields with labels, icons, and keys
             $fields = [
                 ['label' => 'Validity', 'icon' => 'fa-clock', 'key' => 'validity'],
                 ['label' => 'Property Search', 'icon' => 'fa-search', 'key' => 'property_search'],
@@ -227,10 +278,10 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                 ['label' => 'Team Refer Incentive', 'icon' => 'fa-handshake', 'key' => 'team_refer_incentive'],
                 ['label' => 'Property Sale Incentive', 'icon' => 'fa-percent', 'key' => 'property_sale_incentive'],
                 ['label' => 'Team Sale Incentive', 'icon' => 'fa-percent', 'key' => 'team_sale_incentive'],
-                ['label' => 'Free Property Visit', 'icon' => 'fa-building', 'key' => 'free_property_visit'] // नया
+                ['label' => 'Free Property Visit', 'icon' => 'fa-building', 'key' => 'free_property_visit']
             ];
         ?>
-            <div class="<?= $col_size ?> col-md-6 mb-4">
+            <div class="<?= $col_size ?> mb-4 <?= $pkg_class ?>">
                 <div class="pricing-card <?= $is_recommended ? 'recommended' : '' ?> <?= $is_active ? 'border border-success' : '' ?>">
                     <?php if ($is_recommended): ?>
                         <span class="badge-recommended">⭐ Recommended</span>
@@ -249,11 +300,9 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                         <?php endif; ?>
                     </div>
 
-                    <!-- Features with Labels – now includes 0% and empty check fixed -->
                     <ul class="features-list">
                         <?php foreach ($fields as $field): 
                             $value = trim($pkg[$field['key']] ?? '');
-                            // Show if value is not empty string or null (treat "0" as valid)
                             if ($value !== '' && $value !== null):
                         ?>
                             <li>
