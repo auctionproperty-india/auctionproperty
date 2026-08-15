@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 User Packages – World-Class Laravel Style (with Labels)
+// 📦 User Packages – World-Class Laravel Style (0% fix + Free Visit)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -217,7 +217,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
             $col_size = $count == 4 ? 'col-lg-3' : ($count == 3 ? 'col-lg-4' : 'col-lg-4');
             $is_recommended = ($index == 1 && $count > 2);
 
-            // Define all fields with their labels, icons, and database columns
+            // Define all fields with labels, icons, and database columns
             $fields = [
                 ['label' => 'Validity', 'icon' => 'fa-clock', 'key' => 'validity'],
                 ['label' => 'Property Search', 'icon' => 'fa-search', 'key' => 'property_search'],
@@ -226,7 +226,8 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                 ['label' => 'Self Refer Incentive', 'icon' => 'fa-coins', 'key' => 'self_refer_incentive'],
                 ['label' => 'Team Refer Incentive', 'icon' => 'fa-handshake', 'key' => 'team_refer_incentive'],
                 ['label' => 'Property Sale Incentive', 'icon' => 'fa-percent', 'key' => 'property_sale_incentive'],
-                ['label' => 'Team Sale Incentive', 'icon' => 'fa-percent', 'key' => 'team_sale_incentive']
+                ['label' => 'Team Sale Incentive', 'icon' => 'fa-percent', 'key' => 'team_sale_incentive'],
+                ['label' => 'Free Property Visit', 'icon' => 'fa-building', 'key' => 'free_property_visit'] // नया
             ];
         ?>
             <div class="<?= $col_size ?> col-md-6 mb-4">
@@ -248,11 +249,12 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetc
                         <?php endif; ?>
                     </div>
 
-                    <!-- Features with Labels -->
+                    <!-- Features with Labels – now includes 0% and empty check fixed -->
                     <ul class="features-list">
                         <?php foreach ($fields as $field): 
                             $value = trim($pkg[$field['key']] ?? '');
-                            if (!empty($value)):
+                            // Show if value is not empty string or null (treat "0" as valid)
+                            if ($value !== '' && $value !== null):
                         ?>
                             <li>
                                 <span class="feature-icon"><i class="fas <?= $field['icon'] ?>"></i></span>
