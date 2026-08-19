@@ -1,5 +1,4 @@
 <?php
-// session_start(); // ← इस line को **DELETE** करें या comment करें
 require_once 'db.php'; // ← db.php already starts session
 <?php
 // ============================================================
