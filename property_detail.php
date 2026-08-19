@@ -71,7 +71,18 @@ if(!$has_subscription && $source == 'auction') {
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fce4ec; border-left: 5px solid #ef5350;">
                                     <small class="text-muted text-uppercase fw-bold">📅 Auction Date</small>
-                                    <h6 class="fw-bold mb-0"><?= !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A' ?></h6>
+                                    <h6 class="fw-bold mb-0">
+                                        <?php 
+                                        // 🔥 Private Treaty Check
+                                        if (!empty($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty') {
+                                            echo '🔑 Private Treaty';
+                                        } elseif (!empty($prop['auction_date'])) {
+                                            echo date('d M Y', strtotime($prop['auction_date']));
+                                        } else {
+                                            echo 'N/A';
+                                        }
+                                        ?>
+                                    </h6>
                                 </div>
                             </div>
                         </div>
@@ -218,6 +229,25 @@ if($source == 'auction') {
                             </div>
                         </div>
                         <?php endif; ?>
+
+                        <!-- Auction Date / Private Treaty -->
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4 text-center" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3);">
+                                <small class="text-uppercase opacity-75">📅 Auction Date</small>
+                                <h4 class="fw-bold" style="color:#fbbf24;">
+                                    <?php 
+                                    // 🔥 Private Treaty Check
+                                    if (!empty($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty') {
+                                        echo '🔑 Private Treaty';
+                                    } elseif (!empty($prop['auction_date'])) {
+                                        echo date('d M Y', strtotime($prop['auction_date']));
+                                    } else {
+                                        echo 'N/A';
+                                    }
+                                    ?>
+                                </h4>
+                            </div>
+                        </div>
 
                         <!-- Contact -->
                         <div class="col-md-6">
