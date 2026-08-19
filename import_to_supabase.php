@@ -22,7 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         echo "<p style='color:green;'>✅ Connected to Supabase!</p>";
         
-        // MySQL → PostgreSQL conversions
+        // ============================================================
+        // 1. MySQL → PostgreSQL conversions
+        // ============================================================
         $sql = str_replace('`', '"', $sql);
         $sql = str_replace('\\', '', $sql);
         $sql = preg_replace('/ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;/i', '', $sql);
@@ -34,16 +36,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
         $sql = preg_replace("/\r\n/", "\n", $sql);
         $sql = str_replace("''", 'NULL', $sql);
         
-        // ✅ FIX: Remove NOT NULL constraint from sessions.data column
-        $sql = str_replace('data TEXT NOT NULL', 'data TEXT', $sql);
+        // ============================================================
+        // 2. 🔥 FIX: Remove NOT NULL constraint from sessions.data
+        //    (Any spacing/case variation)
+        // ============================================================
+        $sql = preg_replace('/data\s+TEXT\s+NOT\s+NULL/i', 'data TEXT', $sql);
+        $sql = preg_replace('/"data"\s+TEXT\s+NOT\s+NULL/i', '"data" TEXT', $sql);
+        $sql = preg_replace('/data\s+text\s+not\s+null/i', 'data TEXT', $sql);
         
-        // Drop existing tables (clean slate)
+        // Also, if sessions table already exists, drop it first
+        $sql = "DROP TABLE IF EXISTS sessions CASCADE;\n" . $sql;
+        
+        // ============================================================
+        // 3. Drop other tables (clean slate)
+        // ============================================================
         $drop_tables = ['users', 'properties', 'packages', 'settings', 'navigation_items'];
         foreach ($drop_tables as $t) {
             try { $pdo->exec("DROP TABLE IF EXISTS $t CASCADE"); } catch (Exception $e) {}
         }
         
-        // Execute as a single transaction
+        // ============================================================
+        // 4. Execute as a single transaction
+        // ============================================================
         $pdo->beginTransaction();
         try {
             $pdo->exec($sql);
@@ -54,7 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
             echo "<p style='color:red;'>❌ Import failed: " . $e->getMessage() . "</p>";
         }
         
-        // Summary
+        // ============================================================
+        // 5. Summary
+        // ============================================================
         $tables = ['users','properties','packages','settings','navigation_items'];
         echo "<h2>📊 Database Summary</h2><table border='1'><tr><th>Table</th><th>Rows</th></tr>";
         foreach ($tables as $t) {
