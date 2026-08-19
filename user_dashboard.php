@@ -53,11 +53,23 @@ for ($slot = 1; $slot <= 3; $slot++) {
 $current_slot = getCurrentSlot();
 $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
 
-// ---- 🔥 FIX: Today's Auctions = Today's Date + Private Treaty (Any City) ----
-$today_sql = "SELECT * FROM properties WHERE status = 'available' AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC LIMIT 6";
-$today_stmt = $pdo->prepare($today_sql);
-$today_stmt->execute();
-$today_props = $today_stmt->fetchAll();
+// ============================================================
+// 🔥 FIX: Today's Auctions = User City + Private Treaty (Any City)
+// ============================================================
+// Query 1: Properties in user's city with today's date
+$city_sql = "SELECT * FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date = CURRENT_DATE ORDER BY id DESC";
+$city_stmt = $pdo->prepare($city_sql);
+$city_stmt->execute(['%' . $user_city . '%']);
+$city_props = $city_stmt->fetchAll();
+
+// Query 2: Private Treaty properties (any city)
+$pt_sql = "SELECT * FROM properties WHERE status = 'available' AND auction_start_time = 'Private Treaty' ORDER BY id DESC";
+$pt_stmt = $pdo->prepare($pt_sql);
+$pt_stmt->execute();
+$pt_props = $pt_stmt->fetchAll();
+
+// Merge both arrays
+$today_props = array_merge($city_props, $pt_props);
 
 // ---- Best Deals (based on city) ----
 $best_sql = "SELECT * FROM properties WHERE status = 'available'";
@@ -89,7 +101,7 @@ function renderDashboardCard($prop, $show_images = false, $is_today = false) {
     $border = ($g['text'] == 'white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
     $image_url = $prop['image_url'] ?? '';
     
-    // 🔥 Check if Private Treaty
+    // Check if Private Treaty
     $is_private_treaty = isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty';
     ?>
     <div class="col-md-4 mb-4">
@@ -381,7 +393,9 @@ include 'header.php';
         <?php endif; ?>
     </div>
 
-    <!-- ====== TODAY'S AUCTIONS (Includes Private Treaty) ====== -->
+    <!-- ============================================================
+    🔥 TODAY'S AUCTIONS – User City + Private Treaty (All, No Limit)
+    ============================================================ -->
     <?php 
     // Count Private Treaty properties in today's auctions
     $pt_count = 0;
