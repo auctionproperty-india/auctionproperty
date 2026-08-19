@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// db.php – Database connection with Session Handler (Safe)
+// db.php – Database connection + File-based Sessions
 // ============================================================
 
 // ============================================================
@@ -12,7 +12,6 @@ $dbname = getenv('DB_NAME') ?: 'postgres';
 $user = getenv('DB_USER') ?: 'postgres';
 $password = getenv('DB_PASSWORD') ?: '';
 
-// If individual vars are missing, fall back to DATABASE_URL
 $database_url = getenv('DATABASE_URL');
 if ($database_url && (!$host || $host === 'localhost')) {
     $parts = parse_url($database_url);
@@ -41,32 +40,25 @@ try {
 }
 
 // ============================================================
-// 4. Session Handler (Database-based) - WITH SAFE FALLBACK
+// 4. Session Handling – File-based with /tmp
 // ============================================================
-try {
-    require_once __DIR__ . '/session_handler.php';
-    $handler = new DatabaseSessionHandler($pdo);
-    
-    if (session_status() == PHP_SESSION_NONE) {
-        session_set_save_handler($handler, true);
-        session_set_cookie_params([
-            'lifetime' => 60 * 60 * 24 * 30,
-            'path' => '/',
-            'domain' => '',
-            'secure' => false,
-            'httponly' => true,
-            'samesite' => 'Lax'
-        ]);
-        session_start();
-    }
-} catch (Exception $e) {
-    // Fallback: Agar database session fail ho, toh file-based session use karein
-    if (session_status() == PHP_SESSION_NONE) {
-        session_start();
-    }
+// Ensure session save path is writable
+ini_set('session.save_path', '/tmp');
+ini_set('session.gc_maxlifetime', 86400); // 24 hours
+
+if (session_status() == PHP_SESSION_NONE) {
+    session_set_cookie_params([
+        'lifetime' => 86400 * 30,
+        'path' => '/',
+        'domain' => '',
+        'secure' => false,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    session_start();
 }
 
 // ============================================================
-// 5. $pdo is now globally available
+// 5. $pdo is globally available
 // ============================================================
 ?>
