@@ -53,8 +53,8 @@ for ($slot = 1; $slot <= 3; $slot++) {
 $current_slot = getCurrentSlot();
 $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
 
-// ---- Today's Auctions ----
-$today_sql = "SELECT * FROM properties WHERE status = 'available' AND auction_date = CURRENT_DATE ORDER BY id DESC LIMIT 6";
+// ---- 🔥 FIX: Today's Auctions = Today's Date + Private Treaty (Any City) ----
+$today_sql = "SELECT * FROM properties WHERE status = 'available' AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC LIMIT 6";
 $today_stmt = $pdo->prepare($today_sql);
 $today_stmt->execute();
 $today_props = $today_stmt->fetchAll();
@@ -88,13 +88,21 @@ function renderDashboardCard($prop, $show_images = false, $is_today = false) {
     $shadow = ($g['text'] == 'white') ? '0 15px 40px -10px rgba(0,0,0,0.3)' : '0 15px 40px -10px rgba(0,0,0,0.1)';
     $border = ($g['text'] == 'white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
     $image_url = $prop['image_url'] ?? '';
+    
+    // 🔥 Check if Private Treaty
+    $is_private_treaty = isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty';
     ?>
     <div class="col-md-4 mb-4">
-        <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:<?= $shadow ?>; transition:all 0.4s; background: <?= $g['bg'] ?>; color:<?= $text_color ?>;">
+        <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:<?= $shadow ?>; transition:all 0.4s; background: <?= $g['bg'] ?>; color:<?= $text_color ?>; position:relative;">
+            <?php if($is_private_treaty): ?>
+                <div style="position:absolute; top:15px; right:15px; z-index:10; background:#f59e0b; color:#000; padding:4px 14px; border-radius:30px; font-size:0.7rem; font-weight:700;">
+                    🔑 Private Treaty
+                </div>
+            <?php endif; ?>
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center">
                     <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
-                    <?php if(!empty($prop['auction_start_time'])): ?>
+                    <?php if(!empty($prop['auction_start_time']) && $prop['auction_start_time'] != 'Private Treaty'): ?>
                         <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                     <?php endif; ?>
                 </div>
@@ -373,16 +381,32 @@ include 'header.php';
         <?php endif; ?>
     </div>
 
-    <!-- Today's Auctions -->
+    <!-- ====== TODAY'S AUCTIONS (Includes Private Treaty) ====== -->
+    <?php 
+    // Count Private Treaty properties in today's auctions
+    $pt_count = 0;
+    foreach($today_props as $p) {
+        if(isset($p['auction_start_time']) && $p['auction_start_time'] == 'Private Treaty') $pt_count++;
+    }
+    ?>
+    <div class="section-title">
+        <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
+        <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
+        <?php if($pt_count > 0): ?>
+            <span class="badge bg-warning text-dark rounded-pill ms-2">🔑 <?= $pt_count ?> Private Treaty</span>
+        <?php endif; ?>
+    </div>
     <?php if (count($today_props) > 0): ?>
-        <div class="section-title">
-            <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
-            <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
-        </div>
         <div class="row">
             <?php foreach ($today_props as $prop): ?>
                 <?php renderDashboardCard($prop, false, true); ?>
             <?php endforeach; ?>
+        </div>
+        <hr class="my-4">
+    <?php else: ?>
+        <div class="no-auction-msg">
+            <i class="fas fa-calendar-day"></i>
+            <p class="mt-2 fw-bold">📭 No auction today</p>
         </div>
         <hr class="my-4">
     <?php endif; ?>
