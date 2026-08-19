@@ -1,12 +1,10 @@
 <?php
-require_once 'db.php'; // ← db.php already starts session
-<?php
 // ============================================================
 // 🏠 Home Page – Updated with safeDateFormat for Customer Properties
 // ============================================================
 
+require_once __DIR__ . '/db.php'; // ← db.php already starts session
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
 // ---- Safe Date Formatter ----
@@ -96,7 +94,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                     <?php if($prop['source'] == 'auction' && !empty($prop['auction_start_time'])): ?>
                         <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                     <?php elseif($prop['source'] == 'customer'): ?>
-                        <!-- ✅ Use safeDateFormat for customer property created_at -->
                         <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;">📅 <?= safeDateFormat($prop['created_at']) ?></span>
                     <?php endif; ?>
                 </div>
