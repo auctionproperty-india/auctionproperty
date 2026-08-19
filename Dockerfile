@@ -1,5 +1,5 @@
 # ============================================================
-# Dockerfile for PHP with PostgreSQL on Render
+# 🐳 Dockerfile for PHP with PostgreSQL on Render
 # ============================================================
 
 # Use official PHP 8.2 with Apache
@@ -8,7 +8,7 @@ FROM php:8.2-apache
 # Install system dependencies and PostgreSQL extensions
 RUN apt-get update && apt-get install -y \
     libpq-dev \
-    && docker-php-ext-install pdo_pgsql pgsql
+    && docker-php-ext-install pdo pdo_pgsql pgsql
 
 # Enable Apache mod_rewrite (for clean URLs)
 RUN a2enmod rewrite
@@ -20,13 +20,13 @@ WORKDIR /var/www/html
 COPY . /var/www/html/
 
 # ============================================================
-# ✅ DATABASE ENVIRONMENT VARIABLES (Naye Database Ke Hisaab Se)
+# ✅ DATABASE ENVIRONMENT VARIABLES (Supabase Connection)
 # ============================================================
-ENV DB_HOST=dpg-d9eq9brtqb8s73b0gg50-a.oregon-postgres.render.com
-ENV DB_PORT=5432
-ENV DB_NAME=primepropertyindia_szhn
-ENV DB_USER=primepropertyindia
-ENV DB_PASSWORD=ETtD85WmJ98kuNa42fHVIsU4dbnbcXqm
+ENV DB_HOST=aws-0-ap-northeast-2.pooler.supabase.com
+ENV DB_PORT=6543
+ENV DB_NAME=postgres
+ENV DB_USER=postgres.bqspzgwpqimjyhispwtp
+ENV DB_PASSWORD=Dugguai@123
 ENV APP_ENV=production
 
 # ============================================================
