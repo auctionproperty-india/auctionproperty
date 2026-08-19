@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         echo "<p style='color:green;'>✅ Connected to Supabase!</p>";
         
-        // Convert MySQL to PostgreSQL
+        // MySQL → PostgreSQL conversions
         $sql = str_replace('`', '"', $sql);
         $sql = str_replace('\\', '', $sql);
         $sql = preg_replace('/ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;/i', '', $sql);
@@ -33,7 +33,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
         $sql = preg_replace('/TINYINT\(1\)/i', 'BOOLEAN', $sql);
         $sql = preg_replace("/\r\n/", "\n", $sql);
         
-        // पुरानी tables को हटाएँ (clean slate)
+        // ✅ FIX: Replace empty strings with NULL (for boolean columns)
+        $sql = str_replace("''", 'NULL', $sql);
+        
+        // Drop existing tables (clean slate)
         $drop_tables = ['users', 'properties', 'packages', 'settings', 'navigation_items'];
         foreach ($drop_tables as $t) {
             try { $pdo->exec("DROP TABLE IF EXISTS $t CASCADE"); } catch (Exception $e) {}
