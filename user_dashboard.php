@@ -56,11 +56,21 @@ $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
 // ============================================================
 // 🔥 FIX: Today's Auctions = User City + Private Treaty (Any City)
 // ============================================================
-// Query 1: Properties in user's city with today's date
-$city_sql = "SELECT * FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date = CURRENT_DATE ORDER BY id DESC";
-$city_stmt = $pdo->prepare($city_sql);
-$city_stmt->execute(['%' . $user_city . '%']);
-$city_props = $city_stmt->fetchAll();
+
+// Query 1: Properties in user's city with today's date (if city exists)
+if (empty($user_city)) {
+    // No city set → show all today's auctions (any city)
+    $city_sql = "SELECT * FROM properties WHERE status = 'available' AND auction_date = CURRENT_DATE ORDER BY id DESC";
+    $city_stmt = $pdo->prepare($city_sql);
+    $city_stmt->execute();
+    $city_props = $city_stmt->fetchAll();
+} else {
+    // City set → show only user city today's auctions
+    $city_sql = "SELECT * FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date = CURRENT_DATE ORDER BY id DESC";
+    $city_stmt = $pdo->prepare($city_sql);
+    $city_stmt->execute(['%' . $user_city . '%']);
+    $city_props = $city_stmt->fetchAll();
+}
 
 // Query 2: Private Treaty properties (any city)
 $pt_sql = "SELECT * FROM properties WHERE status = 'available' AND auction_start_time = 'Private Treaty' ORDER BY id DESC";
