@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// db.php – Database connection with Session Handler
+// db.php – Database connection with Session Handler (Safe)
 // ============================================================
 
 // ============================================================
@@ -41,41 +41,32 @@ try {
 }
 
 // ============================================================
-// 4. Sessions Table (if not exists)
+// 4. Session Handler (Database-based) - WITH SAFE FALLBACK
 // ============================================================
 try {
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS sessions (
-            id VARCHAR(128) NOT NULL PRIMARY KEY,
-            data TEXT NOT NULL,
-            access TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    ");
-} catch (PDOException $e) {
-    // Table might already exist, ignore error
+    require_once __DIR__ . '/session_handler.php';
+    $handler = new DatabaseSessionHandler($pdo);
+    
+    if (session_status() == PHP_SESSION_NONE) {
+        session_set_save_handler($handler, true);
+        session_set_cookie_params([
+            'lifetime' => 60 * 60 * 24 * 30,
+            'path' => '/',
+            'domain' => '',
+            'secure' => false,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+        session_start();
+    }
+} catch (Exception $e) {
+    // Fallback: Agar database session fail ho, toh file-based session use karein
+    if (session_status() == PHP_SESSION_NONE) {
+        session_start();
+    }
 }
 
 // ============================================================
-// 5. Session Handler (Database-based)
-// ============================================================
-require_once __DIR__ . '/session_handler.php';
-
-$handler = new DatabaseSessionHandler($pdo);
-
-if (session_status() == PHP_SESSION_NONE) {
-    session_set_save_handler($handler, true);
-    session_set_cookie_params([
-        'lifetime' => 60 * 60 * 24 * 30, // 30 days
-        'path' => '/',
-        'domain' => '',
-        'secure' => false,
-        'httponly' => true,
-        'samesite' => 'Lax'
-    ]);
-    session_start();
-}
-
-// ============================================================
-// 6. $pdo is now globally available
+// 5. $pdo is now globally available
 // ============================================================
 ?>
