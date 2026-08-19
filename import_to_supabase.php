@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
     if ($file['error'] !== UPLOAD_ERR_OK) {
         die("❌ Upload error");
     }
-    $sql_content = file_get_contents($file['tmp_name']);
+    $sql = file_get_contents($file['tmp_name']);
     $size = round(filesize($file['tmp_name']) / 1024 / 1024, 2);
     echo "<p>File: " . $file['name'] . " ($size MB)</p>";
     
@@ -22,33 +22,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         echo "<p style='color:green;'>✅ Connected to Supabase!</p>";
         
-        // Convert MySQL to PostgreSQL (if needed)
-        $sql_content = str_replace('`', '"', $sql_content);
-        $sql_content = preg_replace('/ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;/i', '', $sql_content);
-        $sql_content = preg_replace('/SET FOREIGN_KEY_CHECKS = 0;/i', '', $sql_content);
-        $sql_content = preg_replace('/SET FOREIGN_KEY_CHECKS = 1;/i', '', $sql_content);
-        $sql_content = preg_replace('/AUTO_INCREMENT/i', 'SERIAL', $sql_content);
-        $sql_content = preg_replace('/INT PRIMARY KEY AUTO_INCREMENT/i', 'SERIAL PRIMARY KEY', $sql_content);
-        $sql_content = preg_replace('/TINYINT\(1\)/i', 'BOOLEAN', $sql_content);
+        // Convert MySQL to PostgreSQL
+        $sql = str_replace('`', '"', $sql);
+        $sql = str_replace('\\', '', $sql);
+        $sql = preg_replace('/ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;/i', '', $sql);
+        $sql = preg_replace('/SET FOREIGN_KEY_CHECKS = 0;/i', '', $sql);
+        $sql = preg_replace('/SET FOREIGN_KEY_CHECKS = 1;/i', '', $sql);
+        $sql = preg_replace('/AUTO_INCREMENT/i', 'SERIAL', $sql);
+        $sql = preg_replace('/INT PRIMARY KEY AUTO_INCREMENT/i', 'SERIAL PRIMARY KEY', $sql);
+        $sql = preg_replace('/TINYINT\(1\)/i', 'BOOLEAN', $sql);
+        $sql = preg_replace("/\r\n/", "\n", $sql);
         
-        $statements = preg_split("/;(?=(?:[^']*'[^']*')*[^']*$)/", $sql_content);
-        $success = $failed = 0;
-        foreach ($statements as $stmt) {
-            $stmt = trim($stmt);
-            if (empty($stmt)) continue;
-            if (preg_match('/^DROP TABLE/i', $stmt)) continue;
-            try {
-                $pdo->exec($stmt);
-                $success++;
-            } catch (PDOException $e) {
-                if (strpos($e->getMessage(), 'already exists') === false &&
-                    strpos($e->getMessage(), 'duplicate key') === false) {
-                    $failed++;
-                    if ($failed <= 5) echo "<p style='color:red;'>❌ " . substr($e->getMessage(), 0, 150) . "</p>";
-                }
-            }
+        // पुरानी tables को हटाएँ (clean slate)
+        $drop_tables = ['users', 'properties', 'packages', 'settings', 'navigation_items'];
+        foreach ($drop_tables as $t) {
+            try { $pdo->exec("DROP TABLE IF EXISTS $t CASCADE"); } catch (Exception $e) {}
         }
-        echo "<p style='color:green;'>✅ Imported: $success successful, $failed failed</p>";
+        
+        // Execute as a single transaction
+        $pdo->beginTransaction();
+        try {
+            $pdo->exec($sql);
+            $pdo->commit();
+            echo "<p style='color:green;'>✅ Import completed successfully!</p>";
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            echo "<p style='color:red;'>❌ Import failed: " . $e->getMessage() . "</p>";
+        }
         
         // Summary
         $tables = ['users','properties','packages','settings','navigation_items'];
@@ -63,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
         }
         echo "</table>";
         echo "<p><a href='/'>🔗 Open Website</a></p>";
+        
     } catch (PDOException $e) {
         echo "<p style='color:red;'>❌ Connection failed: " . $e->getMessage() . "</p>";
     }
