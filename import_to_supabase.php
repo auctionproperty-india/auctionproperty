@@ -32,9 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
         $sql = preg_replace('/INT PRIMARY KEY AUTO_INCREMENT/i', 'SERIAL PRIMARY KEY', $sql);
         $sql = preg_replace('/TINYINT\(1\)/i', 'BOOLEAN', $sql);
         $sql = preg_replace("/\r\n/", "\n", $sql);
-        
-        // ✅ FIX: Replace empty strings with NULL (for boolean columns)
         $sql = str_replace("''", 'NULL', $sql);
+        
+        // ✅ FIX: Remove NOT NULL constraint from sessions.data column
+        $sql = str_replace('data TEXT NOT NULL', 'data TEXT', $sql);
         
         // Drop existing tables (clean slate)
         $drop_tables = ['users', 'properties', 'packages', 'settings', 'navigation_items'];
