@@ -1,9 +1,11 @@
 <?php
 // ============================================================
-// db.php – Database connection for Render + Supabase
+// db.php – Database connection with Session Handler
 // ============================================================
 
-// Read environment variables
+// ============================================================
+// 1. Read Environment Variables
+// ============================================================
 $host = getenv('DB_HOST') ?: 'localhost';
 $port = getenv('DB_PORT') ?: '5432';
 $dbname = getenv('DB_NAME') ?: 'postgres';
@@ -21,23 +23,59 @@ if ($database_url && (!$host || $host === 'localhost')) {
     $password = $parts['pass'];
 }
 
-// Set timezone (optional)
+// ============================================================
+// 2. Set Timezone
+// ============================================================
 date_default_timezone_set('Asia/Kolkata');
 
+// ============================================================
+// 3. Database Connection
+// ============================================================
 try {
-    // Build DSN
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
     $pdo = new PDO($dsn, $user, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-
-    // Optional: create sessions table if not exists (if your app needs it)
-    // But your backup already creates it – so we skip.
-
 } catch (PDOException $e) {
-    // Log error and stop execution (or show friendly message)
     die("❌ Database Connection Failed: " . $e->getMessage());
 }
 
-// Now $pdo is defined globally – all files that include db.php can use it.
+// ============================================================
+// 4. Sessions Table (if not exists)
+// ============================================================
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS sessions (
+            id VARCHAR(128) NOT NULL PRIMARY KEY,
+            data TEXT NOT NULL,
+            access TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+} catch (PDOException $e) {
+    // Table might already exist, ignore error
+}
+
+// ============================================================
+// 5. Session Handler (Database-based)
+// ============================================================
+require_once __DIR__ . '/session_handler.php';
+
+$handler = new DatabaseSessionHandler($pdo);
+
+if (session_status() == PHP_SESSION_NONE) {
+    session_set_save_handler($handler, true);
+    session_set_cookie_params([
+        'lifetime' => 60 * 60 * 24 * 30, // 30 days
+        'path' => '/',
+        'domain' => '',
+        'secure' => false,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    session_start();
+}
+
+// ============================================================
+// 6. $pdo is now globally available
+// ============================================================
 ?>
