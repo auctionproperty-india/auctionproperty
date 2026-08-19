@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🏠 Home Page – Updated with safeDateFormat for Customer Properties
+// 🏠 Home Page – Updated with Private Treaty Support
 // ============================================================
 
 require_once __DIR__ . '/db.php'; // ← db.php already starts session
@@ -48,12 +48,14 @@ if(!empty($where_clause)) {
     $base_sql .= " AND " . $where_clause;
 }
 
-$today_sql = $base_sql . " AND auction_date = CURRENT_DATE ORDER BY id DESC";
+// 🔥 FIX: Today's Auctions = Private Treaty + Today's Date
+$today_sql = $base_sql . " AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC";
 $today_stmt = $pdo->prepare($today_sql);
 $today_stmt->execute($params);
 $today_props = $today_stmt->fetchAll();
 
-$upcoming_sql = $base_sql . " AND (auction_date != CURRENT_DATE OR auction_date IS NULL) ORDER BY id DESC";
+// 🔥 FIX: Upcoming Auctions = Exclude Private Treaty and Today's Date
+$upcoming_sql = $base_sql . " AND (auction_date != CURRENT_DATE OR auction_date IS NULL) AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC";
 $upcoming_stmt = $pdo->prepare($upcoming_sql);
 $upcoming_stmt->execute($params);
 $upcoming_props = $upcoming_stmt->fetchAll();
@@ -85,13 +87,21 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     $shadow = ($g['text'] == 'white') ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.05)';
     $border = ($g['text'] == 'white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
     $image_url = ($prop['source'] == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image_url'] ?? '');
+    
+    // 🔥 FIX: Check if Private Treaty
+    $is_private_treaty = ($prop['source'] == 'auction' && isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty');
     ?>
     <div class="col-md-4 mb-4">
         <div class="property-card" style="position:relative; border-radius:24px; overflow:hidden; box-shadow:<?= $shadow ?>; height:100%; background: <?= $g['bg'] ?>; color:<?= $text_color ?>; transition:all 0.4s; border:1px solid <?= $border ?>;">
+            <?php if($is_private_treaty): ?>
+                <div style="position:absolute; top:15px; right:15px; z-index:10; background:#f59e0b; color:#000; padding:4px 14px; border-radius:30px; font-size:0.7rem; font-weight:700;">
+                    🔑 Private Treaty
+                </div>
+            <?php endif; ?>
             <div class="p-4">
                 <div class="d-flex justify-content-between align-items-center">
                     <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? ($prop['source']=='customer' ? 'Customer' : 'Bank')) ?></span>
-                    <?php if($prop['source'] == 'auction' && !empty($prop['auction_start_time'])): ?>
+                    <?php if($prop['source'] == 'auction' && !empty($prop['auction_start_time']) && $prop['auction_start_time'] != 'Private Treaty'): ?>
                         <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
                     <?php elseif($prop['source'] == 'customer'): ?>
                         <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;">📅 <?= safeDateFormat($prop['created_at']) ?></span>
@@ -195,6 +205,15 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
             <div class="section-title">
                 <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
                 <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
+                <?php
+                // Count Private Treaty in today's auctions
+                $pt_count = 0;
+                foreach($today_props as $p) {
+                    if(isset($p['auction_start_time']) && $p['auction_start_time'] == 'Private Treaty') $pt_count++;
+                }
+                if($pt_count > 0): ?>
+                    <span class="badge bg-warning text-dark rounded-pill ms-2">🔑 <?= $pt_count ?> Private Treaty</span>
+                <?php endif; ?>
             </div>
             <?php if(count($today_props) > 0): ?>
                 <div class="row"><?php foreach($today_props as $prop) renderPropertyCard($prop, $show_images, true); ?></div>
