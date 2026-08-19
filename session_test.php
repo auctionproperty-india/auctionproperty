@@ -1,7 +1,5 @@
 <?php
-session_start();
-echo "Session ID: " . session_id() . "<br>";
+require_once 'db.php';
 $_SESSION['test'] = 'working';
-echo "Test session set: " . $_SESSION['test'] . "<br>";
-echo "<a href='session_test_check.php'>Check session on next page</a>";
+echo "Session set. <a href='test.php'>Check</a>";
 ?>
