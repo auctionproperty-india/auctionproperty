@@ -1,209 +1,313 @@
-<?php 
+<?php
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { 
-    header("Location: dashboard.php"); 
-    exit; 
+// Check if logged in and is admin
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['role'] != 'sub_admin')) {
+    header("Location: login.php");
+    exit;
 }
 
-if(!hasViewPermission('properties', $pdo)) {
-    die("<div class='alert alert-danger m-5'>❌ You do not have permission to view this page.</div>");
-}
+$user_id = $_SESSION['user_id'];
+$is_admin = ($_SESSION['role'] == 'admin' || $_SESSION['role'] == 'sub_admin');
 
-$default_contact = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='default_contact'")->fetchColumn();
-if(!$default_contact) $default_contact = '9238215516';
+// ---- Get filters ----
+$city_filter = $_GET['city'] ?? '';
+$bank_filter = $_GET['bank'] ?? '';
+$min_price = $_GET['min_price'] ?? '';
+$max_price = $_GET['max_price'] ?? '';
 
-// FILTERS
-$filter_city = $_GET['filter_city'] ?? '';
-$filter_bank = $_GET['filter_bank'] ?? '';
-$filter_price_min = $_GET['filter_price_min'] ?? '';
-$filter_price_max = $_GET['filter_price_max'] ?? '';
-
-$where = [];
+// ---- Build WHERE clause ----
+$where = "1=1";
 $params = [];
-if(!empty($filter_city)) { $where[] = "city ILIKE ?"; $params[] = '%'.$filter_city.'%'; }
-if(!empty($filter_bank)) { $where[] = "bank_name ILIKE ?"; $params[] = '%'.$filter_bank.'%'; }
-if(!empty($filter_price_min)) { $where[] = "price >= ?"; $params[] = (float)$filter_price_min; }
-if(!empty($filter_price_max)) { $where[] = "price <= ?"; $params[] = (float)$filter_price_max; }
 
-$where_clause = count($where) > 0 ? "WHERE " . implode(" AND ", $where) : "";
+if (!empty($city_filter)) {
+    $where .= " AND city ILIKE ?";
+    $params[] = '%' . $city_filter . '%';
+}
+if (!empty($bank_filter)) {
+    $where .= " AND bank_name ILIKE ?";
+    $params[] = '%' . $bank_filter . '%';
+}
+if (!empty($min_price)) {
+    $where .= " AND price >= ?";
+    $params[] = (float)$min_price;
+}
+if (!empty($max_price)) {
+    $where .= " AND price <= ?";
+    $params[] = (float)$max_price;
+}
 
-// PAGINATION
-$limit = 20;
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$offset = ($page - 1) * $limit;
-
-$count_sql = "SELECT COUNT(*) FROM properties $where_clause";
-$count_stmt = $pdo->prepare($count_sql);
-$count_stmt->execute($params);
-$total_rows = $count_stmt->fetchColumn();
-$total_pages = ceil($total_rows / $limit);
-
-$sql = "SELECT id, title, bank_name, city, price, status, auction_date FROM properties $where_clause ORDER BY id DESC LIMIT $limit OFFSET $offset";
+// ---- Get properties ----
+$sql = "SELECT * FROM properties WHERE $where ORDER BY id DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
-$rows = $stmt->fetchAll();
+$properties = $stmt->fetchAll();
 
-// ---- ADD / UPDATE LOGIC ----
-function safeNumeric($val) { if ($val === '' || $val === null) return 0; return (float) $val; }
-function safeString($val) { return trim($val ?? ''); }
+// ---- Handle Add/Edit ----
+$edit_mode = false;
+$prop = null;
 
-// UPDATE
-if(isset($_POST['update_property']) && isset($_POST['property_id'])) {
-    if(!hasEditPermission('properties', $pdo)) die("Permission denied.");
-    $id = $_POST['property_id'];
-    
-    $inspection_date_db = null;
-    if(!empty($_POST['inspection_date'])) {
-        $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
-        if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
+if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
+    $edit_id = (int)$_GET['edit'];
+    $stmt = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
+    $stmt->execute([$edit_id]);
+    $prop = $stmt->fetch();
+    if ($prop) {
+        $edit_mode = true;
     }
+}
 
-    $auction_date_db = null;
-    if(!empty($_POST['auction_date'])) {
-        $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['auction_date']);
-        if($date_obj) $auction_date_db = $date_obj->format('Y-m-d');
-    }
-
-    $sql = "UPDATE properties SET 
-        title=?, description='', price=?, location=?, city=?, state=?, type=?, 
-        bank_name=?, sqft=?, possession_type=?, inspection_date=?, 
-        borrower_name=?, emd_amount=?, bid_increment=?, emd_deadline=?, 
-        auction_start_time=?, auction_end_time=?, locality=?, reserve_price_per_sqft=?, 
-        contact_number=?, auction_date=? 
-        WHERE id=?";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([
-        safeString($_POST['title'] ?? ''),
-        safeNumeric($_POST['price'] ?? 0),
-        safeString($_POST['location'] ?? ''),
-        safeString($_POST['city'] ?? ''),
-        safeString($_POST['state'] ?? ''),
-        safeString($_POST['type'] ?? 'Flat'),
-        safeString($_POST['bank_name'] ?? ''),
-        safeNumeric($_POST['sqft'] ?? 0),
-        safeString($_POST['possession_type'] ?? 'Physical'),
-        $inspection_date_db,
-        safeString($_POST['borrower_name'] ?? ''),
-        safeNumeric($_POST['emd_amount'] ?? 0),
-        safeNumeric($_POST['bid_increment'] ?? 0),
-        safeString($_POST['emd_deadline'] ?? ''),
-        safeString($_POST['auction_start_time'] ?? ''),
-        safeString($_POST['auction_end_time'] ?? ''),
-        safeString($_POST['locality'] ?? ''),
-        safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
-        safeString($_POST['contact_number'] ?? $default_contact),
-        $auction_date_db,
-        $id
-    ]);
-    header("Location: properties.php?updated=1");
+// ---- Handle Delete ----
+if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
+    $delete_id = (int)$_GET['delete'];
+    $stmt = $pdo->prepare("DELETE FROM properties WHERE id = ?");
+    $stmt->execute([$delete_id]);
+    header("Location: properties.php?msg=deleted");
     exit;
 }
 
-// ADD
-if(isset($_POST['add_property'])) {
-    if(!hasEditPermission('properties', $pdo)) die("Permission denied.");
-    
-    $inspection_date_db = null;
-    if(!empty($_POST['inspection_date'])) {
-        $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['inspection_date']);
-        if($date_obj) $inspection_date_db = $date_obj->format('Y-m-d');
+// ---- Handle Form Submission ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $title = trim($_POST['title'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $price = (float)($_POST['price'] ?? 0);
+    $location = trim($_POST['location'] ?? '');
+    $city = trim($_POST['city'] ?? '');
+    $state = trim($_POST['state'] ?? '');
+    $type = trim($_POST['type'] ?? '');
+    $bank_name = trim($_POST['bank_name'] ?? '');
+    $sqft = (float)($_POST['sqft'] ?? 0);
+    $possession_type = trim($_POST['possession_type'] ?? '');
+    $borrower_name = trim($_POST['borrower_name'] ?? '');
+    $emd_amount = (float)($_POST['emd_amount'] ?? 0);
+    $bid_increment = (float)($_POST['bid_increment'] ?? 0);
+    $emd_deadline = trim($_POST['emd_deadline'] ?? '');
+    $auction_start_time = trim($_POST['auction_start_time'] ?? '');
+    $auction_end_time = trim($_POST['auction_end_time'] ?? '');
+    $locality = trim($_POST['locality'] ?? '');
+    $reserve_price_per_sqft = (float)($_POST['reserve_price_per_sqft'] ?? 0);
+    $contact_number = trim($_POST['contact_number'] ?? '');
+    $status = trim($_POST['status'] ?? 'available');
+    $auction_date = trim($_POST['auction_date'] ?? '');
+
+    // Convert date format (DD/MM/YYYY to YYYY-MM-DD)
+    if (!empty($auction_date)) {
+        $parts = explode('/', $auction_date);
+        if (count($parts) === 3) {
+            $auction_date = $parts[2] . '-' . $parts[1] . '-' . $parts[0];
+        }
     }
 
-    $auction_date_db = null;
-    if(!empty($_POST['auction_date'])) {
-        $date_obj = DateTime::createFromFormat('d/m/Y', $_POST['auction_date']);
-        if($date_obj) $auction_date_db = $date_obj->format('Y-m-d');
-    }
+    $action = $_POST['action'];
 
-    $sql = "INSERT INTO properties (
-        title, description, price, location, city, state, type, 
-        bank_name, sqft, possession_type, inspection_date, 
-        borrower_name, emd_amount, bid_increment, emd_deadline, 
-        auction_start_time, auction_end_time, locality, reserve_price_per_sqft, 
-        contact_number, auction_date, status
-    ) VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')";
-    
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([
-        safeString($_POST['title'] ?? ''),
-        safeNumeric($_POST['price'] ?? 0),
-        safeString($_POST['location'] ?? ''),
-        safeString($_POST['city'] ?? ''),
-        safeString($_POST['state'] ?? ''),
-        safeString($_POST['type'] ?? 'Flat'),
-        safeString($_POST['bank_name'] ?? ''),
-        safeNumeric($_POST['sqft'] ?? 0),
-        safeString($_POST['possession_type'] ?? 'Physical'),
-        $inspection_date_db,
-        safeString($_POST['borrower_name'] ?? ''),
-        safeNumeric($_POST['emd_amount'] ?? 0),
-        safeNumeric($_POST['bid_increment'] ?? 0),
-        safeString($_POST['emd_deadline'] ?? ''),
-        safeString($_POST['auction_start_time'] ?? ''),
-        safeString($_POST['auction_end_time'] ?? ''),
-        safeString($_POST['locality'] ?? ''),
-        safeNumeric($_POST['reserve_price_per_sqft'] ?? 0),
-        safeString($_POST['contact_number'] ?? $default_contact),
-        $auction_date_db
-    ]);
-    
-    $new_id = $pdo->lastInsertId();
-    if (function_exists('sendNewPropertyNotification')) {
-        sendNewPropertyNotification($pdo, $new_id, 'auction');
+    if ($action === 'add') {
+        $stmt = $pdo->prepare("
+            INSERT INTO properties (
+                title, description, price, location, city, state, type, bank_name, 
+                sqft, possession_type, borrower_name, emd_amount, bid_increment, 
+                emd_deadline, auction_start_time, auction_end_time, locality, 
+                reserve_price_per_sqft, contact_number, status, auction_date, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([
+            $title, $description, $price, $location, $city, $state, $type, $bank_name,
+            $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
+            $emd_deadline, $auction_start_time, $auction_end_time, $locality,
+            $reserve_price_per_sqft, $contact_number, $status, $auction_date
+        ]);
+        header("Location: properties.php?msg=added");
+        exit;
+    } elseif ($action === 'edit' && isset($_POST['id'])) {
+        $id = (int)$_POST['id'];
+        $stmt = $pdo->prepare("
+            UPDATE properties SET 
+                title = ?, description = ?, price = ?, location = ?, city = ?, state = ?, 
+                type = ?, bank_name = ?, sqft = ?, possession_type = ?, borrower_name = ?, 
+                emd_amount = ?, bid_increment = ?, emd_deadline = ?, auction_start_time = ?, 
+                auction_end_time = ?, locality = ?, reserve_price_per_sqft = ?, 
+                contact_number = ?, status = ?, auction_date = ?
+            WHERE id = ?
+        ");
+        $stmt->execute([
+            $title, $description, $price, $location, $city, $state, $type, $bank_name,
+            $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
+            $emd_deadline, $auction_start_time, $auction_end_time, $locality,
+            $reserve_price_per_sqft, $contact_number, $status, $auction_date, $id
+        ]);
+        header("Location: properties.php?msg=updated");
+        exit;
     }
-    
-    header("Location: properties.php?added=1");
-    exit;
 }
 
-include 'header.php'; 
+include 'header.php';
 ?>
 
-<?php if(isset($_GET['added'])): ?>
-    <div class="alert alert-success">✅ Property Added Successfully!</div>
-<?php endif; ?>
-<?php if(isset($_GET['updated'])): ?>
-    <div class="alert alert-success">✅ Property Updated Successfully!</div>
-<?php endif; ?>
+<div class="container-fluid mt-4">
+    <h1 class="mb-4"><?= $edit_mode ? 'Edit Property' : 'Add New Property' ?></h1>
 
-<div class="container-fluid px-3">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Properties (<?= $total_rows ?>)</h5>
-        <?php if(hasEditPermission('properties', $pdo)): ?>
-            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#propertyModal" onclick="openAddModal()">
-                <i class="fas fa-plus-circle me-1"></i> Add New Property
-            </button>
-        <?php else: ?>
-            <span class="text-muted">(View Only Mode)</span>
-        <?php endif; ?>
+    <?php if (isset($_GET['msg'])): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <?php if ($_GET['msg'] === 'added'): ?>✅ Property added successfully!
+            <?php elseif ($_GET['msg'] === 'updated'): ?>✅ Property updated successfully!
+            <?php elseif ($_GET['msg'] === 'deleted'): ?>✅ Property deleted successfully!
+            <?php endif; ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
+    <!-- Add/Edit Form -->
+    <div class="card shadow-lg rounded-4 mb-5">
+        <div class="card-body p-4">
+            <form method="POST">
+                <input type="hidden" name="action" value="<?= $edit_mode ? 'edit' : 'add' ?>">
+                <?php if ($edit_mode): ?>
+                    <input type="hidden" name="id" value="<?= $prop['id'] ?>">
+                <?php endif; ?>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Title *</label>
+                        <input type="text" name="title" class="form-control" required value="<?= $edit_mode ? htmlspecialchars($prop['title']) : '' ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Address / Location *</label>
+                        <input type="text" name="location" class="form-control" required value="<?= $edit_mode ? htmlspecialchars($prop['location']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Reserve Price (₹) *</label>
+                        <input type="number" name="price" class="form-control" required step="0.01" value="<?= $edit_mode ? $prop['price'] : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Price per Sq Ft</label>
+                        <input type="number" name="reserve_price_per_sqft" class="form-control" step="0.01" value="<?= $edit_mode ? $prop['reserve_price_per_sqft'] : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Area (Sq Ft)</label>
+                        <input type="number" name="sqft" class="form-control" value="<?= $edit_mode ? $prop['sqft'] : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Borrower Name</label>
+                        <input type="text" name="borrower_name" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['borrower_name']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Bank Name</label>
+                        <input type="text" name="bank_name" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['bank_name']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Property Type</label>
+                        <select name="type" class="form-control">
+                            <option value="Flat" <?= $edit_mode && $prop['type'] == 'Flat' ? 'selected' : '' ?>>Flat</option>
+                            <option value="Plot" <?= $edit_mode && $prop['type'] == 'Plot' ? 'selected' : '' ?>>Plot</option>
+                            <option value="Shop" <?= $edit_mode && $prop['type'] == 'Shop' ? 'selected' : '' ?>>Shop</option>
+                            <option value="Land" <?= $edit_mode && $prop['type'] == 'Land' ? 'selected' : '' ?>>Land</option>
+                            <option value="House" <?= $edit_mode && $prop['type'] == 'House' ? 'selected' : '' ?>>House</option>
+                            <option value="Car" <?= $edit_mode && $prop['type'] == 'Car' ? 'selected' : '' ?>>Car / Vehicle</option>
+                            <option value="Commercial" <?= $edit_mode && $prop['type'] == 'Commercial' ? 'selected' : '' ?>>Commercial</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Possession</label>
+                        <select name="possession_type" class="form-control">
+                            <option value="Physical" <?= $edit_mode && $prop['possession_type'] == 'Physical' ? 'selected' : '' ?>>Physical</option>
+                            <option value="Symbolic" <?= $edit_mode && $prop['possession_type'] == 'Symbolic' ? 'selected' : '' ?>>Symbolic</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Locality</label>
+                        <input type="text" name="locality" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['locality']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">City *</label>
+                        <input type="text" name="city" class="form-control" required value="<?= $edit_mode ? htmlspecialchars($prop['city']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">State</label>
+                        <input type="text" name="state" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['state']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">EMD Amount (₹)</label>
+                        <input type="number" name="emd_amount" class="form-control" step="0.01" value="<?= $edit_mode ? $prop['emd_amount'] : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">BID Increment (₹)</label>
+                        <input type="number" name="bid_increment" class="form-control" step="0.01" value="<?= $edit_mode ? $prop['bid_increment'] : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">EMD Deadline</label>
+                        <input type="text" name="emd_deadline" class="form-control" placeholder="e.g., Mon, 22 Jun 2026 06:00 PM" value="<?= $edit_mode ? htmlspecialchars($prop['emd_deadline']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Auction Start</label>
+                        <input type="text" name="auction_start_time" class="form-control" placeholder="e.g., Mon, 22 Jun 2026 02:00 PM" value="<?= $edit_mode ? htmlspecialchars($prop['auction_start_time']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Auction End</label>
+                        <input type="text" name="auction_end_time" class="form-control" placeholder="e.g., Mon, 22 Jun 2026 06:00 PM" value="<?= $edit_mode ? htmlspecialchars($prop['auction_end_time']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Inspection Date (DD/MM/YYYY)</label>
+                        <input type="text" name="inspection_date" class="form-control" placeholder="DD/MM/YYYY" value="<?= $edit_mode && $prop['inspection_date'] ? date('d/m/Y', strtotime($prop['inspection_date'])) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Auction Date (DD/MM/YYYY) *</label>
+                        <input type="text" name="auction_date" class="form-control" placeholder="DD/MM/YYYY" required value="<?= $edit_mode && $prop['auction_date'] ? date('d/m/Y', strtotime($prop['auction_date'])) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Contact Number</label>
+                        <input type="text" name="contact_number" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['contact_number']) : '' ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Status</label>
+                        <select name="status" class="form-control">
+                            <option value="available" <?= $edit_mode && $prop['status'] == 'available' ? 'selected' : '' ?>>Available</option>
+                            <option value="sold" <?= $edit_mode && $prop['status'] == 'sold' ? 'selected' : '' ?>>Sold</option>
+                            <option value="pending" <?= $edit_mode && $prop['status'] == 'pending' ? 'selected' : '' ?>>Pending</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Description</label>
+                        <textarea name="description" class="form-control" rows="3"><?= $edit_mode ? htmlspecialchars($prop['description']) : '' ?></textarea>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill shadow">
+                            <i class="fas fa-save me-2"></i> <?= $edit_mode ? 'Update Property' : 'Add Property' ?>
+                        </button>
+                        <?php if ($edit_mode): ?>
+                            <a href="properties.php" class="btn btn-outline-secondary w-100 mt-2 rounded-pill">Cancel Edit</a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 
-    <div class="bg-white p-2 rounded-3 shadow-sm mb-3 border">
-        <form method="GET" class="row g-1 align-items-center">
-            <div class="col-md-3">
-                <input type="text" name="filter_city" class="form-control form-control-sm" placeholder="🏙️ City" value="<?= htmlspecialchars($filter_city) ?>">
-            </div>
-            <div class="col-md-3">
-                <input type="text" name="filter_bank" class="form-control form-control-sm" placeholder="🏦 Bank Name" value="<?= htmlspecialchars($filter_bank) ?>">
-            </div>
-            <div class="col-md-2">
-                <input type="number" name="filter_price_min" class="form-control form-control-sm" placeholder="Min Price" value="<?= htmlspecialchars($filter_price_min) ?>">
-            </div>
-            <div class="col-md-2">
-                <input type="number" name="filter_price_max" class="form-control form-control-sm" placeholder="Max Price" value="<?= htmlspecialchars($filter_price_max) ?>">
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-filter"></i> Filter</button>
-            </div>
-        </form>
-    </div>
+    <!-- Property List -->
+    <h2 class="mt-4">All Properties (<?= count($properties) ?>)</h2>
 
-    <div class="bg-white rounded-3 p-2 shadow-sm border">
+    <!-- Filters -->
+    <form method="GET" class="row g-2 mb-3">
+        <div class="col-md-3">
+            <input type="text" name="city" class="form-control" placeholder="City" value="<?= htmlspecialchars($city_filter) ?>">
+        </div>
+        <div class="col-md-3">
+            <input type="text" name="bank" class="form-control" placeholder="Bank Name" value="<?= htmlspecialchars($bank_filter) ?>">
+        </div>
+        <div class="col-md-2">
+            <input type="number" name="min_price" class="form-control" placeholder="Min Price" value="<?= htmlspecialchars($min_price) ?>">
+        </div>
+        <div class="col-md-2">
+            <input type="number" name="max_price" class="form-control" placeholder="Max Price" value="<?= htmlspecialchars($max_price) ?>">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Filter</button>
+        </div>
+    </form>
+
+    <?php if (count($properties) > 0): ?>
         <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0">
-                <thead class="table-light">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
                     <tr>
                         <th>ID</th>
                         <th>Title</th>
@@ -216,167 +320,35 @@ include 'header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if(count($rows) > 0): ?>
-                        <?php foreach($rows as $row): ?>
-                            <tr>
-                                <td><?= $row['id'] ?></td>
-                                <td><?= htmlspecialchars($row['title']) ?></td>
-                                <td><?= htmlspecialchars($row['bank_name'] ?? '') ?></td>
-                                <td><?= htmlspecialchars($row['city'] ?? '') ?></td>
-                                <td><?= indianCurrencyFormat($row['price']) ?></td>
-                                <td><?= $row['auction_date'] ? date('d M Y', strtotime($row['auction_date'])) : '<span class="text-muted">N/A</span>' ?></td>
-                                <td><span class="badge bg-<?= ($row['status']=='available')?'success':'secondary' ?>"><?= $row['status'] ?></span></td>
-                                <td>
-                                    <?php if(hasEditPermission('properties', $pdo)): ?>
-                                        <button class="btn btn-sm btn-primary" onclick="openEditModal(<?= $row['id'] ?>)">✏️</button>
-                                        <a href="delete_property.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">🗑️</a>
-                                    <?php else: ?>
-                                        <span class="text-muted">View Only</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr><td colspan="8" class="text-center text-muted">No properties found.</td></tr>
-                    <?php endif; ?>
+                    <?php foreach ($properties as $row): ?>
+                        <tr>
+                            <td><?= $row['id'] ?></td>
+                            <td><?= htmlspecialchars($row['title']) ?></td>
+                            <td><?= htmlspecialchars($row['bank_name'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($row['city'] ?? 'N/A') ?></td>
+                            <td>₹ <?= number_format($row['price'], 2) ?></td>
+                            <td>
+                                <?php if (!empty($row['auction_date'])): ?>
+                                    <?= date('d M Y', strtotime($row['auction_date'])) ?>
+                                <?php else: ?>
+                                    N/A
+                                <?php endif; ?>
+                            </td>
+                            <td><span class="badge bg-<?= $row['status'] == 'available' ? 'success' : ($row['status'] == 'sold' ? 'danger' : 'warning') ?>"><?= $row['status'] ?></span></td>
+                            <td>
+                                <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></a>
+                                <?php if ($is_admin): ?>
+                                    <a href="properties.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')"><i class="fas fa-trash"></i></a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
-    </div>
-
-    <?php if($total_pages > 1): ?>
-        <nav class="mt-3">
-            <ul class="pagination justify-content-center pagination-sm">
-                <?php if($page > 1): ?>
-                    <li class="page-item"><a class="page-link" href="?page=<?= $page-1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">« Prev</a></li>
-                <?php endif; ?>
-                <?php for($i = 1; $i <= $total_pages; $i++): ?>
-                    <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                        <a class="page-link" href="?page=<?= $i ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>"><?= $i ?></a>
-                    </li>
-                <?php endfor; ?>
-                <?php if($page < $total_pages): ?>
-                    <li class="page-item"><a class="page-link" href="?page=<?= $page+1 ?>&<?= http_build_query(array_filter($_GET, fn($k) => $k !== 'page', ARRAY_FILTER_USE_KEY)) ?>">Next »</a></li>
-                <?php endif; ?>
-            </ul>
-        </nav>
+    <?php else: ?>
+        <div class="alert alert-info">No properties found. Add your first property!</div>
     <?php endif; ?>
 </div>
-
-<!-- ===== MODAL ===== -->
-<div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius: 20px;">
-            <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #334155); color: white; border-radius: 20px 20px 0 0;">
-                <h5 class="modal-title" id="modalTitle"><i class="fas fa-plus-circle me-2"></i>Add New Property</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="propertyForm" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="property_id" id="property_id" value="">
-                    <input type="hidden" name="existing_image" id="existing_image" value="">
-
-                    <?php include 'property_form.php'; ?>
-
-                    <div class="mt-4">
-                        <button type="submit" name="add_property" id="submitBtn" class="btn btn-primary btn-lg w-100">Add Property</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    function openAddModal() {
-        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Add New Property';
-        document.getElementById('property_id').value = '';
-        document.getElementById('existing_image').value = '';
-        document.getElementById('submitBtn').name = 'add_property';
-        document.getElementById('submitBtn').innerHTML = 'Add Property';
-        document.getElementById('currentImagePreview').style.display = 'none';
-        document.getElementById('imageHelpText').textContent = 'Leave empty to auto-generate premium social card.';
-        
-        // Clear all fields
-        document.querySelectorAll('#propertyForm input, #propertyForm select, #propertyForm textarea').forEach(el => {
-            if (el.type !== 'file' && el.id !== 'edit_contact_number') {
-                el.value = '';
-            }
-        });
-        document.getElementById('edit_type').value = 'Flat';
-        document.getElementById('edit_possession_type').value = 'Physical';
-    }
-
-    function openEditModal(id) {
-        // Reset form and show loading state
-        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Loading Property #' + id + '...';
-        document.getElementById('submitBtn').name = 'update_property';
-        document.getElementById('submitBtn').innerHTML = 'Update Property';
-        document.getElementById('imageHelpText').textContent = 'Leave empty to keep current image or auto-generate.';
-
-        // Fetch property data
-        fetch('get_property.php?id=' + id)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
-                
-                // Populate fields
-                document.getElementById('property_id').value = data.id || '';
-                document.getElementById('edit_title').value = data.title || '';
-                document.getElementById('edit_location').value = data.location || '';
-                document.getElementById('edit_city').value = data.city || '';
-                document.getElementById('edit_state').value = data.state || '';
-                document.getElementById('edit_locality').value = data.locality || '';
-                document.getElementById('edit_price').value = data.price || '';
-                document.getElementById('edit_reserve_price_per_sqft').value = data.reserve_price_per_sqft || '';
-                document.getElementById('edit_bank_name').value = data.bank_name || '';
-                document.getElementById('edit_borrower_name').value = data.borrower_name || '';
-                document.getElementById('edit_type').value = data.type || 'Flat';
-                document.getElementById('edit_sqft').value = data.sqft || '';
-                document.getElementById('edit_possession_type').value = data.possession_type || 'Physical';
-                document.getElementById('edit_emd_amount').value = data.emd_amount || '';
-                document.getElementById('edit_bid_increment').value = data.bid_increment || '';
-                document.getElementById('edit_auction_start_time').value = data.auction_start_time || '';
-                document.getElementById('edit_auction_end_time').value = data.auction_end_time || '';
-                document.getElementById('edit_emd_deadline').value = data.emd_deadline || '';
-                document.getElementById('edit_inspection_date').value = data.inspection_date || '';
-                document.getElementById('edit_contact_number').value = data.contact_number || '';
-                document.getElementById('edit_google_location').value = data.google_location || '';
-                document.getElementById('existing_image').value = data.image_url || '';
-                document.getElementById('edit_description').value = data.description || '';
-                document.getElementById('edit_auction_date').value = data.auction_date || '';
-
-                // Image preview
-                if (data.image_url) {
-                    var img = document.getElementById('currentImage');
-                    if (img) {
-                        img.src = data.image_url;
-                        document.getElementById('currentImagePreview').style.display = 'block';
-                    }
-                } else {
-                    document.getElementById('currentImagePreview').style.display = 'none';
-                }
-
-                // Update modal title
-                document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Property #' + data.id;
-
-                // Show modal
-                var modal = new bootstrap.Modal(document.getElementById('propertyModal'));
-                modal.show();
-            })
-            .catch(error => {
-                alert('Error loading property data: ' + error);
-                console.error(error);
-            });
-    }
-</script>
 
 <?php include 'footer.php'; ?>
