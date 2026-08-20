@@ -1,4 +1,8 @@
 <?php
+// ============================================================
+// functions.php – Complete with Supabase Storage Support
+// ============================================================
+
 // ---- Currency ----
 function indianCurrencyFormat($number) {
     if ($number === null || $number === '') return '0';
@@ -460,7 +464,7 @@ function getSlotTimeRange($slot) {
 function getUserSpinData($pdo, $user_id, $slot = null) {
     if ($slot === null) $slot = getCurrentSlot();
     $today = date('Y-m-d');
-    $stmt = $pdo->prepare("/* force new plan */ SELECT * FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+    $stmt = $pdo->prepare("SELECT * FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
     $stmt->execute([$user_id, $today, $slot]);
     $data = $stmt->fetch();
     if (!$data) {
@@ -499,7 +503,6 @@ function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
     }
     $props = $stmt->fetchAll();
     if (empty($props)) {
-        // fallback: get any without type filter
         $sql = "SELECT id, title, price, city, image_url, bank_name, type FROM properties WHERE status = 'available'";
         if (!empty($exclude_ids)) {
             $placeholders = implode(',', array_fill(0, count($exclude_ids), '?'));
@@ -533,7 +536,7 @@ function getSpinCoinSettings($pdo) {
 function performSpin($pdo, $user_id) {
     $today = date('Y-m-d');
     $slot = getCurrentSlot();
-    $stmt = $pdo->prepare("/* force new plan */ SELECT spins_used, reward_given, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+    $stmt = $pdo->prepare("SELECT spins_used, reward_given, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
     $stmt->execute([$user_id, $today, $slot]);
     $data = $stmt->fetch();
     if (!$data) {
@@ -551,15 +554,12 @@ function performSpin($pdo, $user_id) {
         return ['success' => false, 'message' => 'You have already used all spins for this slot.'];
     }
 
-    // Get coin settings
     $coin_settings = getSpinCoinSettings($pdo);
     $min_coin = $coin_settings['min'];
     $max_coin = $coin_settings['max'];
-    $cap_per_slot = 22; // fixed cap
+    $cap_per_slot = 22;
 
-    // Determine random coin (between min and max)
     $coin_amount = rand((int)$min_coin, (int)$max_coin);
-    // Ensure total doesn't exceed cap
     if ($coins_earned + $coin_amount > $cap_per_slot) {
         $coin_amount = $cap_per_slot - $coins_earned;
         if ($coin_amount < 1) $coin_amount = 0;
@@ -568,30 +568,24 @@ function performSpin($pdo, $user_id) {
     $new_spins = $spins_used + 1;
     $new_coins_earned = $coins_earned + $coin_amount;
 
-    // Update spins_used, coins_earned
     $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = CURRENT_TIMESTAMP WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
     $stmt->execute([$new_spins, $new_coins_earned, $user_id, $today, $slot]);
 
-    // Credit user's total coins
     if ($coin_amount > 0) {
         $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
     }
 
-    // Check if 5th spin (reward milestone)
     $is_reward = ($new_spins == 5);
     if ($is_reward) {
         $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
     }
 
-    // For spins 1-4, show a property (car/property); for 5th, we can also show property (optional)
-    $show_property = true; // always show property
+    $show_property = true;
     if ($show_property) {
-        // Manage session for shown properties
         if (!isset($_SESSION['shown_properties'])) {
             $_SESSION['shown_properties'] = [];
         }
         $exclude = $_SESSION['shown_properties'];
-        // Alternate between car and property
         $type = ($new_spins % 2 == 1) ? 'car' : 'property';
         $prop = getRandomLowPriceProperty($pdo, $exclude, $type);
         if (!$prop) {
@@ -623,7 +617,6 @@ function performSpin($pdo, $user_id) {
             ];
         }
     } else {
-        // No property (if we ever want to skip)
         $response = [
             'success' => true,
             'message' => "+$coin_amount coins!",
@@ -685,5 +678,110 @@ function logActivity($pdo, $user_id, $activity_type, $details = null) {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
     $stmt = $pdo->prepare("INSERT INTO user_activity_log (user_id, activity_type, details, ip_address) VALUES (?, ?, ?, ?)");
     return $stmt->execute([$user_id, $activity_type, $details, $ip]);
+}
+
+// ============================================================
+// 🔥 NEW: Supabase Storage Functions (Added for Permanent Storage)
+// ============================================================
+
+/**
+ * Upload file to Supabase Storage (Permanent Storage)
+ * 
+ * @param array $file $_FILES['field_name']
+ * @param string $folder Folder name inside bucket (e.g., 'slip', 'support', 'kyc')
+ * @param string $bucket_name Supabase bucket name (default: 'payment_screenshots')
+ * @return string|null Public URL of uploaded file, or null on failure
+ */
+function uploadToSupabase($file, $folder = 'slip', $bucket_name = 'payment_screenshots') {
+    // Get Supabase credentials from environment variables
+    $supabase_url = getenv('SUPABASE_URL') ?: 'https://bqspzgwpqimjyhispwtp.supabase.co';
+    $supabase_key = getenv('SUPABASE_ANON_KEY') ?: '';
+    
+    if (empty($supabase_key)) {
+        error_log("Supabase ANON_KEY not set in environment variables");
+        return null;
+    }
+    
+    // Generate unique filename
+    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+    $filename = time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
+    $filepath = $folder . '/' . $filename;
+    
+    // Read file content
+    $file_content = file_get_contents($file['tmp_name']);
+    if ($file_content === false) {
+        error_log("Failed to read uploaded file: " . $file['tmp_name']);
+        return null;
+    }
+    
+    // Upload to Supabase using cURL
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $supabase_url . '/storage/v1/object/public/' . $bucket_name . '/' . $filepath);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $supabase_key,
+        'Content-Type: ' . $file['type']
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $file_content);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
+    curl_close($ch);
+    
+    if ($http_code === 200 || $http_code === 201 || $http_code === 204) {
+        return $supabase_url . '/storage/v1/object/public/' . $bucket_name . '/' . $filepath;
+    }
+    
+    error_log("Supabase upload failed: HTTP $http_code - " . $response . " - Error: " . $curl_error);
+    return null;
+}
+
+/**
+ * Delete file from Supabase Storage
+ * 
+ * @param string $file_url Full URL of the file to delete
+ * @param string $bucket_name Supabase bucket name
+ * @return bool True on success
+ */
+function deleteFromSupabase($file_url, $bucket_name = 'payment_screenshots') {
+    $supabase_url = getenv('SUPABASE_URL') ?: 'https://bqspzgwpqimjyhispwtp.supabase.co';
+    $supabase_key = getenv('SUPABASE_ANON_KEY') ?: '';
+    
+    if (empty($supabase_key)) return false;
+    
+    // Extract path from URL
+    $path = str_replace($supabase_url . '/storage/v1/object/public/' . $bucket_name . '/', '', $file_url);
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $supabase_url . '/storage/v1/object/public/' . $bucket_name . '/' . $path);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $supabase_key
+    ]);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    return ($http_code === 200 || $http_code === 204);
+}
+
+/**
+ * Legacy: Upload file to local server (for backward compatibility)
+ * Use uploadToSupabase() for new implementations
+ */
+function uploadFile($file, $target_dir = 'uploads/') {
+    if (!is_dir($target_dir)) {
+        mkdir($target_dir, 0777, true);
+    }
+    $filename = time() . '_' . basename($file['name']);
+    $target_file = $target_dir . $filename;
+    if (move_uploaded_file($file['tmp_name'], $target_file)) {
+        return $target_file;
+    }
+    return null;
 }
 ?>
