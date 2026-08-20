@@ -65,6 +65,44 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     exit;
 }
 
+// ---- Function to safely parse date ----
+function parseDate($dateStr) {
+    if (empty($dateStr)) return null;
+    // Remove any extra spaces and time portion (keep only date part)
+    $dateStr = trim($dateStr);
+    // If contains space, take only first part (assuming date part is before space)
+    $parts = explode(' ', $dateStr);
+    $dateStr = $parts[0]; // take only the first token
+    
+    // Try to parse with strtotime (supports many formats)
+    $timestamp = strtotime($dateStr);
+    if ($timestamp !== false) {
+        return date('Y-m-d', $timestamp);
+    }
+    
+    // Fallback: try DD/MM/YYYY or DD-MM-YYYY
+    if (strpos($dateStr, '/') !== false) {
+        $d = explode('/', $dateStr);
+        if (count($d) === 3) {
+            // Assume DD/MM/YYYY
+            return $d[2] . '-' . $d[1] . '-' . $d[0];
+        }
+    } elseif (strpos($dateStr, '-') !== false) {
+        $d = explode('-', $dateStr);
+        if (count($d) === 3) {
+            // Could be DD-MM-YYYY or YYYY-MM-DD
+            // Check if first part is 4-digit year
+            if (strlen($d[0]) === 4) {
+                return $d[0] . '-' . $d[1] . '-' . $d[2];
+            } else {
+                return $d[2] . '-' . $d[1] . '-' . $d[0];
+            }
+        }
+    }
+    // If all fails, return null
+    return null;
+}
+
 // ---- Handle Form Submission ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $title = trim($_POST['title'] ?? '');
@@ -88,14 +126,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $contact_number = trim($_POST['contact_number'] ?? '');
     $status = trim($_POST['status'] ?? 'available');
     $auction_date = trim($_POST['auction_date'] ?? '');
+    $inspection_date = trim($_POST['inspection_date'] ?? '');
 
-    // Convert date format (DD/MM/YYYY to YYYY-MM-DD)
-    if (!empty($auction_date)) {
-        $parts = explode('/', $auction_date);
-        if (count($parts) === 3) {
-            $auction_date = $parts[2] . '-' . $parts[1] . '-' . $parts[0];
-        }
-    }
+    // Parse dates safely
+    $auction_date = parseDate($auction_date);
+    $inspection_date = parseDate($inspection_date);
 
     $action = $_POST['action'];
 
@@ -105,14 +140,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 title, description, price, location, city, state, type, bank_name, 
                 sqft, possession_type, borrower_name, emd_amount, bid_increment, 
                 emd_deadline, auction_start_time, auction_end_time, locality, 
-                reserve_price_per_sqft, contact_number, status, auction_date, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                reserve_price_per_sqft, contact_number, status, auction_date, 
+                inspection_date, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $title, $description, $price, $location, $city, $state, $type, $bank_name,
             $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
             $emd_deadline, $auction_start_time, $auction_end_time, $locality,
-            $reserve_price_per_sqft, $contact_number, $status, $auction_date
+            $reserve_price_per_sqft, $contact_number, $status, $auction_date,
+            $inspection_date
         ]);
         header("Location: properties.php?msg=added");
         exit;
@@ -124,14 +161,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 type = ?, bank_name = ?, sqft = ?, possession_type = ?, borrower_name = ?, 
                 emd_amount = ?, bid_increment = ?, emd_deadline = ?, auction_start_time = ?, 
                 auction_end_time = ?, locality = ?, reserve_price_per_sqft = ?, 
-                contact_number = ?, status = ?, auction_date = ?
+                contact_number = ?, status = ?, auction_date = ?, inspection_date = ?
             WHERE id = ?
         ");
         $stmt->execute([
             $title, $description, $price, $location, $city, $state, $type, $bank_name,
             $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
             $emd_deadline, $auction_start_time, $auction_end_time, $locality,
-            $reserve_price_per_sqft, $contact_number, $status, $auction_date, $id
+            $reserve_price_per_sqft, $contact_number, $status, $auction_date,
+            $inspection_date, $id
         ]);
         header("Location: properties.php?msg=updated");
         exit;
@@ -144,7 +182,6 @@ include 'header.php';
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>🏠 All Properties (<?= count($properties) ?>)</h1>
-        <!-- ✅ Add New Property Button -->
         <a href="?add=1" class="btn btn-primary btn-lg rounded-pill shadow <?= isset($_GET['add']) ? 'disabled' : '' ?>">
             <i class="fas fa-plus-circle me-2"></i> Add New Property
         </a>
@@ -161,7 +198,7 @@ include 'header.php';
     <?php endif; ?>
 
     <!-- ============================================================
-    ADD/EDIT FORM (Shows only when ?add=1 or ?edit=ID)
+    ADD/EDIT FORM
     ============================================================ -->
     <?php if (isset($_GET['add']) || $edit_mode): ?>
     <div class="card shadow-lg rounded-4 mb-5 border-0">
@@ -262,6 +299,7 @@ include 'header.php';
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Date (DD/MM/YYYY) *</label>
                         <input type="text" name="auction_date" class="form-control" placeholder="DD/MM/YYYY" required value="<?= $edit_mode && $prop['auction_date'] ? date('d/m/Y', strtotime($prop['auction_date'])) : '' ?>">
+                        <small class="text-muted">Enter only date (e.g., 24/08/2026). Time will be ignored.</small>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Contact Number</label>
