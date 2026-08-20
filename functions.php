@@ -145,9 +145,18 @@ function changeReferrer($pdo, $user_id, $new_referrer_id) {
 // ---- Accounting ----
 function addAccountEntry($pdo, $type, $amount, $description, $category, $entry_date = null) {
     if($entry_date === null) $entry_date = date('Y-m-d');
-    $stmt = $pdo->prepare("INSERT INTO account_entries (type, amount, description, category, entry_date) VALUES (?, ?, ?, ?, ?)");
-    return $stmt->execute([$type, $amount, $description, $category, $entry_date]);
+    // Use exec() with quoted values to avoid prepared statement errors
+    $sql = sprintf(
+        "INSERT INTO account_entries (type, amount, description, category, entry_date) VALUES (%s, %s, %s, %s, %s)",
+        $pdo->quote($type),
+        (float)$amount,
+        $pdo->quote($description),
+        $pdo->quote($category),
+        $pdo->quote($entry_date)
+    );
+    return $pdo->exec($sql) !== false;
 }
+
 function getAccountBalance($pdo) {
     $income = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM account_entries WHERE type = 'income'")->fetchColumn();
     $expense = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM account_entries WHERE type = 'expense'")->fetchColumn();
