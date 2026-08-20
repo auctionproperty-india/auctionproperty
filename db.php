@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// db.php – Database connection + File-based Sessions
+// db.php – Database Connection + Database Sessions (Permanent)
 // ============================================================
 
 // ============================================================
@@ -12,6 +12,7 @@ $dbname = getenv('DB_NAME') ?: 'postgres';
 $user = getenv('DB_USER') ?: 'postgres';
 $password = getenv('DB_PASSWORD') ?: '';
 
+// If individual vars are missing, fall back to DATABASE_URL
 $database_url = getenv('DATABASE_URL');
 if ($database_url && (!$host || $host === 'localhost')) {
     $parts = parse_url($database_url);
@@ -40,15 +41,31 @@ try {
 }
 
 // ============================================================
-// 4. Session Handling – File-based with /tmp
+// 4. Sessions Table (if not exists)
 // ============================================================
-// Ensure session save path is writable
-ini_set('session.save_path', '/tmp');
-ini_set('session.gc_maxlifetime', 86400); // 24 hours
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS sessions (
+            id VARCHAR(128) NOT NULL PRIMARY KEY,
+            data TEXT NOT NULL,
+            access TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+} catch (PDOException $e) {
+    // Table might already exist, ignore error
+}
+
+// ============================================================
+// 5. Session Handler (Database-based) - PERMANENT LOGIN
+// ============================================================
+require_once __DIR__ . '/session_handler.php';
+
+$handler = new DatabaseSessionHandler($pdo);
 
 if (session_status() == PHP_SESSION_NONE) {
+    session_set_save_handler($handler, true);
     session_set_cookie_params([
-        'lifetime' => 86400 * 30,
+        'lifetime' => 60 * 60 * 24 * 30, // 30 days
         'path' => '/',
         'domain' => '',
         'secure' => false,
@@ -59,6 +76,6 @@ if (session_status() == PHP_SESSION_NONE) {
 }
 
 // ============================================================
-// 5. $pdo is globally available
+// 6. $pdo is globally available
 // ============================================================
 ?>
