@@ -2,7 +2,6 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// Check if logged in and is admin
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['role'] != 'sub_admin')) {
     header("Location: login.php");
     exit;
@@ -17,7 +16,6 @@ $bank_filter = $_GET['bank'] ?? '';
 $min_price = $_GET['min_price'] ?? '';
 $max_price = $_GET['max_price'] ?? '';
 
-// ---- Build WHERE clause ----
 $where = "1=1";
 $params = [];
 
@@ -144,7 +142,13 @@ include 'header.php';
 ?>
 
 <div class="container-fluid mt-4">
-    <h1 class="mb-4"><?= $edit_mode ? 'Edit Property' : 'Add New Property' ?></h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>🏠 All Properties (<?= count($properties) ?>)</h1>
+        <!-- ✅ Add New Property Button -->
+        <a href="?add=1" class="btn btn-primary btn-lg rounded-pill shadow <?= isset($_GET['add']) ? 'disabled' : '' ?>">
+            <i class="fas fa-plus-circle me-2"></i> Add New Property
+        </a>
+    </div>
 
     <?php if (isset($_GET['msg'])): ?>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -156,8 +160,14 @@ include 'header.php';
         </div>
     <?php endif; ?>
 
-    <!-- Add/Edit Form -->
-    <div class="card shadow-lg rounded-4 mb-5">
+    <!-- ============================================================
+    ADD/EDIT FORM (Shows only when ?add=1 or ?edit=ID)
+    ============================================================ -->
+    <?php if (isset($_GET['add']) || $edit_mode): ?>
+    <div class="card shadow-lg rounded-4 mb-5 border-0">
+        <div class="card-header bg-primary text-white p-3 rounded-top-4">
+            <h5 class="mb-0"><i class="fas fa-<?= $edit_mode ? 'edit' : 'plus' ?> me-2"></i> <?= $edit_mode ? 'Edit Property' : 'Add New Property' ?></h5>
+        </div>
         <div class="card-body p-4">
             <form method="POST">
                 <input type="hidden" name="action" value="<?= $edit_mode ? 'edit' : 'add' ?>">
@@ -275,38 +285,56 @@ include 'header.php';
                         </button>
                         <?php if ($edit_mode): ?>
                             <a href="properties.php" class="btn btn-outline-secondary w-100 mt-2 rounded-pill">Cancel Edit</a>
+                        <?php else: ?>
+                            <a href="properties.php" class="btn btn-outline-secondary w-100 mt-2 rounded-pill">Cancel</a>
                         <?php endif; ?>
                     </div>
                 </div>
             </form>
         </div>
     </div>
+    <?php endif; ?>
 
-    <!-- Property List -->
-    <h2 class="mt-4">All Properties (<?= count($properties) ?>)</h2>
+    <!-- ============================================================
+    SEARCH BAR (FILTERS)
+    ============================================================ -->
+    <div class="card shadow-sm rounded-4 mb-4 border-0">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small text-muted">City</label>
+                    <input type="text" name="city" class="form-control" placeholder="Search by City..." value="<?= htmlspecialchars($city_filter) ?>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small text-muted">Bank Name</label>
+                    <input type="text" name="bank" class="form-control" placeholder="Search by Bank..." value="<?= htmlspecialchars($bank_filter) ?>">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small text-muted">Min Price</label>
+                    <input type="number" name="min_price" class="form-control" placeholder="Min" value="<?= htmlspecialchars($min_price) ?>">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small text-muted">Max Price</label>
+                    <input type="number" name="max_price" class="form-control" placeholder="Max" value="<?= htmlspecialchars($max_price) ?>">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100 rounded-pill">
+                        <i class="fas fa-search me-2"></i> Filter
+                    </button>
+                    <a href="properties.php" class="btn btn-outline-secondary w-100 mt-1 rounded-pill">
+                        <i class="fas fa-undo me-2"></i> Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    <!-- Filters -->
-    <form method="GET" class="row g-2 mb-3">
-        <div class="col-md-3">
-            <input type="text" name="city" class="form-control" placeholder="City" value="<?= htmlspecialchars($city_filter) ?>">
-        </div>
-        <div class="col-md-3">
-            <input type="text" name="bank" class="form-control" placeholder="Bank Name" value="<?= htmlspecialchars($bank_filter) ?>">
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="min_price" class="form-control" placeholder="Min Price" value="<?= htmlspecialchars($min_price) ?>">
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="max_price" class="form-control" placeholder="Max Price" value="<?= htmlspecialchars($max_price) ?>">
-        </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-primary w-100">Filter</button>
-        </div>
-    </form>
-
+    <!-- ============================================================
+    PROPERTY LIST
+    ============================================================ -->
     <?php if (count($properties) > 0): ?>
         <div class="table-responsive">
-            <table class="table table-striped table-hover">
+            <table class="table table-striped table-hover align-middle">
                 <thead class="table-dark">
                     <tr>
                         <th>ID</th>
@@ -331,7 +359,7 @@ include 'header.php';
                                 <?php if (!empty($row['auction_date'])): ?>
                                     <?= date('d M Y', strtotime($row['auction_date'])) ?>
                                 <?php else: ?>
-                                    N/A
+                                    <span class="text-muted">N/A</span>
                                 <?php endif; ?>
                             </td>
                             <td><span class="badge bg-<?= $row['status'] == 'available' ? 'success' : ($row['status'] == 'sold' ? 'danger' : 'warning') ?>"><?= $row['status'] ?></span></td>
@@ -347,7 +375,11 @@ include 'header.php';
             </table>
         </div>
     <?php else: ?>
-        <div class="alert alert-info">No properties found. Add your first property!</div>
+        <div class="alert alert-info text-center py-4">
+            <i class="fas fa-inbox fa-3x d-block mb-3 opacity-50"></i>
+            <h5>No properties found</h5>
+            <p class="text-muted">Try adjusting your filters or add a new property.</p>
+        </div>
     <?php endif; ?>
 </div>
 
