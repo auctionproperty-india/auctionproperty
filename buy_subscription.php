@@ -45,7 +45,7 @@ if ($active_check->rowCount() > 0) {
 }
 
 // ============================================================
-// 🔥 नया: Settings से Bank Details और QR Code लें
+// 🔥 Settings से Bank Details और QR Code लें
 // ============================================================
 $bank_keys = ['company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'default_contact'];
 $bank_data = [];
@@ -60,22 +60,29 @@ $qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'compa
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : $display_price;
     $utr = trim($_POST['utr'] ?? '');
-    $slip_path = '';
+    $slip_url = null;
 
-    if (isset($_FILES['slip']) && $_FILES['slip']['error'] == 0) {
-        $upload_dir = 'uploads/slips/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-        $ext = pathinfo($_FILES['slip']['name'], PATHINFO_EXTENSION);
-        $filename = 'slip_' . time() . '_' . $user_id . '.' . $ext;
-        move_uploaded_file($_FILES['slip']['tmp_name'], $upload_dir . $filename);
-        $slip_path = $upload_dir . $filename;
+    // ============================================================
+    // 🔥 NEW: Upload slip to Supabase Storage (Permanent)
+    // ============================================================
+    if (isset($_FILES['slip']) && $_FILES['slip']['error'] == UPLOAD_ERR_OK) {
+        $slip_url = uploadToSupabase($_FILES['slip'], 'slip');
+        if (!$slip_url) {
+            // Fallback to local upload if Supabase fails
+            $upload_dir = 'uploads/slips/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+            $ext = pathinfo($_FILES['slip']['name'], PATHINFO_EXTENSION);
+            $filename = 'slip_' . time() . '_' . $user_id . '.' . $ext;
+            move_uploaded_file($_FILES['slip']['tmp_name'], $upload_dir . $filename);
+            $slip_url = $upload_dir . $filename;
+        }
     }
 
     $stmt = $pdo->prepare("
         INSERT INTO subscriptions (user_id, package_id, amount, payment_method, utr, slip_path, status, start_date, end_date, created_at)
         VALUES (?, ?, ?, 'bank', ?, ?, 'pending', NULL, NULL, NOW())
     ");
-    $stmt->execute([$user_id, $package_id, $amount, $utr, $slip_path]);
+    $stmt->execute([$user_id, $package_id, $amount, $utr, $slip_url]);
 
     header("Location: user_packages.php?msg=request_sent");
     exit;
@@ -176,6 +183,7 @@ include 'header.php';
             <div class="mb-3">
                 <label class="form-label">Payment Slip (optional)</label>
                 <input type="file" name="slip" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
+                <small class="text-muted">Upload your payment screenshot (JPG, PNG, PDF) – stored permanently</small>
             </div>
             <button type="submit" class="btn btn-primary w-100">Submit Request</button>
             <a href="user_packages.php" class="btn btn-secondary w-100 mt-2">Cancel</a>
