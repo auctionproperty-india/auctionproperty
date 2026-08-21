@@ -55,7 +55,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_permissions'])) {
 
 include 'header.php'; 
 
-// ===== 🔥 FIX: अब role = 'admin' या 'sub_admin' दोनों दिखेंगे =====
+// अब role = 'admin' या 'sub_admin' दोनों दिखेंगे
 $users = $pdo->query("SELECT * FROM users WHERE is_super_admin = FALSE AND (role = 'admin' OR role = 'sub_admin') ORDER BY id DESC")->fetchAll();
 ?>
 <div class="container-fluid mt-4">
