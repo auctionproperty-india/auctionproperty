@@ -469,7 +469,6 @@ if ($is_logged_in && $role == 'user') {
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
-    <li><a href="admin_permissions.php"><i class="fas fa-user-cog"></i> Sub-Admins</a></li>
 <li><a href="admin_sales_team.php"><i class="fas fa-users"></i> Sales Team</a></li>
 <li><a href="sales_leads.php"><i class="fas fa-tasks"></i> Leads</a></li>
 <li><a href="sales_lead_upload.php"><i class="fas fa-upload"></i> Upload Leads</a></li>
