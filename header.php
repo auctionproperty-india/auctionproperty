@@ -79,6 +79,7 @@ if ($is_logged_in && $role == 'user') {
         body.role-admin { background: #f8fafc; }
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
+        body.role-sales { background: #f0f5fa; }
 
         /* ====== स्टिकी नेविगेशन ====== */
         .top-nav {
@@ -189,6 +190,11 @@ if ($is_logged_in && $role == 'user') {
             color: #334155;
             border-right: 1px solid #e2e8f0;
         }
+        body.role-sales .sidebar {
+            background: #ffffff;
+            color: #334155;
+            border-right: 1px solid #e2e8f0;
+        }
         @media (max-width: 991px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -280,7 +286,8 @@ if ($is_logged_in && $role == 'user') {
             padding-top: 0 !important;
         }
         body.role-admin .main-content,
-        body.role-user .main-content {
+        body.role-user .main-content,
+        body.role-sales .main-content {
             margin-left: 280px;
         }
         body.role-guest .main-content {
@@ -315,10 +322,18 @@ if ($is_logged_in && $role == 'user') {
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             margin-bottom: 10px;
         }
+        body.role-sales .top-bar {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            color: #1e293b;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin-bottom: 10px;
+        }
         .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
         .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
         body.role-admin .top-bar .user-info .name { color: #0f172a; }
         body.role-user .top-bar .user-info .name { color: #0f172a; }
+        body.role-sales .top-bar .user-info .name { color: #0f172a; }
         .top-bar .badge-role {
             padding: 4px 14px;
             border-radius: 30px;
@@ -358,6 +373,7 @@ if ($is_logged_in && $role == 'user') {
         }
         body.role-admin .hamburger-btn { color: #1e293b; }
         body.role-user .hamburger-btn { color: #1e293b; }
+        body.role-sales .hamburger-btn { color: #1e293b; }
         @media (min-width: 992px) {
             .hamburger-btn {
                 display: none !important;
@@ -383,6 +399,11 @@ if ($is_logged_in && $role == 'user') {
             color: #0f172a;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
         }
+        body.role-sales .card-premium {
+            background: #ffffff;
+            color: #0f172a;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+        }
         .card-premium:hover { transform: translateY(-2px); box-shadow: 0 20px 30px -10px rgba(0,0,0,0.08); }
         .stat-icon {
             width: 50px;
@@ -400,6 +421,9 @@ if ($is_logged_in && $role == 'user') {
         body.role-user .stat-icon.bg-soft-primary { background: #dbeafe; color: #2563eb; }
         body.role-user .stat-icon.bg-soft-success { background: #d1fae5; color: #059669; }
         body.role-user .stat-icon.bg-soft-warning { background: #fef3c7; color: #d97706; }
+        body.role-sales .stat-icon.bg-soft-primary { background: #dbeafe; color: #2563eb; }
+        body.role-sales .stat-icon.bg-soft-success { background: #d1fae5; color: #059669; }
+        body.role-sales .stat-icon.bg-soft-warning { background: #fef3c7; color: #d97706; }
         .btn { border-radius: 10px; font-weight: 600; padding: 8px 16px; font-size: 14px; }
         .btn-primary { background: #1e3a8a; border: none; }
         .btn-primary:hover { background: #1e40af; }
@@ -418,6 +442,12 @@ if ($is_logged_in && $role == 'user') {
             .top-bar .user-info .name { font-size: 14px; }
             .card-premium { padding: 15px; }
             .stat-icon { width: 40px; height: 40px; font-size: 18px; }
+        }
+
+        /* ====== Sales Team Badge Color ====== */
+        .badge-sales {
+            background: #f59e0b;
+            color: #000;
         }
     </style>
 </head>
@@ -461,6 +491,7 @@ if ($is_logged_in && $role == 'user') {
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
     
     <?php if ($role == 'admin'): ?>
+        <!-- ====== ADMIN SIDEBAR ====== -->
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <?php if (hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
@@ -469,10 +500,12 @@ if ($is_logged_in && $role == 'user') {
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
-<li><a href="admin_sales_team.php"><i class="fas fa-users"></i> Sales Team</a></li>
-<li><a href="sales_leads.php"><i class="fas fa-tasks"></i> Leads</a></li>
-<li><a href="sales_lead_upload.php"><i class="fas fa-upload"></i> Upload Leads</a></li>
-<li><a href="sales_lead_add.php"><i class="fas fa-plus"></i> Add Lead</a></li>
+            
+            <!-- ====== 🔥 SALES CRM LINKS (Admin) ====== -->
+            <a href="admin_sales_team.php"><i class="fas fa-users"></i> <span>Sales Team</span></a>
+            <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>Leads</span></a>
+            <a href="sales_lead_upload.php"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
+            <a href="sales_lead_add.php"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
         <?php endif; ?>
         <?php if (hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
@@ -509,7 +542,18 @@ if ($is_logged_in && $role == 'user') {
         <?php endif; ?>
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         
+    <?php elseif ($role == 'sales'): ?>
+        <!-- ====== 🔥 SALES TEAM SIDEBAR ====== -->
+        <a href="sales_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
+        <a href="sales_lead_upload.php"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
+        <a href="sales_lead_add.php"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
+        <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
+        <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
+        <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
+        
     <?php else: ?>
+        <!-- ====== REGULAR USER SIDEBAR ====== -->
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
@@ -535,10 +579,10 @@ if ($is_logged_in && $role == 'user') {
                 <i class="fas fa-bars"></i>
             </button>
             <div class="user-info">
-                <i class="fas fa-user-circle" style="font-size:32px; <?= ($role=='admin')?'color:#1e3a8a;':'color:#10b981;' ?>"></i>
+                <i class="fas fa-user-circle" style="font-size:32px; <?= ($role=='admin')?'color:#1e3a8a;':(($role=='sales')?'color:#f59e0b;':'color:#10b981;') ?>"></i>
                 <div>
                     <div class="name"><?= htmlspecialchars($_SESSION['user_name']) ?>
-                        <span class="badge-role badge <?= ($role=='admin')?'bg-primary':'bg-success' ?>"><?= strtoupper($role) ?></span>
+                        <span class="badge-role badge <?= ($role=='admin')?'bg-primary':(($role=='sales')?'badge-sales':'bg-success') ?>"><?= strtoupper($role) ?></span>
                     </div>
                     <?php if ($role == 'user'): ?>
                         <div class="user-dates">
