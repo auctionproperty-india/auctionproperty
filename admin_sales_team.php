@@ -68,6 +68,11 @@ if ($action == 'edit' && $id) {
 }
 ?>
 <div class="container-fluid mt-4">
+    <div class="mb-3">
+        <a href="admin_permissions.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Sub-Admins</a>
+        <a href="sales_leads.php" class="btn btn-success"><i class="fas fa-tasks"></i> View All Leads</a>
+    </div>
+
     <h1>👥 Sales Team Management</h1>
     <?php if (isset($_GET['msg'])): ?>
         <div class="alert alert-success"><?= $_GET['msg'] == 'added' ? '✅ Member added' : ($_GET['msg'] == 'updated' ? '✅ Member updated' : '✅ Member deleted') ?></div>
