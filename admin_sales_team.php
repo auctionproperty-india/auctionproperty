@@ -1,4 +1,6 @@
 <?php
+ob_start(); // Start output buffering to prevent "headers already sent" errors
+
 require_once __DIR__ . '/db.php';
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: login.php");
@@ -35,6 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("INSERT INTO sales_team (user_id, role, manager_id) VALUES (?, ?, ?)");
             $stmt->execute([$user_id, $role, $manager_id]);
             
+            // Redirect with success message
+            ob_end_clean(); // Clear buffer before redirect
             header("Location: admin_sales_team.php?msg=added");
             exit;
         }
@@ -44,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $manager_id = !empty($_POST['manager_id']) ? (int)$_POST['manager_id'] : null;
         $stmt = $pdo->prepare("UPDATE sales_team SET role = ?, manager_id = ?, updated_at = NOW() WHERE id = ?");
         $stmt->execute([$role, $manager_id, $id]);
+        ob_end_clean();
         header("Location: admin_sales_team.php?msg=updated");
         exit;
     } elseif (isset($_GET['delete'])) {
@@ -51,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ensure not delete self
         $stmt = $pdo->prepare("DELETE FROM sales_team WHERE id = ? AND user_id != ?");
         $stmt->execute([$id, $_SESSION['user_id']]);
+        ob_end_clean();
         header("Location: admin_sales_team.php?msg=deleted");
         exit;
     }
@@ -72,6 +78,9 @@ if ($action == 'edit' && $id) {
     $stmt->execute([$id]);
     $edit_record = $stmt->fetch();
 }
+
+// Flush buffer before displaying HTML
+ob_end_flush();
 ?>
 <div class="container-fluid mt-4">
     <div class="mb-3">
