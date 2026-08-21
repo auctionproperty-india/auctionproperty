@@ -1,5 +1,5 @@
 <?php
-ob_start(); // Start output buffering to prevent "headers already sent" errors
+ob_start(); // Prevent "headers already sent" errors
 
 require_once __DIR__ . '/db.php';
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
@@ -37,8 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("INSERT INTO sales_team (user_id, role, manager_id) VALUES (?, ?, ?)");
             $stmt->execute([$user_id, $role, $manager_id]);
             
-            // Redirect with success message
-            ob_end_clean(); // Clear buffer before redirect
+            ob_end_clean();
             header("Location: admin_sales_team.php?msg=added");
             exit;
         }
@@ -79,7 +78,6 @@ if ($action == 'edit' && $id) {
     $edit_record = $stmt->fetch();
 }
 
-// Flush buffer before displaying HTML
 ob_end_flush();
 ?>
 <div class="container-fluid mt-4">
