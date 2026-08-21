@@ -55,68 +55,77 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_permissions'])) {
 
 include 'header.php'; 
 
-// ===== 🔥 FIX: सिर्फ Admin/SubAdmin (role = 'admin') दिखाएँ, बाकी Users नहीं =====
-$users = $pdo->query("SELECT * FROM users WHERE is_super_admin = FALSE AND role = 'admin' ORDER BY id DESC")->fetchAll();
+// ===== 🔥 FIX: अब role = 'admin' या 'sub_admin' दोनों दिखेंगे =====
+$users = $pdo->query("SELECT * FROM users WHERE is_super_admin = FALSE AND (role = 'admin' OR role = 'sub_admin') ORDER BY id DESC")->fetchAll();
 ?>
-<div class="card-premium mb-4" style="border-left:4px solid #2563eb;">
-    <h4><i class="fas fa-user-plus me-2"></i>Create New Sub-Admin</h4>
-    <?php if(isset($error)) echo "<div class='alert alert-danger'>$error</div>"; ?>
-    <form method="POST">
-        <div class="row g-3">
-            <div class="col-md-3"><input type="text" name="name" class="form-control" placeholder="Full Name" required></div>
-            <div class="col-md-3"><input type="email" name="email" class="form-control" placeholder="Email" required></div>
-            <div class="col-md-3"><input type="text" name="password" class="form-control" placeholder="Password" required></div>
-            <div class="col-md-3"><button type="submit" name="create_subadmin" class="btn btn-success w-100"><i class="fas fa-user-shield"></i> Create</button></div>
-        </div>
-        <hr>
-        <p class="fw-bold">Assign Permissions:</p>
-        <div class="row g-2">
-            <?php 
-            $all_modules = ['properties'=>'🏠 Properties','users'=>'👥 Users','packages'=>'📦 Packages','subscriptions'=>'📋 Subscriptions','settings'=>'⚙️ Settings','referrals'=>'💰 Referrals','accounting'=>'💰 Accounting'];
-            foreach($all_modules as $key => $label): ?>
-            <div class="col-md-3">
-                <div class="card p-2 text-center bg-light">
-                    <small class="fw-bold"><?= $label ?></small>
-                    <div><input class="form-check-input" type="checkbox" name="view_<?= $key ?>" checked> View</div>
-                    <div><input class="form-check-input" type="checkbox" name="edit_<?= $key ?>" checked> Edit</div>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        </div>
-    </form>
-</div>
+<div class="container-fluid mt-4">
+    <!-- Sales CRM Quick Link -->
+    <div class="mb-3">
+        <a href="admin_sales_team.php" class="btn btn-primary"><i class="fas fa-users"></i> Sales Team Management</a>
+        <a href="sales_leads.php" class="btn btn-success"><i class="fas fa-tasks"></i> All Leads</a>
+        <a href="sales_lead_upload.php" class="btn btn-warning"><i class="fas fa-upload"></i> Upload Leads</a>
+    </div>
 
-<div class="card-premium">
-    <h4><i class="fas fa-users-cog me-2"></i>Manage Sub-Admins</h4>
-    <?php if(isset($_GET['created'])) echo "<div class='alert alert-success'>✅ Created!</div>"; ?>
-    <?php if(isset($_GET['saved'])) echo "<div class='alert alert-success'>✅ Saved!</div>"; ?>
-    <div class="table-responsive">
-        <table class="table table-bordered">
-            <thead><tr><th>Sub-Admin</th><th>Properties</th><th>Users</th><th>Packages</th><th>Subscriptions</th><th>Settings</th><th>Referrals</th><th>Accounting</th><th>Action</th></tr></thead>
-            <tbody>
-            <?php if(count($users)>0) {
-                foreach($users as $u): 
-                    $perms = getUserPermissions($u['id'], $pdo);
-            ?>
-                <form method="POST"><input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                    <tr>
-                        <td><?= htmlspecialchars($u['name']) ?><br><small><?= $u['email'] ?></small></td>
-                        <?php $modules = ['properties','users','packages','subscriptions','settings','referrals','accounting']; 
-                        foreach($modules as $mod): 
-                            $view = $perms[$mod]['view'] ?? false;
-                            $edit = $perms[$mod]['edit'] ?? false;
-                        ?>
-                        <td>
-                            <div><input class="form-check-input" type="checkbox" name="view_<?= $mod ?>" <?= $view?'checked':'' ?>> V</div>
-                            <div><input class="form-check-input" type="checkbox" name="edit_<?= $mod ?>" <?= $edit?'checked':'' ?>> E</div>
-                        </td>
-                        <?php endforeach; ?>
-                        <td><button type="submit" name="save_permissions" class="btn btn-sm btn-primary">Save</button></td>
-                    </tr>
-                </form>
-            <?php endforeach; } else { echo "<tr><td colspan='9' class='text-center'>No Sub-Admins.</td></tr>"; } ?>
-            </tbody>
-        </table>
+    <div class="card-premium mb-4" style="border-left:4px solid #2563eb;">
+        <h4><i class="fas fa-user-plus me-2"></i>Create New Sub-Admin</h4>
+        <?php if(isset($error)) echo "<div class='alert alert-danger'>$error</div>"; ?>
+        <form method="POST">
+            <div class="row g-3">
+                <div class="col-md-3"><input type="text" name="name" class="form-control" placeholder="Full Name" required></div>
+                <div class="col-md-3"><input type="email" name="email" class="form-control" placeholder="Email" required></div>
+                <div class="col-md-3"><input type="text" name="password" class="form-control" placeholder="Password" required></div>
+                <div class="col-md-3"><button type="submit" name="create_subadmin" class="btn btn-success w-100"><i class="fas fa-user-shield"></i> Create</button></div>
+            </div>
+            <hr>
+            <p class="fw-bold">Assign Permissions:</p>
+            <div class="row g-2">
+                <?php 
+                $all_modules = ['properties'=>'🏠 Properties','users'=>'👥 Users','packages'=>'📦 Packages','subscriptions'=>'📋 Subscriptions','settings'=>'⚙️ Settings','referrals'=>'💰 Referrals','accounting'=>'💰 Accounting'];
+                foreach($all_modules as $key => $label): ?>
+                <div class="col-md-3">
+                    <div class="card p-2 text-center bg-light">
+                        <small class="fw-bold"><?= $label ?></small>
+                        <div><input class="form-check-input" type="checkbox" name="view_<?= $key ?>" checked> View</div>
+                        <div><input class="form-check-input" type="checkbox" name="edit_<?= $key ?>" checked> Edit</div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </form>
+    </div>
+
+    <div class="card-premium">
+        <h4><i class="fas fa-users-cog me-2"></i>Manage Sub-Admins</h4>
+        <?php if(isset($_GET['created'])) echo "<div class='alert alert-success'>✅ Created!</div>"; ?>
+        <?php if(isset($_GET['saved'])) echo "<div class='alert alert-success'>✅ Saved!</div>"; ?>
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead><tr><th>Sub-Admin</th><th>Properties</th><th>Users</th><th>Packages</th><th>Subscriptions</th><th>Settings</th><th>Referrals</th><th>Accounting</th><th>Action</th></tr></thead>
+                <tbody>
+                <?php if(count($users)>0) {
+                    foreach($users as $u): 
+                        $perms = getUserPermissions($u['id'], $pdo);
+                ?>
+                    <form method="POST"><input type="hidden" name="user_id" value="<?= $u['id'] ?>">
+                        <tr>
+                            <td><?= htmlspecialchars($u['name']) ?><br><small><?= $u['email'] ?></small></td>
+                            <?php $modules = ['properties','users','packages','subscriptions','settings','referrals','accounting']; 
+                            foreach($modules as $mod): 
+                                $view = $perms[$mod]['view'] ?? false;
+                                $edit = $perms[$mod]['edit'] ?? false;
+                            ?>
+                            <td>
+                                <div><input class="form-check-input" type="checkbox" name="view_<?= $mod ?>" <?= $view?'checked':'' ?>> V</div>
+                                <div><input class="form-check-input" type="checkbox" name="edit_<?= $mod ?>" <?= $edit?'checked':'' ?>> E</div>
+                            </td>
+                            <?php endforeach; ?>
+                            <td><button type="submit" name="save_permissions" class="btn btn-sm btn-primary">Save</button></td>
+                        </tr>
+                    </form>
+                <?php endforeach; } else { echo "<tr><td colspan='9' class='text-center'>No Sub-Admins found.</td></tr>"; } ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 <?php include 'footer.php'; ?>
