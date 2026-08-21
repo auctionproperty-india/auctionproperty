@@ -1,6 +1,10 @@
 <?php
+// ============================================================
+// sales_leads.php – List All Leads with Hierarchy
+// ============================================================
+
 require_once __DIR__ . '/db.php';
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['role'] != 'sales')) {
     header("Location: login.php");
     exit;
 }
@@ -9,7 +13,7 @@ include 'header.php';
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'];
 
-// Helper: get subordinate team IDs (including self)
+// Recursive function for subordinates
 function getSubordinateIds($pdo, $team_id) {
     $ids = [$team_id];
     $children = $pdo->prepare("SELECT id FROM sales_team WHERE manager_id = ?");
@@ -24,7 +28,7 @@ if ($role == 'admin') {
     // Admin sees all leads
     $leads = $pdo->query("SELECT l.*, u.name as assigned_name FROM leads l JOIN sales_team st ON l.assigned_to = st.id JOIN users u ON st.user_id = u.id ORDER BY l.created_at DESC")->fetchAll();
 } else {
-    // Sales person: get their team id
+    // Sales person sees own and subordinates
     $stmt = $pdo->prepare("SELECT id FROM sales_team WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $team_id = $stmt->fetchColumn();
@@ -42,7 +46,7 @@ if ($role == 'admin') {
 }
 ?>
 <div class="container-fluid mt-4">
-    <h1>📋 Leads</h1>
+    <h1>📋 All Leads</h1>
     <div class="mb-3">
         <a href="sales_lead_upload.php" class="btn btn-primary"><i class="fas fa-upload"></i> Upload Leads</a>
         <a href="sales_lead_add.php" class="btn btn-success"><i class="fas fa-plus"></i> Add Manual Lead</a>
