@@ -1,16 +1,28 @@
 <?php
+// ============================================================
+// sales_lead_add.php – Manual Lead Entry
+// ============================================================
+
 require_once __DIR__ . '/db.php';
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin' && !$pdo->prepare("SELECT id FROM sales_team WHERE user_id = ?")->execute([$_SESSION['user_id']])) {
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['role'] != 'sales')) {
     header("Location: login.php");
     exit;
 }
 include 'header.php';
 
+$user_id = $_SESSION['user_id'];
+$role = $_SESSION['role'];
+
 $team_id = null;
-if ($_SESSION['role'] != 'admin') {
+if ($role == 'sales') {
     $stmt = $pdo->prepare("SELECT id FROM sales_team WHERE user_id = ?");
-    $stmt->execute([$_SESSION['user_id']]);
+    $stmt->execute([$user_id]);
     $team_id = $stmt->fetchColumn();
+    if (!$team_id) {
+        echo "<div class='alert alert-danger'>You are not assigned to any sales team.</div>";
+        include 'footer.php';
+        exit;
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -21,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $city = $_POST['city'];
     $state = $_POST['state'];
     $source = $_POST['source'] ?? 'Manual';
-    $assigned_to = $_SESSION['role'] == 'admin' ? $_POST['assigned_to'] : $team_id;
+    $assigned_to = ($role == 'admin') ? $_POST['assigned_to'] : $team_id;
 
     $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([$name, $phone, $email, $address, $city, $state, $source, $assigned_to, $_SESSION['user_id']]);
@@ -39,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="col-md-6"><label>State</label><input type="text" name="state" class="form-control"></div>
             <div class="col-md-6"><label>Address</label><textarea name="address" class="form-control"></textarea></div>
             <div class="col-md-6"><label>Source</label><input type="text" name="source" class="form-control" placeholder="e.g., Website, Call, Referral"></div>
-            <?php if ($_SESSION['role'] == 'admin'): ?>
+            <?php if ($role == 'admin'): ?>
                 <div class="col-md-6">
                     <label>Assign to (Sales Person)</label>
                     <select name="assigned_to" class="form-control">
