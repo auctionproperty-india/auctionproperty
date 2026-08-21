@@ -9,22 +9,32 @@ include 'header.php';
 $action = $_GET['action'] ?? 'list';
 $id = $_GET['id'] ?? 0;
 $message = '';
+$error = '';
 
 // ---- Handle Add/Edit/Delete ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add'])) {
-        $user_id = (int)$_POST['user_id'];
+        $name = trim($_POST['name']);
+        $email = trim($_POST['email']);
+        $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
         $role = $_POST['role'];
         $manager_id = !empty($_POST['manager_id']) ? (int)$_POST['manager_id'] : null;
-        // check user not already in sales_team
-        $check = $pdo->prepare("SELECT id FROM sales_team WHERE user_id = ?");
-        $check->execute([$user_id]);
+        
+        // Check if email already exists
+        $check = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+        $check->execute([$email]);
         if ($check->fetch()) {
-            $message = "User is already in sales team.";
+            $error = "❌ Email already registered!";
         } else {
+            // Insert user with role 'sales'
+            $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role, status, created_at) VALUES (?, ?, ?, 'sales', 'active', NOW())");
+            $stmt->execute([$name, $email, $password]);
+            $user_id = $pdo->lastInsertId();
+            
+            // Add to sales_team
             $stmt = $pdo->prepare("INSERT INTO sales_team (user_id, role, manager_id) VALUES (?, ?, ?)");
             $stmt->execute([$user_id, $role, $manager_id]);
-            $message = "Member added.";
+            
             header("Location: admin_sales_team.php?msg=added");
             exit;
         }
@@ -34,7 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $manager_id = !empty($_POST['manager_id']) ? (int)$_POST['manager_id'] : null;
         $stmt = $pdo->prepare("UPDATE sales_team SET role = ?, manager_id = ?, updated_at = NOW() WHERE id = ?");
         $stmt->execute([$role, $manager_id, $id]);
-        $message = "Member updated.";
         header("Location: admin_sales_team.php?msg=updated");
         exit;
     } elseif (isset($_GET['delete'])) {
@@ -56,13 +65,10 @@ $team = $pdo->query("
     ORDER BY st.id
 ")->fetchAll();
 
-// ---- Fetch users not in sales_team for dropdown ----
-$non_sales = $pdo->query("SELECT id, name, email FROM users WHERE id NOT IN (SELECT user_id FROM sales_team) AND status = 'active'")->fetchAll();
-
 // ---- For edit, fetch current record ----
 $edit_record = null;
 if ($action == 'edit' && $id) {
-    $stmt = $pdo->prepare("SELECT * FROM sales_team WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT st.*, u.name, u.email FROM sales_team st JOIN users u ON st.user_id = u.id WHERE st.id = ?");
     $stmt->execute([$id]);
     $edit_record = $stmt->fetch();
 }
@@ -77,12 +83,17 @@ if ($action == 'edit' && $id) {
     <?php if (isset($_GET['msg'])): ?>
         <div class="alert alert-success"><?= $_GET['msg'] == 'added' ? '✅ Member added' : ($_GET['msg'] == 'updated' ? '✅ Member updated' : '✅ Member deleted') ?></div>
     <?php endif; ?>
-    <?php if ($message) echo "<div class='alert alert-info'>$message</div>"; ?>
+    <?php if ($error): ?>
+        <div class="alert alert-danger"><?= $error ?></div>
+    <?php endif; ?>
+    <?php if ($message): ?>
+        <div class="alert alert-info"><?= $message ?></div>
+    <?php endif; ?>
 
     <!-- Add/Edit Form -->
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">
-            <?= $edit_record ? 'Edit Member' : 'Add New Member' ?>
+            <?= $edit_record ? 'Edit Member' : '➕ Add New Sales Team Member' ?>
         </div>
         <div class="card-body">
             <form method="POST">
@@ -93,22 +104,34 @@ if ($action == 'edit' && $id) {
                     <input type="hidden" name="add" value="1">
                 <?php endif; ?>
                 <div class="row g-3">
+                    <?php if (!$edit_record): ?>
+                        <!-- New User Fields (only for Add) -->
+                        <div class="col-md-4">
+                            <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" placeholder="Enter full name" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" name="email" class="form-control" placeholder="Enter email" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Password <span class="text-danger">*</span></label>
+                            <input type="text" name="password" class="form-control" placeholder="Enter password" required>
+                        </div>
+                    <?php else: ?>
+                        <!-- Edit Mode: show user info (read-only) -->
+                        <div class="col-md-6">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" value="<?= htmlspecialchars($edit_record['name']) ?>" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="text" class="form-control" value="<?= htmlspecialchars($edit_record['email']) ?>" disabled>
+                        </div>
+                    <?php endif; ?>
+                    
                     <div class="col-md-4">
-                        <label class="form-label">User</label>
-                        <?php if ($edit_record): ?>
-                            <input type="text" class="form-control" value="<?= htmlspecialchars($edit_record['user_id']) ?>" disabled>
-                            <input type="hidden" name="user_id" value="<?= $edit_record['user_id'] ?>">
-                        <?php else: ?>
-                            <select name="user_id" class="form-control" required>
-                                <option value="">Select User</option>
-                                <?php foreach ($non_sales as $u): ?>
-                                    <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name'] . ' (' . $u['email'] . ')') ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        <?php endif; ?>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Role</label>
+                        <label class="form-label">Role <span class="text-danger">*</span></label>
                         <select name="role" class="form-control" required>
                             <option value="RM" <?= ($edit_record && $edit_record['role']=='RM')?'selected':'' ?>>RM - Relationship Manager</option>
                             <option value="TL" <?= ($edit_record && $edit_record['role']=='TL')?'selected':'' ?>>TL - Team Lead</option>
@@ -128,7 +151,7 @@ if ($action == 'edit' && $id) {
                         </select>
                     </div>
                     <div class="col-12">
-                        <button type="submit" class="btn btn-primary"><?= $edit_record ? 'Update' : 'Add' ?></button>
+                        <button type="submit" class="btn btn-primary"><?= $edit_record ? 'Update' : 'Create & Add' ?></button>
                         <?php if ($edit_record): ?>
                             <a href="admin_sales_team.php" class="btn btn-secondary">Cancel</a>
                         <?php endif; ?>
