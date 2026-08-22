@@ -29,35 +29,80 @@ if ($role == 'admin') {
     $sales_users = $pdo->query("SELECT st.id, u.name FROM sales_team st JOIN users u ON st.user_id = u.id")->fetchAll();
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
-    $file = $_FILES['lead_file']['tmp_name'];
-    $assigned_to = $_POST['assigned_to'] ?? $team_id;
-    $count = 0;
+$message = '';
+$count = 0;
 
-    if (($handle = fopen($file, "r")) !== FALSE) {
-        $header = fgetcsv($handle); // skip header
-        while (($data = fgetcsv($handle)) !== FALSE) {
-            list($name, $phone, $email, $address, $city, $state, $source) = array_pad($data, 7, '');
-            if (empty($name) || empty($phone)) continue;
-            $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $phone, $email, $address, $city, $state, $source ?: 'Excel Upload', $assigned_to, $_SESSION['user_id']]);
-            $count++;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
+    $file = $_FILES['lead_file'];
+    $tmp_name = $file['tmp_name'];
+    $name = $file['name'];
+    $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    $assigned_to = $_POST['assigned_to'] ?? $team_id;
+
+    // Check if file is CSV or Excel
+    if ($extension === 'csv') {
+        // --- CSV Parse ---
+        if (($handle = fopen($tmp_name, "r")) !== FALSE) {
+            $header = fgetcsv($handle); // skip header
+            while (($data = fgetcsv($handle)) !== FALSE) {
+                list($name_col, $phone, $email, $address, $city, $state, $source) = array_pad($data, 7, '');
+                if (empty($name_col) || empty($phone)) continue;
+                $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$name_col, $phone, $email, $address, $city, $state, $source ?: 'Excel Upload', $assigned_to, $_SESSION['user_id']]);
+                $count++;
+            }
+            fclose($handle);
+            $message = "✅ $count leads uploaded successfully!";
+        } else {
+            $message = "❌ Failed to open CSV file.";
         }
-        fclose($handle);
-        echo "<div class='alert alert-success'>✅ $count leads uploaded successfully!</div>";
+    } elseif (in_array($extension, ['xlsx', 'xls'])) {
+        // --- Excel Parse using PhpSpreadsheet ---
+        if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+            require_once __DIR__ . '/vendor/autoload.php';
+            try {
+                $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp_name);
+                $worksheet = $spreadsheet->getActiveSheet();
+                $rows = $worksheet->toArray();
+                // Skip header row
+                $header = array_shift($rows);
+                foreach ($rows as $row) {
+                    list($name_col, $phone, $email, $address, $city, $state, $source) = array_pad($row, 7, '');
+                    if (empty($name_col) || empty($phone)) continue;
+                    $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$name_col, $phone, $email, $address, $city, $state, $source ?: 'Excel Upload', $assigned_to, $_SESSION['user_id']]);
+                    $count++;
+                }
+                $message = "✅ $count leads uploaded successfully from Excel!";
+            } catch (Exception $e) {
+                $message = "❌ Error reading Excel file: " . $e->getMessage();
+            }
+        } else {
+            // PhpSpreadsheet not installed – fallback to CSV conversion note
+            $message = "❌ PhpSpreadsheet library not installed. Please install it via Composer: <code>composer require phpoffice/phpspreadsheet</code><br>Or save your Excel file as CSV and upload again.";
+        }
     } else {
-        echo "<div class='alert alert-danger'>Failed to open file.</div>";
+        $message = "❌ Unsupported file type. Please upload CSV or Excel (.xlsx, .xls) files.";
     }
 }
 ?>
 <div class="container-fluid mt-4">
     <h1>📥 Upload Leads (CSV/Excel)</h1>
-    <p>Upload a CSV file with columns: <strong>Name, Phone, Email, Address, City, State, Source</strong></p>
+    <p>Upload a CSV or Excel file with columns: <strong>Name, Phone, Email, Address, City, State, Source</strong></p>
+
+    <?php if ($message): ?>
+        <div class="alert <?= strpos($message, '✅') !== false ? 'alert-success' : 'alert-danger' ?>">
+            <?= $message ?>
+        </div>
+    <?php endif; ?>
+
     <form method="POST" enctype="multipart/form-data">
         <div class="row g-3">
             <div class="col-md-6">
-                <label class="form-label">Choose CSV File</label>
-                <input type="file" name="lead_file" class="form-control" accept=".csv" required>
+                <label class="form-label">Choose File (CSV or Excel)</label>
+                <!-- 🔥 FIX: accept attribute includes Excel files -->
+                <input type="file" name="lead_file" class="form-control" accept=".csv,.xlsx,.xls" required>
+                <small class="text-muted">Supported: .csv, .xlsx, .xls</small>
             </div>
             <?php if ($role == 'admin'): ?>
             <div class="col-md-6">
