@@ -3,7 +3,7 @@ $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
 $port = getenv('DB_PORT') ?: '6543';
 $dbname = getenv('DB_NAME') ?: 'postgres';
 $user = getenv('DB_USER') ?: 'postgres.bqspzgwpqimjyhispwtp';
-$password = getenv('DB_PASSWORD') ?: 'Dugguai20143';
+$password = getenv('DB_PASSWORD') ?: 'Primeaug2026';
 
 date_default_timezone_set('Asia/Kolkata');
 
