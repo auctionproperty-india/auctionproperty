@@ -1,16 +1,16 @@
 <?php
 // ============================================================
-// db.php – Database Connection + Database Sessions (Permanent)
+// db.php – Database Connection + Database Sessions (Stable)
 // ============================================================
 
-// 1. Read Environment Variables
+// ----- Read environment variables -----
 $host = getenv('DB_HOST') ?: 'localhost';
 $port = getenv('DB_PORT') ?: '5432';
 $dbname = getenv('DB_NAME') ?: 'postgres';
 $user = getenv('DB_USER') ?: 'postgres';
 $password = getenv('DB_PASSWORD') ?: '';
 
-// Fallback to DATABASE_URL if individual vars missing
+// Fallback to DATABASE_URL if individual vars are missing
 $database_url = getenv('DATABASE_URL');
 if ($database_url && (!$host || $host === 'localhost')) {
     $parts = parse_url($database_url);
@@ -23,7 +23,7 @@ if ($database_url && (!$host || $host === 'localhost')) {
 
 date_default_timezone_set('Asia/Kolkata');
 
-// 2. Connect to Database
+// ----- Connect to Supabase -----
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
     $pdo = new PDO($dsn, $user, $password);
@@ -33,7 +33,7 @@ try {
     die("❌ Database Connection Failed: " . $e->getMessage());
 }
 
-// 3. Create sessions table if not exists
+// ----- Create sessions table if not exists (for database sessions) -----
 try {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS sessions (
@@ -43,17 +43,18 @@ try {
         )
     ");
 } catch (PDOException $e) {
-    // ignore
+    // ignore if table already exists
 }
 
-// 4. Initialize Database Session Handler
+// ----- Database session handler -----
 require_once __DIR__ . '/session_handler.php';
+
 $handler = new DatabaseSessionHandler($pdo);
 
 if (session_status() == PHP_SESSION_NONE) {
     session_set_save_handler($handler, true);
     session_set_cookie_params([
-        'lifetime' => 60 * 60 * 24 * 30, // 30 days
+        'lifetime' => 60 * 60 * 24 * 30,
         'path' => '/',
         'domain' => '',
         'secure' => false,
@@ -63,4 +64,5 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-// Now $pdo and $_SESSION are available globally
+// $pdo is now globally available
+?>
