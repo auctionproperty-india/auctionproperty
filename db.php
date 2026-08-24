@@ -1,5 +1,4 @@
 <?php
-// db.php – सिर्फ database connection (बिना session handler)
 $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
 $port = getenv('DB_PORT') ?: '6543';
 $dbname = getenv('DB_NAME') ?: 'postgres';
@@ -15,5 +14,21 @@ try {
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die("❌ Database Connection Failed: " . $e->getMessage());
+}
+
+require_once __DIR__ . '/session_handler.php';
+$handler = new DatabaseSessionHandler($pdo);
+
+if (session_status() == PHP_SESSION_NONE) {
+    session_set_save_handler($handler, true);
+    session_set_cookie_params([
+        'lifetime' => 86400 * 30,
+        'path' => '/',
+        'domain' => '',
+        'secure' => false,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    session_start();
 }
 ?>
