@@ -501,11 +501,7 @@ if ($is_logged_in && $role == 'user') {
             <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
             
-            <!-- ====== 🔥 SALES CRM LINKS (Admin) ====== -->
-            <a href="admin_sales_team.php"><i class="fas fa-users"></i> <span>Sales Team</span></a>
-            <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>Leads</span></a>
-            <a href="sales_lead_upload.php"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
-            <a href="sales_lead_add.php"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
+            
         <?php endif; ?>
         <?php if (hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
@@ -542,15 +538,7 @@ if ($is_logged_in && $role == 'user') {
         <?php endif; ?>
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         
-    <?php elseif ($role == 'sales'): ?>
-        <!-- ====== 🔥 SALES TEAM SIDEBAR ====== -->
-        <a href="sales_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
-        <a href="sales_lead_upload.php"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
-        <a href="sales_lead_add.php"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
-        <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
-        <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
-        <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
+   
         
     <?php else: ?>
         <!-- ====== REGULAR USER SIDEBAR ====== -->
