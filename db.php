@@ -1,18 +1,19 @@
 <?php
 // ============================================================
-// db.php – Supabase Connection (Using Render Environment Variables)
+// db.php – Stable Version (22 Aug से पहले)
 // ============================================================
 
-// ----- Render Variables से सीधे पढ़ें (जैसा screenshot में है) -----
+// ----- Render Environment Variables से पढ़ें -----
 $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
 $port = getenv('DB_PORT') ?: '6543';
 $dbname = getenv('DB_NAME') ?: 'postgres';
 $user = getenv('DB_USER') ?: 'postgres.bqspzgwpqimjyhispwtp';
 $password = getenv('DB_PASSWORD') ?: 'Dugguai20143';
 
+// ----- Timezone -----
 date_default_timezone_set('Asia/Kolkata');
 
-// ----- Supabase से Connect करें -----
+// ----- Database Connection -----
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
     $pdo = new PDO($dsn, $user, $password);
