@@ -1,29 +1,18 @@
 <?php
 // ============================================================
-// db.php – Database Connection + Database Sessions (Stable)
+// db.php – Supabase Connection (Using Render Environment Variables)
 // ============================================================
 
-// ----- Read environment variables -----
-$host = getenv('DB_HOST') ?: 'localhost';
-$port = getenv('DB_PORT') ?: '5432';
+// ----- Render Variables से सीधे पढ़ें (जैसा screenshot में है) -----
+$host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
+$port = getenv('DB_PORT') ?: '6543';
 $dbname = getenv('DB_NAME') ?: 'postgres';
-$user = getenv('DB_USER') ?: 'postgres';
-$password = getenv('DB_PASSWORD') ?: '';
-
-// Fallback to DATABASE_URL if individual vars are missing
-$database_url = getenv('DATABASE_URL');
-if ($database_url && (!$host || $host === 'localhost')) {
-    $parts = parse_url($database_url);
-    $host = $parts['host'];
-    $port = $parts['port'] ?? 5432;
-    $dbname = ltrim($parts['path'], '/');
-    $user = $parts['user'];
-    $password = $parts['pass'];
-}
+$user = getenv('DB_USER') ?: 'postgres.bqspzgwpqimjyhispwtp';
+$password = getenv('DB_PASSWORD') ?: 'Dugguai20143';
 
 date_default_timezone_set('Asia/Kolkata');
 
-// ----- Connect to Supabase -----
+// ----- Supabase से Connect करें -----
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
     $pdo = new PDO($dsn, $user, $password);
@@ -33,28 +22,14 @@ try {
     die("❌ Database Connection Failed: " . $e->getMessage());
 }
 
-// ----- Create sessions table if not exists (for database sessions) -----
-try {
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS sessions (
-            id VARCHAR(128) NOT NULL PRIMARY KEY,
-            data TEXT NOT NULL,
-            access TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    ");
-} catch (PDOException $e) {
-    // ignore if table already exists
-}
-
-// ----- Database session handler -----
+// ----- Session Handler (Database-based) -----
 require_once __DIR__ . '/session_handler.php';
-
 $handler = new DatabaseSessionHandler($pdo);
 
 if (session_status() == PHP_SESSION_NONE) {
     session_set_save_handler($handler, true);
     session_set_cookie_params([
-        'lifetime' => 60 * 60 * 24 * 30,
+        'lifetime' => 86400 * 30,
         'path' => '/',
         'domain' => '',
         'secure' => false,
@@ -64,5 +39,5 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-// $pdo is now globally available
+// $pdo अब globally available है
 ?>
