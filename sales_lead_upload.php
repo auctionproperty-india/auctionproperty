@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// sales_lead_upload.php – CSV & XLSX Upload (No Libraries Required)
+// sales_lead_upload.php – Auto‑Map Any CSV/XLSX Format
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -32,19 +32,34 @@ if ($role == 'admin') {
 $message = '';
 $count = 0;
 
-// ============================================================
-// 🔥 CORE FUNCTION: Parse XLSX without external libraries
-// ============================================================
+// ---------- Auto‑detect delimiter for CSV ----------
+function detectDelimiter($filePath) {
+    $fh = fopen($filePath, 'r');
+    $firstLine = fgets($fh);
+    fclose($fh);
+    $delimiters = [',', "\t", ';', '|'];
+    $results = [];
+    foreach ($delimiters as $d) {
+        $count = substr_count($firstLine, $d);
+        if ($count > 0) {
+            $results[$d] = $count;
+        }
+    }
+    if (empty($results)) return ',';
+    arsort($results);
+    return key($results);
+}
+
+// ---------- Parse XLSX without external libraries ----------
 function parseXLSX($filePath) {
     $data = [];
     if (!class_exists('ZipArchive')) {
-        return ['error' => 'ZipArchive extension is required to read XLSX files.'];
+        return ['error' => 'ZipArchive extension is required.'];
     }
     $zip = new ZipArchive();
     if ($zip->open($filePath) !== true) {
         return ['error' => 'Cannot open XLSX file.'];
     }
-    // Read shared strings (for text values)
     $sharedStrings = [];
     $xml = $zip->getFromName('xl/sharedStrings.xml');
     if ($xml !== false) {
@@ -52,7 +67,6 @@ function parseXLSX($filePath) {
         $dom->loadXML($xml);
         $strings = $dom->getElementsByTagName('si');
         foreach ($strings as $si) {
-            // Get all <t> elements (there might be multiple for formatted text)
             $text = '';
             $children = $si->childNodes;
             foreach ($children as $child) {
@@ -63,7 +77,6 @@ function parseXLSX($filePath) {
             $sharedStrings[] = $text;
         }
     }
-    // Read sheet data
     $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
     if ($xml === false) {
         return ['error' => 'Sheet1 not found.'];
@@ -80,7 +93,6 @@ function parseXLSX($filePath) {
             $vNode = $cell->getElementsByTagName('v')->item(0);
             if ($vNode) {
                 if ($type === 's') {
-                    // Shared string
                     $idx = (int)$vNode->nodeValue;
                     $value = $sharedStrings[$idx] ?? '';
                 } else {
@@ -97,9 +109,14 @@ function parseXLSX($filePath) {
     return ['data' => $data];
 }
 
-// ============================================================
-// Handle Upload
-// ============================================================
+// ---------- Normalize header column name ----------
+function normalizeHeader($col) {
+    $col = trim($col);
+    $col = str_replace([' ', '_', '-', '.'], '', $col);
+    return strtolower($col);
+}
+
+// ---------- Handle file upload ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
     $file = $_FILES['lead_file'];
     $tmp_name = $file['tmp_name'];
@@ -108,48 +125,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
     $assigned_to = $_POST['assigned_to'] ?? $team_id;
 
     $rows = [];
+    $delimiter = ',';
 
-    // --- CSV ---
+    // ---------- CSV ----------
     if ($extension === 'csv') {
+        $delimiter = detectDelimiter($tmp_name);
         if (($handle = fopen($tmp_name, "r")) !== FALSE) {
-            $header = fgetcsv($handle);
-            while (($data = fgetcsv($handle)) !== FALSE) {
-                $rows[] = array_pad($data, 7, '');
+            while (($data = fgetcsv($handle, 0, $delimiter)) !== FALSE) {
+                $rows[] = $data;
             }
             fclose($handle);
         } else {
             $message = "❌ Failed to open CSV file.";
         }
     }
-    // --- XLSX ---
+    // ---------- XLSX ----------
     elseif ($extension === 'xlsx') {
         $result = parseXLSX($tmp_name);
         if (isset($result['error'])) {
             $message = "❌ " . $result['error'];
         } else {
             $rows = $result['data'];
-            // Remove header row if present
-            if (!empty($rows)) {
-                array_shift($rows);
-            }
         }
-    }
-    // --- XLS (older Excel) ---
-    elseif ($extension === 'xls') {
-        $message = "❌ .xls files are not supported. Please save the file as .xlsx or .csv and upload again.";
     }
     else {
         $message = "❌ Unsupported file type. Please upload CSV or XLSX.";
     }
 
-    // Insert rows
+    // ---------- Process rows with header mapping ----------
     if (!empty($rows) && empty($message)) {
+        // Extract header (first row)
+        $header = array_shift($rows);
+        // Normalize header columns
+        $headerMap = [];
+        foreach ($header as $idx => $col) {
+            $normal = normalizeHeader($col);
+            $headerMap[$idx] = $normal;
+        }
+
+        // Define target fields and their aliases
+        $fieldMap = [
+            'name' => ['full_name', 'name', 'customer', 'client', 'fullname'],
+            'phone' => ['phone_number', 'phone', 'mobile', 'contact', 'phoneno'],
+            'email' => ['email', 'mail', 'e-mail'],
+            'address' => ['address', 'addr', 'location'],
+            'city' => ['city', 'town', 'district'],
+            'state' => ['state', 'province', 'region'],
+            'source' => ['source', 'lead_source', 'origin'],
+        ];
+
+        // Determine column indexes
+        $colIndex = [];
+        foreach ($fieldMap as $field => $aliases) {
+            $found = false;
+            foreach ($headerMap as $idx => $normal) {
+                if (in_array($normal, $aliases)) {
+                    $colIndex[$field] = $idx;
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
+                $colIndex[$field] = null; // no column found
+            }
+        }
+
+        // Also capture extra columns (all others) to store as notes
+        $extraColumns = [];
+        foreach ($headerMap as $idx => $normal) {
+            $isMapped = false;
+            foreach ($fieldMap as $field => $aliases) {
+                if (in_array($normal, $aliases)) {
+                    $isMapped = true;
+                    break;
+                }
+            }
+            if (!$isMapped) {
+                $extraColumns[$idx] = $normal;
+            }
+        }
+
+        // Insert rows
         $inserted = 0;
         foreach ($rows as $row) {
-            list($name_col, $phone, $email, $address, $city, $state, $source) = array_pad($row, 7, '');
-            if (empty($name_col) || empty($phone)) continue;
-            $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name_col, $phone, $email, $address, $city, $state, $source ?: 'Excel Upload', $assigned_to, $_SESSION['user_id']]);
+            // If row has fewer columns than header, pad
+            $row = array_pad($row, count($header), '');
+
+            // Extract mapped fields
+            $name    = isset($colIndex['name']) && isset($row[$colIndex['name']]) ? trim($row[$colIndex['name']]) : '';
+            $phone   = isset($colIndex['phone']) && isset($row[$colIndex['phone']]) ? trim($row[$colIndex['phone']]) : '';
+            $email   = isset($colIndex['email']) && isset($row[$colIndex['email']]) ? trim($row[$colIndex['email']]) : '';
+            $address = isset($colIndex['address']) && isset($row[$colIndex['address']]) ? trim($row[$colIndex['address']]) : '';
+            $city    = isset($colIndex['city']) && isset($row[$colIndex['city']]) ? trim($row[$colIndex['city']]) : '';
+            $state   = isset($colIndex['state']) && isset($row[$colIndex['state']]) ? trim($row[$colIndex['state']]) : '';
+            $source  = isset($colIndex['source']) && isset($row[$colIndex['source']]) ? trim($row[$colIndex['source']]) : 'File Upload';
+
+            // Build notes from extra columns
+            $notes = '';
+            foreach ($extraColumns as $idx => $colName) {
+                if (isset($row[$idx]) && trim($row[$idx]) !== '') {
+                    $notes .= $colName . ': ' . trim($row[$idx]) . ' | ';
+                }
+            }
+            $notes = rtrim($notes, ' | ');
+
+            // Skip if name or phone is empty
+            if (empty($name) || empty($phone)) continue;
+
+            // Insert
+            $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $phone, $email, $address, $city, $state, $source ?: 'File Upload', $assigned_to, $_SESSION['user_id'], $notes]);
             $inserted++;
         }
         $message = "✅ $inserted leads uploaded successfully!";
@@ -158,10 +243,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
     }
 }
 ?>
+
 <div class="container-fluid mt-4">
     <h1>📥 Upload Leads</h1>
-    <p>Upload a <strong>CSV</strong> or <strong>Excel (.xlsx)</strong> file with columns:<br>
-    <code>Name, Phone, Email, Address, City, State, Source</code></p>
+    <p>Upload a <strong>CSV</strong> or <strong>Excel (.xlsx)</strong> file with any column format.<br>
+    The script will automatically detect and map columns like <code>Name</code>, <code>Phone</code>, <code>City</code>, etc.</p>
 
     <?php if ($message): ?>
         <div class="alert <?= strpos($message, '✅') !== false ? 'alert-success' : 'alert-danger' ?>">
@@ -211,10 +297,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
         $state = trim($_POST['manual_state']);
         $source = trim($_POST['manual_source']) ?: 'Manual Entry';
         $assigned_to = ($role == 'admin') ? $_POST['manual_assigned_to'] : $team_id;
+        $notes = trim($_POST['manual_notes']);
 
         if (!empty($name) && !empty($phone)) {
-            $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $phone, $email, $address, $city, $state, $source, $assigned_to, $_SESSION['user_id']]);
+            $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $phone, $email, $address, $city, $state, $source, $assigned_to, $_SESSION['user_id'], $notes]);
             echo "<div class='alert alert-success'>✅ Lead added manually!</div>";
         } else {
             echo "<div class='alert alert-danger'>Name and Phone are required.</div>";
@@ -231,6 +318,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
             <div class="col-md-4"><label>State</label><input type="text" name="manual_state" class="form-control"></div>
             <div class="col-md-4"><label>Address</label><input type="text" name="manual_address" class="form-control"></div>
             <div class="col-md-4"><label>Source</label><input type="text" name="manual_source" class="form-control" placeholder="e.g., Call, Website"></div>
+            <div class="col-md-4"><label>Notes</label><input type="text" name="manual_notes" class="form-control" placeholder="Additional info"></div>
             <?php if ($role == 'admin'): ?>
             <div class="col-md-4">
                 <label>Assign to</label>
