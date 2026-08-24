@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// sales_lead_upload.php – CSV/Excel Upload with Auto-Detect
+// sales_lead_upload.php – CSV & XLSX Upload (No Libraries Required)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -32,13 +32,74 @@ if ($role == 'admin') {
 $message = '';
 $count = 0;
 
-// ---- Load PhpSpreadsheet if installed ----
-$hasSpreadsheet = false;
-if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-    $hasSpreadsheet = true;
+// ============================================================
+// 🔥 CORE FUNCTION: Parse XLSX without external libraries
+// ============================================================
+function parseXLSX($filePath) {
+    $data = [];
+    if (!class_exists('ZipArchive')) {
+        return ['error' => 'ZipArchive extension is required to read XLSX files.'];
+    }
+    $zip = new ZipArchive();
+    if ($zip->open($filePath) !== true) {
+        return ['error' => 'Cannot open XLSX file.'];
+    }
+    // Read shared strings (for text values)
+    $sharedStrings = [];
+    $xml = $zip->getFromName('xl/sharedStrings.xml');
+    if ($xml !== false) {
+        $dom = new DOMDocument();
+        $dom->loadXML($xml);
+        $strings = $dom->getElementsByTagName('si');
+        foreach ($strings as $si) {
+            // Get all <t> elements (there might be multiple for formatted text)
+            $text = '';
+            $children = $si->childNodes;
+            foreach ($children as $child) {
+                if ($child instanceof DOMElement && $child->tagName === 't') {
+                    $text .= $child->nodeValue;
+                }
+            }
+            $sharedStrings[] = $text;
+        }
+    }
+    // Read sheet data
+    $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+    if ($xml === false) {
+        return ['error' => 'Sheet1 not found.'];
+    }
+    $dom = new DOMDocument();
+    $dom->loadXML($xml);
+    $rows = $dom->getElementsByTagName('row');
+    foreach ($rows as $row) {
+        $rowData = [];
+        $cells = $row->getElementsByTagName('c');
+        foreach ($cells as $cell) {
+            $type = $cell->getAttribute('t');
+            $value = '';
+            $vNode = $cell->getElementsByTagName('v')->item(0);
+            if ($vNode) {
+                if ($type === 's') {
+                    // Shared string
+                    $idx = (int)$vNode->nodeValue;
+                    $value = $sharedStrings[$idx] ?? '';
+                } else {
+                    $value = $vNode->nodeValue;
+                }
+            }
+            $rowData[] = $value;
+        }
+        if (!empty($rowData)) {
+            $data[] = $rowData;
+        }
+    }
+    $zip->close();
+    return ['data' => $data];
 }
 
+// ============================================================
+// Handle Upload
+// ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
     $file = $_FILES['lead_file'];
     $tmp_name = $file['tmp_name'];
@@ -46,55 +107,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
     $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
     $assigned_to = $_POST['assigned_to'] ?? $team_id;
 
-    // ---- CSV ----
+    $rows = [];
+
+    // --- CSV ---
     if ($extension === 'csv') {
         if (($handle = fopen($tmp_name, "r")) !== FALSE) {
             $header = fgetcsv($handle);
             while (($data = fgetcsv($handle)) !== FALSE) {
-                list($name_col, $phone, $email, $address, $city, $state, $source) = array_pad($data, 7, '');
-                if (empty($name_col) || empty($phone)) continue;
-                $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$name_col, $phone, $email, $address, $city, $state, $source ?: 'Excel Upload', $assigned_to, $_SESSION['user_id']]);
-                $count++;
+                $rows[] = array_pad($data, 7, '');
             }
             fclose($handle);
-            $message = "✅ $count leads uploaded successfully from CSV!";
         } else {
             $message = "❌ Failed to open CSV file.";
         }
     }
-    // ---- Excel ----
-    elseif (in_array($extension, ['xlsx', 'xls'])) {
-        if ($hasSpreadsheet) {
-            try {
-                $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp_name);
-                $worksheet = $spreadsheet->getActiveSheet();
-                $rows = $worksheet->toArray();
-                $header = array_shift($rows);
-                foreach ($rows as $row) {
-                    list($name_col, $phone, $email, $address, $city, $state, $source) = array_pad($row, 7, '');
-                    if (empty($name_col) || empty($phone)) continue;
-                    $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$name_col, $phone, $email, $address, $city, $state, $source ?: 'Excel Upload', $assigned_to, $_SESSION['user_id']]);
-                    $count++;
-                }
-                $message = "✅ $count leads uploaded successfully from Excel!";
-            } catch (Exception $e) {
-                $message = "❌ Error reading Excel: " . $e->getMessage();
-            }
+    // --- XLSX ---
+    elseif ($extension === 'xlsx') {
+        $result = parseXLSX($tmp_name);
+        if (isset($result['error'])) {
+            $message = "❌ " . $result['error'];
         } else {
-            $message = "❌ PhpSpreadsheet library not installed. Please save your Excel file as CSV and upload again.<br>
-                        Or install PhpSpreadsheet via <code>composer require phpoffice/phpspreadsheet</code> and commit <code>vendor/</code> to GitHub.";
+            $rows = $result['data'];
+            // Remove header row if present
+            if (!empty($rows)) {
+                array_shift($rows);
+            }
         }
     }
+    // --- XLS (older Excel) ---
+    elseif ($extension === 'xls') {
+        $message = "❌ .xls files are not supported. Please save the file as .xlsx or .csv and upload again.";
+    }
     else {
-        $message = "❌ Unsupported file type. Please upload CSV or Excel (.xlsx, .xls).";
+        $message = "❌ Unsupported file type. Please upload CSV or XLSX.";
+    }
+
+    // Insert rows
+    if (!empty($rows) && empty($message)) {
+        $inserted = 0;
+        foreach ($rows as $row) {
+            list($name_col, $phone, $email, $address, $city, $state, $source) = array_pad($row, 7, '');
+            if (empty($name_col) || empty($phone)) continue;
+            $stmt = $pdo->prepare("INSERT INTO leads (name, phone, email, address, city, state, lead_source, assigned_to, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name_col, $phone, $email, $address, $city, $state, $source ?: 'Excel Upload', $assigned_to, $_SESSION['user_id']]);
+            $inserted++;
+        }
+        $message = "✅ $inserted leads uploaded successfully!";
+    } elseif (empty($message)) {
+        $message = "⚠️ No data rows found in the file.";
     }
 }
 ?>
 <div class="container-fluid mt-4">
     <h1>📥 Upload Leads</h1>
-    <p>Upload a <strong>CSV</strong> or <strong>Excel</strong> file with columns: <br>
+    <p>Upload a <strong>CSV</strong> or <strong>Excel (.xlsx)</strong> file with columns:<br>
     <code>Name, Phone, Email, Address, City, State, Source</code></p>
 
     <?php if ($message): ?>
@@ -109,8 +175,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Choose File</label>
-                        <input type="file" name="lead_file" class="form-control" accept=".csv,.xlsx,.xls" required>
-                        <small class="text-muted">Supported: .csv, .xlsx, .xls</small>
+                        <input type="file" name="lead_file" class="form-control" accept=".csv,.xlsx" required>
+                        <small class="text-muted">Supported: .csv, .xlsx</small>
                     </div>
                     <?php if ($role == 'admin'): ?>
                     <div class="col-md-6">
@@ -132,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['lead_file'])) {
         </div>
     </div>
 
-    <!-- ====== MANUAL SINGLE LEAD ENTRY (Same Page) ====== -->
+    <!-- ====== MANUAL SINGLE LEAD ENTRY ====== -->
     <hr>
     <h3>➕ Or Add a Single Lead Manually</h3>
     <?php
