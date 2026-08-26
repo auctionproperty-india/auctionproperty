@@ -53,35 +53,20 @@ for ($slot = 1; $slot <= 3; $slot++) {
 $current_slot = getCurrentSlot();
 $current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
 
-// ============================================================
-// 🔥 FIX: Today's Auctions = User City + Private Treaty (Any City)
-// ============================================================
+// ---- Today's Auctions (including Private Treaty) ----
+$city_sql = "SELECT * FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date = CURRENT_DATE ORDER BY id DESC";
+$city_stmt = $pdo->prepare($city_sql);
+$city_stmt->execute(['%' . $user_city . '%']);
+$city_props = $city_stmt->fetchAll();
 
-// Query 1: Properties in user's city with today's date (if city exists)
-if (empty($user_city)) {
-    // No city set → show all today's auctions (any city)
-    $city_sql = "SELECT * FROM properties WHERE status = 'available' AND auction_date = CURRENT_DATE ORDER BY id DESC";
-    $city_stmt = $pdo->prepare($city_sql);
-    $city_stmt->execute();
-    $city_props = $city_stmt->fetchAll();
-} else {
-    // City set → show only user city today's auctions
-    $city_sql = "SELECT * FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date = CURRENT_DATE ORDER BY id DESC";
-    $city_stmt = $pdo->prepare($city_sql);
-    $city_stmt->execute(['%' . $user_city . '%']);
-    $city_props = $city_stmt->fetchAll();
-}
-
-// Query 2: Private Treaty properties (any city)
 $pt_sql = "SELECT * FROM properties WHERE status = 'available' AND auction_start_time = 'Private Treaty' ORDER BY id DESC";
 $pt_stmt = $pdo->prepare($pt_sql);
 $pt_stmt->execute();
 $pt_props = $pt_stmt->fetchAll();
 
-// Merge both arrays
 $today_props = array_merge($city_props, $pt_props);
 
-// ---- Best Deals (based on city) ----
+// ---- Best Deals ----
 $best_sql = "SELECT * FROM properties WHERE status = 'available'";
 $best_params = [];
 if (!empty($user_city)) {
@@ -93,7 +78,7 @@ $best_stmt = $pdo->prepare($best_sql);
 $best_stmt->execute($best_params);
 $best_props = $best_stmt->fetchAll();
 
-// ---- Function to render property card (used in dashboard) ----
+// ---- Render property card ----
 function renderDashboardCard($prop, $show_images = false, $is_today = false) {
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
@@ -110,8 +95,6 @@ function renderDashboardCard($prop, $show_images = false, $is_today = false) {
     $shadow = ($g['text'] == 'white') ? '0 15px 40px -10px rgba(0,0,0,0.3)' : '0 15px 40px -10px rgba(0,0,0,0.1)';
     $border = ($g['text'] == 'white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
     $image_url = $prop['image_url'] ?? '';
-    
-    // Check if Private Treaty
     $is_private_treaty = isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty';
     ?>
     <div class="col-md-4 mb-4">
@@ -198,7 +181,6 @@ include 'header.php';
     .welcome-banner h2 { font-weight: 700; }
     .welcome-banner p { opacity: 0.8; }
 
-    /* Spin System Styles */
     .spin-card {
         background: linear-gradient(135deg, #1e293b, #334155);
         border-radius: 20px;
@@ -293,7 +275,7 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- Stats Cards (Includes Coin Balance) -->
+    <!-- Stats Cards -->
     <div class="dashboard-stats">
         <div class="stat-card">
             <div class="stat-icon">🏠</div>
@@ -376,13 +358,18 @@ include 'header.php';
             </div>
             <div class="col-md-6 text-center">
                 <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                    <div id="spinWheel" class="spin-wheel" style="width:120px; height:120px; border-radius:50%; background: conic-gradient(
-                        #fbbf24 0deg 72deg, 
-                        #ef4444 72deg 144deg, 
-                        #10b981 144deg 216deg, 
-                        #3b82f6 216deg 288deg, 
-                        #8b5cf6 288deg 360deg
-                    ); border:4px solid #fff; box-shadow:0 0 30px rgba(251,191,36,0.3); margin:0 auto;">
+                    <!-- 🎡 SPIN WHEEL with Silver Label -->
+                    <div style="position:relative; display:inline-block; width:120px; height:120px;">
+                        <div id="spinWheel" class="spin-wheel" style="width:120px; height:120px; border-radius:50%; background: conic-gradient(
+                            #fbbf24 0deg 72deg, 
+                            #ef4444 72deg 144deg, 
+                            #10b981 144deg 216deg, 
+                            #3b82f6 216deg 288deg, 
+                            #8b5cf6 288deg 360deg
+                        ); border:4px solid #fff; box-shadow:0 0 30px rgba(251,191,36,0.3); margin:0 auto;">
+                        </div>
+                        <!-- 🥈 Silver Label -->
+                        <span style="position:absolute; top:20px; left:50%; transform:translateX(-50%); font-size:12px; font-weight:bold; color:#fff; text-shadow:0 0 8px rgba(0,0,0,0.8); pointer-events:none; background:rgba(0,0,0,0.4); padding:2px 8px; border-radius:10px; z-index:10;">Silver</span>
                     </div>
                     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:30px; height:30px; border-radius:50%; border:3px solid #fbbf24;"></div>
                     <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:12px solid transparent; border-right:12px solid transparent; border-top:20px solid #fbbf24; filter:drop-shadow(0 0 10px rgba(251,191,36,0.5));"></div>
@@ -403,11 +390,8 @@ include 'header.php';
         <?php endif; ?>
     </div>
 
-    <!-- ============================================================
-    🔥 TODAY'S AUCTIONS – User City + Private Treaty (All, No Limit)
-    ============================================================ -->
+    <!-- ====== TODAY'S AUCTIONS ====== -->
     <?php 
-    // Count Private Treaty properties in today's auctions
     $pt_count = 0;
     foreach($today_props as $p) {
         if(isset($p['auction_start_time']) && $p['auction_start_time'] == 'Private Treaty') $pt_count++;
@@ -476,7 +460,6 @@ include 'header.php';
     </div>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -489,8 +472,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Spin button not found');
         return;
     }
-
-    console.log('Spin system initialized');
 
     let currentRotation = 0;
     let isSpinning = false;
@@ -531,7 +512,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         showCoinAnimation(data.coins);
                         launchStarShower();
 
-                        // Update coin display in stats card
                         const coinSpan = document.querySelector('.stat-card .stat-number');
                         if (coinSpan) {
                             let current = parseInt(coinSpan.textContent.replace(/,/g, ''));
