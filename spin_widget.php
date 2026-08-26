@@ -1,13 +1,13 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with GOLD & DIAMOND
+// spin_widget.php – 8‑Segment Wheel with Tilted GOLD & DIAMOND
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// Helper to generate segment colors (you can change these)
+// Segment colors
 $segmentColors = [
     '#fbbf24', // 0 – Yellow
     '#ef4444', // 1 – Red
@@ -65,7 +65,7 @@ $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) -->
+                <!-- 🎡 8‑SEGMENT WHEEL (200px) with tilted labels -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -81,17 +81,18 @@ $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto;">
-                        <!-- Segment Labels (positioned at center of each wedge) -->
+                        <!-- Segment Labels (positioned at center of each wedge, tilted consistently) -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
-                            // Calculate position: center of wedge at radius ~65% of 100px
-                            $angleRad = deg2rad($i * $angle + $angle/2 - 90); // -90 to start from top
-                            $distance = 65; // pixels from center
+                            // Calculate center of wedge: polar coordinates from center
+                            $centerAngle = $i * $angle + $angle/2;
+                            $angleRad = deg2rad($centerAngle - 90); // -90 because 0° is top
+                            $distance = 65; // pixels from center (radius 100px, so ~65%)
                             $left = 100 + $distance * cos($angleRad);
                             $top = 100 + $distance * sin($angleRad);
-                            // Rotate to align with wedge (45°)
-                            $rotation = $i * $angle + $angle/2;
+                            // 🔥 Consistent tilt: rotate -35° (like previous Silver)
+                            $rotation = -35;
                         ?>
                             <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(<?= $rotation ?>deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 12px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:2px 10px; border-radius:12px;">
                                 <?= htmlspecialchars($label) ?>
@@ -120,7 +121,7 @@ $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT (updated with segment detection) ====== -->
+<!-- ====== SPIN JAVASCRIPT ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -148,15 +149,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Random: decide which segment to land on (0-7)
         const targetSegment = Math.floor(Math.random() * numSegments);
         // Calculate rotation to land on that segment (pointer at top)
-        // We want the segment's center to be at top (0°)
-        // Segment center angle = targetSegment * segmentAngle + segmentAngle/2
         const targetAngle = targetSegment * segmentAngle + segmentAngle/2;
-        // We need to rotate so that this angle aligns with the top (0°)
-        // Current rotation is from previous spins.
-        // We'll add extra spins for visual effect.
         const extraSpins = 5 + Math.floor(Math.random() * 5);
         const newRotation = extraSpins * 360 + (360 - targetAngle);
-        // Ensure total rotation is more than current
         const totalRotation = newRotation + 360 - (currentRotation % 360);
         currentRotation += totalRotation;
 
@@ -164,28 +159,17 @@ document.addEventListener('DOMContentLoaded', function() {
         wheel.style.transform = `rotate(${currentRotation}deg)`;
         wheel.classList.add('pulse');
 
-        // Simulate spin result from backend (we keep the existing AJAX for coins)
         fetch('spin_ajax.php')
             .then(response => response.json())
             .then(data => {
                 wheel.classList.remove('pulse');
                 isSpinning = false;
 
-                // After spin, determine which segment is at top
-                const finalAngle = currentRotation % 360;
-                // Compute which segment index is at the top (pointer at 0°)
-                // Segment index = floor((360 - (finalAngle % 360)) / segmentAngle) % numSegments
-                let segIndex = Math.floor(((360 - (finalAngle % 360)) % 360) / segmentAngle) % numSegments;
-                // Adjust for offset (pointer is at top, segment center is at segmentAngle/2)
-                // Actually, since we aligned targetAngle to top, we can use the targetSegment we set.
-                // But we want to detect after spin, we can compute from rotation.
-                // Using targetSegment from earlier is more reliable.
-                const landedSegment = targetSegment; // we set it earlier
-
-                // Show message if landed on GOLD or DIAMOND
+                // Determine landed segment from targetSegment
+                const landedSegment = targetSegment;
                 const label = segmentLabels[landedSegment] || '';
+
                 if (label === 'GOLD' || label === 'DIAMOND') {
-                    // Show modal with message
                     const modalBody = document.getElementById('propertyModalContent');
                     if (modalBody) {
                         modalBody.innerHTML = `
@@ -201,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process the backend data (coins/property) – as before
+                // Process backend data
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
@@ -229,7 +213,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
                         const icon = isCar ? '🚗' : '🏠';
                         const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
-                        // Only show property if we didn't show the GOLD/DIAMOND modal
                         if (label !== 'GOLD' && label !== 'DIAMOND') {
                             const modalContent = document.getElementById('propertyModalContent');
                             if (modalContent) {
