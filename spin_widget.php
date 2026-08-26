@@ -1,13 +1,13 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Dynamically Tilted Labels
+// spin_widget.php – 8‑Segment Wheel with Labels Inside
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// Segment colors
+// Segment colors and labels
 $segmentColors = [
     '#fbbf24', // 0 – Yellow
     '#ef4444', // 1 – Red
@@ -18,7 +18,6 @@ $segmentColors = [
     '#ec4899', // 6 – Pink
     '#14b8a6'  // 7 – Teal
 ];
-// Labels for each segment (index 0=GOLD, index 4=DIAMOND)
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
@@ -67,7 +66,7 @@ $angle = 360 / $numSegments; // 45°
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) with labels tilted to wedge angle -->
+                <!-- 🎡 8‑SEGMENT WHEEL (200px) with labels placed inside -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -80,22 +79,24 @@ $angle = 360 / $numSegments; // 45°
                         }
                         echo implode(', ', $gradientParts);
                         ?>
-                    ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto;">
-                        <!-- Segment Labels – placed at center, rotated to match wedge angle -->
+                    ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
+                        <!-- Segment Labels – calculated to stay inside the wheel -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
                             // Center angle of this wedge (0° at top, clockwise)
                             $centerAngle = $i * $angle + $angle/2;
-                            // Polar coordinates: distance from center = 65% of radius (100px)
-                            $rad = deg2rad($centerAngle - 90); // -90 because 0° is top
-                            $distance = 65;
+                            // Convert to radians (0° is top, but cos/sin expect 0° at right)
+                            // So we offset by -90° to make 0° point up.
+                            $rad = deg2rad($centerAngle - 90);
+                            // Distance from center: 60% of radius (100px) → 60px
+                            $distance = 60;
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
-                            // 🔥 Tilt exactly to the wedge angle
+                            // Tilt exactly to the wedge angle
                             $rotation = $centerAngle;
                         ?>
-                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(<?= $rotation ?>deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 12px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:2px 10px; border-radius:12px;">
+                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(<?= $rotation ?>deg); color:#fff; font-weight:bold; font-size:14px; text-shadow:0 0 10px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.5); padding:2px 8px; border-radius:10px;">
                                 <?= htmlspecialchars($label) ?>
                             </span>
                         <?php endfor; ?>
@@ -122,7 +123,7 @@ $angle = 360 / $numSegments; // 45°
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT (with segment detection & benefit popup) ====== -->
+<!-- ====== SPIN JAVASCRIPT ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
