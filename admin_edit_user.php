@@ -37,21 +37,23 @@ if ($user['referred_by']) {
     }
 }
 
-// ---- Get current package ----
-$pkg_stmt = $pdo->prepare("
-    SELECT s.package_id, p.name as package_name, s.start_date, s.end_date
+// ---- Get current active subscription ----
+$sub_stmt = $pdo->prepare("
+    SELECT s.package_id, p.name as package_name, p.duration_months, 
+           s.start_date, s.end_date, s.id as sub_id
     FROM subscriptions s
     LEFT JOIN packages p ON s.package_id = p.id
     WHERE s.user_id = ? AND s.status = 'active'
     ORDER BY s.id DESC LIMIT 1
 ");
-$pkg_stmt->execute([$user_id]);
-$sub_info = $pkg_stmt->fetch();
+$sub_stmt->execute([$user_id]);
+$sub_info = $sub_stmt->fetch();
 $current_pkg = $sub_info['package_id'] ?? null;
 $pkg_expiry = $sub_info['end_date'] ?? null;
+$sub_id = $sub_info['sub_id'] ?? null;
 
 // ---- Get all packages ----
-$packages = $pdo->query("SELECT id, name FROM packages ORDER BY id")->fetchAll();
+$packages = $pdo->query("SELECT id, name, duration_months FROM packages ORDER BY id")->fetchAll();
 
 // ---- Get all users for referrer dropdown ----
 $all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
@@ -123,39 +125,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                 $stmt->execute([$hashed, $user_id]);
             }
 
-            // ---- Update package ----
+            // ============================================================
+            // 🔥 FIX: Update subscription with new activation_date & package
+            // ============================================================
             if ($package_id) {
-                $sub_stmt = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
-                $sub_stmt->execute([$user_id]);
-                $sub = $sub_stmt->fetch();
-                if ($sub) {
-                    $stmt = $pdo->prepare("UPDATE subscriptions SET package_id = ? WHERE id = ?");
-                    $stmt->execute([$package_id, $sub['id']]);
-                    $duration = $pdo->prepare("SELECT duration_months FROM packages WHERE id = ?");
-                    $duration->execute([$package_id]);
-                    $months = $duration->fetchColumn();
-                    if ($months) {
-                        $new_end = date('Y-m-d', strtotime("+$months months", strtotime($sub['start_date'])));
-                        $pdo->prepare("UPDATE subscriptions SET end_date = ? WHERE id = ?")->execute([$new_end, $sub['id']]);
+                // Get package duration
+                $duration = 0;
+                foreach ($packages as $pkg) {
+                    if ($pkg['id'] == $package_id) {
+                        $duration = (int)$pkg['duration_months'];
+                        break;
                     }
-                } else {
-                    $stmt = $pdo->prepare("
-                        INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at)
-                        VALUES (?, ?, 0, 'active', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days', NOW())
-                    ");
-                    $stmt->execute([$user_id, $package_id]);
                 }
+
+                if ($sub_id) {
+                    // Existing active subscription – update package, start_date, end_date
+                    $new_start = $activation_date ?: $sub_info['start_date'] ?? date('Y-m-d');
+                    if ($duration > 0) {
+                        $new_end = date('Y-m-d', strtotime("$new_start + $duration months"));
+                    } else {
+                        $new_end = null; // if no duration, keep null
+                    }
+                    $stmt = $pdo->prepare("
+                        UPDATE subscriptions 
+                        SET package_id = ?, start_date = ?, end_date = ?,
+                            amount = (SELECT price FROM packages WHERE id = ?)
+                        WHERE id = ?
+                    ");
+                    $stmt->execute([$package_id, $new_start, $new_end, $package_id, $sub_id]);
+                } else {
+                    // No active subscription – create a new one
+                    if (!empty($activation_date) && $duration > 0) {
+                        $new_end = date('Y-m-d', strtotime("$activation_date + $duration months"));
+                        $stmt = $pdo->prepare("
+                            INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at)
+                            VALUES (?, ?, (SELECT price FROM packages WHERE id = ?), 'active', ?, ?, NOW())
+                        ");
+                        $stmt->execute([$user_id, $package_id, $package_id, $activation_date, $new_end]);
+                        // Fetch the new sub_id for expiry display
+                        $sub_id = $pdo->lastInsertId();
+                        $sub_info = $pdo->prepare("SELECT start_date, end_date FROM subscriptions WHERE id = ?")
+                            ->execute([$sub_id]) ? $sub_info = $pdo->fetch() : null;
+                    } else {
+                        // No activation date or no duration – create a pending subscription or just skip
+                        // We'll create a pending one with no dates.
+                        $stmt = $pdo->prepare("
+                            INSERT INTO subscriptions (user_id, package_id, amount, status, created_at)
+                            VALUES (?, ?, (SELECT price FROM packages WHERE id = ?), 'pending', NOW())
+                        ");
+                        $stmt->execute([$user_id, $package_id, $package_id]);
+                    }
+                }
+            } else {
+                // If package_id is empty (Free), we might want to deactivate or remove subscription?
+                // Usually we would set subscription status to 'cancelled' or leave as is.
+                // For simplicity, we'll keep existing subscription but update package to null? 
+                // But we'll just leave it.
             }
 
             $pdo->commit();
 
-            // ---- Update the referrer name for display after successful save ----
+            // ---- Update referrer name for display ----
             $referrer_name = $new_referrer_name;
 
             // ---- Refresh user data ----
             $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
             $stmt->execute([$user_id]);
             $user = $stmt->fetch();
+
+            // Refresh subscription info
+            $sub_stmt->execute([$user_id]);
+            $sub_info = $sub_stmt->fetch();
+            $pkg_expiry = $sub_info['end_date'] ?? null;
 
             $success = "✅ User updated successfully!";
             if (!empty($new_referrer_name) && $new_referrer_name != 'None') {
@@ -232,6 +273,7 @@ include 'header.php';
                         <div class="col-md-6">
                             <label class="form-label">Activation Date</label>
                             <input type="date" name="activation_date" class="form-control" value="<?= safeDateFormat($user['activation_date']) ?>">
+                            <small class="text-muted">If set, subscription start date will be updated.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Package</label>
@@ -247,7 +289,7 @@ include 'header.php';
                         <div class="col-md-6">
                             <label class="form-label">Package Expiry Date</label>
                             <input type="text" class="form-control" value="<?= $pkg_expiry ? date('d M Y', strtotime($pkg_expiry)) : 'No active subscription' ?>" readonly>
-                            <small class="text-muted">Expiry is auto-calculated</small>
+                            <small class="text-muted">Auto-calculated from activation date + package duration</small>
                         </div>
 
                         <!-- ====== REFERRAL SECTION ====== -->
