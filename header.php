@@ -33,7 +33,9 @@ if ($is_logged_in) {
 // ---- डेटाबेस से नेविगेशन आइटम लोड करें ----
 $nav_items = $pdo->query("SELECT * FROM navigation_items WHERE is_active = TRUE ORDER BY display_order")->fetchAll();
 
-// ---- लॉगिन यूजर के लिए टॉप बार डेटा ----
+// ============================================================
+// 🔥 UPDATED: User Info Block – Activation Date & Expiry
+// ============================================================
 $reg_date = '';
 $activation_date = 'Not Active';
 $expiry_date = null;
@@ -46,14 +48,21 @@ if ($is_logged_in && $role == 'user') {
     $user_sidebar = $stmt->fetch();
     $reg_date = !empty($user_sidebar['reg_date']) ? date('d M Y', strtotime($user_sidebar['reg_date'])) : 'N/A';
 
-    $sub = $pdo->prepare("SELECT start_date, end_date FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
-    $sub->execute([$user_id]);
-    $sub_info = $sub->fetch();
-    if ($sub_info) {
-        $activation_date = date('d M Y', strtotime($sub_info['start_date']));
-        $expiry_date = $sub_info['end_date'];
-        $days_left = (int) ((strtotime($expiry_date) - time()) / (60 * 60 * 24));
-        $days_left = max(0, $days_left);
+    // Check active subscription using updated function
+    $active_sub = userHasActiveSubscription($pdo, $user_id);
+    if ($active_sub) {
+        // Fetch subscription details
+        $sub = $pdo->prepare("SELECT start_date, end_date FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
+        $sub->execute([$user_id]);
+        $sub_info = $sub->fetch();
+        if ($sub_info) {
+            $activation_date = date('d M Y', strtotime($sub_info['start_date']));
+            $expiry_date = $sub_info['end_date'];
+            if ($expiry_date) {
+                $days_left = (int) ((strtotime($expiry_date) - time()) / (60 * 60 * 24));
+                $days_left = max(0, $days_left);
+            }
+        }
     } else {
         $activation_date = 'Not Active';
         $expiry_date = null;
@@ -97,9 +106,7 @@ if ($is_logged_in && $role == 'user') {
             border-bottom: 1px solid #334155;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
-        body.top-nav-hidden .top-nav {
-            display: none !important;
-        }
+        body.top-nav-hidden .top-nav { display: none !important; }
         .top-nav a {
             color: #94a3b8;
             text-decoration: none;
@@ -112,53 +119,23 @@ if ($is_logged_in && $role == 'user') {
             align-items: center;
             gap: 6px;
         }
-        .top-nav a:hover,
-        .top-nav a.active-nav {
-            color: #f8fafc;
-            background: #2d3748;
-        }
+        .top-nav a:hover, .top-nav a.active-nav { color: #f8fafc; background: #2d3748; }
         .top-nav a i { color: #fbbf24; }
-        .top-nav .nav-brand {
-            color: #f8fafc;
-            font-weight: 700;
-            font-size: 18px;
-            margin-right: 15px;
-        }
+        .top-nav .nav-brand { color: #f8fafc; font-weight: 700; font-size: 18px; margin-right: 15px; }
         .top-nav .nav-brand i { color: #fbbf24; }
-        .top-nav .nav-right {
-            margin-left: auto;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .top-nav .nav-right a {
-            padding: 6px 14px;
-            border-radius: 20px;
-        }
-        .top-nav .nav-right .btn-login {
-            background: #2563eb;
-            color: #fff !important;
-        }
+        .top-nav .nav-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+        .top-nav .nav-right a { padding: 6px 14px; border-radius: 20px; }
+        .top-nav .nav-right .btn-login { background: #2563eb; color: #fff !important; }
         .top-nav .nav-right .btn-login:hover { background: #1d4ed8; color: #fff !important; }
-        .top-nav .nav-right .btn-register {
-            border: 1px solid #2563eb;
-            color: #60a5fa !important;
-        }
-        .top-nav .nav-right .btn-register:hover {
-            background: #2563eb;
-            color: #fff !important;
-        }
-        .top-nav .nav-right .user-badge {
-            color: #94a3b8;
-            font-size: 13px;
-        }
+        .top-nav .nav-right .btn-register { border: 1px solid #2563eb; color: #60a5fa !important; }
+        .top-nav .nav-right .btn-register:hover { background: #2563eb; color: #fff !important; }
+        .top-nav .nav-right .user-badge { color: #94a3b8; font-size: 13px; }
         .top-nav .nav-right .user-badge i { color: #fbbf24; }
 
         @media (max-width: 768px) {
             .top-nav .nav-brand { font-size: 16px; }
             .top-nav a { font-size: 13px; padding: 6px 10px; }
-            .top-nav .nav-right .btn-login,
-            .top-nav .nav-right .btn-register { padding: 4px 12px; font-size: 12px; }
+            .top-nav .nav-right .btn-login, .top-nav .nav-right .btn-register { padding: 4px 12px; font-size: 12px; }
         }
 
         /* ====== साइडबार – Mobile Friendly ====== */
@@ -174,55 +151,20 @@ if ($is_logged_in && $role == 'user') {
             transition: transform 0.3s ease-in-out, background 0.3s;
             overflow-y: auto;
         }
-        body:not(.top-nav-hidden) .sidebar {
-            top: 70px;
-        }
-        body.top-nav-hidden .sidebar {
-            top: 0;
-        }
-        body.role-admin .sidebar {
-            background: #ffffff;
-            color: #1e293b;
-            border-right: 1px solid #e2e8f0;
-        }
-        body.role-user .sidebar {
-            background: #ffffff;
-            color: #334155;
-            border-right: 1px solid #e2e8f0;
-        }
-        body.role-sales .sidebar {
-            background: #ffffff;
-            color: #334155;
-            border-right: 1px solid #e2e8f0;
-        }
+        body:not(.top-nav-hidden) .sidebar { top: 70px; }
+        body.top-nav-hidden .sidebar { top: 0; }
+        body.role-admin .sidebar { background: #ffffff; color: #1e293b; border-right: 1px solid #e2e8f0; }
+        body.role-user .sidebar { background: #ffffff; color: #334155; border-right: 1px solid #e2e8f0; }
+        body.role-sales .sidebar { background: #ffffff; color: #334155; border-right: 1px solid #e2e8f0; }
 
         @media (max-width: 991px) {
-            .sidebar {
-                transform: translateX(-100%);
-                top: 0 !important;
-            }
-            .sidebar.show {
-                transform: translateX(0);
-            }
+            .sidebar { transform: translateX(-100%); top: 0 !important; }
+            .sidebar.show { transform: translateX(0); }
         }
-        @media (min-width: 992px) {
-            .sidebar {
-                transform: translateX(0) !important;
-            }
-        }
+        @media (min-width: 992px) { .sidebar { transform: translateX(0) !important; } }
 
-        .sidebar .brand {
-            font-size: 24px;
-            font-weight: 800;
-            text-align: center;
-            padding-bottom: 25px;
-            border-bottom: 1px solid #e2e8f0;
-            margin-bottom: 25px;
-            letter-spacing: 1px;
-            color: #1e293b;
-        }
+        .sidebar .brand { font-size: 24px; font-weight: 800; text-align: center; padding-bottom: 25px; border-bottom: 1px solid #e2e8f0; margin-bottom: 25px; letter-spacing: 1px; color: #1e293b; }
         .sidebar .brand i { color: #1e3a8a; }
-
         .sidebar a {
             display: flex;
             align-items: center;
@@ -236,72 +178,23 @@ if ($is_logged_in && $role == 'user') {
             border-left: 3px solid transparent;
             color: #475569;
         }
-        .sidebar a i {
-            width: 28px;
-            font-size: 18px;
-            transition: all 0.3s;
-            color: #94a3b8;
-        }
-        .sidebar a:hover {
-            background: #f1f5f9;
-            color: #1e3a8a;
-        }
+        .sidebar a i { width: 28px; font-size: 18px; transition: all 0.3s; color: #94a3b8; }
+        .sidebar a:hover { background: #f1f5f9; color: #1e3a8a; }
         .sidebar a:hover i { color: #1e3a8a; }
-        .sidebar a.active {
-            background: #eef2ff;
-            color: #1e3a8a;
-            border-left-color: #1e3a8a;
-        }
+        .sidebar a.active { background: #eef2ff; color: #1e3a8a; border-left-color: #1e3a8a; }
         .sidebar a.active i { color: #1e3a8a; }
-
-        .sidebar .logout-link {
-            margin-top: 30px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 20px;
-            color: #dc2626 !important;
-        }
+        .sidebar .logout-link { margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; color: #dc2626 !important; }
         .sidebar .logout-link i { color: #dc2626 !important; }
-        .sidebar .logout-link:hover {
-            background: #fef2f2 !important;
-            color: #b91c1c !important;
-        }
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.4);
-            z-index: 1040;
-        }
+        .sidebar .logout-link:hover { background: #fef2f2 !important; color: #b91c1c !important; }
+        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1040; }
         .sidebar-overlay.show { display: block; }
 
-        /* ====== मुख्य कंटेंट ====== */
-        .main-content {
-            padding: 30px 35px;
-            min-height: 100vh;
-            transition: margin-left 0.3s;
-        }
-        body.role-admin .main-content {
-            padding-top: 0 !important;
-        }
-        body.role-admin .main-content,
-        body.role-user .main-content,
-        body.role-sales .main-content {
-            margin-left: 280px;
-        }
-        body.role-guest .main-content {
-            margin-left: 0 !important;
-        }
-        @media (max-width: 991px) {
-            .main-content {
-                margin-left: 0 !important;
-                padding: 15px;
-            }
-        }
+        .main-content { padding: 30px 35px; min-height: 100vh; transition: margin-left 0.3s; }
+        body.role-admin .main-content { padding-top: 0 !important; }
+        body.role-admin .main-content, body.role-user .main-content, body.role-sales .main-content { margin-left: 280px; }
+        body.role-guest .main-content { margin-left: 0 !important; }
+        @media (max-width: 991px) { .main-content { margin-left: 0 !important; padding: 15px; } }
 
-        /* ====== टॉप बार ====== */
         .top-bar {
             padding: 15px 20px;
             border-radius: 20px;
@@ -316,72 +209,22 @@ if ($is_logged_in && $role == 'user') {
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
             color: #0f172a;
         }
-        body.role-admin .top-bar {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            color: #1e293b;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            margin-bottom: 10px;
-        }
-        body.role-sales .top-bar {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            color: #1e293b;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            margin-bottom: 10px;
-        }
+        body.role-admin .top-bar { background: #ffffff; border: 1px solid #e2e8f0; color: #1e293b; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 10px; }
+        body.role-sales .top-bar { background: #ffffff; border: 1px solid #e2e8f0; color: #1e293b; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 10px; }
         .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
         .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
         body.role-admin .top-bar .user-info .name { color: #0f172a; }
         body.role-user .top-bar .user-info .name { color: #0f172a; }
         body.role-sales .top-bar .user-info .name { color: #0f172a; }
-        .top-bar .badge-role {
-            padding: 4px 14px;
-            border-radius: 30px;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .top-bar .user-dates {
-            font-size: 0.75rem;
-            opacity: 0.7;
-            margin-top: 2px;
-            color: inherit;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-        }
-        .top-bar .countdown-timer {
-            font-weight: 700 !important;
-            color: #dc3545 !important;
-            background: rgba(220, 53, 69, 0.1);
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .hamburger-btn {
-            background: transparent;
-            border: none;
-            font-size: 28px;
-            padding: 5px 10px;
-            cursor: pointer;
-            display: inline-block;
-        }
+        .top-bar .badge-role { padding: 4px 14px; border-radius: 30px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+        .top-bar .user-dates { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; color: inherit; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .top-bar .countdown-timer { font-weight: 700 !important; color: #dc3545 !important; background: rgba(220, 53, 69, 0.1); padding: 2px 12px; border-radius: 20px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; }
+        .hamburger-btn { background: transparent; border: none; font-size: 28px; padding: 5px 10px; cursor: pointer; display: inline-block; }
         body.role-admin .hamburger-btn { color: #1e293b; }
         body.role-user .hamburger-btn { color: #1e293b; }
         body.role-sales .hamburger-btn { color: #1e293b; }
-        @media (min-width: 992px) {
-            .hamburger-btn {
-                display: none !important;
-            }
-        }
+        @media (min-width: 992px) { .hamburger-btn { display: none !important; } }
 
-        /* ====== कार्ड / स्टेट्स ====== */
         .card-premium {
             border-radius: 20px;
             border: none;
@@ -389,33 +232,11 @@ if ($is_logged_in && $role == 'user') {
             margin-bottom: 20px;
             transition: transform 0.2s, box-shadow 0.2s;
         }
-        body.role-admin .card-premium {
-            background: #ffffff;
-            color: #0f172a;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            border: 1px solid #e2e8f0;
-        }
-        body.role-user .card-premium {
-            background: #ffffff;
-            color: #0f172a;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
-        }
-        body.role-sales .card-premium {
-            background: #ffffff;
-            color: #0f172a;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
-        }
+        body.role-admin .card-premium { background: #ffffff; color: #0f172a; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; }
+        body.role-user .card-premium { background: #ffffff; color: #0f172a; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
+        body.role-sales .card-premium { background: #ffffff; color: #0f172a; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
         .card-premium:hover { transform: translateY(-2px); box-shadow: 0 20px 30px -10px rgba(0,0,0,0.08); }
-        .stat-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            flex-shrink: 0;
-        }
+        .stat-icon { width: 50px; height: 50px; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
         body.role-admin .stat-icon.bg-soft-primary { background: #eef2ff; color: #1e3a8a; }
         body.role-admin .stat-icon.bg-soft-success { background: #dcfce7; color: #166534; }
         body.role-admin .stat-icon.bg-soft-warning { background: #fef3c7; color: #92400e; }
@@ -429,14 +250,7 @@ if ($is_logged_in && $role == 'user') {
         .btn-primary { background: #1e3a8a; border: none; }
         .btn-primary:hover { background: #1e40af; }
         .btn-sm { padding: 5px 10px; font-size: 12px; }
-        .user-welcome-banner {
-            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
-            border-radius: 24px;
-            padding: 30px;
-            color: white;
-            margin-bottom: 25px;
-            box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3);
-        }
+        .user-welcome-banner { background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); border-radius: 24px; padding: 30px; color: white; margin-bottom: 25px; box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3); }
         .user-welcome-banner h2 { font-weight: 800; }
         .user-welcome-banner p { opacity: 0.9; }
         @media (max-width: 576px) {
@@ -444,8 +258,6 @@ if ($is_logged_in && $role == 'user') {
             .card-premium { padding: 15px; }
             .stat-icon { width: 40px; height: 40px; font-size: 18px; }
         }
-
-        /* ====== Sales Team Badge Color ====== */
         .badge-sales { background: #f59e0b; color: #000; }
     </style>
 </head>
@@ -459,11 +271,8 @@ if ($is_logged_in && $role == 'user') {
         <?php
             $is_active = false;
             $current_uri = $_SERVER['REQUEST_URI'];
-            if ($item['url'] == '/' && $current_uri == '/') {
-                $is_active = true;
-            } elseif ($item['url'] != '/' && strpos($current_uri, $item['url']) !== false) {
-                $is_active = true;
-            }
+            if ($item['url'] == '/' && $current_uri == '/') { $is_active = true; }
+            elseif ($item['url'] != '/' && strpos($current_uri, $item['url']) !== false) { $is_active = true; }
         ?>
         <a href="<?= htmlspecialchars($item['url']) ?>" class="<?= $is_active ? 'active-nav' : '' ?>">
             <?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?>
@@ -489,7 +298,6 @@ if ($is_logged_in && $role == 'user') {
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
     
     <?php if ($role == 'admin'): ?>
-        <!-- ====== ADMIN SIDEBAR ====== -->
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <?php if (hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
@@ -535,7 +343,6 @@ if ($is_logged_in && $role == 'user') {
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         
     <?php elseif ($role == 'sales'): ?>
-        <!-- ====== SALES TEAM SIDEBAR ====== -->
         <a href="sales_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
         <a href="sales_lead_upload.php"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
@@ -545,7 +352,6 @@ if ($is_logged_in && $role == 'user') {
         <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
         
     <?php else: ?>
-        <!-- ====== REGULAR USER SIDEBAR ====== -->
         <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
@@ -583,7 +389,7 @@ if ($is_logged_in && $role == 'user') {
                                 <?php if ($expiry_date): ?>
                                     <?= $activation_date ?>
                                     <span class="countdown-timer" id="countdownDisplay" data-expiry="<?= $expiry_date ?>">
-                                        <i class="fas fa-clock"></i> Loading...
+                                        <i class="fas fa-clock"></i> <?= $days_left ?> days left
                                     </span>
                                 <?php else: ?>
                                     Not Active
@@ -595,7 +401,6 @@ if ($is_logged_in && $role == 'user') {
             </div>
         </div>
 
-        <!-- Notification Bell (Admin only) – No user notification bell -->
         <?php if ($role == 'admin'): ?>
         <div class="notification-dropdown" style="position:relative; display:inline-block;">
             <button class="btn-notify" id="notifyToggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="background:transparent; border:none; color:#1e293b; font-size:1.4rem; padding:4px 8px; position:relative; cursor:pointer;">
@@ -636,7 +441,6 @@ function toggleSidebar() {
     }
 }
 
-// Overlay click पर sidebar close
 document.addEventListener('DOMContentLoaded', function() {
     const overlay = document.getElementById('sidebarOverlay');
     if (overlay) {
@@ -646,7 +450,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// 🔄 Countdown Timer for Subscription
 document.addEventListener('DOMContentLoaded', function() {
     const countdownEl = document.getElementById('countdownDisplay');
     if (countdownEl && countdownEl.dataset.expiry) {
