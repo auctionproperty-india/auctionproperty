@@ -1,15 +1,14 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Beautiful Distinct Colors
+// spin_widget.php – 8‑Segment Wheel with Unique Colors
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// 🎨 New vibrant, distinct colors (each segment unique)
 $segmentColors = [
-    '#FFD700', // 0 – Gold (GOLD)
+    '#FFD700', // 0 – Gold
     '#FF6B6B', // 1 – Coral
     '#4ECDC4', // 2 – Turquoise
     '#45B7D1', // 3 – Sky Blue
@@ -18,11 +17,10 @@ $segmentColors = [
     '#F368E0', // 6 – Magenta
     '#00D2D3'  // 7 – Cyan
 ];
-// Labels: only GOLD (index 0) and DIAMOND (index 4)
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
-$angle = 360 / $numSegments; // 45°
-$rotationOffset = 80; // rotate the whole wheel by 80°
+$angle = 360 / $numSegments;
+$rotationOffset = 80;
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -68,7 +66,6 @@ $rotationOffset = 80; // rotate the whole wheel by 80°
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) with new colors -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -82,7 +79,6 @@ $rotationOffset = 80; // rotate the whole wheel by 80°
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
-                        <!-- Segment Labels – upright, centred, inside wedge -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
@@ -97,9 +93,7 @@ $rotationOffset = 80; // rotate the whole wheel by 80°
                             </span>
                         <?php endfor; ?>
                     </div>
-                    <!-- Center dot -->
                     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:36px; height:36px; border-radius:50%; border:5px solid #fbbf24; z-index:2;"></div>
-                    <!-- Pointer -->
                     <div style="position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:16px solid transparent; border-right:16px solid transparent; border-top:26px solid #fbbf24; filter:drop-shadow(0 0 16px rgba(251,191,36,0.7)); z-index:2;"></div>
                 </div>
                 <button id="spinBtn" class="btn btn-warning mt-3 px-4 fw-bold" <?= ($current_slot_data['can_spin']) ? '' : 'disabled' ?>>
@@ -119,7 +113,6 @@ $rotationOffset = 80; // rotate the whole wheel by 80°
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT (unchanged) ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -188,7 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process coins/property (same as before)
+                // Process backend data
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
