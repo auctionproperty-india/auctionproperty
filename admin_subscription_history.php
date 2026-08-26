@@ -75,7 +75,7 @@ include 'header.php';
                         <td><span class="badge bg-<?= $badge ?>"><?= $s['status'] ?></span></td>
                         <td><?= $s['payment_method'] ?></td>
                         <td><?= htmlspecialchars($s['utr']??'N/A') ?></td>
-                        <td><?= date('d M Y', strtotime($s['created_at'])) ?></td>
+                        <td><?= !empty($row['request_date']) ? date('d M Y', strtotime($row['request_date'])) : 'N/A' ?></td>
                         <td><?= $s['start_date'] ? date('d M Y', strtotime($s['start_date'])) : ($s['status']=='rejected' ? 'Rejected' : '—') ?></td>
                     </tr>
                 <?php endforeach; ?>
