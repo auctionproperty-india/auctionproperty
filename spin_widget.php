@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – Daily Spin Widget (Silver in Blue Wedge)
+// spin_widget.php – Daily Spin Widget (Gold in Blue Wedge)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -51,7 +51,7 @@ if (!isset($pdo) || !isset($user_id)) {
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 WHEEL (160px) with "Silver" label inside the blue segment -->
+                <!-- 🎡 WHEEL (160px) with "Gold" label inside the blue segment -->
                 <div style="position:relative; display:inline-block; width:160px; height:160px;">
                     <div id="spinWheel" class="spin-wheel" style="width:160px; height:160px; border-radius:50%; background: conic-gradient(
                         #fbbf24 0deg 72deg, 
@@ -60,15 +60,15 @@ if (!isset($pdo) || !isset($user_id)) {
                         #3b82f6 216deg 288deg, 
                         #8b5cf6 288deg 360deg
                     ); border:4px solid #fff; box-shadow:0 0 20px rgba(251,191,36,0.3); margin:0 auto;">
-                        <!-- 🥈 "Silver" label – fixed at the center of the blue wedge -->
+                        <!-- 🥈 "Gold" label – fixed at the center of the blue wedge -->
                         <span style="position:absolute; left:30%; top:70%; transform:translate(-50%, -50%) rotate(-40deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 14px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:3px 10px; border-radius:6px;">
                             Silver
                         </span>
                     </div>
                     <!-- Center dot -->
-                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:32px; height:32px; border-radius:50%; border:4px solid #fbbf24; z-index:2;"></div>
+                    <div style="position:absolute; top:50%; left:50%; transform:translate(-40%,-40%); background:white; width:22px; height:32px; border-radius:50%; border:4px solid #fbbf24; z-index:2;"></div>
                     <!-- Pointer -->
-                    <div style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent; border-top:22px solid #fbbf24; filter:drop-shadow(0 0 12px rgba(251,191,36,0.6)); z-index:2;"></div>
+                    <div style="position:absolute; top:-8px; left:40%; transform:translateX(-40%); width:0; height:0; border-left:12px solid transparent; border-right:14px solid transparent; border-top:22px solid #fbbf24; filter:drop-shadow(0 0 12px rgba(251,191,36,0.6)); z-index:2;"></div>
                 </div>
                 <button id="spinBtn" class="btn btn-warning mt-3 px-4 fw-bold" <?= ($current_slot_data['can_spin']) ? '' : 'disabled' ?>>
                     <i class="fas fa-sync-alt"></i> Spin!
