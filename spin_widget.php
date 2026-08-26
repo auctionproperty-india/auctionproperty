@@ -1,26 +1,28 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Upright Labels (Final)
+// spin_widget.php – 8‑Segment Wheel (90° rotated, with SILVER)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// Segment colors and labels
+// Segment colors and labels (index 0=GOLD, index 2=SILVER, index 4=DIAMOND)
 $segmentColors = [
-    '#fbbf24', // 0 – Yellow
+    '#fbbf24', // 0 – GOLD
     '#ef4444', // 1 – Red
-    '#10b981', // 2 – Green
+    '#c0c0c0', // 2 – SILVER (grey/silver)
     '#3b82f6', // 3 – Blue
-    '#8b5cf6', // 4 – Purple
+    '#8b5cf6', // 4 – DIAMOND
     '#f59e0b', // 5 – Amber
     '#ec4899', // 6 – Pink
     '#14b8a6'  // 7 – Teal
 ];
-$segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
+$segmentLabels = ['GOLD', '', 'SILVER', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
+// Rotate the whole wheel by 90° so that GOLD and DIAMOND are on the sides
+$rotationOffset = 90; // degrees
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -66,29 +68,27 @@ $angle = 360 / $numSegments; // 45°
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) with upright labels placed exactly at wedge centre -->
+                <!-- 🎡 8‑SEGMENT WHEEL (200px) rotated by 90° with upright labels -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
                         $gradientParts = [];
                         for ($i = 0; $i < $numSegments; $i++) {
-                            $start = $i * $angle;
-                            $end = ($i + 1) * $angle;
+                            $start = $i * $angle + $rotationOffset;
+                            $end = ($i + 1) * $angle + $rotationOffset;
                             $color = $segmentColors[$i % count($segmentColors)];
                             $gradientParts[] = "$color $start" . "deg $end" . "deg";
                         }
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
-                        <!-- Segment Labels – upright (no rotation) and placed at the exact centre of each wedge -->
+                        <!-- Segment Labels – placed at centre of each wedge, upright -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
-                            // Centre angle of this wedge
-                            $centerAngle = $i * $angle + $angle/2;
-                            // Polar to cartesian (0° is top, so offset by -90°)
+                            // Centre angle of this wedge (with offset)
+                            $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
                             $rad = deg2rad($centerAngle - 90);
-                            // Distance from centre: 60% of radius (100px) → 60px
                             $distance = 60;
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
@@ -120,7 +120,7 @@ $angle = 360 / $numSegments; // 45°
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT (landing detection + benefit popup) ====== -->
+<!-- ====== SPIN JAVASCRIPT (biased landing: 60% chance for GOLD/SILVER/DIAMOND) ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -137,6 +137,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentLabels = <?= json_encode($segmentLabels) ?>;
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
+    // Special segments indices: GOLD (0), SILVER (2), DIAMOND (4)
+    const specialIndices = [0, 2, 4];
 
     spinBtn.addEventListener('click', function() {
         if (isSpinning) return;
@@ -144,9 +146,17 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
-        // Decide which segment to land on (0-7)
-        const targetSegment = Math.floor(Math.random() * numSegments);
-        // Calculate rotation to align that segment's centre with the pointer (top)
+        // ---- BIASED LANDING: 60% chance to land on a special segment ----
+        let targetSegment;
+        if (Math.random() < 0.6) {
+            // 60% chance: pick one of the special segments randomly
+            targetSegment = specialIndices[Math.floor(Math.random() * specialIndices.length)];
+        } else {
+            // 40% chance: pick any segment (including special ones, but evenly)
+            targetSegment = Math.floor(Math.random() * numSegments);
+        }
+
+        // ---- Calculate rotation to align target segment's centre with pointer (top) ----
         const targetAngle = targetSegment * segmentAngle + segmentAngle/2;
         const extraSpins = 5 + Math.floor(Math.random() * 5);
         const newRotation = extraSpins * 360 + (360 - targetAngle);
@@ -157,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
         wheel.style.transform = `rotate(${currentRotation}deg)`;
         wheel.classList.add('pulse');
 
-        // Call backend for coins/property reward
+        // ---- Call backend for coins/property reward (as before) ----
         fetch('spin_ajax.php')
             .then(response => response.json())
             .then(data => {
@@ -166,13 +176,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const label = segmentLabels[targetSegment] || '';
 
-                // If GOLD or DIAMOND, show benefit modal
-                if (label === 'GOLD' || label === 'DIAMOND') {
+                // If special label, show benefit modal
+                if (label === 'GOLD' || label === 'SILVER' || label === 'DIAMOND') {
                     const modalBody = document.getElementById('propertyModalContent');
                     if (modalBody) {
+                        let icon = 'fa-gem';
+                        let color = '#fbbf24';
+                        if (label === 'SILVER') { icon = 'fa-coins'; color = '#c0c0c0'; }
+                        else if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#8b5cf6'; }
                         modalBody.innerHTML = `
                             <div style="text-align:center; padding:20px;">
-                                <i class="fas fa-gem" style="font-size:4rem; color:#fbbf24;"></i>
+                                <i class="fas ${icon}" style="font-size:4rem; color:${color};"></i>
                                 <h4 class="mt-3">🎉 You landed on <strong>${label}</strong>!</h4>
                                 <p class="mt-3" style="font-size:1.2rem;">First activate your package to get benefits!</p>
                                 <a href="user_packages.php" class="btn btn-primary mt-3">View Packages</a>
@@ -183,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process coins/property reward (same as before)
+                // Process coins/property (unchanged)
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
@@ -210,7 +224,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
                         const icon = isCar ? '🚗' : '🏠';
                         const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
-                        if (label !== 'GOLD' && label !== 'DIAMOND') {
+                        if (!specialIndices.includes(targetSegment)) {
                             const modalContent = document.getElementById('propertyModalContent');
                             if (modalContent) {
                                 modalContent.innerHTML = `
