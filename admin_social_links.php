@@ -1,4 +1,6 @@
 <?php
+ob_start(); // Prevent headers already sent error
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -19,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $is_active = isset($_POST['is_active']) ? 1 : 0;
         $stmt = $pdo->prepare("INSERT INTO social_links (platform, url, icon_class, display_order, is_active) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$platform, $url, $icon_class, $display_order, $is_active]);
+        ob_end_clean();
         header("Location: admin_social_links.php?msg=added");
         exit;
     } elseif (isset($_POST['edit'])) {
@@ -30,12 +33,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $is_active = isset($_POST['is_active']) ? 1 : 0;
         $stmt = $pdo->prepare("UPDATE social_links SET platform = ?, url = ?, icon_class = ?, display_order = ?, is_active = ?, updated_at = NOW() WHERE id = ?");
         $stmt->execute([$platform, $url, $icon_class, $display_order, $is_active, $id]);
+        ob_end_clean();
         header("Location: admin_social_links.php?msg=updated");
         exit;
     } elseif (isset($_GET['delete'])) {
         $id = (int)$_GET['delete'];
         $stmt = $pdo->prepare("DELETE FROM social_links WHERE id = ?");
         $stmt->execute([$id]);
+        ob_end_clean();
         header("Location: admin_social_links.php?msg=deleted");
         exit;
     }
@@ -48,6 +53,8 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     $stmt->execute([$_GET['edit']]);
     $edit_record = $stmt->fetch();
 }
+
+ob_end_flush();
 ?>
 <div class="container-fluid mt-4">
     <h1><i class="fas fa-share-alt me-2"></i>Social Links</h1>
