@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Upright Labels
+// spin_widget.php – 8‑Segment Wheel with Upright Labels (Final)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -66,7 +66,7 @@ $angle = 360 / $numSegments; // 45°
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) with upright labels -->
+                <!-- 🎡 8‑SEGMENT WHEEL (200px) with upright labels placed exactly at wedge centre -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -80,20 +80,20 @@ $angle = 360 / $numSegments; // 45°
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
-                        <!-- Segment Labels – placed inside, but NOT rotated (upright) -->
+                        <!-- Segment Labels – upright (no rotation) and placed at the exact centre of each wedge -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
-                            // Center angle of this wedge (0° at top, clockwise)
+                            // Centre angle of this wedge
                             $centerAngle = $i * $angle + $angle/2;
-                            // Convert to radians (0° at right, so offset by -90°)
+                            // Polar to cartesian (0° is top, so offset by -90°)
                             $rad = deg2rad($centerAngle - 90);
-                            $distance = 60; // pixels from center
+                            // Distance from centre: 60% of radius (100px) → 60px
+                            $distance = 60;
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
-                            // 🔥 No rotation – the text stays upright (khada)
                         ?>
-                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#fff; font-weight:bold; font-size:14px; text-shadow:0 0 10px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.5); padding:2px 8px; border-radius:10px;">
+                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#fff; font-weight:bold; font-size:15px; text-shadow:0 0 12px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:3px 10px; border-radius:8px;">
                                 <?= htmlspecialchars($label) ?>
                             </span>
                         <?php endfor; ?>
@@ -120,7 +120,7 @@ $angle = 360 / $numSegments; // 45°
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT ====== -->
+<!-- ====== SPIN JAVASCRIPT (landing detection + benefit popup) ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -134,7 +134,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentRotation = 0;
     let isSpinning = false;
 
-    // Segment mapping (index -> label)
     const segmentLabels = <?= json_encode($segmentLabels) ?>;
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
@@ -145,9 +144,9 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
-        // Random: decide which segment to land on (0-7)
+        // Decide which segment to land on (0-7)
         const targetSegment = Math.floor(Math.random() * numSegments);
-        // Calculate rotation to land on that segment (pointer at top)
+        // Calculate rotation to align that segment's centre with the pointer (top)
         const targetAngle = targetSegment * segmentAngle + segmentAngle/2;
         const extraSpins = 5 + Math.floor(Math.random() * 5);
         const newRotation = extraSpins * 360 + (360 - targetAngle);
@@ -158,16 +157,16 @@ document.addEventListener('DOMContentLoaded', function() {
         wheel.style.transform = `rotate(${currentRotation}deg)`;
         wheel.classList.add('pulse');
 
+        // Call backend for coins/property reward
         fetch('spin_ajax.php')
             .then(response => response.json())
             .then(data => {
                 wheel.classList.remove('pulse');
                 isSpinning = false;
 
-                // Determine landed segment from targetSegment
-                const landedSegment = targetSegment;
-                const label = segmentLabels[landedSegment] || '';
+                const label = segmentLabels[targetSegment] || '';
 
+                // If GOLD or DIAMOND, show benefit modal
                 if (label === 'GOLD' || label === 'DIAMOND') {
                     const modalBody = document.getElementById('propertyModalContent');
                     if (modalBody) {
@@ -184,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process backend data (coins, property)
+                // Process coins/property reward (same as before)
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
@@ -193,7 +192,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
                         showCoinAnimation(data.coins);
                         launchStarShower();
-
                         const coinSpan = document.querySelector('.stat-card .stat-number');
                         if (coinSpan) {
                             let current = parseInt(coinSpan.textContent.replace(/,/g, ''));
@@ -227,9 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                 `;
                                 const viewLink = document.getElementById('viewPropertyLink');
-                                if (viewLink) {
-                                    viewLink.href = `property_detail.php?id=${p.id}&source=auction`;
-                                }
+                                if (viewLink) viewLink.href = `property_detail.php?id=${p.id}&source=auction`;
                                 const propertyModal = new bootstrap.Modal(document.getElementById('propertyModal'));
                                 propertyModal.show();
                                 spinMessage.innerHTML = data.message || '🏠 Check out this property!';
@@ -258,6 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     });
 
+    // Helper animations (unchanged)
     function showCoinAnimation(coins) {
         const toast = document.createElement('div');
         toast.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#10b981; color:white; padding:16px 24px; border-radius:12px; font-weight:bold; box-shadow:0 10px 30px rgba(0,0,0,0.2); z-index:9999; animation: slideIn 0.5s ease;';
@@ -274,10 +271,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.createElement('div');
         container.className = 'star-shower-container';
         document.body.appendChild(container);
-
         const count = 130;
         const colors = ['#fbbf24', '#f59e0b', '#fcd34d', '#fde68a', '#fef3c7', '#ffffff', '#ffd700', '#ffb700', '#ffaa00', '#ffcc66'];
-
         for (let i = 0; i < count; i++) {
             const star = document.createElement('div');
             star.className = 'star-shower';
@@ -288,7 +283,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const rotation = Math.random() * 360;
             const color = colors[Math.floor(Math.random() * colors.length)];
             const starChar = Math.random() > 0.4 ? '★' : '✦';
-            
             star.style.cssText = `
                 --duration: ${duration}s;
                 --delay: ${delay}s;
@@ -301,12 +295,9 @@ document.addEventListener('DOMContentLoaded', function() {
             star.textContent = starChar;
             container.appendChild(star);
         }
-
         const maxDuration = 3.0 + 1.6;
         setTimeout(() => {
-            if (container.parentNode) {
-                container.parentNode.removeChild(container);
-            }
+            if (container.parentNode) container.parentNode.removeChild(container);
         }, maxDuration * 1000 + 500);
     }
 });
