@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – Daily Spin Widget (Silver in Blue Segment)
+// spin_widget.php – Daily Spin Widget (Silver Text in Blue Segment)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -51,7 +51,7 @@ if (!isset($pdo) || !isset($user_id)) {
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 WHEEL (160px) with "Silver" label inside the blue segment -->
+                <!-- 🎡 WHEEL (160px) with "Silver" text inside the blue segment -->
                 <div style="position:relative; display:inline-block; width:160px; height:160px;">
                     <div id="spinWheel" class="spin-wheel" style="width:160px; height:160px; border-radius:50%; background: conic-gradient(
                         #fbbf24 0deg 72deg, 
@@ -60,10 +60,10 @@ if (!isset($pdo) || !isset($user_id)) {
                         #3b82f6 216deg 288deg, 
                         #8b5cf6 288deg 360deg
                     ); border:4px solid #fff; box-shadow:0 0 30px rgba(251,191,36,0.3); margin:0 auto;">
-                        <!-- 🥈 "Silver" label – inside the blue segment (bottom-left) -->
-                        <div style="position:absolute; left:25%; top:72%; transform:translate(-50%, -50%) rotate(-35deg); width:55px; height:55px; background:rgba(0,0,0,0.6); clip-path:polygon(50% 0%, 0% 100%, 100% 100%); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:bold; font-size:14px; text-shadow:0 0 8px rgba(0,0,0,0.9); pointer-events:none; z-index:5; border-radius:4px;">
-                            <span style="transform:rotate(35deg);">Silver</span>
-                        </div>
+                        <!-- 🥈 "Silver" label – pure text, no triangle, inside blue segment -->
+                        <span style="position:absolute; left:25%; top:70%; transform:translate(-50%, -50%) rotate(-40deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 12px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.6); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:4px;">
+                            Silver
+                        </span>
                     </div>
                     <!-- Center dot -->
                     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:32px; height:32px; border-radius:50%; border:4px solid #fbbf24; z-index:2;"></div>
