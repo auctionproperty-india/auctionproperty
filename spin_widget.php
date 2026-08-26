@@ -1,22 +1,22 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Upright Labels in Centre
+// spin_widget.php – 8‑Segment Wheel with Beautiful Distinct Colors
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// 8 distinct segment colors (no repetition)
+// 🎨 New vibrant, distinct colors (each segment unique)
 $segmentColors = [
-    '#fbbf24', // 0 – Yellow (GOLD)
-    '#ef4444', // 1 – Red
-    '#10b981', // 2 – Green
-    '#3b82f6', // 3 – Blue
-    '#8b5cf6', // 4 – Purple (DIAMOND)
-    '#f59e0b', // 5 – Amber
-    '#ec4899', // 6 – Pink
-    '#14b8a6'  // 7 – Teal
+    '#FFD700', // 0 – Gold (GOLD)
+    '#FF6B6B', // 1 – Coral
+    '#4ECDC4', // 2 – Turquoise
+    '#45B7D1', // 3 – Sky Blue
+    '#9B59B6', // 4 – Purple (DIAMOND)
+    '#FF9F43', // 5 – Orange
+    '#F368E0', // 6 – Magenta
+    '#00D2D3'  // 7 – Cyan
 ];
 // Labels: only GOLD (index 0) and DIAMOND (index 4)
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
@@ -68,7 +68,7 @@ $rotationOffset = 80; // rotate the whole wheel by 80°
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) rotated by 80° with distinct colours -->
+                <!-- 🎡 8‑SEGMENT WHEEL (200px) with new colors -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -82,15 +82,12 @@ $rotationOffset = 80; // rotate the whole wheel by 80°
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
-                        <!-- Segment Labels – upright, centred, inside wedge (distance = 65% of radius) -->
+                        <!-- Segment Labels – upright, centred, inside wedge -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
-                            // Centre angle of this wedge (with offset)
                             $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
-                            // Convert to radians (0° at top => -90° offset)
                             $rad = deg2rad($centerAngle - 90);
-                            // Distance from centre: 65% of radius (100px) → 65px
                             $distance = 65;
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
@@ -122,7 +119,7 @@ $rotationOffset = 80; // rotate the whole wheel by 80°
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT ====== -->
+<!-- ====== SPIN JAVASCRIPT (unchanged) ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -139,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentLabels = <?= json_encode($segmentLabels) ?>;
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
-    const specialIndices = [0, 4]; // GOLD and DIAMOND
+    const specialIndices = [0, 4];
 
     spinBtn.addEventListener('click', function() {
         if (isSpinning) return;
@@ -147,7 +144,6 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
-        // 60% chance to land on GOLD or DIAMOND
         let targetSegment;
         if (Math.random() < 0.6) {
             targetSegment = specialIndices[Math.floor(Math.random() * specialIndices.length)];
@@ -178,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (modalBody) {
                         let icon = 'fa-gem';
                         let color = '#fbbf24';
-                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#8b5cf6'; }
+                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#9B59B6'; }
                         modalBody.innerHTML = `
                             <div style="text-align:center; padding:20px;">
                                 <i class="fas ${icon}" style="font-size:4rem; color:${color};"></i>
@@ -192,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process backend data (coins, property)
+                // Process coins/property (same as before)
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
