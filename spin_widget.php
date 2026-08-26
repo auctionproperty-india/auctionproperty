@@ -1,28 +1,28 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel (90° rotated, with SILVER)
+// spin_widget.php – 8‑Segment Wheel (80° rotated, GOLD & DIAMOND only)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// Segment colors and labels (index 0=GOLD, index 2=SILVER, index 4=DIAMOND)
+// Segment colors and labels (index 0=GOLD, index 4=DIAMOND)
 $segmentColors = [
     '#fbbf24', // 0 – GOLD
     '#ef4444', // 1 – Red
-    '#c0c0c0', // 2 – SILVER (grey/silver)
+    '#10b981', // 2 – Green
     '#3b82f6', // 3 – Blue
     '#8b5cf6', // 4 – DIAMOND
     '#f59e0b', // 5 – Amber
     '#ec4899', // 6 – Pink
     '#14b8a6'  // 7 – Teal
 ];
-$segmentLabels = ['GOLD', '', 'SILVER', '', 'DIAMOND', '', '', ''];
+$segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
-// Rotate the whole wheel by 90° so that GOLD and DIAMOND are on the sides
-$rotationOffset = 90; // degrees
+// Rotate by 80° so GOLD and DIAMOND sit nicely
+$rotationOffset = 80; // degrees
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -68,7 +68,7 @@ $rotationOffset = 90; // degrees
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) rotated by 90° with upright labels -->
+                <!-- 🎡 8‑SEGMENT WHEEL (200px) rotated by 80° with upright labels -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -120,7 +120,7 @@ $rotationOffset = 90; // degrees
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT (biased landing: 60% chance for GOLD/SILVER/DIAMOND) ====== -->
+<!-- ====== SPIN JAVASCRIPT (biased landing: GOLD or DIAMOND only) ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -137,8 +137,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentLabels = <?= json_encode($segmentLabels) ?>;
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
-    // Special segments indices: GOLD (0), SILVER (2), DIAMOND (4)
-    const specialIndices = [0, 2, 4];
+    // Special segments: GOLD (0) and DIAMOND (4)
+    const specialIndices = [0, 4];
 
     spinBtn.addEventListener('click', function() {
         if (isSpinning) return;
@@ -146,13 +146,13 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
-        // ---- BIASED LANDING: 60% chance to land on a special segment ----
+        // ---- BIASED LANDING: 60% chance to land on GOLD or DIAMOND ----
         let targetSegment;
         if (Math.random() < 0.6) {
-            // 60% chance: pick one of the special segments randomly
+            // Pick randomly between GOLD and DIAMOND
             targetSegment = specialIndices[Math.floor(Math.random() * specialIndices.length)];
         } else {
-            // 40% chance: pick any segment (including special ones, but evenly)
+            // 40% chance: any segment (including special ones, but evenly)
             targetSegment = Math.floor(Math.random() * numSegments);
         }
 
@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
         wheel.style.transform = `rotate(${currentRotation}deg)`;
         wheel.classList.add('pulse');
 
-        // ---- Call backend for coins/property reward (as before) ----
+        // ---- Call backend for coins/property reward ----
         fetch('spin_ajax.php')
             .then(response => response.json())
             .then(data => {
@@ -176,14 +176,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const label = segmentLabels[targetSegment] || '';
 
-                // If special label, show benefit modal
-                if (label === 'GOLD' || label === 'SILVER' || label === 'DIAMOND') {
+                // If GOLD or DIAMOND, show benefit modal
+                if (label === 'GOLD' || label === 'DIAMOND') {
                     const modalBody = document.getElementById('propertyModalContent');
                     if (modalBody) {
                         let icon = 'fa-gem';
                         let color = '#fbbf24';
-                        if (label === 'SILVER') { icon = 'fa-coins'; color = '#c0c0c0'; }
-                        else if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#8b5cf6'; }
+                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#8b5cf6'; }
                         modalBody.innerHTML = `
                             <div style="text-align:center; padding:20px;">
                                 <i class="fas ${icon}" style="font-size:4rem; color:${color};"></i>
