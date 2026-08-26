@@ -1,149 +1,176 @@
 <?php
-// ============================================================
-// 📝 Register – All Fields Required + 100 Coins (User + Referrer)
-// ============================================================
-
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
 $error = '';
-
-// ---- Check if referral code exists in URL ----
-$ref_code = isset($_GET['ref']) ? trim($_GET['ref']) : '';
+$success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     $phone = trim($_POST['phone']);
-    $city = trim($_POST['city']);
     $password = $_POST['password'];
     $confirm = $_POST['confirm_password'];
-    $ref_code_post = trim($_POST['ref_code'] ?? '');
+    $ref_code = trim($_POST['referral_code'] ?? '');
 
-    // ---- Validation ----
-    $errors = [];
-
-    if (empty($name)) $errors[] = "Name is required.";
-    if (empty($email)) $errors[] = "Email is required.";
-    if (empty($phone)) $errors[] = "Phone number is required.";
-    if (empty($city)) $errors[] = "City is required.";
-    if (empty($password)) $errors[] = "Password is required.";
-    if (empty($confirm)) $errors[] = "Please confirm your password.";
-
-    if ($password !== $confirm) $errors[] = "Passwords do not match.";
-    if (strlen($password) < 6) $errors[] = "Password must be at least 6 characters.";
-
-    // Mobile number must be exactly 10 digits (starting with 6-9)
-    if (!preg_match('/^[6-9][0-9]{9}$/', $phone)) {
-        $errors[] = "Phone number must be a valid 10-digit Indian mobile number (starting with 6,7,8,9).";
-    }
-
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = "Please enter a valid email address.";
-    }
-
-    // Check duplicate email
-    if (empty($errors)) {
-        $check_stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-        $check_stmt->execute([$email]);
-        if ($check_stmt->rowCount() > 0) {
-            $errors[] = "This email is already registered. Please use a different email or <a href='login.php'>login</a>.";
-        }
-    }
-
-    // ---- If no errors, proceed ----
-    if (empty($errors)) {
-        // Generate referral code for new user
-        $referral_code = strtoupper(substr(md5(uniqid()), 0, 8));
-        $hashed = password_hash($password, PASSWORD_DEFAULT);
-        $referred_by = null;
-
-        // Check referral code from URL or form
-        $ref_to_use = !empty($ref_code_post) ? $ref_code_post : $ref_code;
-        if (!empty($ref_to_use)) {
-            $ref_stmt = $pdo->prepare("SELECT id FROM users WHERE referral_code = ?");
-            $ref_stmt->execute([$ref_to_use]);
-            $ref_user = $ref_stmt->fetch();
-            if ($ref_user) {
-                $referred_by = $ref_user['id'];
-                // ✅ Give referrer 100 coins
-                $update_ref = $pdo->prepare("UPDATE users SET coins = coins + 100 WHERE id = ?");
-                $update_ref->execute([$referred_by]);
-            }
-        }
-
-        // Insert new user with 100 coins
-        $stmt = $pdo->prepare("
-            INSERT INTO users (name, email, phone, password, referral_code, referred_by, role, status, created_at, coins, city)
-            VALUES (?, ?, ?, ?, ?, ?, 'user', 'active', NOW(), 100, ?)
-        ");
-        $stmt->execute([$name, $email, $phone, $hashed, $referral_code, $referred_by, $city]);
-
-        // ✅ AUTO-LOGIN
-        $_SESSION['user_id'] = $pdo->lastInsertId();
-        $_SESSION['user_name'] = $name;
-        $_SESSION['role'] = 'user';
-
-        // ✅ Set success message
-        $msg = "🎉 Welcome! You received 100 bonus coins.";
-        if ($referred_by) {
-            $msg .= " Your referrer also received 100 coins!";
-        }
-        $_SESSION['registration_success'] = $msg;
-
-        // ✅ Redirect to user dashboard
-        header("Location: user_dashboard.php");
-        exit;
+    if (empty($name) || empty($email) || empty($password)) {
+        $error = 'All fields are required.';
+    } elseif ($password !== $confirm) {
+        $error = 'Passwords do not match.';
+    } elseif (strlen($password) < 6) {
+        $error = 'Password must be at least 6 characters.';
     } else {
-        $error = implode("<br>", $errors);
+        // Check email exists
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        if ($stmt->fetch()) {
+            $error = 'Email already registered.';
+        } else {
+            // Check referral code
+            $ref_by = null;
+            if (!empty($ref_code)) {
+                $ref_by = getReferrerIdByCode($pdo, $ref_code);
+            }
+            // Hash password
+            $hashed = password_hash($password, PASSWORD_DEFAULT);
+            $new_code = generateReferralCode();
+
+            $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'active', NOW())");
+            $stmt->execute([$name, $email, $phone, $hashed, $new_code, $ref_by]);
+
+            $success = 'Account created! You can now login.';
+            // Optionally auto-login
+            // header("Location: login.php?registered=1");
+        }
     }
 }
 
-include 'header.php'; 
+include 'header.php';
 ?>
-<div class="container-fluid">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card-premium">
-                <h4><i class="fas fa-user-plus me-2"></i>Register</h4>
-                <?php if ($error): ?>
-                    <div class="alert alert-danger"><?= $error ?></div>
-                <?php endif; ?>
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Full Name *</label>
-                        <input type="text" name="name" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Email *</label>
-                        <input type="email" name="email" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Phone *</label>
-                        <input type="tel" name="phone" class="form-control" required maxlength="10" pattern="[6-9][0-9]{9}">
-                        <small class="text-muted">Enter 10-digit Indian mobile number (starting with 6,7,8,9).</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">City *</label>
-                        <input type="text" name="city" class="form-control" required placeholder="Enter your city (e.g. Indore, Mumbai, Delhi)">
-                        <small class="text-muted">Properties from your city will appear on your dashboard.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Password *</label>
-                        <input type="password" name="password" class="form-control" required minlength="6">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Confirm Password *</label>
-                        <input type="password" name="confirm_password" class="form-control" required>
-                    </div>
-                    <?php if (!empty($ref_code)): ?>
-                        <input type="hidden" name="ref_code" value="<?= htmlspecialchars($ref_code) ?>">
-                    <?php endif; ?>
-                    <button type="submit" class="btn btn-primary w-100">Register</button>
-                    <p class="mt-3 text-center">Already have an account? <a href="login.php">Login</a></p>
-                </form>
+<style>
+    .register-container {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .register-card {
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(8px);
+        border-radius: 30px;
+        padding: 40px 35px;
+        max-width: 500px;
+        width: 100%;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    .register-card h2 {
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 8px;
+    }
+    .register-card p.sub {
+        color: #64748b;
+        margin-bottom: 25px;
+        font-size: 0.95rem;
+    }
+    .register-card .form-label {
+        font-weight: 600;
+        color: #1e293b;
+    }
+    .register-card .form-control {
+        border-radius: 12px;
+        padding: 12px 16px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+    .register-card .form-control:focus {
+        border-color: #1e3a8a;
+        box-shadow: 0 0 0 3px rgba(30,58,138,0.1);
+    }
+    .register-card .btn-primary {
+        background: #1e3a8a;
+        border: none;
+        padding: 12px;
+        border-radius: 12px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    .register-card .btn-primary:hover {
+        background: #2563eb;
+        transform: translateY(-2px);
+    }
+    .register-card .login-link {
+        color: #1e3a8a;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .register-card .login-link:hover {
+        text-decoration: underline;
+    }
+    .register-card .error-msg {
+        background: #fef2f2;
+        border-left: 4px solid #dc2626;
+        padding: 12px;
+        border-radius: 8px;
+        color: #991b1b;
+        font-size: 0.9rem;
+    }
+    .register-card .success-msg {
+        background: #dcfce7;
+        border-left: 4px solid #16a34a;
+        padding: 12px;
+        border-radius: 8px;
+        color: #14532d;
+    }
+    @media (max-width: 576px) {
+        .register-card { padding: 30px 20px; }
+    }
+</style>
+<div class="register-container">
+    <div class="register-card">
+        <h2>Create Account</h2>
+        <p class="sub">Join Prime Property today</p>
+
+        <?php if ($error): ?>
+            <div class="error-msg mb-3"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+        <?php if ($success): ?>
+            <div class="success-msg mb-3"><?= htmlspecialchars($success) ?> <a href="login.php" class="login-link">Login now</a></div>
+        <?php endif; ?>
+
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="name" class="form-control" placeholder="Your name" required>
             </div>
-        </div>
+            <div class="mb-3">
+                <label class="form-label">Email Address</label>
+                <input type="email" name="email" class="form-control" placeholder="you@example.com" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Phone (optional)</label>
+                <input type="text" name="phone" class="form-control" placeholder="9876543210">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Confirm Password</label>
+                <input type="password" name="confirm_password" class="form-control" placeholder="••••••••" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Referral Code (optional)</label>
+                <input type="text" name="referral_code" class="form-control" placeholder="Enter code if you have one">
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Create Account</button>
+        </form>
+
+        <p class="text-center mt-4">
+            Already have an account? <a href="login.php" class="login-link">Sign in</a>
+        </p>
     </div>
 </div>
 <?php include 'footer.php'; ?>
