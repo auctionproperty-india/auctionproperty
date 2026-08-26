@@ -81,7 +81,7 @@ if ($is_logged_in && $role == 'user') {
         body.role-guest { background: #f8fafc; }
         body.role-sales { background: #f0f5fa; }
 
-        /* ====== स्टिकी नेविगेशन ====== */
+        /* ====== स्टिकी नेविगेशन – केवल Home Page पर ====== */
         .top-nav {
             position: fixed;
             top: 0;
@@ -195,6 +195,7 @@ if ($is_logged_in && $role == 'user') {
             color: #334155;
             border-right: 1px solid #e2e8f0;
         }
+
         @media (max-width: 991px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -445,10 +446,7 @@ if ($is_logged_in && $role == 'user') {
         }
 
         /* ====== Sales Team Badge Color ====== */
-        .badge-sales {
-            background: #f59e0b;
-            color: #000;
-        }
+        .badge-sales { background: #f59e0b; color: #000; }
     </style>
 </head>
 <body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?>">
@@ -500,8 +498,6 @@ if ($is_logged_in && $role == 'user') {
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
-            
-            
         <?php endif; ?>
         <?php if (hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
@@ -538,7 +534,15 @@ if ($is_logged_in && $role == 'user') {
         <?php endif; ?>
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         
-   
+    <?php elseif ($role == 'sales'): ?>
+        <!-- ====== SALES TEAM SIDEBAR ====== -->
+        <a href="sales_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
+        <a href="sales_lead_upload.php"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
+        <a href="sales_lead_add.php"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
+        <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
+        <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
+        <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
         
     <?php else: ?>
         <!-- ====== REGULAR USER SIDEBAR ====== -->
