@@ -61,7 +61,7 @@ if (!isset($pdo) || !isset($user_id)) {
                         #8b5cf6 288deg 360deg
                     ); border:4px solid #fff; box-shadow:0 0 30px rgba(251,191,36,0.3); margin:0 auto;">
                         <!-- 🥈 "Silver" label – fixed at the center of the blue wedge -->
-                        <span style="position:absolute; left:30%; top:70%; transform:translate(-50%, -50%) rotate(-35deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 14px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:3px 10px; border-radius:6px;">
+                        <span style="position:absolute; left:50%; top:50%; transform:translate(-50%, -50%) rotate(-35deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 14px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:3px 10px; border-radius:6px;">
                             Silver
                         </span>
                     </div>
