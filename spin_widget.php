@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – Daily Spin Widget (Silver in Blue Segment)
+// spin_widget.php – Daily Spin Widget (Silver in Blue Wedge)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -60,8 +60,8 @@ if (!isset($pdo) || !isset($user_id)) {
                         #3b82f6 216deg 288deg, 
                         #8b5cf6 288deg 360deg
                     ); border:4px solid #fff; box-shadow:0 0 30px rgba(251,191,36,0.3); margin:0 auto;">
-                        <!-- 🥈 "Silver" label – positioned exactly in the blue wedge -->
-                        <span style="position:absolute; left:28%; top:72%; transform:translate(-50%, -50%) rotate(-35deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 14px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.35); padding:3px 10px; border-radius:6px;">
+                        <!-- 🥈 "Silver" label – fixed at the center of the blue wedge -->
+                        <span style="position:absolute; left:30%; top:70%; transform:translate(-50%, -50%) rotate(-35deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 14px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:3px 10px; border-radius:6px;">
                             Silver
                         </span>
                     </div>
