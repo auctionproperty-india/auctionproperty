@@ -28,9 +28,16 @@ function hasActiveSubscription($pdo, $user_id, $property_id = null) {
     return $stmt->rowCount() > 0;
 }
 
+// ✅ UPDATED: userHasActiveSubscription – now handles NULL end_date gracefully
 function userHasActiveSubscription($pdo, $user_id) {
     if(!$user_id) return false;
-    $stmt = $pdo->prepare("SELECT id FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE LIMIT 1");
+    $stmt = $pdo->prepare("
+        SELECT id FROM subscriptions 
+        WHERE user_id = ? 
+        AND status = 'active' 
+        AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+        LIMIT 1
+    ");
     $stmt->execute([$user_id]);
     return $stmt->rowCount() > 0;
 }
@@ -792,5 +799,15 @@ function uploadFile($file, $target_dir = 'uploads/') {
         return $target_file;
     }
     return null;
+}
+
+// ---- Safe Date Formatter (added for consistency) ----
+if (!function_exists('safeDateFormat')) {
+    function safeDateFormat($dateStr) {
+        if (empty($dateStr) || strtotime($dateStr) === false) {
+            return 'N/A';
+        }
+        return date('d M Y', strtotime($dateStr));
+    }
 }
 ?>
