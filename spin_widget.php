@@ -1,14 +1,10 @@
 <?php
 // ============================================================
-// spin_widget.php – Daily Spin Widget (Separate File)
-// ============================================================
-// This file is included in user_dashboard.php
-// It uses variables: $pdo, $user_id, $slot_statuses, $current_slot, $current_slot_data
+// spin_widget.php – Daily Spin Widget (Larger Wheel + Silver Label)
 // ============================================================
 
-// Ensure required data is available
 if (!isset($pdo) || !isset($user_id)) {
-    return; // safety
+    return;
 }
 ?>
 <div class="spin-card">
@@ -55,20 +51,22 @@ if (!isset($pdo) || !isset($user_id)) {
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 SPIN WHEEL with "Silver" label on the wheel -->
-                <div style="position:relative; display:inline-block; width:120px; height:120px;">
-                    <div id="spinWheel" class="spin-wheel" style="width:120px; height:120px; border-radius:50%; background: conic-gradient(
+                <!-- 🎡 LARGER SPIN WHEEL (160px) with Silver Label Centered -->
+                <div style="position:relative; display:inline-block; width:160px; height:160px;">
+                    <div id="spinWheel" class="spin-wheel" style="width:160px; height:160px; border-radius:50%; background: conic-gradient(
                         #fbbf24 0deg 72deg, 
                         #ef4444 72deg 144deg, 
                         #10b981 144deg 216deg, 
                         #3b82f6 216deg 288deg, 
                         #8b5cf6 288deg 360deg
                     ); border:4px solid #fff; box-shadow:0 0 30px rgba(251,191,36,0.3); margin:0 auto;">
-                        <!-- 🥈 "Silver" label positioned on the first segment (yellow) -->
-                        <span style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%) rotate(0deg); font-size:14px; font-weight:bold; color:#fff; text-shadow:0 0 8px rgba(0,0,0,0.9); pointer-events:none; background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:6px; transform-origin:center;">Silver</span>
+                        <!-- 🥈 "Silver" label – placed inside the first (yellow) segment -->
+                        <span style="position:absolute; top:12%; left:50%; transform:translateX(-50%); font-size:16px; font-weight:bold; color:#fff; text-shadow:0 0 12px rgba(0,0,0,0.9); pointer-events:none; background:rgba(0,0,0,0.5); padding:4px 12px; border-radius:20px; z-index:5; white-space:nowrap;">Silver</span>
                     </div>
-                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:30px; height:30px; border-radius:50%; border:3px solid #fbbf24; z-index:2;"></div>
-                    <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:12px solid transparent; border-right:12px solid transparent; border-top:20px solid #fbbf24; filter:drop-shadow(0 0 10px rgba(251,191,36,0.5)); z-index:2;"></div>
+                    <!-- Center dot -->
+                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:32px; height:32px; border-radius:50%; border:4px solid #fbbf24; z-index:2;"></div>
+                    <!-- Pointer -->
+                    <div style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent; border-top:22px solid #fbbf24; filter:drop-shadow(0 0 12px rgba(251,191,36,0.6)); z-index:2;"></div>
                 </div>
                 <button id="spinBtn" class="btn btn-warning mt-3 px-4 fw-bold" <?= ($current_slot_data['can_spin']) ? '' : 'disabled' ?>>
                     <i class="fas fa-sync-alt"></i> Spin!
@@ -87,7 +85,7 @@ if (!isset($pdo) || !isset($user_id)) {
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT ====== -->
+<!-- ====== SPIN JAVASCRIPT (unchanged) ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -136,7 +134,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         showCoinAnimation(data.coins);
                         launchStarShower();
 
-                        // Update coin display in stats card (if exists)
                         const coinSpan = document.querySelector('.stat-card .stat-number');
                         if (coinSpan) {
                             let current = parseInt(coinSpan.textContent.replace(/,/g, ''));
