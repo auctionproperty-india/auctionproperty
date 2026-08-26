@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📋 User Subscription History – Safe Date Formatting (No updated_at)
+// 📋 User Subscription History – Activation & Expiry Dates
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -25,14 +25,12 @@ if (!function_exists('safeDateFormat')) {
 }
 
 // ---- Fetch user's subscription history ----
-// Removed s.updated_at since it doesn't exist in the table.
 $stmt = $pdo->prepare("
     SELECT 
         s.*,
         p.name as package_name,
         s.start_date,
-        s.end_date,
-        s.created_at as request_date
+        s.end_date
     FROM subscriptions s
     LEFT JOIN packages p ON s.package_id = p.id
     WHERE s.user_id = ?
@@ -44,8 +42,8 @@ $subscriptions = $stmt->fetchAll();
 
 <div class="container-fluid">
     <div class="card-premium">
-        <h4><i class="fas fa-history me-2"></i>Your Subscription Requests</h4>
-        <p class="text-muted">All your subscription requests and their status.</p>
+        <h4><i class="fas fa-history me-2"></i>Your Subscription History</h4>
+        <p class="text-muted">View your subscription details, activation and expiry dates.</p>
 
         <?php if (empty($subscriptions)): ?>
             <div class="alert alert-info">You have not made any subscription request yet.</div>
@@ -59,14 +57,14 @@ $subscriptions = $stmt->fetchAll();
                             <th>Status</th>
                             <th>Payment Method</th>
                             <th>UTR</th>
-                            <th>Request Date</th>
-                            <th>Activation/Reject Date</th>
+                            <th>Activation Date</th>
+                            <th>Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($subscriptions as $sub): ?>
                             <tr>
-                                <td><?= htmlspecialchars($sub['package_name']) ?></td>
+                                <td><?= htmlspecialchars($sub['package_name'] ?? 'N/A') ?></td>
                                 <td>₹<?= number_format($sub['amount'], 2) ?></td>
                                 <td>
                                     <?php
@@ -80,26 +78,8 @@ $subscriptions = $stmt->fetchAll();
                                 </td>
                                 <td><?= htmlspecialchars($sub['payment_method'] ?? 'N/A') ?></td>
                                 <td><?= htmlspecialchars($sub['utr'] ?? 'N/A') ?></td>
-                                <td><?= safeDateFormat($sub['request_date']) ?></td>
-                                <td>
-                                    <?php
-                                    // Determine action date:
-                                    // If status is active -> show start_date
-                                    // If status is rejected -> we don't have a reject date column, so show N/A or use created_at as fallback
-                                    // If status is pending -> N/A
-                                    $actionDate = null;
-                                    if ($sub['status'] == 'active') {
-                                        $actionDate = $sub['start_date'];
-                                    } elseif ($sub['status'] == 'rejected') {
-                                        // No reject timestamp; we can show created_at (request date) or N/A.
-                                        // Let's show N/A because we don't have a reject date.
-                                        $actionDate = null;
-                                    } else {
-                                        $actionDate = null;
-                                    }
-                                    echo safeDateFormat($actionDate);
-                                    ?>
-                                </td>
+                                <td><?= safeDateFormat($sub['start_date']) ?></td>
+                                <td><?= safeDateFormat($sub['end_date']) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
