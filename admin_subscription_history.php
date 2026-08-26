@@ -9,13 +9,24 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 
 include 'header.php';
 
+// ---- Safe Date Formatter ----
+if (!function_exists('safeDateFormat')) {
+    function safeDateFormat($dateStr) {
+        if (empty($dateStr) || strtotime($dateStr) === false) {
+            return 'N/A';
+        }
+        return date('d M Y', strtotime($dateStr));
+    }
+}
+
 // ---- Search filter ----
 $search = $_GET['search'] ?? '';
 $status_filter = $_GET['status'] ?? '';
 
-$sql = "SELECT s.*, u.name as user_name 
-        FROM subscriptions s 
-        JOIN users u ON s.user_id = u.id 
+$sql = "SELECT s.*, u.name as user_name, p.name as package_name
+        FROM subscriptions s
+        JOIN users u ON s.user_id = u.id
+        LEFT JOIN packages p ON s.package_id = p.id
         WHERE 1=1";
 $params = [];
 
@@ -86,8 +97,8 @@ $subscriptions = $stmt->fetchAll();
                             </td>
                             <td><?= htmlspecialchars($row['payment_method'] ?? 'N/A') ?></td>
                             <td><?= htmlspecialchars($row['utr'] ?? 'N/A') ?></td>
-                            <td><?= !empty($row['start_date']) ? date('d M Y', strtotime($row['start_date'])) : 'N/A' ?></td>
-                            <td><?= !empty($row['end_date']) ? date('d M Y', strtotime($row['end_date'])) : 'N/A' ?></td>
+                            <td><?= safeDateFormat($row['start_date']) ?></td>
+                            <td><?= safeDateFormat($row['end_date']) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
