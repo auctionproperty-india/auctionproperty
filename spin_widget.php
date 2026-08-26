@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Tilted GOLD & DIAMOND
+// spin_widget.php – 8‑Segment Wheel with Dynamically Tilted Labels
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -20,6 +20,8 @@ $segmentColors = [
 ];
 // Labels for each segment (index 0=GOLD, index 4=DIAMOND)
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
+$numSegments = 8;
+$angle = 360 / $numSegments; // 45°
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -65,12 +67,10 @@ $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) with tilted labels -->
+                <!-- 🎡 8‑SEGMENT WHEEL (200px) with labels tilted to wedge angle -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
-                        $numSegments = 8;
-                        $angle = 360 / $numSegments;
                         $gradientParts = [];
                         for ($i = 0; $i < $numSegments; $i++) {
                             $start = $i * $angle;
@@ -81,18 +81,19 @@ $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto;">
-                        <!-- Segment Labels (positioned at center of each wedge, tilted consistently) -->
+                        <!-- Segment Labels – placed at center, rotated to match wedge angle -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
-                            // Calculate center of wedge: polar coordinates from center
+                            // Center angle of this wedge (0° at top, clockwise)
                             $centerAngle = $i * $angle + $angle/2;
-                            $angleRad = deg2rad($centerAngle - 90); // -90 because 0° is top
-                            $distance = 65; // pixels from center (radius 100px, so ~65%)
-                            $left = 100 + $distance * cos($angleRad);
-                            $top = 100 + $distance * sin($angleRad);
-                            // 🔥 Consistent tilt: rotate -35° (like previous Silver)
-                            $rotation = -35;
+                            // Polar coordinates: distance from center = 65% of radius (100px)
+                            $rad = deg2rad($centerAngle - 90); // -90 because 0° is top
+                            $distance = 65;
+                            $left = 100 + $distance * cos($rad);
+                            $top = 100 + $distance * sin($rad);
+                            // 🔥 Tilt exactly to the wedge angle
+                            $rotation = $centerAngle;
                         ?>
                             <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(<?= $rotation ?>deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 12px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:2px 10px; border-radius:12px;">
                                 <?= htmlspecialchars($label) ?>
@@ -121,7 +122,7 @@ $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT ====== -->
+<!-- ====== SPIN JAVASCRIPT (with segment detection & benefit popup) ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -185,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process backend data
+                // Process backend data (coins, property)
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
