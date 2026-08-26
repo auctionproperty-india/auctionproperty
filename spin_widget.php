@@ -1,27 +1,27 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel (80° rotated, GOLD & DIAMOND only)
+// spin_widget.php – Final: Original Colors, GOLD & DIAMOND only
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// Segment colors and labels (index 0=GOLD, index 4=DIAMOND)
+// Original segment colors (as before)
 $segmentColors = [
-    '#fbbf24', // 0 – GOLD
+    '#fbbf24', // 0 – Yellow (GOLD)
     '#ef4444', // 1 – Red
     '#10b981', // 2 – Green
     '#3b82f6', // 3 – Blue
-    '#8b5cf6', // 4 – DIAMOND
+    '#8b5cf6', // 4 – Purple (DIAMOND)
     '#f59e0b', // 5 – Amber
     '#ec4899', // 6 – Pink
     '#14b8a6'  // 7 – Teal
 ];
+// Labels: only GOLD (index 0) and DIAMOND (index 4)
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
-// Rotate by 80° so GOLD and DIAMOND sit nicely
 $rotationOffset = 80; // degrees
 ?>
 <div class="spin-card">
@@ -68,7 +68,7 @@ $rotationOffset = 80; // degrees
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) rotated by 80° with upright labels -->
+                <!-- 🎡 8‑SEGMENT WHEEL (200px) rotated by 80° with original colors -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -82,18 +82,17 @@ $rotationOffset = 80; // degrees
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
-                        <!-- Segment Labels – placed at centre of each wedge, upright -->
+                        <!-- Segment Labels – upright, centred, small font -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
-                            // Centre angle of this wedge (with offset)
                             $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
                             $rad = deg2rad($centerAngle - 90);
                             $distance = 60;
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
                         ?>
-                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#fff; font-weight:bold; font-size:15px; text-shadow:0 0 12px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:3px 10px; border-radius:8px;">
+                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#fff; font-weight:bold; font-size:12px; text-shadow:0 0 10px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:2px 8px; border-radius:6px;">
                                 <?= htmlspecialchars($label) ?>
                             </span>
                         <?php endfor; ?>
@@ -120,7 +119,7 @@ $rotationOffset = 80; // degrees
     <?php endif; ?>
 </div>
 
-<!-- ====== SPIN JAVASCRIPT (biased landing: GOLD or DIAMOND only) ====== -->
+<!-- ====== SPIN JAVASCRIPT ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -137,8 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentLabels = <?= json_encode($segmentLabels) ?>;
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
-    // Special segments: GOLD (0) and DIAMOND (4)
-    const specialIndices = [0, 4];
+    const specialIndices = [0, 4]; // GOLD and DIAMOND
 
     spinBtn.addEventListener('click', function() {
         if (isSpinning) return;
@@ -146,17 +144,14 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
-        // ---- BIASED LANDING: 60% chance to land on GOLD or DIAMOND ----
+        // 60% chance to land on GOLD or DIAMOND
         let targetSegment;
         if (Math.random() < 0.6) {
-            // Pick randomly between GOLD and DIAMOND
             targetSegment = specialIndices[Math.floor(Math.random() * specialIndices.length)];
         } else {
-            // 40% chance: any segment (including special ones, but evenly)
             targetSegment = Math.floor(Math.random() * numSegments);
         }
 
-        // ---- Calculate rotation to align target segment's centre with pointer (top) ----
         const targetAngle = targetSegment * segmentAngle + segmentAngle/2;
         const extraSpins = 5 + Math.floor(Math.random() * 5);
         const newRotation = extraSpins * 360 + (360 - targetAngle);
@@ -167,7 +162,6 @@ document.addEventListener('DOMContentLoaded', function() {
         wheel.style.transform = `rotate(${currentRotation}deg)`;
         wheel.classList.add('pulse');
 
-        // ---- Call backend for coins/property reward ----
         fetch('spin_ajax.php')
             .then(response => response.json())
             .then(data => {
@@ -176,7 +170,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const label = segmentLabels[targetSegment] || '';
 
-                // If GOLD or DIAMOND, show benefit modal
                 if (label === 'GOLD' || label === 'DIAMOND') {
                     const modalBody = document.getElementById('propertyModalContent');
                     if (modalBody) {
@@ -196,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process coins/property (unchanged)
+                // Process coins/property (same as before)
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
@@ -267,7 +260,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     });
 
-    // Helper animations (unchanged)
     function showCoinAnimation(coins) {
         const toast = document.createElement('div');
         toast.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#10b981; color:white; padding:16px 24px; border-radius:12px; font-weight:bold; box-shadow:0 10px 30px rgba(0,0,0,0.2); z-index:9999; animation: slideIn 0.5s ease;';
