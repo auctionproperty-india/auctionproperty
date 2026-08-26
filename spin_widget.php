@@ -1,13 +1,13 @@
 <?php
 // ============================================================
-// spin_widget.php – Final: Original Colors, GOLD & DIAMOND only
+// spin_widget.php – 8‑Segment Wheel with Upright Labels in Centre
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// Original segment colors (as before)
+// 8 distinct segment colors (no repetition)
 $segmentColors = [
     '#fbbf24', // 0 – Yellow (GOLD)
     '#ef4444', // 1 – Red
@@ -22,7 +22,7 @@ $segmentColors = [
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
-$rotationOffset = 80; // degrees
+$rotationOffset = 80; // rotate the whole wheel by 80°
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -68,7 +68,7 @@ $rotationOffset = 80; // degrees
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 8‑SEGMENT WHEEL (200px) rotated by 80° with original colors -->
+                <!-- 🎡 8‑SEGMENT WHEEL (200px) rotated by 80° with distinct colours -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -76,23 +76,26 @@ $rotationOffset = 80; // degrees
                         for ($i = 0; $i < $numSegments; $i++) {
                             $start = $i * $angle + $rotationOffset;
                             $end = ($i + 1) * $angle + $rotationOffset;
-                            $color = $segmentColors[$i % count($segmentColors)];
+                            $color = $segmentColors[$i];
                             $gradientParts[] = "$color $start" . "deg $end" . "deg";
                         }
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
-                        <!-- Segment Labels – upright, centred, small font -->
+                        <!-- Segment Labels – upright, centred, inside wedge (distance = 65% of radius) -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
+                            // Centre angle of this wedge (with offset)
                             $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
+                            // Convert to radians (0° at top => -90° offset)
                             $rad = deg2rad($centerAngle - 90);
-                            $distance = 60;
+                            // Distance from centre: 65% of radius (100px) → 65px
+                            $distance = 65;
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
                         ?>
-                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#fff; font-weight:bold; font-size:12px; text-shadow:0 0 10px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.4); padding:2px 8px; border-radius:6px;">
+                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#fff; font-weight:bold; font-size:12px; text-shadow:0 0 10px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:transparent; padding:0;">
                                 <?= htmlspecialchars($label) ?>
                             </span>
                         <?php endfor; ?>
@@ -189,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process coins/property (same as before)
+                // Process backend data (coins, property)
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
