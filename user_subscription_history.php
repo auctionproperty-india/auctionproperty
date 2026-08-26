@@ -14,7 +14,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 $user_id = $_SESSION['user_id'];
 include 'header.php';
 
-// ---- Safe Date Formatter (if not defined in functions.php) ----
+// ---- Safe Date Formatter ----
 if (!function_exists('safeDateFormat')) {
     function safeDateFormat($dateStr) {
         if (empty($dateStr) || strtotime($dateStr) === false) {
