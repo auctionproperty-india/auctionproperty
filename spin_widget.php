@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – Daily Spin Widget (Silver Text in Blue Segment)
+// spin_widget.php – Daily Spin Widget (Silver in Blue Segment)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -51,7 +51,7 @@ if (!isset($pdo) || !isset($user_id)) {
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 WHEEL (160px) with "Silver" text inside the blue segment -->
+                <!-- 🎡 WHEEL (160px) with "Silver" label inside the blue segment -->
                 <div style="position:relative; display:inline-block; width:160px; height:160px;">
                     <div id="spinWheel" class="spin-wheel" style="width:160px; height:160px; border-radius:50%; background: conic-gradient(
                         #fbbf24 0deg 72deg, 
@@ -60,8 +60,8 @@ if (!isset($pdo) || !isset($user_id)) {
                         #3b82f6 216deg 288deg, 
                         #8b5cf6 288deg 360deg
                     ); border:4px solid #fff; box-shadow:0 0 30px rgba(251,191,36,0.3); margin:0 auto;">
-                        <!-- 🥈 "Silver" label – pure text, no triangle, inside blue segment -->
-                        <span style="position:absolute; left:25%; top:70%; transform:translate(-50%, -50%) rotate(-40deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 12px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.6); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:4px;">
+                        <!-- 🥈 "Silver" label – perfectly positioned inside the blue wedge -->
+                        <span style="position:absolute; left:22%; top:74%; transform:translate(-50%, -50%) rotate(-35deg); color:#fff; font-weight:bold; font-size:16px; text-shadow:0 0 14px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.35); padding:3px 10px; border-radius:6px;">
                             Silver
                         </span>
                     </div>
