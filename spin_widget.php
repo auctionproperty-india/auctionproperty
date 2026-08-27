@@ -1,22 +1,22 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel (Final)
+// spin_widget.php – 8‑Segment Wheel with Distinct Colors (No Repeat)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// 🎨 ये वही colors हैं जो आपने सही कहे थे (पिछली बार)
+// 🎨 8 बिल्कुल अलग colors – कोई repeat नहीं
 $segmentColors = [
-    '#FFD700', // 0 – Gold (GOLD)
-    '#FF6B6B', // 1 – Coral
-    '#4ECDC4', // 2 – Turquoise
-    '#45B7D1', // 3 – Sky Blue
-    '#9B59B6', // 4 – Purple (DIAMOND)
-    '#FF9F43', // 5 – Orange
-    '#F368E0', // 6 – Magenta
-    '#00D2D3'  // 7 – Cyan
+    '#FF0000', // 0 – Red (GOLD)
+    '#00FF00', // 1 – Green
+    '#0000FF', // 2 – Blue
+    '#FFFF00', // 3 – Yellow (only one)
+    '#FF00FF', // 4 – Magenta (DIAMOND)
+    '#00FFFF', // 5 – Cyan
+    '#FFA500', // 6 – Orange
+    '#800080'  // 7 – Purple
 ];
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
@@ -67,7 +67,6 @@ $rotationOffset = 80; // 80° घुमाव
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 WHEEL (200px) with correct colors and clean labels -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -81,7 +80,6 @@ $rotationOffset = 80; // 80° घुमाव
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
-                        <!-- Labels – बिना background, black text, centred, upright -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
@@ -96,9 +94,7 @@ $rotationOffset = 80; // 80° घुमाव
                             </span>
                         <?php endfor; ?>
                     </div>
-                    <!-- Center dot -->
                     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:36px; height:36px; border-radius:50%; border:5px solid #fbbf24; z-index:2;"></div>
-                    <!-- Pointer -->
                     <div style="position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:16px solid transparent; border-right:16px solid transparent; border-top:26px solid #fbbf24; filter:drop-shadow(0 0 16px rgba(251,191,36,0.7)); z-index:2;"></div>
                 </div>
                 <button id="spinBtn" class="btn btn-warning mt-3 px-4 fw-bold" <?= ($current_slot_data['can_spin']) ? '' : 'disabled' ?>>
@@ -142,7 +138,6 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
-        // 60% chance to land on GOLD or DIAMOND
         let targetSegment;
         if (Math.random() < 0.6) {
             targetSegment = specialIndices[Math.floor(Math.random() * specialIndices.length)];
@@ -173,7 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (modalBody) {
                         let icon = 'fa-gem';
                         let color = '#fbbf24';
-                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#9B59B6'; }
+                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#FF00FF'; }
                         modalBody.innerHTML = `
                             <div style="text-align:center; padding:20px;">
                                 <i class="fas ${icon}" style="font-size:4rem; color:${color};"></i>
@@ -187,7 +182,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process backend data (coins, property)
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
