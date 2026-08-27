@@ -1,22 +1,22 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Distinct Colors (No Repeat)
+// spin_widget.php – 8‑Segment Wheel with Evenly Distributed Hues
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// 🎨 8 बिल्कुल अलग colors – कोई repeat नहीं
+// 🎨 8 colors – evenly spread across the color wheel (no two look alike)
 $segmentColors = [
     '#FF0000', // 0 – Red (GOLD)
-    '#00FF00', // 1 – Green
-    '#0000FF', // 2 – Blue
-    '#FFFF00', // 3 – Yellow (only one)
-    '#FF00FF', // 4 – Magenta (DIAMOND)
-    '#00FFFF', // 5 – Cyan
-    '#FFA500', // 6 – Orange
-    '#800080'  // 7 – Purple
+    '#FF7F00', // 1 – Orange
+    '#FFFF00', // 2 – Yellow
+    '#00FF00', // 3 – Green
+    '#00FFFF', // 4 – Cyan (DIAMOND)
+    '#0000FF', // 5 – Blue
+    '#8B00FF', // 6 – Violet
+    '#FF00FF'  // 7 – Magenta
 ];
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (modalBody) {
                         let icon = 'fa-gem';
                         let color = '#fbbf24';
-                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#FF00FF'; }
+                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#00FFFF'; }
                         modalBody.innerHTML = `
                             <div style="text-align:center; padding:20px;">
                                 <i class="fas ${icon}" style="font-size:4rem; color:${color};"></i>
