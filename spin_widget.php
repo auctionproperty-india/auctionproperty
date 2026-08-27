@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel (Fixed)
+// spin_widget.php – 8‑Segment Wheel with Admin Settings
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -20,7 +20,7 @@ $segmentColors = [
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
-$rotationOffset = 0; // 55° offset (matches conic-gradient)
+$rotationOffset = 80; // 80° offset (matches conic-gradient)
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -84,7 +84,7 @@ $rotationOffset = 0; // 55° offset (matches conic-gradient)
                             if (empty($label)) continue;
                             $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
                             $rad = deg2rad($centerAngle - 90);
-                            $distance = 60;
+                            $distance = 65;
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
                             
@@ -97,7 +97,7 @@ $rotationOffset = 0; // 55° offset (matches conic-gradient)
                             }
                             $finalLeft = $left + $adjustLeft;
                         ?>
-                            <span style="position:absolute; left:<?= $finalLeft ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-55deg); color:#000; font-weight:bold; font-size:<?= $fontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
+                            <span style="position:absolute; left:<?= $finalLeft ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-45deg); color:#000; font-weight:bold; font-size:<?= $fontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
                                 <?= htmlspecialchars($label) ?>
                             </span>
                         <?php endfor; ?>
@@ -138,8 +138,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentLabels = <?= json_encode($segmentLabels) ?>;
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
-    const rotationOffset = <?= $rotationOffset ?>; // 80° offset
-    const specialIndices = [0, 4];
+    const rotationOffset = <?= $rotationOffset ?>;
+    const specialIndices = [0, 4]; // GOLD and DIAMOND
 
     spinBtn.addEventListener('click', function() {
         if (isSpinning) return;
@@ -147,115 +147,67 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
-        // 60% chance to land on GOLD or DIAMOND
-        let targetSegment;
-        if (Math.random() < 0.6) {
-            targetSegment = specialIndices[Math.floor(Math.random() * specialIndices.length)];
-        } else {
-            targetSegment = Math.floor(Math.random() * numSegments);
-        }
-
-        // 🔥 Include rotationOffset in target angle
-        const targetAngle = targetSegment * segmentAngle + segmentAngle/2 + rotationOffset;
-        const extraSpins = 5 + Math.floor(Math.random() * 5);
-        const newRotation = extraSpins * 360 + (360 - targetAngle);
-        const totalRotation = newRotation + 360 - (currentRotation % 360);
-        currentRotation += totalRotation;
-
-        wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
-        wheel.style.transform = `rotate(${currentRotation}deg)`;
-        wheel.classList.add('pulse');
+        // We'll get the target segment from the server, but we still need to compute rotation
+        // We'll fetch first, then rotate based on server response.
+        // However, to avoid delay, we can still rotate based on a random guess, but the server will tell us which segment to land on.
+        // So we'll do the rotation after we get the response? That would be delayed.
+        // Instead, we can let the server return a target segment, and we rotate accordingly.
+        // We'll use a two-step: first send request, get target segment, then rotate.
+        // But the user expects immediate spin animation. So we can still animate and then adjust if needed.
+        // Actually, the server already knows the target. We can send the request and then rotate to the segment returned.
+        // For better UX, we can do the fetch first, then rotate.
+        // Let's do that: fetch, then rotate based on response.
 
         fetch('spin_ajax.php')
             .then(response => response.json())
             .then(data => {
-                wheel.classList.remove('pulse');
-                isSpinning = false;
-
-                // 🎯 Determine actual landed segment from final rotation
-                // The pointer is at top (0°). Segment with center at (360 - (currentRotation % 360)) is at top.
-                const finalAngle = currentRotation % 360;
-                // The segment whose center aligns with top: center = (360 - finalAngle) mod 360
-                // But we need to find which segment index that is.
-                let landedSegment = -1;
-                for (let i = 0; i < numSegments; i++) {
-                    const segCenter = i * segmentAngle + segmentAngle/2 + rotationOffset;
-                    // Check if pointer is within this segment's boundaries
-                    const start = i * segmentAngle + rotationOffset;
-                    const end = (i + 1) * segmentAngle + rotationOffset;
-                    // Normalize finalAngle to 0-360
-                    let pointerAngle = (360 - finalAngle) % 360;
-                    // Wrap around
-                    if (start > end) {
-                        // segment wraps around 0
-                        if (pointerAngle >= start || pointerAngle < end) {
-                            landedSegment = i;
-                            break;
-                        }
-                    } else {
-                        if (pointerAngle >= start && pointerAngle < end) {
-                            landedSegment = i;
-                            break;
-                        }
-                    }
-                }
-                // Fallback: if not found, use targetSegment
-                if (landedSegment === -1) {
-                    landedSegment = targetSegment;
-                }
-
-                const label = segmentLabels[landedSegment] || '';
-
-                if (label === 'GOLD' || label === 'DIAMOND') {
-                    const modalBody = document.getElementById('propertyModalContent');
-                    if (modalBody) {
-                        let icon = 'fa-gem';
-                        let color = '#fbbf24';
-                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#00FFFF'; }
-                        modalBody.innerHTML = `
-                            <div style="text-align:center; padding:20px;">
-                                <i class="fas ${icon}" style="font-size:4rem; color:${color};"></i>
-                                <h4 class="mt-3">🎉 You landed on <strong>${label}</strong>!</h4>
-                                <p class="mt-3" style="font-size:1.2rem;">First activate your package to get benefits!</p>
-                                <a href="user_packages.php" class="btn btn-primary mt-3">View Packages</a>
-                            </div>
-                        `;
-                        const modal = new bootstrap.Modal(document.getElementById('propertyModal'));
-                        modal.show();
-                    }
-                }
-
-                // ✅ Handle spins_used and disable button if >=5
                 if (data.success) {
-                    spinCount.textContent = data.spins_used || 0;
-                    slotCoins.textContent = data.total_coins_earned || 0;
+                    const targetSegment = data.target_segment || 0;
+                    // Calculate rotation to land on that segment
+                    const targetAngle = targetSegment * segmentAngle + segmentAngle/2 + rotationOffset;
+                    const extraSpins = 5 + Math.floor(Math.random() * 5);
+                    const newRotation = extraSpins * 360 + (360 - targetAngle);
+                    const totalRotation = newRotation + 360 - (currentRotation % 360);
+                    currentRotation += totalRotation;
 
-                    if (data.spins_used >= 5) {
-                        spinBtn.disabled = true;
-                        spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
-                        spinMessage.innerHTML = '✅ You have used all spins for this slot!';
-                    } else {
-                        spinBtn.disabled = false;
-                    }
+                    wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+                    wheel.style.transform = `rotate(${currentRotation}deg)`;
+                    wheel.classList.add('pulse');
 
-                    // Rest of the reward/property logic...
-                    if (data.is_reward) {
-                        spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
-                        showCoinAnimation(data.coins);
-                        launchStarShower();
-                        const coinSpan = document.querySelector('.stat-card .stat-number');
-                        if (coinSpan) {
-                            let current = parseInt(coinSpan.textContent.replace(/,/g, ''));
-                            if (!isNaN(current)) {
-                                coinSpan.textContent = (current + data.coins).toLocaleString();
+                    // After spin completes, show results
+                    setTimeout(() => {
+                        wheel.classList.remove('pulse');
+                        isSpinning = false;
+
+                        spinCount.textContent = data.spins_used || 0;
+                        slotCoins.textContent = data.total_coins_earned || 0;
+
+                        const rewardType = data.reward_type || 'property';
+
+                        if (rewardType === 'gold' || rewardType === 'diamond') {
+                            const label = rewardType === 'gold' ? 'GOLD' : 'DIAMOND';
+                            const modalBody = document.getElementById('propertyModalContent');
+                            if (modalBody) {
+                                let icon = 'fa-gem';
+                                let color = '#fbbf24';
+                                if (rewardType === 'diamond') { icon = 'fa-crown'; color = '#00FFFF'; }
+                                modalBody.innerHTML = `
+                                    <div style="text-align:center; padding:20px;">
+                                        <i class="fas ${icon}" style="font-size:4rem; color:${color};"></i>
+                                        <h4 class="mt-3">🎉 You landed on <strong>${label}</strong>!</h4>
+                                        <p class="mt-3" style="font-size:1.2rem;">First activate your package to get benefits!</p>
+                                        <a href="user_packages.php" class="btn btn-primary mt-3">View Packages</a>
+                                    </div>
+                                `;
+                                const modal = new bootstrap.Modal(document.getElementById('propertyModal'));
+                                modal.show();
                             }
-                        }
-                    } else if (data.show_property && data.property) {
-                        const p = data.property;
-                        const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
-                        const icon = isCar ? '🚗' : '🏠';
-                        const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
-                        if (!specialIndices.includes(landedSegment)) {
+                            spinMessage.innerHTML = `🎉 You got ${label}!`;
+                        } else if (data.show_property && data.property) {
+                            const p = data.property;
+                            const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
+                            const icon = isCar ? '🚗' : '🏠';
+                            const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
                             const modalContent = document.getElementById('propertyModalContent');
                             if (modalContent) {
                                 modalContent.innerHTML = `
@@ -279,13 +231,20 @@ document.addEventListener('DOMContentLoaded', function() {
                                 });
                             }
                         } else {
+                            spinMessage.innerHTML = data.message || 'Spin done!';
+                        }
+
+                        if (data.spins_used >= 5) {
+                            spinBtn.disabled = true;
+                            spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
+                        } else {
                             spinBtn.disabled = false;
                         }
-                    } else {
-                        spinMessage.innerHTML = data.message || 'Spin done!';
-                        spinBtn.disabled = false;
-                    }
+                    }, 4200); // wait for spin animation to finish
+
                 } else {
+                    wheel.classList.remove('pulse');
+                    isSpinning = false;
                     spinMessage.innerHTML = `❌ ${data.message || 'Something went wrong'}`;
                     spinBtn.disabled = false;
                 }
@@ -293,9 +252,9 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Spin error:', error);
                 wheel.classList.remove('pulse');
+                isSpinning = false;
                 spinMessage.innerHTML = '❌ Error spinning. Please try again.';
                 spinBtn.disabled = false;
-                isSpinning = false;
             });
     });
 
