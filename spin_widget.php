@@ -98,7 +98,7 @@ $rotationOffset = 0;
                             }
                             $finalLeft = $left + $adjustLeft;
                         ?>
-                            <span style="position:absolute; left:<?= $finalLeft ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-45deg); color:#000; font-weight:bold; font-size:<?= $fontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
+                            <span style="position:absolute; left:<?= $finalLeft ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-55deg); color:#000; font-weight:bold; font-size:<?= $fontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
                                 <?= htmlspecialchars($label) ?>
                             </span>
                         <?php endfor; ?>
