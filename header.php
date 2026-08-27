@@ -709,6 +709,7 @@ if ($is_logged_in && $role == 'user') {
         <?php if (hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
+    <a href="admin_spin_settings.php"><i class="fas fa-cog"></i> <span>Spin Settings</span></a>
         <?php if (hasViewPermission('kyc', $pdo)): ?>
             <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <?php endif; ?>
