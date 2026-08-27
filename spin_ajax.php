@@ -25,10 +25,20 @@ $diamond_numbers = array_filter(array_map('trim', explode(',', $diamond_triggers
 $slot = getCurrentSlot();
 $today = date('Y-m-d');
 
-$stmt = $pdo->prepare("SELECT spins_used FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+$stmt = $pdo->prepare("SELECT spins_used, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
 $stmt->execute([$user_id, $today, $slot]);
-$row = $stmt->fetch();
-$spins_used = $row ? (int)$row['spins_used'] : 0;
+$data = $stmt->fetch();
+
+if (!$data) {
+    // First spin of the slot – insert row
+    $stmt = $pdo->prepare("INSERT INTO user_spins (user_id, slot_date, slot_number, spins_used, coins_earned) VALUES (?, ?, ?, 0, 0)");
+    $stmt->execute([$user_id, $today, $slot]);
+    $spins_used = 0;
+    $coins_earned = 0;
+} else {
+    $spins_used = (int)$data['spins_used'];
+    $coins_earned = (int)$data['coins_earned'];
+}
 
 if ($spins_used >= 5) {
     echo json_encode(['success' => false, 'message' => 'All spins used for this slot']);
@@ -57,86 +67,57 @@ if ($reward_type === 'property') {
     $targetSegment = $available[array_rand($available)];
 }
 
-// ----- Perform spin with custom target segment -----
-function doSpin($pdo, $user_id, $slot, $targetSegment, $reward_type) {
-    $today = date('Y-m-d');
-    $stmt = $pdo->prepare("SELECT spins_used, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
-    $stmt->execute([$user_id, $today, $slot]);
-    $data = $stmt->fetch();
+// ----- Perform spin -----
+$coin_settings = getSpinCoinSettings($pdo);
+$min = $coin_settings['min'];
+$max = $coin_settings['max'];
+$cap_per_slot = 22;
 
-    if (!$data) {
-        // Insert if not exists
-        $stmt = $pdo->prepare("INSERT INTO user_spins (user_id, slot_date, slot_number, spins_used, coins_earned) VALUES (?, ?, ?, 0, 0)");
-        $stmt->execute([$user_id, $today, $slot]);
-        $spins_used = 0;
-        $coins_earned = 0;
-    } else {
-        $spins_used = (int)$data['spins_used'];
-        $coins_earned = (int)$data['coins_earned'];
-    }
-
-    // Coin reward (if not special, we still give coins)
-    $coin_settings = getSpinCoinSettings($pdo);
-    $min = $coin_settings['min'];
-    $max = $coin_settings['max'];
-    $cap_per_slot = 22;
-
-    $coin_amount = rand((int)$min, (int)$max);
-    if ($coins_earned + $coin_amount > $cap_per_slot) {
-        $coin_amount = max(0, $cap_per_slot - $coins_earned);
-    }
-
-    $new_spins = $spins_used + 1;
-    $new_coins = $coins_earned + $coin_amount;
-
-    // Update user_spins
-    $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = NOW() WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
-    $stmt->execute([$new_spins, $new_coins, $user_id, $today, $slot]);
-
-    // Credit total coins
-    if ($coin_amount > 0) {
-        $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
-    }
-
-    $is_reward = ($new_spins == 5);
-    if ($is_reward) {
-        $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
-    }
-
-    // Prepare response
-    $response = [
-        'success' => true,
-        'spins_used' => $new_spins,
-        'coins' => $coin_amount,
-        'total_coins_earned' => $new_coins,
-        'is_reward' => $is_reward,
-        'reward_type' => $reward_type,
-        'target_segment' => $targetSegment
-    ];
-
-    // If property, fetch a random property (but we already have target segment)
-    // For property, we still need to show a property in modal if not special
-    if ($reward_type === 'property') {
-        // Get a random low-price property (upcoming auction)
-        $prop = getRandomLowPriceProperty($pdo);
-        if ($prop) {
-            $response['show_property'] = true;
-            $response['property'] = $prop;
-        } else {
-            $response['show_property'] = false;
-        }
-    } else {
-        // Gold or Diamond – no property modal
-        $response['show_property'] = false;
-    }
-
-    return $response;
+$coin_amount = rand((int)$min, (int)$max);
+if ($coins_earned + $coin_amount > $cap_per_slot) {
+    $coin_amount = max(0, $cap_per_slot - $coins_earned);
 }
 
-// Execute spin
-$result = doSpin($pdo, $user_id, $slot, $targetSegment, $reward_type);
+$new_spins = $spins_used + 1;
+$new_coins = $coins_earned + $coin_amount;
 
-// Also include the target segment in the response for the frontend to rotate correctly
-$result['target_segment'] = $targetSegment;
+// Update user_spins
+$stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = NOW() WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+$stmt->execute([$new_spins, $new_coins, $user_id, $today, $slot]);
 
-echo json_encode($result);
+// Credit total coins
+if ($coin_amount > 0) {
+    $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
+}
+
+$is_reward = ($new_spins == 5);
+if ($is_reward) {
+    $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
+}
+
+// Prepare response
+$response = [
+    'success' => true,
+    'spins_used' => $new_spins,
+    'coins' => $coin_amount,
+    'total_coins_earned' => $new_coins,
+    'is_reward' => $is_reward,
+    'reward_type' => $reward_type,
+    'target_segment' => $targetSegment
+];
+
+// If property, fetch a random upcoming auction property
+if ($reward_type === 'property') {
+    $prop = getRandomLowPriceProperty($pdo);
+    if ($prop) {
+        $response['show_property'] = true;
+        $response['property'] = $prop;
+    } else {
+        $response['show_property'] = false;
+    }
+} else {
+    // Gold or Diamond – no property modal
+    $response['show_property'] = false;
+}
+
+echo json_encode($response);
