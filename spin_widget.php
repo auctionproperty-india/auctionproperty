@@ -1,19 +1,19 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Fully Distinct Colors
+// spin_widget.php – Final: 8 Distinct Colors + White Pointer
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// 🎨 8 बिल्कुल अलग colors (कोई repeat नहीं, और विज़ुअली स्पष्ट)
+// 🎨 8 बिल्कुल अलग colors (कोई repeat नहीं, सभी स्पष्ट)
 $segmentColors = [
-    '#FF0000', // 0 – Red (GOLD)
+    '#FF0000', // 0 – Red
     '#FF8C00', // 1 – Dark Orange
-    '#FFD700', // 2 – Gold/Yellow
+    '#FFD700', // 2 – Gold (only one yellow)
     '#00FF00', // 3 – Lime Green
-    '#00BFFF', // 4 – Deep Sky Blue (DIAMOND)
+    '#00BFFF', // 4 – Deep Sky Blue
     '#0000FF', // 5 – Blue
     '#8A2BE2', // 6 – Blue Violet
     '#FF1493'  // 7 – Deep Pink
@@ -95,7 +95,8 @@ $rotationOffset = 80; // 80° घुमाव
                         <?php endfor; ?>
                     </div>
                     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:36px; height:36px; border-radius:50%; border:5px solid #fbbf24; z-index:2;"></div>
-                    <div style="position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:16px solid transparent; border-right:16px solid transparent; border-top:26px solid #fbbf24; filter:drop-shadow(0 0 16px rgba(251,191,36,0.7)); z-index:2;"></div>
+                    <!-- 🟢 White Pointer – अब किसी color से match नहीं होगा -->
+                    <div style="position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:16px solid transparent; border-right:16px solid transparent; border-top:26px solid #FFFFFF; filter:drop-shadow(0 0 16px rgba(255,255,255,0.7)); z-index:2;"></div>
                 </div>
                 <button id="spinBtn" class="btn btn-warning mt-3 px-4 fw-bold" <?= ($current_slot_data['can_spin']) ? '' : 'disabled' ?>>
                     <i class="fas fa-sync-alt"></i> Spin!
@@ -130,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentLabels = <?= json_encode($segmentLabels) ?>;
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
-    const specialIndices = [0, 4]; // GOLD and DIAMOND
+    const specialIndices = [0, 4];
 
     spinBtn.addEventListener('click', function() {
         if (isSpinning) return;
