@@ -1,28 +1,27 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with White‑Background Labels
+// spin_widget.php – 8‑Segment Wheel (Final)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// 8 distinct, vibrant colors
+// 🎨 ये वही colors हैं जो आपने सही कहे थे (पिछली बार)
 $segmentColors = [
-    '#FFD700', // 0 – Gold (GOLD label)
+    '#FFD700', // 0 – Gold (GOLD)
     '#FF6B6B', // 1 – Coral
     '#4ECDC4', // 2 – Turquoise
     '#45B7D1', // 3 – Sky Blue
-    '#9B59B6', // 4 – Purple (DIAMOND label)
+    '#9B59B6', // 4 – Purple (DIAMOND)
     '#FF9F43', // 5 – Orange
     '#F368E0', // 6 – Magenta
     '#00D2D3'  // 7 – Cyan
 ];
-// Labels: GOLD at 0, DIAMOND at 4
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
-$rotationOffset = 80; // rotate wheel by 80° so they align nicely
+$rotationOffset = 80; // 80° घुमाव
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -68,7 +67,7 @@ $rotationOffset = 80; // rotate wheel by 80° so they align nicely
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 WHEEL (200px) rotated by 80° with white‑background labels -->
+                <!-- 🎡 WHEEL (200px) with correct colors and clean labels -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
@@ -82,17 +81,17 @@ $rotationOffset = 80; // rotate wheel by 80° so they align nicely
                         echo implode(', ', $gradientParts);
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
-                        <!-- Labels – centred, upright, white background, black text -->
+                        <!-- Labels – बिना background, black text, centred, upright -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
                             $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
                             $rad = deg2rad($centerAngle - 90);
-                            $distance = 65; // 65% of radius from centre
+                            $distance = 65;
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
                         ?>
-                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#000; font-weight:bold; font-size:14px; background:rgba(255,255,255,0.9); padding:4px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.2); pointer-events:none; z-index:5; white-space:nowrap;">
+                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#000; font-weight:bold; font-size:14px; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
                                 <?= htmlspecialchars($label) ?>
                             </span>
                         <?php endfor; ?>
@@ -154,7 +153,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const targetAngle = targetSegment * segmentAngle + segmentAngle/2;
         const extraSpins = 5 + Math.floor(Math.random() * 5);
         const newRotation = extraSpins * 360 + (360 - targetAngle);
-        // We keep track of total rotation (including offset, but offset is applied via CSS)
         const totalRotation = newRotation + 360 - (currentRotation % 360);
         currentRotation += totalRotation;
 
@@ -189,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process coins/property (unchanged)
+                // Process backend data (coins, property)
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
