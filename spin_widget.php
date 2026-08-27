@@ -89,7 +89,11 @@ $rotationOffset = 0; // 45° घुमाव
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
                         ?>
-                         <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-45deg); color:#000; font-weight:bold; font-size:18px; text-shadow:0 0 8px rgba(255,255,255,0.8); pointer-events:none; z-index:5; white-space:nowrap;">
+                         <?php 
+// Label font size: DIAMOND ko chhota, GOLD ko bada
+$labelFontSize = ($label === 'DIAMOND') ? '12px' : '16px';
+?>
+<span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-45deg); color:#000; font-weight:bold; font-size:<?= $labelFontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
     <?= htmlspecialchars($label) ?>
 </span>
                         <?php endfor; ?>
