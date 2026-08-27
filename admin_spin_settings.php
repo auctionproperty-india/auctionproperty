@@ -19,10 +19,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
     if (!preg_match('/^[\d,]*$/', $gold)) $gold = '';
     if (!preg_match('/^[\d,]*$/', $diamond)) $diamond = '';
 
-    // Save to settings table
-    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('spin_special_enabled', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = ?")->execute([$enabled, $enabled]);
-    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('spin_gold_triggers', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = ?")->execute([$gold, $gold]);
-    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('spin_diamond_triggers', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = ?")->execute([$diamond, $diamond]);
+    // Save settings
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
+    $enabled = isset($_POST['enabled']) ? 1 : 0;
+    $gold = trim($_POST['gold_triggers']);
+    $diamond = trim($_POST['diamond_triggers']);
+
+    // Validate: only numbers and commas
+    if (!preg_match('/^[\d,]*$/', $gold)) $gold = '';
+    if (!preg_match('/^[\d,]*$/', $diamond)) $diamond = '';
+
+    // Helper function to upsert
+    function upsertSetting($pdo, $key, $value) {
+        $stmt = $pdo->prepare("SELECT id FROM settings WHERE setting_key = ?");
+        $stmt->execute([$key]);
+        if ($stmt->fetch()) {
+            $stmt = $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
+            $stmt->execute([$value, $key]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
+            $stmt->execute([$key, $value]);
+        }
+    }
+
+    upsertSetting($pdo, 'spin_special_enabled', $enabled);
+    upsertSetting($pdo, 'spin_gold_triggers', $gold);
+    upsertSetting($pdo, 'spin_diamond_triggers', $diamond);
 
     $msg = "✅ Settings saved!";
 }
