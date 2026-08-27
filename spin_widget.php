@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with GOLD & DIAMOND
+// spin_widget.php – 8‑Segment Wheel (Fixed)
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -20,7 +20,7 @@ $segmentColors = [
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
-$rotationOffset = 0;
+$rotationOffset = 0; // 55° offset (matches conic-gradient)
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -84,11 +84,10 @@ $rotationOffset = 0;
                             if (empty($label)) continue;
                             $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
                             $rad = deg2rad($centerAngle - 90);
-                            $distance = 65;
+                            $distance = 60;
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
                             
-                            // DIAMOND के लिए छोटा font और थोड़ा adjust
                             if ($label === 'DIAMOND') {
                                 $fontSize = '12px';
                                 $adjustLeft = -2;
@@ -139,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentLabels = <?= json_encode($segmentLabels) ?>;
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
+    const rotationOffset = <?= $rotationOffset ?>; // 80° offset
     const specialIndices = [0, 4];
 
     spinBtn.addEventListener('click', function() {
@@ -147,6 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
+        // 60% chance to land on GOLD or DIAMOND
         let targetSegment;
         if (Math.random() < 0.6) {
             targetSegment = specialIndices[Math.floor(Math.random() * specialIndices.length)];
@@ -154,7 +155,8 @@ document.addEventListener('DOMContentLoaded', function() {
             targetSegment = Math.floor(Math.random() * numSegments);
         }
 
-        const targetAngle = targetSegment * segmentAngle + segmentAngle/2;
+        // 🔥 Include rotationOffset in target angle
+        const targetAngle = targetSegment * segmentAngle + segmentAngle/2 + rotationOffset;
         const extraSpins = 5 + Math.floor(Math.random() * 5);
         const newRotation = extraSpins * 360 + (360 - targetAngle);
         const totalRotation = newRotation + 360 - (currentRotation % 360);
@@ -170,7 +172,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 wheel.classList.remove('pulse');
                 isSpinning = false;
 
-                const label = segmentLabels[targetSegment] || '';
+                // 🎯 Determine actual landed segment from final rotation
+                // The pointer is at top (0°). Segment with center at (360 - (currentRotation % 360)) is at top.
+                const finalAngle = currentRotation % 360;
+                // The segment whose center aligns with top: center = (360 - finalAngle) mod 360
+                // But we need to find which segment index that is.
+                let landedSegment = -1;
+                for (let i = 0; i < numSegments; i++) {
+                    const segCenter = i * segmentAngle + segmentAngle/2 + rotationOffset;
+                    // Check if pointer is within this segment's boundaries
+                    const start = i * segmentAngle + rotationOffset;
+                    const end = (i + 1) * segmentAngle + rotationOffset;
+                    // Normalize finalAngle to 0-360
+                    let pointerAngle = (360 - finalAngle) % 360;
+                    // Wrap around
+                    if (start > end) {
+                        // segment wraps around 0
+                        if (pointerAngle >= start || pointerAngle < end) {
+                            landedSegment = i;
+                            break;
+                        }
+                    } else {
+                        if (pointerAngle >= start && pointerAngle < end) {
+                            landedSegment = i;
+                            break;
+                        }
+                    }
+                }
+                // Fallback: if not found, use targetSegment
+                if (landedSegment === -1) {
+                    landedSegment = targetSegment;
+                }
+
+                const label = segmentLabels[landedSegment] || '';
 
                 if (label === 'GOLD' || label === 'DIAMOND') {
                     const modalBody = document.getElementById('propertyModalContent');
@@ -191,10 +225,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
+                // ✅ Handle spins_used and disable button if >=5
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
 
+                    if (data.spins_used >= 5) {
+                        spinBtn.disabled = true;
+                        spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
+                        spinMessage.innerHTML = '✅ You have used all spins for this slot!';
+                    } else {
+                        spinBtn.disabled = false;
+                    }
+
+                    // Rest of the reward/property logic...
                     if (data.is_reward) {
                         spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
                         showCoinAnimation(data.coins);
@@ -206,18 +250,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 coinSpan.textContent = (current + data.coins).toLocaleString();
                             }
                         }
-                        if (data.spins_used >= 5) {
-                            spinBtn.disabled = true;
-                            spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
-                        } else {
-                            spinBtn.disabled = false;
-                        }
                     } else if (data.show_property && data.property) {
                         const p = data.property;
                         const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
                         const icon = isCar ? '🚗' : '🏠';
                         const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
-                        if (!specialIndices.includes(targetSegment)) {
+                        if (!specialIndices.includes(landedSegment)) {
                             const modalContent = document.getElementById('propertyModalContent');
                             if (modalContent) {
                                 modalContent.innerHTML = `
