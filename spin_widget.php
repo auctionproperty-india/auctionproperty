@@ -81,21 +81,31 @@ $rotationOffset = 0; // 45° घुमाव
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
                         <?php for ($i = 0; $i < $numSegments; $i++): 
-                            $label = $segmentLabels[$i] ?? '';
-                            if (empty($label)) continue;
-                            $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
-                            $rad = deg2rad($centerAngle - 90);
-                            $distance = 65;
-                            $left = 100 + $distance * cos($rad);
-                            $top = 100 + $distance * sin($rad);
-                        ?>
-                         <?php 
-// Label font size: DIAMOND ko chhota, GOLD ko bada
-$labelFontSize = ($label === 'DIAMOND') ? '12px' : '16px';
+    $label = $segmentLabels[$i] ?? '';
+    if (empty($label)) continue;
+    $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
+    $rad = deg2rad($centerAngle - 90);
+    $distance = 65;
+    $left = 100 + $distance * cos($rad);
+    $top = 100 + $distance * sin($rad);
+    
+    // 🎯 DIAMOND के लिए छोटा font और थोड़ा adjust position
+    if ($label === 'DIAMOND') {
+        $fontSize = '12px';
+        $adjustLeft = -2; // थोड़ा left shift
+        $adjustTop = 0;
+    } else {
+        $fontSize = '16px';
+        $adjustLeft = 0;
+        $adjustTop = 0;
+    }
+    $finalLeft = $left + $adjustLeft;
+    $finalTop = $top + $adjustTop;
 ?>
-<span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-45deg); color:#000; font-weight:bold; font-size:<?= $labelFontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
-    <?= htmlspecialchars($label) ?>
-</span>
+    <span style="position:absolute; left:<?= $finalLeft ?>px; top:<?= $finalTop ?>px; transform:translate(-50%, -50%) rotate(-45deg); color:#000; font-weight:bold; font-size:<?= $fontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
+        <?= htmlspecialchars($label) ?>
+    </span>
+<?php endfor; ?>
                         <?php endfor; ?>
                     </div>
                     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:36px; height:36px; border-radius:50%; border:5px solid #fbbf24; z-index:2;"></div>
