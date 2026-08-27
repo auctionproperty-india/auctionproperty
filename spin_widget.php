@@ -20,7 +20,7 @@ $segmentColors = [
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
-$rotationOffset = 80; // 80° offset (matches conic-gradient)
+$rotationOffset = 0; // 0° offset (matches conic-gradient)
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -97,7 +97,7 @@ $rotationOffset = 80; // 80° offset (matches conic-gradient)
                             }
                             $finalLeft = $left + $adjustLeft;
                         ?>
-                            <span style="position:absolute; left:<?= $finalLeft ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-45deg); color:#000; font-weight:bold; font-size:<?= $fontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
+                            <span style="position:absolute; left:<?= $finalLeft ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-55deg); color:#000; font-weight:bold; font-size:<?= $fontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
                                 <?= htmlspecialchars($label) ?>
                             </span>
                         <?php endfor; ?>
