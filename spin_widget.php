@@ -1,27 +1,28 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with 8 Distinct Colors
+// spin_widget.php – 8‑Segment Wheel with White‑Background Labels
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// 🎨 8 बिल्कुल अलग और चटक colors
+// 8 distinct, vibrant colors
 $segmentColors = [
-    '#FF0000', // 0 – Red
-    '#00FF00', // 1 – Green
-    '#0000FF', // 2 – Blue
-    '#FFFF00', // 3 – Yellow
-    '#FF00FF', // 4 – Magenta (DIAMOND)
-    '#00FFFF', // 5 – Cyan
-    '#FFA500', // 6 – Orange
-    '#800080'  // 7 – Purple (GOLD)
+    '#FFD700', // 0 – Gold (GOLD label)
+    '#FF6B6B', // 1 – Coral
+    '#4ECDC4', // 2 – Turquoise
+    '#45B7D1', // 3 – Sky Blue
+    '#9B59B6', // 4 – Purple (DIAMOND label)
+    '#FF9F43', // 5 – Orange
+    '#F368E0', // 6 – Magenta
+    '#00D2D3'  // 7 – Cyan
 ];
-// Labels: GOLD (index 7) and DIAMOND (index 4)
-$segmentLabels = ['', '', '', '', 'DIAMOND', '', '', 'GOLD'];
+// Labels: GOLD at 0, DIAMOND at 4
+$segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
+$rotationOffset = 80; // rotate wheel by 80° so they align nicely
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -67,38 +68,38 @@ $angle = 360 / $numSegments; // 45°
         </div>
         <div class="col-md-6 text-center">
             <div class="spinner-wrapper" style="position:relative; display:inline-block;">
-                <!-- 🎡 WHEEL (200px) – rotated by 80° using CSS transform -->
+                <!-- 🎡 WHEEL (200px) rotated by 80° with white‑background labels -->
                 <div style="position:relative; display:inline-block; width:200px; height:200px;">
                     <div id="spinWheel" class="spin-wheel" style="width:200px; height:200px; border-radius:50%; background: conic-gradient(
                         <?php 
                         $gradientParts = [];
                         for ($i = 0; $i < $numSegments; $i++) {
-                            $start = $i * $angle;
-                            $end = ($i + 1) * $angle;
+                            $start = $i * $angle + $rotationOffset;
+                            $end = ($i + 1) * $angle + $rotationOffset;
                             $color = $segmentColors[$i];
                             $gradientParts[] = "$color $start" . "deg $end" . "deg";
                         }
                         echo implode(', ', $gradientParts);
                         ?>
-                    ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative; transform: rotate(80deg);">
-                        <!-- Labels – positioned at centre of each slice (unrotated) -->
+                    ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
+                        <!-- Labels – centred, upright, white background, black text -->
                         <?php for ($i = 0; $i < $numSegments; $i++): 
                             $label = $segmentLabels[$i] ?? '';
                             if (empty($label)) continue;
-                            $centerAngle = $i * $angle + $angle/2;
+                            $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
                             $rad = deg2rad($centerAngle - 90);
-                            $distance = 65;
+                            $distance = 65; // 65% of radius from centre
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
                         ?>
-                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#fff; font-weight:bold; font-size:14px; text-shadow:0 0 10px rgba(0,0,0,0.9); pointer-events:none; z-index:5; white-space:nowrap; background:rgba(0,0,0,0.3); padding:2px 8px; border-radius:6px;">
+                            <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%); color:#000; font-weight:bold; font-size:14px; background:rgba(255,255,255,0.9); padding:4px 10px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.2); pointer-events:none; z-index:5; white-space:nowrap;">
                                 <?= htmlspecialchars($label) ?>
                             </span>
                         <?php endfor; ?>
                     </div>
                     <!-- Center dot -->
                     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:36px; height:36px; border-radius:50%; border:5px solid #fbbf24; z-index:2;"></div>
-                    <!-- Pointer (fixed at top) -->
+                    <!-- Pointer -->
                     <div style="position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:16px solid transparent; border-right:16px solid transparent; border-top:26px solid #fbbf24; filter:drop-shadow(0 0 16px rgba(251,191,36,0.7)); z-index:2;"></div>
                 </div>
                 <button id="spinBtn" class="btn btn-warning mt-3 px-4 fw-bold" <?= ($current_slot_data['can_spin']) ? '' : 'disabled' ?>>
@@ -128,13 +129,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (!spinBtn) return;
 
-    let currentRotation = 80; // start at 80° offset
+    let currentRotation = 0;
     let isSpinning = false;
 
     const segmentLabels = <?= json_encode($segmentLabels) ?>;
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
-    const specialIndices = [4, 7]; // DIAMOND (4), GOLD (7)
+    const specialIndices = [0, 4]; // GOLD and DIAMOND
 
     spinBtn.addEventListener('click', function() {
         if (isSpinning) return;
@@ -142,6 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
+        // 60% chance to land on GOLD or DIAMOND
         let targetSegment;
         if (Math.random() < 0.6) {
             targetSegment = specialIndices[Math.floor(Math.random() * specialIndices.length)];
@@ -149,15 +151,10 @@ document.addEventListener('DOMContentLoaded', function() {
             targetSegment = Math.floor(Math.random() * numSegments);
         }
 
-        // targetAngle is the angle of the center of the target slice (unrotated)
         const targetAngle = targetSegment * segmentAngle + segmentAngle/2;
-        // We need to rotate so that this angle aligns with the pointer (top = 0°)
-        // Current rotation includes the base offset (80°). We calculate additional rotation.
         const extraSpins = 5 + Math.floor(Math.random() * 5);
-        // newRotation = extraSpins*360 + (360 - targetAngle) - currentRotation (so that it lands exactly)
-        // But simpler: we add total rotation and let CSS transition.
         const newRotation = extraSpins * 360 + (360 - targetAngle);
-        // Add to current rotation (which already includes the 80° offset)
+        // We keep track of total rotation (including offset, but offset is applied via CSS)
         const totalRotation = newRotation + 360 - (currentRotation % 360);
         currentRotation += totalRotation;
 
@@ -178,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (modalBody) {
                         let icon = 'fa-gem';
                         let color = '#fbbf24';
-                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#FF00FF'; }
+                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#9B59B6'; }
                         modalBody.innerHTML = `
                             <div style="text-align:center; padding:20px;">
                                 <i class="fas ${icon}" style="font-size:4rem; color:${color};"></i>
@@ -192,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Process coins/property (same as before)
+                // Process coins/property (unchanged)
                 if (data.success) {
                     spinCount.textContent = data.spins_used || 0;
                     slotCoins.textContent = data.total_coins_earned || 0;
