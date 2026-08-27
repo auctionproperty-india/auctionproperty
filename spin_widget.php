@@ -89,7 +89,7 @@ $rotationOffset = 0; // 45° घुमाव
                             $left = 100 + $distance * cos($rad);
                             $top = 100 + $distance * sin($rad);
                         ?>
-                         <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(<?= $centerAngle ?>deg); color:#000; font-weight:bold; font-size:18px; text-shadow:0 0 8px rgba(255,255,255,0.8); pointer-events:none; z-index:5; white-space:nowrap;">
+                         <span style="position:absolute; left:<?= $left ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-35deg); color:#000; font-weight:bold; font-size:18px; text-shadow:0 0 8px rgba(255,255,255,0.8); pointer-events:none; z-index:5; white-space:nowrap;">
     <?= htmlspecialchars($label) ?>
 </span>
                         <?php endfor; ?>
