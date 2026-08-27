@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_ajax.php – Updated with Admin Settings
+// spin_ajax.php – Complete with Admin Settings Support
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -13,16 +13,15 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// ----- Fetch admin settings -----
+// ----- Admin settings -----
 $enabled = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'spin_special_enabled'")->fetchColumn() ?: 1;
 $gold_triggers = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'spin_gold_triggers'")->fetchColumn() ?: '1,3,5';
 $diamond_triggers = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'spin_diamond_triggers'")->fetchColumn() ?: '2,4';
 
-// Convert to arrays
 $gold_numbers = array_filter(array_map('trim', explode(',', $gold_triggers)));
 $diamond_numbers = array_filter(array_map('trim', explode(',', $diamond_triggers)));
 
-// ----- Get current spin data -----
+// ----- Current slot -----
 $slot = getCurrentSlot();
 $today = date('Y-m-d');
 
@@ -31,62 +30,113 @@ $stmt->execute([$user_id, $today, $slot]);
 $row = $stmt->fetch();
 $spins_used = $row ? (int)$row['spins_used'] : 0;
 
-// If already 5, disallow
 if ($spins_used >= 5) {
     echo json_encode(['success' => false, 'message' => 'All spins used for this slot']);
     exit;
 }
 
-// The next spin number is spins_used + 1
 $next_spin_number = $spins_used + 1;
 
-// Determine reward type based on settings
-$reward_type = 'property'; // default
+// Determine reward type and target segment
+$reward_type = 'property';
 $targetSegment = null;
 
 if ($enabled) {
     if (in_array($next_spin_number, $diamond_numbers)) {
         $reward_type = 'diamond';
-        $targetSegment = 4; // index of DIAMOND
+        $targetSegment = 4; // DIAMOND index
     } elseif (in_array($next_spin_number, $gold_numbers)) {
         $reward_type = 'gold';
-        $targetSegment = 0; // index of GOLD
+        $targetSegment = 0; // GOLD index
     }
 }
 
-// If no special reward, pick random property segment
 if ($reward_type === 'property') {
-    // Random segment from 0-7, but we can let the wheel land on any segment
-    // Actually, we want to land on a segment that corresponds to a property reward.
-    // We'll choose a random segment that is not Gold or Diamond (0 and 4)
-    $available_segments = [1,2,3,5,6,7];
-    $targetSegment = $available_segments[array_rand($available_segments)];
+    // Avoid Gold (0) and Diamond (4)
+    $available = [1,2,3,5,6,7];
+    $targetSegment = $available[array_rand($available)];
 }
 
-// ----- Perform spin (update spins, earn coins, possibly property) -----
-$spin_result = performSpin($pdo, $user_id, $slot, $targetSegment, $reward_type);
+// ----- Perform spin with custom target segment -----
+function doSpin($pdo, $user_id, $slot, $targetSegment, $reward_type) {
+    $today = date('Y-m-d');
+    $stmt = $pdo->prepare("SELECT spins_used, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+    $stmt->execute([$user_id, $today, $slot]);
+    $data = $stmt->fetch();
 
-// The performSpin function should be modified to accept targetSegment and reward_type
-// and return appropriate data.
-// For now, we'll call the existing performSpin but we need to modify it to accept these parameters.
+    if (!$data) {
+        // Insert if not exists
+        $stmt = $pdo->prepare("INSERT INTO user_spins (user_id, slot_date, slot_number, spins_used, coins_earned) VALUES (?, ?, ?, 0, 0)");
+        $stmt->execute([$user_id, $today, $slot]);
+        $spins_used = 0;
+        $coins_earned = 0;
+    } else {
+        $spins_used = (int)$data['spins_used'];
+        $coins_earned = (int)$data['coins_earned'];
+    }
 
-// However, the existing performSpin does not accept segment or type. We'll rewrite it.
-// We'll create a new function or modify the existing one to handle this.
+    // Coin reward (if not special, we still give coins)
+    $coin_settings = getSpinCoinSettings($pdo);
+    $min = $coin_settings['min'];
+    $max = $coin_settings['max'];
+    $cap_per_slot = 22;
 
-// For simplicity, I'll include a modified performSpin function below.
+    $coin_amount = rand((int)$min, (int)$max);
+    if ($coins_earned + $coin_amount > $cap_per_slot) {
+        $coin_amount = max(0, $cap_per_slot - $coins_earned);
+    }
 
-// But to keep this answer focused, I'll provide the complete code for spin_ajax.php with the logic.
+    $new_spins = $spins_used + 1;
+    $new_coins = $coins_earned + $coin_amount;
 
-// I'll assume you have a function performSpin($pdo, $user_id, $slot, $targetSegment, $reward_type) that returns the data.
+    // Update user_spins
+    $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = NOW() WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+    $stmt->execute([$new_spins, $new_coins, $user_id, $today, $slot]);
 
-// Since the user code already has a performSpin function, we need to replace it with the new one.
+    // Credit total coins
+    if ($coin_amount > 0) {
+        $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
+    }
 
-// I will provide the full spin_ajax.php including the modified performSpin function.
+    $is_reward = ($new_spins == 5);
+    if ($is_reward) {
+        $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
+    }
 
-// For brevity, I'll list the key changes:
+    // Prepare response
+    $response = [
+        'success' => true,
+        'spins_used' => $new_spins,
+        'coins' => $coin_amount,
+        'total_coins_earned' => $new_coins,
+        'is_reward' => $is_reward,
+        'reward_type' => $reward_type,
+        'target_segment' => $targetSegment
+    ];
 
-// 1. The performSpin function now accepts $targetSegment and $reward_type.
-// 2. It uses these to decide which segment to land on and what reward to show.
+    // If property, fetch a random property (but we already have target segment)
+    // For property, we still need to show a property in modal if not special
+    if ($reward_type === 'property') {
+        // Get a random low-price property (upcoming auction)
+        $prop = getRandomLowPriceProperty($pdo);
+        if ($prop) {
+            $response['show_property'] = true;
+            $response['property'] = $prop;
+        } else {
+            $response['show_property'] = false;
+        }
+    } else {
+        // Gold or Diamond – no property modal
+        $response['show_property'] = false;
+    }
 
-// I'll include the full code below.
-?>
+    return $response;
+}
+
+// Execute spin
+$result = doSpin($pdo, $user_id, $slot, $targetSegment, $reward_type);
+
+// Also include the target segment in the response for the frontend to rotate correctly
+$result['target_segment'] = $targetSegment;
+
+echo json_encode($result);
