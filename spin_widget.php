@@ -1,27 +1,26 @@
 <?php
 // ============================================================
-// spin_widget.php – Final: 8 Distinct Colors + White Pointer
+// spin_widget.php – 8‑Segment Wheel with GOLD & DIAMOND
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
     return;
 }
 
-// 🎨 8 बिल्कुल अलग colors (कोई repeat नहीं, सभी स्पष्ट)
 $segmentColors = [
-    '#7CFC00', // 0 – Lawn Green (light but not blinding)
-    '#FF8C00', // 1 – Dark Orange
-    '#FFD700', // 2 – Gold (only one yellow)
-    '#00FF00', // 3 – Lime Green
-    '#00BFFF', // 4 – Deep Sky Blue
+    '#FF0000', // 0 – Red (GOLD)
+    '#FF7F00', // 1 – Orange
+    '#FFFF00', // 2 – Yellow
+    '#00FF00', // 3 – Green
+    '#00FFFF', // 4 – Cyan (DIAMOND)
     '#0000FF', // 5 – Blue
-    '#8A2BE2', // 6 – Blue Violet
-    '#FF1493'  // 7 – Deep Pink
+    '#8B00FF', // 6 – Violet
+    '#FF00FF'  // 7 – Magenta
 ];
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
 $angle = 360 / $numSegments; // 45°
-$rotationOffset = 0; // 45° घुमाव
+$rotationOffset = 80;
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -81,36 +80,31 @@ $rotationOffset = 0; // 45° घुमाव
                         ?>
                     ); border:5px solid #fff; box-shadow:0 0 40px rgba(251,191,36,0.4); margin:0 auto; position:relative;">
                         <?php for ($i = 0; $i < $numSegments; $i++): 
-    $label = $segmentLabels[$i] ?? '';
-    if (empty($label)) continue;
-    $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
-    $rad = deg2rad($centerAngle - 90);
-    $distance = 65;
-    $left = 100 + $distance * cos($rad);
-    $top = 100 + $distance * sin($rad);
-    
-    // 🎯 DIAMOND के लिए छोटा font और थोड़ा adjust position
-    if ($label === 'DIAMOND') {
-        $fontSize = '12px';
-        $adjustLeft = -2; // थोड़ा left shift
-        $adjustTop = 0;
-    } else {
-        $fontSize = '16px';
-        $adjustLeft = 0;
-        $adjustTop = 0;
-    }
-    $finalLeft = $left + $adjustLeft;
-    $finalTop = $top + $adjustTop;
-?>
-    <span style="position:absolute; left:<?= $finalLeft ?>px; top:<?= $finalTop ?>px; transform:translate(-50%, -50%) rotate(-45deg); color:#000; font-weight:bold; font-size:<?= $fontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
-        <?= htmlspecialchars($label) ?>
-    </span>
-<?php endfor; ?>
+                            $label = $segmentLabels[$i] ?? '';
+                            if (empty($label)) continue;
+                            $centerAngle = $i * $angle + $angle/2 + $rotationOffset;
+                            $rad = deg2rad($centerAngle - 90);
+                            $distance = 65;
+                            $left = 100 + $distance * cos($rad);
+                            $top = 100 + $distance * sin($rad);
+                            
+                            // DIAMOND के लिए छोटा font और थोड़ा adjust
+                            if ($label === 'DIAMOND') {
+                                $fontSize = '12px';
+                                $adjustLeft = -2;
+                            } else {
+                                $fontSize = '16px';
+                                $adjustLeft = 0;
+                            }
+                            $finalLeft = $left + $adjustLeft;
+                        ?>
+                            <span style="position:absolute; left:<?= $finalLeft ?>px; top:<?= $top ?>px; transform:translate(-50%, -50%) rotate(-45deg); color:#000; font-weight:bold; font-size:<?= $fontSize ?>; text-shadow:0 0 6px rgba(255,255,255,0.7); pointer-events:none; z-index:5; white-space:nowrap;">
+                                <?= htmlspecialchars($label) ?>
+                            </span>
                         <?php endfor; ?>
                     </div>
                     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; width:36px; height:36px; border-radius:50%; border:5px solid #fbbf24; z-index:2;"></div>
-                    <!-- 🟢 White Pointer – अब किसी color से match नहीं होगा -->
-                    <div style="position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:16px solid transparent; border-right:16px solid transparent; border-top:26px solid #FFFFFF; filter:drop-shadow(0 0 16px rgba(255,255,255,0.7)); z-index:2;"></div>
+                    <div style="position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:16px solid transparent; border-right:16px solid transparent; border-top:26px solid #fbbf24; filter:drop-shadow(0 0 16px rgba(251,191,36,0.7)); z-index:2;"></div>
                 </div>
                 <button id="spinBtn" class="btn btn-warning mt-3 px-4 fw-bold" <?= ($current_slot_data['can_spin']) ? '' : 'disabled' ?>>
                     <i class="fas fa-sync-alt"></i> Spin!
@@ -183,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (modalBody) {
                         let icon = 'fa-gem';
                         let color = '#fbbf24';
-                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#00BFFF'; }
+                        if (label === 'DIAMOND') { icon = 'fa-crown'; color = '#00FFFF'; }
                         modalBody.innerHTML = `
                             <div style="text-align:center; padding:20px;">
                                 <i class="fas ${icon}" style="font-size:4rem; color:${color};"></i>
