@@ -9,7 +9,7 @@ if (!isset($pdo) || !isset($user_id)) {
 
 // 🎨 8 बिल्कुल अलग colors (कोई repeat नहीं, सभी स्पष्ट)
 $segmentColors = [
-    '#00FF00', // 0 – Lime Green
+    '#7CFC00', // 0 – Lawn Green (light but not blinding)
     '#FF8C00', // 1 – Dark Orange
     '#FFD700', // 2 – Gold (only one yellow)
     '#00FF00', // 3 – Lime Green
