@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_ajax.php – Complete with Admin Settings & Next Slot Time
+// spin_ajax.php – Final with Admin Settings & Next Slot Time
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -13,19 +13,12 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// ----- Helper: Get next slot start time -----
+// ----- Helper: Next slot start time -----
 function getNextSlotStartTime() {
     $hour = (int)date('H');
-    if ($hour < 8) {
-        // next slot is 8 AM today
-        return date('Y-m-d 08:00:00');
-    } elseif ($hour < 14) {
-        // next slot is 2 PM today
-        return date('Y-m-d 14:00:00');
-    } else {
-        // next slot is 12 AM (midnight) tomorrow
-        return date('Y-m-d 00:00:00', strtotime('+1 day'));
-    }
+    if ($hour < 8) return date('Y-m-d 08:00:00');
+    elseif ($hour < 14) return date('Y-m-d 14:00:00');
+    else return date('Y-m-d 00:00:00', strtotime('+1 day'));
 }
 
 // ----- Admin settings -----
@@ -59,7 +52,7 @@ if ($spins_used >= 5) {
     $formatted_time = date('h:i A', strtotime($next_time));
     echo json_encode([
         'success' => false,
-        'message' => "All spins used for this slot. Next slot available at <strong>{$formatted_time}</strong>",
+        'message' => "All spins used. Next slot at <strong>{$formatted_time}</strong>",
         'next_slot_time' => $next_time
     ]);
     exit;
@@ -132,11 +125,10 @@ if ($reward_type === 'property') {
     $response['show_property'] = false;
 }
 
-// If spins are exhausted now, add next slot time
 if ($new_spins >= 5) {
     $next_time = getNextSlotStartTime();
     $response['next_slot_time'] = $next_time;
-    $response['message'] = "All spins used for this slot. Next slot available at " . date('h:i A', strtotime($next_time));
+    $response['message'] = "All spins used. Next slot at " . date('h:i A', strtotime($next_time));
 }
 
 echo json_encode($response);
