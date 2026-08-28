@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_ajax.php – Complete with Admin Settings Support
+// spin_ajax.php – Complete with Admin Settings & Next Slot Time
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -12,6 +12,21 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $user_id = $_SESSION['user_id'];
+
+// ----- Helper: Get next slot start time -----
+function getNextSlotStartTime() {
+    $hour = (int)date('H');
+    if ($hour < 8) {
+        // next slot is 8 AM today
+        return date('Y-m-d 08:00:00');
+    } elseif ($hour < 14) {
+        // next slot is 2 PM today
+        return date('Y-m-d 14:00:00');
+    } else {
+        // next slot is 12 AM (midnight) tomorrow
+        return date('Y-m-d 00:00:00', strtotime('+1 day'));
+    }
+}
 
 // ----- Admin settings -----
 $enabled = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'spin_special_enabled'")->fetchColumn() ?: 1;
@@ -30,7 +45,6 @@ $stmt->execute([$user_id, $today, $slot]);
 $data = $stmt->fetch();
 
 if (!$data) {
-    // First spin of the slot – insert row
     $stmt = $pdo->prepare("INSERT INTO user_spins (user_id, slot_date, slot_number, spins_used, coins_earned) VALUES (?, ?, ?, 0, 0)");
     $stmt->execute([$user_id, $today, $slot]);
     $spins_used = 0;
@@ -41,28 +55,31 @@ if (!$data) {
 }
 
 if ($spins_used >= 5) {
-    echo json_encode(['success' => false, 'message' => 'All spins used for this slot']);
+    $next_time = getNextSlotStartTime();
+    $formatted_time = date('h:i A', strtotime($next_time));
+    echo json_encode([
+        'success' => false,
+        'message' => "All spins used for this slot. Next slot available at <strong>{$formatted_time}</strong>",
+        'next_slot_time' => $next_time
+    ]);
     exit;
 }
 
 $next_spin_number = $spins_used + 1;
-
-// Determine reward type and target segment
 $reward_type = 'property';
 $targetSegment = null;
 
 if ($enabled) {
     if (in_array($next_spin_number, $diamond_numbers)) {
         $reward_type = 'diamond';
-        $targetSegment = 4; // DIAMOND index
+        $targetSegment = 4;
     } elseif (in_array($next_spin_number, $gold_numbers)) {
         $reward_type = 'gold';
-        $targetSegment = 0; // GOLD index
+        $targetSegment = 0;
     }
 }
 
 if ($reward_type === 'property') {
-    // Avoid Gold (0) and Diamond (4)
     $available = [1,2,3,5,6,7];
     $targetSegment = $available[array_rand($available)];
 }
@@ -81,11 +98,9 @@ if ($coins_earned + $coin_amount > $cap_per_slot) {
 $new_spins = $spins_used + 1;
 $new_coins = $coins_earned + $coin_amount;
 
-// Update user_spins
 $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = NOW() WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
 $stmt->execute([$new_spins, $new_coins, $user_id, $today, $slot]);
 
-// Credit total coins
 if ($coin_amount > 0) {
     $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
 }
@@ -95,7 +110,6 @@ if ($is_reward) {
     $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
 }
 
-// Prepare response
 $response = [
     'success' => true,
     'spins_used' => $new_spins,
@@ -106,7 +120,6 @@ $response = [
     'target_segment' => $targetSegment
 ];
 
-// If property, fetch a random upcoming auction property
 if ($reward_type === 'property') {
     $prop = getRandomLowPriceProperty($pdo);
     if ($prop) {
@@ -116,8 +129,14 @@ if ($reward_type === 'property') {
         $response['show_property'] = false;
     }
 } else {
-    // Gold or Diamond – no property modal
     $response['show_property'] = false;
+}
+
+// If spins are exhausted now, add next slot time
+if ($new_spins >= 5) {
+    $next_time = getNextSlotStartTime();
+    $response['next_slot_time'] = $next_time;
+    $response['message'] = "All spins used for this slot. Next slot available at " . date('h:i A', strtotime($next_time));
 }
 
 echo json_encode($response);
