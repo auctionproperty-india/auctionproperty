@@ -9,6 +9,19 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 
 include 'header.php';
 
+// Helper function to save setting
+function saveSetting($pdo, $key, $value) {
+    $stmt = $pdo->prepare("SELECT id FROM settings WHERE setting_key = ?");
+    $stmt->execute([$key]);
+    if ($stmt->fetch()) {
+        $stmt = $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
+        $stmt->execute([$value, $key]);
+    } else {
+        $stmt = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
+        $stmt->execute([$key, $value]);
+    }
+}
+
 // Save settings
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
     $enabled = isset($_POST['enabled']) ? 1 : 0;
@@ -19,32 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
     if (!preg_match('/^[\d,]*$/', $gold)) $gold = '';
     if (!preg_match('/^[\d,]*$/', $diamond)) $diamond = '';
 
-    // Save settings
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
-    $enabled = isset($_POST['enabled']) ? 1 : 0;
-    $gold = trim($_POST['gold_triggers']);
-    $diamond = trim($_POST['diamond_triggers']);
-
-    // Validate: only numbers and commas
-    if (!preg_match('/^[\d,]*$/', $gold)) $gold = '';
-    if (!preg_match('/^[\d,]*$/', $diamond)) $diamond = '';
-
-    // Helper function to upsert
-    function upsertSetting($pdo, $key, $value) {
-        $stmt = $pdo->prepare("SELECT id FROM settings WHERE setting_key = ?");
-        $stmt->execute([$key]);
-        if ($stmt->fetch()) {
-            $stmt = $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
-            $stmt->execute([$value, $key]);
-        } else {
-            $stmt = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)");
-            $stmt->execute([$key, $value]);
-        }
-    }
-
-    upsertSetting($pdo, 'spin_special_enabled', $enabled);
-    upsertSetting($pdo, 'spin_gold_triggers', $gold);
-    upsertSetting($pdo, 'spin_diamond_triggers', $diamond);
+    saveSetting($pdo, 'spin_special_enabled', $enabled);
+    saveSetting($pdo, 'spin_gold_triggers', $gold);
+    saveSetting($pdo, 'spin_diamond_triggers', $diamond);
 
     $msg = "✅ Settings saved!";
 }
