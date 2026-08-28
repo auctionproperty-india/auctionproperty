@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Next Slot Time
+// spin_widget.php – Final with Disable & Next Slot Time
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -8,18 +8,12 @@ if (!isset($pdo) || !isset($user_id)) {
 }
 
 $segmentColors = [
-    '#FF0000', // 0 – Red (GOLD)
-    '#FF7F00', // 1 – Orange
-    '#FFFF00', // 2 – Yellow
-    '#00FF00', // 3 – Green
-    '#00FFFF', // 4 – Cyan (DIAMOND)
-    '#0000FF', // 5 – Blue
-    '#8B00FF', // 6 – Violet
-    '#FF00FF'  // 7 – Magenta
+    '#FF0000', '#FF7F00', '#FFFF00', '#00FF00',
+    '#00FFFF', '#0000FF', '#8B00FF', '#FF00FF'
 ];
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
-$angle = 360 / $numSegments; // 55°
+$angle = 360 / $numSegments;
 $rotationOffset = 0;
 ?>
 <div class="spin-card">
@@ -150,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    const targetSegment = data.target_segment || 0;
+                    const targetSegment = data.target_segment ?? 0;
                     const targetAngle = targetSegment * segmentAngle + segmentAngle/2 + rotationOffset;
                     const extraSpins = 5 + Math.floor(Math.random() * 5);
                     const newRotation = extraSpins * 360 + (360 - targetAngle);
@@ -220,16 +214,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             spinMessage.innerHTML = data.message || 'Spin done!';
                         }
 
-                        // ✅ Check if all spins used
                         if (data.spins_used >= 5) {
                             spinBtn.disabled = true;
                             spinBtn.innerHTML = '<i class="fas fa-clock"></i> Wait';
-                            // Show next slot time if available
                             if (data.next_slot_time) {
                                 const nextTime = new Date(data.next_slot_time);
-                                const options = { hour: '2-digit', minute: '2-digit', hour12: true };
-                                const timeStr = nextTime.toLocaleTimeString('en-US', options);
-                                spinMessage.innerHTML = `✅ All spins used! Next slot available at <strong>${timeStr}</strong>`;
+                                const timeStr = nextTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                                spinMessage.innerHTML = `✅ All spins used! Next slot at <strong>${timeStr}</strong>`;
                             } else {
                                 spinMessage.innerHTML = '✅ All spins used for this slot!';
                             }
