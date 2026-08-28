@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_widget.php – 8‑Segment Wheel with Admin Settings
+// spin_widget.php – 8‑Segment Wheel with Next Slot Time
 // ============================================================
 
 if (!isset($pdo) || !isset($user_id)) {
@@ -19,8 +19,8 @@ $segmentColors = [
 ];
 $segmentLabels = ['GOLD', '', '', '', 'DIAMOND', '', '', ''];
 $numSegments = 8;
-$angle = 360 / $numSegments; // 45°
-$rotationOffset = 0; // 0° offset (matches conic-gradient)
+$angle = 360 / $numSegments; // 55°
+$rotationOffset = 0;
 ?>
 <div class="spin-card">
     <h4><i class="fas fa-gift me-2" style="color: #fbbf24;"></i>Daily Spin</h4>
@@ -139,7 +139,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const numSegments = 8;
     const segmentAngle = 360 / numSegments;
     const rotationOffset = <?= $rotationOffset ?>;
-    const specialIndices = [0, 4]; // GOLD and DIAMOND
 
     spinBtn.addEventListener('click', function() {
         if (isSpinning) return;
@@ -147,23 +146,11 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
-        // We'll get the target segment from the server, but we still need to compute rotation
-        // We'll fetch first, then rotate based on server response.
-        // However, to avoid delay, we can still rotate based on a random guess, but the server will tell us which segment to land on.
-        // So we'll do the rotation after we get the response? That would be delayed.
-        // Instead, we can let the server return a target segment, and we rotate accordingly.
-        // We'll use a two-step: first send request, get target segment, then rotate.
-        // But the user expects immediate spin animation. So we can still animate and then adjust if needed.
-        // Actually, the server already knows the target. We can send the request and then rotate to the segment returned.
-        // For better UX, we can do the fetch first, then rotate.
-        // Let's do that: fetch, then rotate based on response.
-
         fetch('spin_ajax.php')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     const targetSegment = data.target_segment || 0;
-                    // Calculate rotation to land on that segment
                     const targetAngle = targetSegment * segmentAngle + segmentAngle/2 + rotationOffset;
                     const extraSpins = 5 + Math.floor(Math.random() * 5);
                     const newRotation = extraSpins * 360 + (360 - targetAngle);
@@ -174,7 +161,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     wheel.style.transform = `rotate(${currentRotation}deg)`;
                     wheel.classList.add('pulse');
 
-                    // After spin completes, show results
                     setTimeout(() => {
                         wheel.classList.remove('pulse');
                         isSpinning = false;
@@ -234,19 +220,31 @@ document.addEventListener('DOMContentLoaded', function() {
                             spinMessage.innerHTML = data.message || 'Spin done!';
                         }
 
+                        // ✅ Check if all spins used
                         if (data.spins_used >= 5) {
                             spinBtn.disabled = true;
-                            spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
+                            spinBtn.innerHTML = '<i class="fas fa-clock"></i> Wait';
+                            // Show next slot time if available
+                            if (data.next_slot_time) {
+                                const nextTime = new Date(data.next_slot_time);
+                                const options = { hour: '2-digit', minute: '2-digit', hour12: true };
+                                const timeStr = nextTime.toLocaleTimeString('en-US', options);
+                                spinMessage.innerHTML = `✅ All spins used! Next slot available at <strong>${timeStr}</strong>`;
+                            } else {
+                                spinMessage.innerHTML = '✅ All spins used for this slot!';
+                            }
                         } else {
                             spinBtn.disabled = false;
+                            spinBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Spin!';
                         }
-                    }, 4200); // wait for spin animation to finish
+                    }, 4200);
 
                 } else {
                     wheel.classList.remove('pulse');
                     isSpinning = false;
-                    spinMessage.innerHTML = `❌ ${data.message || 'Something went wrong'}`;
+                    spinMessage.innerHTML = data.message || '❌ Something went wrong';
                     spinBtn.disabled = false;
+                    spinBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Spin!';
                 }
             })
             .catch(error => {
@@ -255,6 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 isSpinning = false;
                 spinMessage.innerHTML = '❌ Error spinning. Please try again.';
                 spinBtn.disabled = false;
+                spinBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Spin!';
             });
     });
 
