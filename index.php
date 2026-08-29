@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🏠 Home Page – Updated with Private Treaty Support + Date Search
+// 🏠 Home Page – Updated with Private Treaty Support + Date Search (Fixed)
 // ============================================================
 
 require_once __DIR__ . '/db.php'; // ← db.php already starts session
@@ -23,9 +23,10 @@ $show_images = userHasActiveSubscription($pdo, $user_id);
 $search_city = $_GET['city'] ?? '';
 $search_type = $_GET['type'] ?? '';
 $search_max_price = $_GET['max_price'] ?? '';
-$search_date  = $_GET['date']  ?? '';  // 🔥 NEW: Date search
+$search_date  = $_GET['date']  ?? '';
 $tab = $_GET['tab'] ?? 'auction';
 
+// ---- Common Search Filters (City, Type, Max Price) ----
 $where = [];
 $params = [];
 if(!empty($search_city)) {
@@ -40,17 +41,6 @@ if(!empty($search_max_price)) {
     $where[] = "price <= ?";
     $params[] = (float)$search_max_price;
 }
-
-// ---- 🔥 NEW: Date search - condition depends on active tab ----
-if(!empty($search_date)) {
-    if($tab == 'auction') {
-        $where[] = "auction_date = ?";
-    } else { // customer tab
-        $where[] = "DATE(created_at) = ?";
-    }
-    $params[] = $search_date;
-}
-
 $where_clause = implode(" AND ", $where);
 
 // ---- Auction Properties ----
@@ -59,26 +49,49 @@ if(!empty($where_clause)) {
     $base_sql .= " AND " . $where_clause;
 }
 
-// 🔥 FIX: Today's Auctions = Private Treaty + Today's Date
-$today_sql = $base_sql . " AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC";
-$today_stmt = $pdo->prepare($today_sql);
-$today_stmt->execute($params);
-$today_props = $today_stmt->fetchAll();
+// 🔥 Auction के लिए Date Filter अलग से लागू करें
+$auction_params = $params; // city, type, max_price
+if(!empty($search_date)) {
+    $base_sql .= " AND auction_date = ?";
+    $auction_params[] = $search_date;
+}
 
-// 🔥 FIX: Upcoming Auctions = Exclude Private Treaty and Today's Date
-$upcoming_sql = $base_sql . " AND (auction_date != CURRENT_DATE OR auction_date IS NULL) AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC";
-$upcoming_stmt = $pdo->prepare($upcoming_sql);
-$upcoming_stmt->execute($params);
-$upcoming_props = $upcoming_stmt->fetchAll();
+// अगर Date चुनी गई है, तो सिर्फ उस तारीख वाली प्रॉपर्टी "Today" में दिखाएँ
+if(!empty($search_date)) {
+    $today_sql = $base_sql . " ORDER BY id DESC";
+    $today_stmt = $pdo->prepare($today_sql);
+    $today_stmt->execute($auction_params);
+    $today_props = $today_stmt->fetchAll();
+    $upcoming_props = [];
+} else {
+    // 🔥 बिना Date के – Today's और Upcoming की पुरानी लॉजिक
+    $today_sql = $base_sql . " AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC";
+    $today_stmt = $pdo->prepare($today_sql);
+    $today_stmt->execute($params);
+    $today_props = $today_stmt->fetchAll();
+
+    $upcoming_sql = $base_sql . " AND (auction_date != CURRENT_DATE OR auction_date IS NULL) AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC";
+    $upcoming_stmt = $pdo->prepare($upcoming_sql);
+    $upcoming_stmt->execute($params);
+    $upcoming_props = $upcoming_stmt->fetchAll();
+}
 
 // ---- Customer Properties ----
 $customer_where = "status = 'approved'";
 if(!empty($where_clause)) {
     $customer_where .= " AND " . $where_clause;
 }
+
+// 🔥 Customer के लिए Date Filter अलग से लागू करें (created_at पर)
+$customer_params = $params; // city, type, max_price
+if(!empty($search_date)) {
+    $customer_where .= " AND DATE(created_at) = ?";
+    $customer_params[] = $search_date;
+}
+
 $customer_sql = "SELECT *, 'customer' as source FROM user_properties WHERE $customer_where ORDER BY created_at DESC";
 $customer_stmt = $pdo->prepare($customer_sql);
-$customer_stmt->execute($params);
+$customer_stmt->execute($customer_params);
 $customer_props = $customer_stmt->fetchAll();
 
 // ---- Render Property Card (with safeDateFormat) ----
@@ -99,7 +112,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     $border = ($g['text'] == 'white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
     $image_url = ($prop['source'] == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image_url'] ?? '');
     
-    // 🔥 FIX: Check if Private Treaty
     $is_private_treaty = ($prop['source'] == 'auction' && isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty');
     ?>
     <div class="col-md-4 mb-4">
@@ -192,7 +204,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                 <div class="col-md-2">
                     <input type="number" name="max_price" class="form-control" placeholder="Max Price (₹)" value="<?= htmlspecialchars($search_max_price) ?>">
                 </div>
-                <!-- 🔥 NEW: Date input -->
+                <!-- 🔥 Date Search Box -->
                 <div class="col-md-3">
                     <input type="date" name="date" class="form-control" value="<?= htmlspecialchars($search_date) ?>" placeholder="Select Date">
                 </div>
@@ -218,10 +230,10 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
 
         <?php if($tab == 'auction'): ?>
             <div class="section-title">
-                <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
+                <i class="fas fa-bolt" style="color:#dc2626;"></i> 
+                <?= !empty($search_date) ? '🔍 Searched Auctions' : "Today's Auctions" ?>
                 <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
                 <?php
-                // Count Private Treaty in today's auctions
                 $pt_count = 0;
                 foreach($today_props as $p) {
                     if(isset($p['auction_start_time']) && $p['auction_start_time'] == 'Private Treaty') $pt_count++;
@@ -229,35 +241,43 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                 if($pt_count > 0): ?>
                     <span class="badge bg-warning text-dark rounded-pill ms-2">🔑 <?= $pt_count ?> Private Treaty</span>
                 <?php endif; ?>
+                <?php if(!empty($search_date)): ?>
+                    <span class="badge bg-info rounded-pill ms-2">📅 <?= htmlspecialchars($search_date) ?></span>
+                <?php endif; ?>
             </div>
             <?php if(count($today_props) > 0): ?>
                 <div class="row"><?php foreach($today_props as $prop) renderPropertyCard($prop, $show_images, true); ?></div>
             <?php else: ?>
-                <div class="no-auction-msg"><i class="fas fa-calendar-day"></i><p class="mt-2 fw-bold">📭 No auction today</p></div>
+                <div class="no-auction-msg"><i class="fas fa-calendar-day"></i><p class="mt-2 fw-bold">📭 No auction found for this date</p></div>
             <?php endif; ?>
 
-            <hr class="my-5">
-            <div class="section-title">
-                <i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions
-                <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span>
-            </div>
-            <?php if(count($upcoming_props) > 0): ?>
-                <div class="row"><?php foreach($upcoming_props as $prop) renderPropertyCard($prop, $show_images, false); ?></div>
-            <?php else: ?>
-                <div class="no-auction-msg"><i class="fas fa-calendar-plus"></i><p class="mt-2 fw-bold">📅 No upcoming auctions</p></div>
+            <?php if(empty($search_date)): // अगर Date नहीं चुनी है तो ही Upcoming दिखाएँ ?>
+                <hr class="my-5">
+                <div class="section-title">
+                    <i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions
+                    <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span>
+                </div>
+                <?php if(count($upcoming_props) > 0): ?>
+                    <div class="row"><?php foreach($upcoming_props as $prop) renderPropertyCard($prop, $show_images, false); ?></div>
+                <?php else: ?>
+                    <div class="no-auction-msg"><i class="fas fa-calendar-plus"></i><p class="mt-2 fw-bold">📅 No upcoming auctions</p></div>
+                <?php endif; ?>
             <?php endif; ?>
 
         <?php else: ?>
             <div class="section-title">
                 <i class="fas fa-home" style="color:#10b981;"></i> Customer Properties
                 <span class="badge bg-primary rounded-pill ms-2"><?= count($customer_props) ?></span>
+                <?php if(!empty($search_date)): ?>
+                    <span class="badge bg-info rounded-pill ms-2">📅 <?= htmlspecialchars($search_date) ?></span>
+                <?php endif; ?>
             </div>
             <?php if(count($customer_props) > 0): ?>
                 <div class="row"><?php foreach($customer_props as $prop) renderPropertyCard($prop, $show_images, false); ?></div>
             <?php else: ?>
                 <div class="no-auction-msg">
                     <i class="fas fa-home"></i>
-                    <p class="mt-2 fw-bold">🏠 No customer properties yet</p>
+                    <p class="mt-2 fw-bold">🏠 No customer properties found</p>
                     <?php if(isset($_SESSION['user_id']) && $_SESSION['role'] != 'admin'): ?>
                         <a href="add_user_property.php" class="btn btn-primary mt-2">Add Your Property</a>
                     <?php endif; ?>
