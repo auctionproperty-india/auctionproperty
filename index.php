@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🏠 Home Page – Updated with Private Treaty Support
+// 🏠 Home Page – Updated with Private Treaty Support + Date Search
 // ============================================================
 
 require_once __DIR__ . '/db.php'; // ← db.php already starts session
@@ -23,6 +23,7 @@ $show_images = userHasActiveSubscription($pdo, $user_id);
 $search_city = $_GET['city'] ?? '';
 $search_type = $_GET['type'] ?? '';
 $search_max_price = $_GET['max_price'] ?? '';
+$search_date  = $_GET['date']  ?? '';  // 🔥 NEW: Date search
 $tab = $_GET['tab'] ?? 'auction';
 
 $where = [];
@@ -38,6 +39,16 @@ if(!empty($search_type)) {
 if(!empty($search_max_price)) {
     $where[] = "price <= ?";
     $params[] = (float)$search_max_price;
+}
+
+// ---- 🔥 NEW: Date search - condition depends on active tab ----
+if(!empty($search_date)) {
+    if($tab == 'auction') {
+        $where[] = "auction_date = ?";
+    } else { // customer tab
+        $where[] = "DATE(created_at) = ?";
+    }
+    $params[] = $search_date;
 }
 
 $where_clause = implode(" AND ", $where);
@@ -166,10 +177,10 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         <div class="search-box">
             <form method="GET" class="row g-3 align-items-center">
                 <input type="hidden" name="tab" value="<?= $tab ?>">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <input type="text" name="city" class="form-control" placeholder="🔍 Search by City..." value="<?= htmlspecialchars($search_city) ?>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <select name="type" class="form-control">
                         <option value="">All Types</option>
                         <option value="Flat" <?= ($search_type=='Flat')?'selected':'' ?>>Flat</option>
@@ -178,8 +189,12 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                         <option value="Land" <?= ($search_type=='Land')?'selected':'' ?>>Land</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <input type="number" name="max_price" class="form-control" placeholder="Max Price (₹)" value="<?= htmlspecialchars($search_max_price) ?>">
+                </div>
+                <!-- 🔥 NEW: Date input -->
+                <div class="col-md-3">
+                    <input type="date" name="date" class="form-control" value="<?= htmlspecialchars($search_date) ?>" placeholder="Select Date">
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Search</button>
@@ -190,12 +205,12 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-4">
             <li class="nav-item">
-                <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?tab=auction&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>">
+                <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?tab=auction&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>&date=<?= urlencode($search_date) ?>">
                     <i class="fas fa-gavel me-2"></i>Auction Properties
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?tab=customer&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>">
+                <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?tab=customer&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>&date=<?= urlencode($search_date) ?>">
                     <i class="fas fa-home me-2"></i>Customer Properties
                 </a>
             </li>
