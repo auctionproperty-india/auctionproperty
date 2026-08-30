@@ -560,4 +560,38 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- ====== ADMIN NOTIFICATION MODAL ====== -->
+<?php if ($notification): ?>
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h5 class="modal-title"><i class="fas fa-bullhorn me-2" style="color: #fbbf24;"></i><?= htmlspecialchars($notification['title']) ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <?php if (!empty($notification['image_url'])): ?>
+                    <img src="<?= htmlspecialchars($notification['image_url']) ?>" style="width:100%; max-height:300px; object-fit:contain; border-radius:16px; margin-bottom:16px;" alt="Notification Image">
+                <?php endif; ?>
+                <p style="font-size:1.1rem; line-height:1.6;"><?= nl2br(htmlspecialchars($notification['message'] ?? '')) ?></p>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal"><i class="fas fa-check me-2"></i>Got it!</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto show modal on page load
+    const myModal = new bootstrap.Modal(document.getElementById('notificationModal'), {
+        backdrop: 'static',
+        keyboard: false
+    });
+    myModal.show();
+});
+</script>
+<?php endif; ?>
+
 <?php include 'footer.php'; ?>
