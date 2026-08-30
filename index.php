@@ -1,9 +1,9 @@
 <?php
 // ============================================================
-// 🏠 Home Page – Updated with Private Treaty Support + Date Search (Fixed)
+// 🏠 Home Page – Updated with Private Treaty Support + Date Search + Total Counts (All Properties)
 // ============================================================
 
-require_once __DIR__ . '/db.php'; // ← db.php already starts session
+require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/functions.php';
 
@@ -26,7 +26,22 @@ $search_max_price = $_GET['max_price'] ?? '';
 $search_date  = $_GET['date']  ?? '';
 $tab = $_GET['tab'] ?? 'auction';
 
-// ---- Common Search Filters (City, Type, Max Price) ----
+// ============================================================
+// 🔥 TOTAL COUNTS (पूरे पोर्टल की कुल संख्या – बिना किसी फ़िल्टर के)
+// ============================================================
+
+// कुल Auction Properties – सभी जिनकी status = 'available' (Private Treaty + Today + Upcoming सभी)
+$total_auction_stmt = $pdo->query("SELECT COUNT(*) as total FROM properties WHERE status = 'available'");
+$total_auction = $total_auction_stmt->fetchColumn();
+
+// कुल Customer Properties – **सभी** (चाहे approved हो, pending हो या rejected) – क्योंकि आप चाहते हैं कि सभी की count दिखे
+$total_customer_stmt = $pdo->query("SELECT COUNT(*) as total FROM user_properties");
+$total_customer = $total_customer_stmt->fetchColumn();
+
+// ============================================================
+// SEARCH FILTERS (City, Type, Max Price, Date)
+// ============================================================
+
 $where = [];
 $params = [];
 if(!empty($search_city)) {
@@ -77,6 +92,7 @@ if(!empty($search_date)) {
 }
 
 // ---- Customer Properties ----
+// केवल approved customer properties ही दिखाई देंगी (index page पर)
 $customer_where = "status = 'approved'";
 if(!empty($where_clause)) {
     $customer_where .= " AND " . $where_clause;
@@ -175,9 +191,22 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
         .section-title { font-weight:800; color:#0f172a; margin-bottom:20px; position:relative; }
         .section-title i { margin-right:10px; }
         .property-card:hover { transform:translateY(-10px); box-shadow:0 30px 60px -15px rgba(0,0,0,0.2) !important; }
-        .nav-tabs .nav-link { font-weight:600; color:#475569; border: none; padding:12px 20px; }
+        .nav-tabs .nav-link { font-weight:600; color:#475569; border: none; padding:12px 20px; position:relative; }
         .nav-tabs .nav-link.active { background: transparent; border-bottom: 3px solid #2563eb; color: #2563eb; }
         .nav-tabs .nav-link:hover { border-bottom: 3px solid #94a3b8; }
+        .nav-tabs .nav-link .badge-count { 
+            background: #e2e8f0; 
+            color: #1e293b; 
+            font-size: 0.7rem; 
+            padding: 2px 10px; 
+            border-radius: 30px; 
+            margin-left: 8px;
+            font-weight: 700;
+        }
+        .nav-tabs .nav-link.active .badge-count {
+            background: #2563eb;
+            color: #ffffff;
+        }
         .no-auction-msg { background: #f8fafc; border-radius: 30px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
         .no-auction-msg i { font-size: 2.5rem; opacity:0.3; }
         @media (max-width:576px) { .search-box { padding:20px; } }
@@ -204,7 +233,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                 <div class="col-md-2">
                     <input type="number" name="max_price" class="form-control" placeholder="Max Price (₹)" value="<?= htmlspecialchars($search_max_price) ?>">
                 </div>
-                <!-- 🔥 Date Search Box -->
                 <div class="col-md-3">
                     <input type="date" name="date" class="form-control" value="<?= htmlspecialchars($search_date) ?>" placeholder="Select Date">
                 </div>
@@ -214,16 +242,18 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
             </form>
         </div>
 
-        <!-- Tabs -->
+        <!-- Tabs with Total Counts -->
         <ul class="nav nav-tabs mb-4">
             <li class="nav-item">
                 <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?tab=auction&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>&date=<?= urlencode($search_date) ?>">
                     <i class="fas fa-gavel me-2"></i>Auction Properties
+                    <span class="badge-count"><?= $total_auction ?></span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?tab=customer&city=<?= urlencode($search_city) ?>&type=<?= urlencode($search_type) ?>&max_price=<?= urlencode($search_max_price) ?>&date=<?= urlencode($search_date) ?>">
                     <i class="fas fa-home me-2"></i>Customer Properties
+                    <span class="badge-count"><?= $total_customer ?></span>
                 </a>
             </li>
         </ul>
