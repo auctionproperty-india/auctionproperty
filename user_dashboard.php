@@ -29,6 +29,10 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user_id, $user_id, $user_id, $user_id, $user_id, $user_id]);
 $stats = $stmt->fetch();
 
+// ---- Fetch active notification for popup ----
+$notif_stmt = $pdo->query("SELECT * FROM admin_notifications WHERE is_active = true ORDER BY updated_at DESC LIMIT 1");
+$notification = $notif_stmt->fetch();
+
 // ---- Get user city for best deals ----
 $user_stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
 $user_stmt->execute([$user_id]);
