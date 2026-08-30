@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – Complete with Spin, Stats, Cards
+// 👤 User Dashboard – Complete with Spin, Stats, Cards + Admin Notification Popup
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -28,10 +28,6 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$user_id, $user_id, $user_id, $user_id, $user_id, $user_id]);
 $stats = $stmt->fetch();
-
-// ---- Fetch active notification for popup ----
-$notif_stmt = $pdo->query("SELECT * FROM admin_notifications WHERE is_active = true ORDER BY updated_at DESC LIMIT 1");
-$notification = $notif_stmt->fetch();
 
 // ---- Get user city for best deals ----
 $user_stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
@@ -81,6 +77,10 @@ $best_sql .= " ORDER BY price ASC LIMIT 6";
 $best_stmt = $pdo->prepare($best_sql);
 $best_stmt->execute($best_params);
 $best_props = $best_stmt->fetchAll();
+
+// ---- 🔥 NEW: Fetch active notification for popup ----
+$notif_stmt = $pdo->query("SELECT * FROM admin_notifications WHERE is_active = true ORDER BY updated_at DESC LIMIT 1");
+$notification = $notif_stmt->fetch();
 
 // ---- Render property card ----
 function renderDashboardCard($prop, $show_images = false, $is_today = false) {
@@ -250,6 +250,123 @@ include 'header.php';
     .section-title i { margin-right: 10px; }
     .no-auction-msg { background: #f8fafc; border-radius: 30px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
     .no-auction-msg i { font-size: 2.5rem; opacity:0.3; }
+
+    /* ===== Premium Modal Styles ===== */
+    .premium-modal .modal-content {
+        background: linear-gradient(145deg, #0b1120, #1a2332);
+        border: 2px solid rgba(255, 215, 0, 0.3);
+        box-shadow: 0 30px 80px rgba(0,0,0,0.8), 0 0 40px rgba(255, 215, 0, 0.1);
+        border-radius: 32px;
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+    }
+    .premium-modal .modal-content::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle at 30% 50%, rgba(255,215,0,0.08) 0%, transparent 60%);
+        pointer-events: none;
+        animation: shimmer 6s infinite linear;
+    }
+    @keyframes shimmer {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .premium-modal .modal-header {
+        border-bottom: 1px solid rgba(255,215,0,0.2);
+        padding: 24px 30px 16px 30px;
+    }
+    .premium-modal .modal-title {
+        font-size: 1.8rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #fbbf24, #f59e0b, #fbbf24);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: goldShine 3s ease-in-out infinite;
+        letter-spacing: 1px;
+        text-shadow: 0 0 30px rgba(251,191,36,0.3);
+    }
+    @keyframes goldShine {
+        0% { background-position: 0% center; }
+        50% { background-position: 200% center; }
+        100% { background-position: 0% center; }
+    }
+    .premium-modal .modal-body {
+        padding: 30px 30px 20px 30px;
+        font-size: 1.15rem;
+        line-height: 1.8;
+        color: #e2e8f0;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        position: relative;
+        z-index: 1;
+    }
+    .premium-modal .modal-body img {
+        border-radius: 20px;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+        border: 1px solid rgba(255,215,0,0.15);
+        margin-bottom: 20px;
+        width: 100%;
+        max-height: 280px;
+        object-fit: contain;
+    }
+    .premium-modal .modal-footer {
+        border-top: 1px solid rgba(255,215,0,0.15);
+        padding: 16px 30px 24px 30px;
+        justify-content: center;
+    }
+    .premium-modal .btn-gold {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        border: none;
+        color: #0f172a;
+        font-weight: 700;
+        padding: 12px 40px;
+        border-radius: 50px;
+        font-size: 1.1rem;
+        letter-spacing: 0.5px;
+        box-shadow: 0 8px 25px rgba(251,191,36,0.4);
+        transition: all 0.3s ease;
+    }
+    .premium-modal .btn-gold:hover {
+        transform: scale(1.05);
+        box-shadow: 0 12px 40px rgba(251,191,36,0.6);
+        color: #0f172a;
+    }
+    .premium-modal .btn-close-white {
+        filter: invert(1) brightness(2);
+        opacity: 0.7;
+    }
+    .premium-modal .btn-close-white:hover {
+        opacity: 1;
+    }
+    .star-sparkle-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: hidden;
+        z-index: 0;
+    }
+    .star-sparkle {
+        position: absolute;
+        font-size: 24px;
+        color: #fbbf24;
+        text-shadow: 0 0 20px #fbbf24, 0 0 60px #f59e0b;
+        animation: sparkleFloat var(--duration) ease-in-out infinite alternate;
+        opacity: 0;
+    }
+    @keyframes sparkleFloat {
+        0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity: 0; }
+        20% { opacity: 1; }
+        80% { opacity: 1; }
+        100% { transform: translateY(-120px) scale(1.2) rotate(360deg); opacity: 0; }
+    }
 </style>
 
 <div class="container-fluid">
@@ -391,6 +508,77 @@ include 'header.php';
     </div>
 </div>
 
+<!-- ====== 🔥 ADMIN NOTIFICATION POPUP – PREMIUM STYLE ====== -->
+<?php if ($notification): ?>
+<div class="modal fade premium-modal" id="notificationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <!-- Sparkle Stars Container -->
+            <div class="star-sparkle-container" id="sparkleContainer"></div>
+
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-crown me-2" style="color: #fbbf24;"></i><?= htmlspecialchars($notification['title']) ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <?php if (!empty($notification['image_url'])): ?>
+                    <img src="<?= htmlspecialchars($notification['image_url']) ?>" alt="Notification Image">
+                <?php endif; ?>
+                <p style="font-weight: 400;"><?= nl2br(htmlspecialchars($notification['message'] ?? '')) ?></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-gold" data-bs-dismiss="modal"><i class="fas fa-check-circle me-2"></i>Got it!</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto show modal
+    const modalElement = document.getElementById('notificationModal');
+    if (modalElement) {
+        const myModal = new bootstrap.Modal(modalElement, {
+            backdrop: 'static',
+            keyboard: false
+        });
+        myModal.show();
+
+        // Generate sparkle stars
+        generateSparkles();
+    }
+
+    function generateSparkles() {
+        const container = document.getElementById('sparkleContainer');
+        if (!container) return;
+        container.innerHTML = '';
+        const count = 30;
+        const symbols = ['✦', '✧', '★', '☆', '✨'];
+        for (let i = 0; i < count; i++) {
+            const star = document.createElement('div');
+            star.className = 'star-sparkle';
+            star.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+            const left = Math.random() * 100;
+            const top = Math.random() * 100;
+            const size = 14 + Math.random() * 24;
+            const duration = 2 + Math.random() * 4;
+            const delay = Math.random() * 3;
+            star.style.cssText = `
+                left: ${left}%;
+                top: ${top}%;
+                font-size: ${size}px;
+                --duration: ${duration}s;
+                animation-delay: ${delay}s;
+                animation-duration: ${duration}s;
+            `;
+            container.appendChild(star);
+        }
+    }
+});
+</script>
+<?php endif; ?>
+
+<!-- ====== SPIN SCRIPT (existing) ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -559,39 +747,5 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-
-<!-- ====== ADMIN NOTIFICATION MODAL ====== -->
-<?php if ($notification): ?>
-<div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content" style="border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
-            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <h5 class="modal-title"><i class="fas fa-bullhorn me-2" style="color: #fbbf24;"></i><?= htmlspecialchars($notification['title']) ?></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4 text-center">
-                <?php if (!empty($notification['image_url'])): ?>
-                    <img src="<?= htmlspecialchars($notification['image_url']) ?>" style="width:100%; max-height:300px; object-fit:contain; border-radius:16px; margin-bottom:16px;" alt="Notification Image">
-                <?php endif; ?>
-                <p style="font-size:1.1rem; line-height:1.6;"><?= nl2br(htmlspecialchars($notification['message'] ?? '')) ?></p>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal"><i class="fas fa-check me-2"></i>Got it!</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Auto show modal on page load
-    const myModal = new bootstrap.Modal(document.getElementById('notificationModal'), {
-        backdrop: 'static',
-        keyboard: false
-    });
-    myModal.show();
-});
-</script>
-<?php endif; ?>
 
 <?php include 'footer.php'; ?>
