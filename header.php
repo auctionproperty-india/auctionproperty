@@ -723,11 +723,14 @@ if ($is_logged_in && $role == 'user') {
         <?php endif; ?>
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         <a href="admin_social_links.php"><i class="fas fa-share-alt"></i> <span>Social Links</span></a>
-    <a href="admin_notification.php"><i class="fas fa-bullhorn"></i> <span>📢 Manage Popup Notification</span>
-    <?php if ($notif_count > 0): ?>
-        <span class="badge bg-danger ms-2"><?= $notif_count ?></span>
-    <?php endif; ?>
-</a>
+    <!-- 🔥 Notification Manager Link – सही कोड -->
+    <a href="admin_notification.php">
+        <i class="fas fa-bullhorn"></i> 
+        <span>Manage Popup Notification</span>
+        <?php if (isset($notif_count) && $notif_count > 0): ?>
+            <span class="badge bg-danger ms-2"><?= $notif_count ?></span>
+        <?php endif; ?>
+    </a>
 
     <?php elseif ($role == 'sales'): ?>
         <!-- SALES SIDEBAR -->
