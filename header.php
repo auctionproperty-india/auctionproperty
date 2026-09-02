@@ -670,13 +670,61 @@ if ($is_logged_in && $role == 'user') {
 </div>
 <?php endif; ?>
 
-<!-- ====== EXISTING SIDEBAR (for logged-in users - SALES & USER ONLY) ====== -->
-<?php if ($is_logged_in && $role != 'admin'): ?>
+<!-- ====== EXISTING SIDEBAR (for logged-in users) ====== -->
+<?php if ($is_logged_in): ?>
 <div class="sidebar-overlay-main" id="sidebarOverlayMain" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
 
-    <?php if ($role == 'sales'): ?>
+    <?php if ($role == 'admin'): ?>
+        <!-- ADMIN SIDEBAR -->
+        <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <?php if (hasViewPermission('properties', $pdo)): ?>
+            <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
+        <?php endif; ?>
+        <?php if ($is_super_admin): ?>
+            <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
+            <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
+            <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
+        <?php endif; ?>
+        <?php if (hasViewPermission('packages', $pdo)): ?>
+            <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
+        <?php endif; ?>
+        <?php if (hasViewPermission('subscriptions', $pdo)): ?>
+            <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
+            <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
+        <?php endif; ?>
+        <?php if (hasViewPermission('referrals', $pdo)): ?>
+            <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
+        <?php endif; ?>
+        <?php if (hasViewPermission('deductions', $pdo)): ?>
+            <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
+        <?php endif; ?>
+        <?php if (hasViewPermission('activity_logs', $pdo)): ?>
+            <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
+        <?php endif; ?>
+        <?php if (hasViewPermission('accounting', $pdo)): ?>
+            <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
+        <?php endif; ?>
+        <?php if (hasViewPermission('settings', $pdo)): ?>
+            <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
+        <?php endif; ?>
+    <a href="admin_spin_settings.php"><i class="fas fa-cog"></i> <span>Spin Settings</span></a>
+        <?php if (hasViewPermission('kyc', $pdo)): ?>
+            <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
+        <?php endif; ?>
+        <?php if (hasViewPermission('support', $pdo)): ?>
+            <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
+        <?php endif; ?>
+        <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
+        <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
+        <?php if ($is_super_admin): ?>
+            <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
+        <?php endif; ?>
+        <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
+        <a href="admin_social_links.php"><i class="fas fa-share-alt"></i> <span>Social Links</span></a>
+
+    <?php elseif ($role == 'sales'): ?>
         <!-- SALES SIDEBAR -->
         <a href="sales_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
@@ -710,11 +758,9 @@ if ($is_logged_in && $role == 'user') {
     <?php if ($is_logged_in): ?>
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
-            <?php if ($role != 'admin'): ?>
             <button class="hamburger-btn" id="hamburgerBtnMain" onclick="toggleSidebar()">
                 <i class="fas fa-bars"></i>
             </button>
-            <?php endif; ?>
             <div class="user-info">
                 <i class="fas fa-user-circle" style="font-size:32px; <?= ($role=='admin')?'color:#1e3a8a;':(($role=='sales')?'color:#f59e0b;':'color:#10b981;') ?>"></i>
                 <div>
@@ -798,7 +844,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (overlay) overlay.addEventListener('click', closeSidebar);
 });
 
-// Toggle main sidebar (for logged-in users - SALES & USER only)
+// Toggle main sidebar (for logged-in users)
 function toggleSidebar() {
     const sidebar = document.getElementById('mainSidebar');
     const overlay = document.getElementById('sidebarOverlayMain');
