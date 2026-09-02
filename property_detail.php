@@ -85,11 +85,13 @@ if (!$has_subscription && $source == 'auction') {
                             </div>
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fce4ec; border-left: 5px solid #ef5350;">
-                                    <small class="text-muted text-uppercase fw-bold">📅 Auction Date</small>
+                                    <small class="text-muted text-uppercase fw-bold">📅 Auction Date & Time</small>
                                     <h6 class="fw-bold mb-0">
                                         <?php 
                                         if (!empty($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty') {
                                             echo '🔑 Private Treaty';
+                                        } elseif (!empty($prop['auction_start_time'])) {
+                                            echo date('d M Y h:i A', strtotime($prop['auction_start_time']));
                                         } elseif (!empty($prop['auction_date'])) {
                                             echo date('d M Y', strtotime($prop['auction_date']));
                                         } else {
@@ -231,7 +233,7 @@ if ($source == 'auction') {
                             </div>
                         </div>
 
-                        <!-- Possession -->
+                        <!-- 🔥 FIXED: Possession – अब सही वैल्यू दिखेगी -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75">Possession</small>
@@ -335,7 +337,7 @@ if ($source == 'auction') {
                             </div>
                         </div>
 
-                        <!-- Auction Date -->
+                        <!-- Auction Date (for display) -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3);">
                                 <small class="text-uppercase opacity-75">📅 Auction Date</small>
