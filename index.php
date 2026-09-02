@@ -34,7 +34,7 @@ $tab = $_GET['tab'] ?? 'auction';
 $total_auction_stmt = $pdo->query("SELECT COUNT(*) as total FROM properties WHERE status = 'available'");
 $total_auction = $total_auction_stmt->fetchColumn();
 
-// कुल Customer Properties – **सभी** (चाहे approved हो, pending हो या rejected) – क्योंकि आप चाहते हैं कि सभी की count दिखे
+// कुल Customer Properties – **सभी** (चाहे approved हो, pending हो या rejected)
 $total_customer_stmt = $pdo->query("SELECT COUNT(*) as total FROM user_properties");
 $total_customer = $total_customer_stmt->fetchColumn();
 
@@ -243,6 +243,14 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                         <option value="Plot" <?= ($search_type=='Plot')?'selected':'' ?>>Plot</option>
                         <option value="Shop" <?= ($search_type=='Shop')?'selected':'' ?>>Shop</option>
                         <option value="Land" <?= ($search_type=='Land')?'selected':'' ?>>Land</option>
+                        <!-- 🔥 नए जोड़े गए विकल्प – Add Form के अनुसार पूरी लिस्ट -->
+                        <option value="House" <?= ($search_type=='House')?'selected':'' ?>>House</option>
+                        <option value="Car/Vehicle" <?= ($search_type=='Car/Vehicle')?'selected':'' ?>>Car / Vehicle</option>
+                        <option value="Commercial" <?= ($search_type=='Commercial')?'selected':'' ?>>Commercial</option>
+                        <option value="Office" <?= ($search_type=='Office')?'selected':'' ?>>Office</option>
+                        <option value="Row House" <?= ($search_type=='Row House')?'selected':'' ?>>Row House</option>
+                        <option value="Bungalow" <?= ($search_type=='Bungalow')?'selected':'' ?>>Bungalow</option>
+                        <option value="Other" <?= ($search_type=='Other')?'selected':'' ?>>Other</option>
                     </select>
                 </div>
                 <div class="col-md-2">
