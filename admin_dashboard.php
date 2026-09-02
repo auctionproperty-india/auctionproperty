@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📊 Admin Dashboard – Complete with Admin Sidebar + Notification Link
+// 📊 Admin Dashboard – Safe Date Formatting
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -37,119 +37,10 @@ $recent_users = $pdo->query("SELECT id, name, email, created_at FROM users ORDER
 // ---- Recent properties ----
 $recent_props = $pdo->query("SELECT id, title, price, created_at FROM properties ORDER BY id DESC LIMIT 5")->fetchAll();
 
-// ---- Super admin check ----
-$is_super_admin = $_SESSION['is_super_admin'] ?? false;
-
-// ---- Get notification count (if any) ----
-$notif_count = $pdo->query("SELECT COUNT(*) FROM admin_notifications WHERE is_active = true")->fetchColumn();
-
 require_once __DIR__ . '/header.php';
 ?>
 
-<!-- ============================================================ -->
-<!-- 🔥 ADMIN SIDEBAR – पूरी Coding अब यहाँ Shift की गई है          -->
-<!-- ============================================================ -->
 <style>
-    .sidebar {
-        height: 100vh;
-        width: 280px;
-        position: fixed;
-        top: 0;
-        left: 0;
-        padding: 30px 15px;
-        box-shadow: 2px 0 12px rgba(0,0,0,0.06);
-        z-index: 1050;
-        transition: transform 0.3s ease-in-out, background 0.3s;
-        overflow-y: auto;
-        background: #ffffff;
-        color: #1e293b;
-        border-right: 1px solid #e2e8f0;
-    }
-    body:not(.top-nav-hidden) .sidebar {
-        top: 70px;
-    }
-    body.top-nav-hidden .sidebar {
-        top: 0;
-    }
-    @media (max-width: 991px) {
-        .sidebar {
-            transform: translateX(-100%);
-            top: 0 !important;
-        }
-        .sidebar.show {
-            transform: translateX(0);
-        }
-    }
-    @media (min-width: 992px) {
-        .sidebar {
-            transform: translateX(0) !important;
-        }
-    }
-    .sidebar .brand {
-        font-size: 24px;
-        font-weight: 800;
-        text-align: center;
-        padding-bottom: 25px;
-        border-bottom: 1px solid #e2e8f0;
-        margin-bottom: 25px;
-        letter-spacing: 1px;
-        color: #1e293b;
-    }
-    .sidebar .brand i { color: #1e3a8a; }
-    .sidebar a {
-        display: flex;
-        align-items: center;
-        padding: 12px 20px;
-        margin: 4px 0;
-        text-decoration: none;
-        border-radius: 12px;
-        font-weight: 500;
-        font-size: 15px;
-        transition: all 0.3s ease;
-        border-left: 3px solid transparent;
-        color: #475569;
-    }
-    .sidebar a i {
-        width: 28px;
-        font-size: 18px;
-        transition: all 0.3s;
-        color: #94a3b8;
-    }
-    .sidebar a:hover {
-        background: #f1f5f9;
-        color: #1e3a8a;
-    }
-    .sidebar a:hover i { color: #1e3a8a; }
-    .sidebar a.active {
-        background: #eef2ff;
-        color: #1e3a8a;
-        border-left-color: #1e3a8a;
-    }
-    .sidebar a.active i { color: #1e3a8a; }
-    .sidebar .logout-link {
-        margin-top: 30px;
-        border-top: 1px solid #e2e8f0;
-        padding-top: 20px;
-        color: #dc2626 !important;
-    }
-    .sidebar .logout-link i { color: #dc2626 !important; }
-    .sidebar .logout-link:hover {
-        background: #fef2f2 !important;
-        color: #b91c1c !important;
-    }
-    .sidebar-overlay-main {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.4);
-        z-index: 1040;
-    }
-    .sidebar-overlay-main.show { display: block; }
-
-    /* ===== Admin Dashboard Styles ===== */
     .dashboard-container { background: #f8fafc; border-radius: 24px; padding: 20px 25px; margin: 0; }
     .dashboard-title { color: #1e293b; font-weight: 700; margin-bottom: 20px; font-size: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
     .dashboard-title i { color: #1e3a8a; }
@@ -175,195 +66,111 @@ require_once __DIR__ . '/header.php';
     }
 </style>
 
-<!-- ====== SIDEBAR OVERLAY (Mobile) ====== -->
-<div class="sidebar-overlay-main" id="sidebarOverlayAdmin" onclick="toggleAdminSidebar()"></div>
+<div class="dashboard-container">
+    <div class="dashboard-title">
+        <i class="fas fa-chart-pie"></i> Dashboard Overview
+    </div>
 
-<!-- ====== ADMIN SIDEBAR ====== -->
-<div class="sidebar" id="adminSidebar">
-    <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
-
-    <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-    <?php if (hasViewPermission('properties', $pdo)): ?>
-        <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
-    <?php endif; ?>
-    <?php if ($is_super_admin): ?>
-        <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
-        <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
-        <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
-    <?php endif; ?>
-    <?php if (hasViewPermission('packages', $pdo)): ?>
-        <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
-    <?php endif; ?>
-    <?php if (hasViewPermission('subscriptions', $pdo)): ?>
-        <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
-        <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
-    <?php endif; ?>
-    <?php if (hasViewPermission('referrals', $pdo)): ?>
-        <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
-    <?php endif; ?>
-    <?php if (hasViewPermission('deductions', $pdo)): ?>
-        <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
-    <?php endif; ?>
-    <?php if (hasViewPermission('activity_logs', $pdo)): ?>
-        <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
-    <?php endif; ?>
-    <?php if (hasViewPermission('accounting', $pdo)): ?>
-        <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
-    <?php endif; ?>
-    <?php if (hasViewPermission('settings', $pdo)): ?>
-        <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
-    <?php endif; ?>
-    <a href="admin_spin_settings.php"><i class="fas fa-cog"></i> <span>Spin Settings</span></a>
-    <?php if (hasViewPermission('kyc', $pdo)): ?>
-        <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
-    <?php endif; ?>
-    <?php if (hasViewPermission('support', $pdo)): ?>
-        <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
-    <?php endif; ?>
-    <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
-    <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
-    <?php if ($is_super_admin): ?>
-        <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
-    <?php endif; ?>
-    <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
-    <a href="admin_social_links.php"><i class="fas fa-share-alt"></i> <span>Social Links</span></a>
-    
-    <!-- 🔥 NEW: Notification Manager Link -->
-    <a href="admin_notification.php"><i class="fas fa-bullhorn"></i> <span>📢 Manage Popup Notification</span>
-        <?php if ($notif_count > 0): ?>
-            <span class="badge bg-danger ms-2"><?= $notif_count ?></span>
-        <?php endif; ?>
-    </a>
-
-    <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
-</div>
-
-<!-- ====== MAIN ADMIN CONTENT ====== -->
-<div class="main-content" style="margin-left: 280px;">
-    <div class="dashboard-container">
-        <div class="dashboard-title">
-            <i class="fas fa-chart-pie"></i> Dashboard Overview
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card-white">
+            <div class="stat-icon"><i class="fas fa-gavel"></i></div>
+            <div class="stat-number"><?= number_format($total_properties) ?></div>
+            <div class="stat-label">Total Auction Properties</div>
+            <div class="stat-sub">All properties listed</div>
         </div>
-
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card-white">
-                <div class="stat-icon"><i class="fas fa-gavel"></i></div>
-                <div class="stat-number"><?= number_format($total_properties) ?></div>
-                <div class="stat-label">Total Auction Properties</div>
-                <div class="stat-sub">All properties listed</div>
-            </div>
-            <div class="stat-card-white">
-                <div class="stat-icon"><i class="fas fa-users"></i></div>
-                <div class="stat-number"><?= number_format($total_users) ?></div>
-                <div class="stat-label">Total Users</div>
-                <div class="stat-sub">Registered users</div>
-            </div>
-            <div class="stat-card-white">
-                <div class="stat-icon"><i class="fas fa-home"></i></div>
-                <div class="stat-number"><?= number_format($customer_properties) ?></div>
-                <div class="stat-label">Customer Properties</div>
-                <div class="stat-sub">Approved listings</div>
-            </div>
-            <div class="stat-card-white">
-                <div class="stat-icon"><i class="fas fa-coins"></i></div>
-                <div class="stat-number"><?= number_format($total_coins) ?></div>
-                <div class="stat-label">Total Coins</div>
-                <div class="stat-sub">All user coins</div>
-            </div>
-            <div class="stat-card-white">
-                <div class="stat-icon"><i class="fas fa-wallet"></i></div>
-                <div class="stat-number currency">₹ <?= number_format($total_wallet, 2) ?></div>
-                <div class="stat-label">Total Wallet Balance</div>
-                <div class="stat-sub">All users' wallet</div>
-            </div>
-            <div class="stat-card-white">
-                <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
-                <div class="stat-number"><?= number_format($pending_subs) ?></div>
-                <div class="stat-label">Pending Subscriptions</div>
-                <div class="stat-sub">Awaiting approval</div>
-            </div>
-            <div class="stat-card-white">
-                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-                <div class="stat-number"><?= number_format($active_subs) ?></div>
-                <div class="stat-label">Active Subscriptions</div>
-                <div class="stat-sub">Paid & active</div>
-            </div>
-            <div class="stat-card-white">
-                <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
-                <div class="stat-number currency">₹ <?= number_format($total_revenue, 2) ?></div>
-                <div class="stat-label">Total Revenue</div>
-                <div class="stat-sub">From subscriptions</div>
-            </div>
+        <div class="stat-card-white">
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+            <div class="stat-number"><?= number_format($total_users) ?></div>
+            <div class="stat-label">Total Users</div>
+            <div class="stat-sub">Registered users</div>
         </div>
+        <div class="stat-card-white">
+            <div class="stat-icon"><i class="fas fa-home"></i></div>
+            <div class="stat-number"><?= number_format($customer_properties) ?></div>
+            <div class="stat-label">Customer Properties</div>
+            <div class="stat-sub">Approved listings</div>
+        </div>
+        <div class="stat-card-white">
+            <div class="stat-icon"><i class="fas fa-coins"></i></div>
+            <div class="stat-number"><?= number_format($total_coins) ?></div>
+            <div class="stat-label">Total Coins</div>
+            <div class="stat-sub">All user coins</div>
+        </div>
+        <div class="stat-card-white">
+            <div class="stat-icon"><i class="fas fa-wallet"></i></div>
+            <div class="stat-number currency">₹ <?= number_format($total_wallet, 2) ?></div>
+            <div class="stat-label">Total Wallet Balance</div>
+            <div class="stat-sub">All users' wallet</div>
+        </div>
+        <div class="stat-card-white">
+            <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
+            <div class="stat-number"><?= number_format($pending_subs) ?></div>
+            <div class="stat-label">Pending Subscriptions</div>
+            <div class="stat-sub">Awaiting approval</div>
+        </div>
+        <div class="stat-card-white">
+            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-number"><?= number_format($active_subs) ?></div>
+            <div class="stat-label">Active Subscriptions</div>
+            <div class="stat-sub">Paid & active</div>
+        </div>
+        <div class="stat-card-white">
+            <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+            <div class="stat-number currency">₹ <?= number_format($total_revenue, 2) ?></div>
+            <div class="stat-label">Total Revenue</div>
+            <div class="stat-sub">From subscriptions</div>
+        </div>
+    </div>
 
-        <!-- Recent Activity -->
-        <div class="row g-4">
-            <div class="col-md-6">
-                <div class="card-table-white">
-                    <h5><i class="fas fa-user-plus me-2"></i>Recent Users</h5>
-                    <div class="table-responsive">
-                        <table class="table table-white">
-                            <thead>
-                                <tr><th>ID</th><th>Name</th><th>Email</th><th>Joined</th></tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($recent_users as $u): ?>
-                                <tr>
-                                    <td><?= $u['id'] ?></td>
-                                    <td><?= htmlspecialchars($u['name']) ?></td>
-                                    <td><?= htmlspecialchars($u['email']) ?></td>
-                                    <td><?= safeDateFormat($u['created_at']) ?></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+    <!-- Recent Activity -->
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card-table-white">
+                <h5><i class="fas fa-user-plus me-2"></i>Recent Users</h5>
+                <div class="table-responsive">
+                    <table class="table table-white">
+                        <thead>
+                            <tr><th>ID</th><th>Name</th><th>Email</th><th>Joined</th></tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($recent_users as $u): ?>
+                            <tr>
+                                <td><?= $u['id'] ?></td>
+                                <td><?= htmlspecialchars($u['name']) ?></td>
+                                <td><?= htmlspecialchars($u['email']) ?></td>
+                                <td><?= safeDateFormat($u['created_at']) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card-table-white">
-                    <h5><i class="fas fa-gavel me-2"></i>Recent Properties</h5>
-                    <div class="table-responsive">
-                        <table class="table table-white">
-                            <thead>
-                                <tr><th>ID</th><th>Title</th><th>Price</th><th>Added</th></tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($recent_props as $p): ?>
-                                <tr>
-                                    <td><?= $p['id'] ?></td>
-                                    <td><?= htmlspecialchars($p['title']) ?></td>
-                                    <td>₹ <?= number_format($p['price'], 2) ?></td>
-                                    <td><?= safeDateFormat($p['created_at']) ?></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card-table-white">
+                <h5><i class="fas fa-gavel me-2"></i>Recent Properties</h5>
+                <div class="table-responsive">
+                    <table class="table table-white">
+                        <thead>
+                            <tr><th>ID</th><th>Title</th><th>Price</th><th>Added</th></tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($recent_props as $p): ?>
+                            <tr>
+                                <td><?= $p['id'] ?></td>
+                                <td><?= htmlspecialchars($p['title']) ?></td>
+                                <td>₹ <?= number_format($p['price'], 2) ?></td>
+                                <td><?= safeDateFormat($p['created_at']) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<!-- ====== SIDEBAR TOGGLE SCRIPT (Admin) ====== -->
-<script>
-function toggleAdminSidebar() {
-    const sidebar = document.getElementById('adminSidebar');
-    const overlay = document.getElementById('sidebarOverlayAdmin');
-    if (sidebar) {
-        sidebar.classList.toggle('show');
-        if (overlay) overlay.classList.toggle('show');
-    }
-}
-document.addEventListener('DOMContentLoaded', function() {
-    const overlay = document.getElementById('sidebarOverlayAdmin');
-    if (overlay) {
-        overlay.addEventListener('click', toggleAdminSidebar);
-    }
-});
-</script>
 
 <?php
 // require_once __DIR__ . '/footer.php';
