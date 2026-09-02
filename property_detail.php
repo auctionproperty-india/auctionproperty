@@ -83,7 +83,6 @@ if (!$has_subscription && $source == 'auction') {
                                     <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h6>
                                 </div>
                             </div>
-                            <!-- 🔥 FIXED: Label "Auction Date" and format d.m.Y -->
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fce4ec; border-left: 5px solid #ef5350;">
                                     <small class="text-muted text-uppercase fw-bold">Auction Date</small>
@@ -163,6 +162,20 @@ $gradient   = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
 $image_url  = $prop['image_url'] ?? '';
 $show_images = true;
 
+// ---- Helper to get possession value ----
+function getPossessionValue($prop) {
+    // Try multiple possible column names
+    $possession = '';
+    if (isset($prop['possession']) && !empty($prop['possession'])) {
+        $possession = $prop['possession'];
+    } elseif (isset($prop['possession_type']) && !empty($prop['possession_type'])) {
+        $possession = $prop['possession_type'];
+    } elseif (isset($prop['possession_status']) && !empty($prop['possession_status'])) {
+        $possession = $prop['possession_status'];
+    }
+    return !empty($possession) ? htmlspecialchars($possession) : 'N/A';
+}
+
 // ---- Similar Properties (only for auction) ----
 $similar_props = [];
 if ($source == 'auction') {
@@ -234,11 +247,11 @@ if ($source == 'auction') {
                             </div>
                         </div>
 
-                        <!-- Possession -->
+                        <!-- 🔥 FIXED: Possession – now using helper function -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75">Possession</small>
-                                <h5 class="fw-bold"><?= htmlspecialchars($prop['possession'] ?? 'N/A') ?></h5>
+                                <h5 class="fw-bold"><?= getPossessionValue($prop) ?></h5>
                             </div>
                         </div>
 
@@ -274,7 +287,7 @@ if ($source == 'auction') {
                             </div>
                         </div>
 
-                        <!-- Price per Sq Ft (NEW) -->
+                        <!-- Price per Sq Ft -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75">Price per Sq Ft</small>
