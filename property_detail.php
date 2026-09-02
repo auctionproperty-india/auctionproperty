@@ -1,18 +1,27 @@
 <?php
+// ============================================================
+// 📄 Property Detail – Full Detail for Paid / Basic for Free
+// ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
-if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+
+if(!isset($_SESSION['user_id'])) { 
+    header("Location: login.php"); 
+    exit; 
+}
 
 $property_id = $_GET['id'] ?? 0;
-$source = $_GET['source'] ?? 'auction'; // default auction
-$user_id = $_SESSION['user_id'];
+$source      = $_GET['source'] ?? 'auction';
+$user_id     = $_SESSION['user_id'];
 
-// Log property view
+// Log view
 if ($property_id) {
     logActivity($pdo, $user_id, 'property_view', 'Property ID: ' . $property_id . ', Source: ' . $source);
 }
 
-if($source == 'auction') {
+// Fetch property
+if ($source == 'auction') {
     $stmt = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
     $stmt->execute([$property_id]);
     $prop = $stmt->fetch();
@@ -23,18 +32,22 @@ if($source == 'auction') {
     $prop = $stmt->fetch();
     $is_customer = true;
 }
+
 if(!$prop) { die("Property not found!"); }
 
-if($source == 'auction') {
+// Subscription check
+if ($source == 'auction') {
     $has_subscription = userHasActiveSubscription($pdo, $user_id);
 } else {
     $has_subscription = true; // customer properties are always visible
 }
 
-include 'header.php'; 
+include 'header.php';
 
-// ---- IF NOT SUBSCRIBED (only for auction) ----
-if(!$has_subscription && $source == 'auction') {
+// ============================================================
+// 1️⃣ FREE USER VIEW (No Subscription) – Only Basic Details
+// ============================================================
+if (!$has_subscription && $source == 'auction') {
     ?>
     <div class="container py-5">
         <div class="row justify-content-center">
@@ -49,6 +62,8 @@ if(!$has_subscription && $source == 'auction') {
                             <i class="fas fa-building" style="font-size: 4rem; color: #94a3b8;"></i>
                             <h4 class="mt-2"><?= htmlspecialchars($prop['title']) ?></h4>
                         </div>
+
+                        <!-- Basic Details Grid (Free User) -->
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #dcfce7; border-left: 5px solid #22c55e;">
@@ -73,7 +88,6 @@ if(!$has_subscription && $source == 'auction') {
                                     <small class="text-muted text-uppercase fw-bold">📅 Auction Date</small>
                                     <h6 class="fw-bold mb-0">
                                         <?php 
-                                        // 🔥 Private Treaty Check
                                         if (!empty($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty') {
                                             echo '🔑 Private Treaty';
                                         } elseif (!empty($prop['auction_date'])) {
@@ -85,7 +99,43 @@ if(!$has_subscription && $source == 'auction') {
                                     </h6>
                                 </div>
                             </div>
+                            <!-- EMD Amount -->
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #f3e8ff; border-left: 5px solid #a855f7;">
+                                    <small class="text-muted text-uppercase fw-bold">EMD Amount</small>
+                                    <h6 class="fw-bold mb-0">₹ <?= indianCurrencyFormat($prop['emd_amount'] ?? 0) ?></h6>
+                                </div>
+                            </div>
+                            <!-- Bid Increment -->
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #e0f2fe; border-left: 5px solid #0ea5e9;">
+                                    <small class="text-muted text-uppercase fw-bold">Bid Increment</small>
+                                    <h6 class="fw-bold mb-0">₹ <?= indianCurrencyFormat($prop['bid_increment'] ?? 0) ?></h6>
+                                </div>
+                            </div>
+                            <!-- Area -->
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fefce8; border-left: 5px solid #eab308;">
+                                    <small class="text-muted text-uppercase fw-bold">Area (Sq Ft)</small>
+                                    <h6 class="fw-bold mb-0"><?= number_format($prop['sqft'] ?? 0, 2) ?></h6>
+                                </div>
+                            </div>
+                            <!-- Contact -->
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #ecfdf5; border-left: 5px solid #10b981;">
+                                    <small class="text-muted text-uppercase fw-bold">Contact</small>
+                                    <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['contact_number'] ?? 'N/A') ?></h6>
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Image (if any) -->
+                        <?php if (!empty($prop['image_url'])): ?>
+                            <div class="mt-4 text-center">
+                                <img src="<?= htmlspecialchars($prop['image_url']) ?>" class="img-fluid rounded shadow" style="max-height:250px;" alt="Property Image">
+                            </div>
+                        <?php endif; ?>
+
                         <div class="text-center mt-4">
                             <a href="user_packages.php" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow">
                                 <i class="fas fa-rocket me-2"></i> Subscribe Now
@@ -102,18 +152,21 @@ if(!$has_subscription && $source == 'auction') {
     exit;
 }
 
-// ----- SUBSCRIBED or CUSTOMER: Show ALL Details ----
-$gradient = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
-$image_url = ($source == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image_url'] ?? '');
-$show_images = ($source == 'auction') ? $has_subscription : true;
+// ============================================================
+// 2️⃣ PAID USER VIEW (Active Subscription) – Full Details
+// ============================================================
 
-// ---- Similar Properties (only for auction, based on city and price) ----
+$gradient   = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
+$image_url  = $prop['image_url'] ?? '';
+$show_images = true;
+
+// ---- Similar Properties (only for auction) ----
 $similar_props = [];
-if($source == 'auction') {
+if ($source == 'auction') {
     $city = $prop['city'] ?? '';
     $price = (float)$prop['price'];
-    $min_price = $price * 0.7; // 30% less
-    $max_price = $price * 1.3; // 30% more
+    $min_price = $price * 0.7;
+    $max_price = $price * 1.3;
     $sql = "SELECT id, title, price, city, image_url, bank_name, auction_date 
             FROM properties 
             WHERE status = 'available' 
@@ -127,13 +180,16 @@ if($source == 'auction') {
     $similar_props = $stmt->fetchAll();
 }
 ?>
+
 <div class="container-fluid px-4 mt-4">
     <div class="row justify-content-center">
         <div class="col-lg-10">
+
             <a href="javascript:history.back()" class="btn btn-outline-secondary mb-4 shadow-sm rounded-pill px-4">
                 <i class="fas fa-arrow-left me-2"></i>Back
             </a>
 
+            <!-- Main Property Card -->
             <div class="card border-0 shadow-xxl" style="border-radius: 28px; overflow: hidden; background: <?= $gradient ?>; color:#fff;">
                 <div class="card-header p-4" style="background: rgba(0,0,0,0.2); border: none;">
                     <div class="d-flex justify-content-between align-items-center flex-wrap">
@@ -146,14 +202,28 @@ if($source == 'auction') {
                 </div>
 
                 <div class="card-body p-4">
-                    <!-- All Details -->
+
+                    <!-- ====== FULL DETAIL GRID (Paid User) ====== -->
                     <div class="row g-4">
+
+                        <!-- Address / Location -->
+                        <div class="col-12">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08); border-left:4px solid #fbbf24;">
+                                <i class="fas fa-home me-2" style="color:#fbbf24;"></i>
+                                <strong>Address / Location:</strong> 
+                                <?= nl2br(htmlspecialchars($prop['address'] ?? $prop['location'] ?? 'N/A')) ?>
+                            </div>
+                        </div>
+
+                        <!-- Borrower -->
                         <div class="col-md-6">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
-                                <small class="text-uppercase opacity-75">Borrower</small>
+                                <small class="text-uppercase opacity-75">Borrower Name</small>
                                 <h5 class="fw-bold"><?= htmlspecialchars($prop['borrower_name'] ?? ($source=='customer' ? 'Customer Listed' : 'N/A')) ?></h5>
                             </div>
                         </div>
+
+                        <!-- Property Type -->
                         <div class="col-md-6">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75">Property Type</small>
@@ -161,82 +231,116 @@ if($source == 'auction') {
                             </div>
                         </div>
 
-                        <div class="col-12">
-                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08); border-left:4px solid #fbbf24;">
-                                <i class="fas fa-home me-2" style="color:#fbbf24;"></i>
-                                <strong>Address:</strong> <?= htmlspecialchars($prop['location'] ?? ($prop['city'] ?? 'Not Provided')) ?>
-                            </div>
-                        </div>
-
-                        <!-- Area and Construction Area (for customer properties) -->
+                        <!-- Possession -->
                         <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
-                                <small class="text-uppercase opacity-75"><i class="fas fa-map-pin"></i> City</small>
-                                <h6 class="fw-bold"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h6>
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">Possession</small>
+                                <h5 class="fw-bold"><?= htmlspecialchars($prop['possession'] ?? 'N/A') ?></h5>
                             </div>
                         </div>
+
+                        <!-- Locality -->
                         <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
-                                <small class="text-uppercase opacity-75"><i class="fas fa-location-dot"></i> State</small>
-                                <h6 class="fw-bold"><?= htmlspecialchars($prop['state'] ?? 'N/A') ?></h6>
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">Locality</small>
+                                <h5 class="fw-bold"><?= htmlspecialchars($prop['locality'] ?? 'N/A') ?></h5>
                             </div>
                         </div>
 
-                        <?php if($source == 'customer'): ?>
-                            <!-- Customer Property: Show both Area and Construction Area -->
-                            <div class="col-md-4">
-                                <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
-                                    <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
-                                    <h6 class="fw-bold"><?= $prop['sqft'] ?? 'N/A' ?> Sq Ft</h6>
-                                </div>
+                        <!-- City -->
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">City</small>
+                                <h5 class="fw-bold"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h5>
                             </div>
-                            <?php if(!empty($prop['construction_sqft']) && $prop['construction_sqft'] > 0): ?>
-                            <div class="col-md-4">
-                                <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
-                                    <small class="text-uppercase opacity-75"><i class="fas fa-building"></i> Construction Area</small>
-                                    <h6 class="fw-bold"><?= $prop['construction_sqft'] ?> Sq Ft</h6>
-                                </div>
-                            </div>
-                            <?php endif; ?>
-                        <?php else: ?>
-                            <!-- Auction Property: just area -->
-                            <div class="col-md-4">
-                                <div class="p-3 rounded-4 text-center" style="background:rgba(255,255,255,0.08);">
-                                    <small class="text-uppercase opacity-75"><i class="fas fa-vector-square"></i> Area</small>
-                                    <h6 class="fw-bold"><?= $prop['sqft'] ?? 'N/A' ?> Sq Ft</h6>
-                                </div>
-                            </div>
-                        <?php endif; ?>
+                        </div>
 
-                        <!-- Price -->
+                        <!-- State -->
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">State</small>
+                                <h5 class="fw-bold"><?= htmlspecialchars($prop['state'] ?? 'N/A') ?></h5>
+                            </div>
+                        </div>
+
+                        <!-- Area (Sq Ft) -->
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">Area (Sq Ft)</small>
+                                <h5 class="fw-bold"><?= number_format($prop['sqft'] ?? 0, 2) ?></h5>
+                            </div>
+                        </div>
+
+                        <!-- Price per Sq Ft (NEW) -->
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">Price per Sq Ft</small>
+                                <h5 class="fw-bold">₹ <?= number_format($prop['price_per_sqft'] ?? 0, 2) ?></h5>
+                            </div>
+                        </div>
+
+                        <!-- Reserve Price -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3);">
                                 <small class="text-uppercase opacity-75">Reserve Price</small>
                                 <h4 class="fw-bold" style="color:#fbbf24;">₹ <?= indianCurrencyFormat($prop['price']) ?></h4>
                             </div>
                         </div>
-                        <?php if($source == 'auction'): ?>
+
+                        <!-- EMD Amount -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3);">
                                 <small class="text-uppercase opacity-75">EMD Amount</small>
                                 <h4 class="fw-bold" style="color:#818cf8;">₹ <?= indianCurrencyFormat($prop['emd_amount'] ?? 0) ?></h4>
                             </div>
                         </div>
+
+                        <!-- Bid Increment -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4 text-center" style="background:rgba(52,211,153,0.15); border:1px solid rgba(52,211,153,0.3);">
                                 <small class="text-uppercase opacity-75">Bid Increment</small>
                                 <h4 class="fw-bold" style="color:#34d399;">₹ <?= indianCurrencyFormat($prop['bid_increment'] ?? 0) ?></h4>
                             </div>
                         </div>
-                        <?php endif; ?>
 
-                        <!-- Auction Date / Private Treaty -->
+                        <!-- EMD Deadline -->
                         <div class="col-md-4">
-                            <div class="p-3 rounded-4 text-center" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3);">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">EMD Deadline</small>
+                                <h5 class="fw-bold"><?= empty($prop['emd_deadline']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['emd_deadline'])) ?></h5>
+                            </div>
+                        </div>
+
+                        <!-- Auction Start -->
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">Auction Start</small>
+                                <h5 class="fw-bold"><?= empty($prop['auction_start_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_start_time'])) ?></h5>
+                            </div>
+                        </div>
+
+                        <!-- Auction End -->
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">Auction End</small>
+                                <h5 class="fw-bold"><?= empty($prop['auction_end_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_end_time'])) ?></h5>
+                            </div>
+                        </div>
+
+                        <!-- Inspection Date -->
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">Inspection Date</small>
+                                <h5 class="fw-bold"><?= empty($prop['inspection_date']) ? 'N/A' : date('d M Y', strtotime($prop['inspection_date'])) ?></h5>
+                            </div>
+                        </div>
+
+                        <!-- Auction Date -->
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3);">
                                 <small class="text-uppercase opacity-75">📅 Auction Date</small>
                                 <h4 class="fw-bold" style="color:#fbbf24;">
                                     <?php 
-                                    // 🔥 Private Treaty Check
                                     if (!empty($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty') {
                                         echo '🔑 Private Treaty';
                                     } elseif (!empty($prop['auction_date'])) {
@@ -250,19 +354,24 @@ if($source == 'auction') {
                         </div>
 
                         <!-- Contact -->
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
-                                <i class="fas fa-phone text-success me-2"></i> 
-                                <strong>Contact:</strong>
-                                <?php if(!empty($prop['contact_number'])): ?>
-                                    <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $prop['contact_number']) ?>" target="_blank" style="text-decoration:none; font-weight:bold; color:#25D366;">
-                                        <?= htmlspecialchars($prop['contact_number']) ?>
-                                        <i class="fab fa-whatsapp ms-1"></i>
-                                    </a>
-                                <?php else: ?> N/A <?php endif; ?>
+                                <small class="text-uppercase opacity-75">Contact Number</small>
+                                <h5 class="fw-bold">
+                                    <?php if(!empty($prop['contact_number'])): ?>
+                                        <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $prop['contact_number']) ?>" target="_blank" style="text-decoration:none; font-weight:bold; color:#25D366;">
+                                            <?= htmlspecialchars($prop['contact_number']) ?>
+                                            <i class="fab fa-whatsapp ms-1"></i>
+                                        </a>
+                                    <?php else: ?>
+                                        N/A
+                                    <?php endif; ?>
+                                </h5>
                             </div>
                         </div>
-                        <div class="col-md-6">
+
+                        <!-- Google Map Link -->
+                        <div class="col-md-4">
                             <?php if(!empty($prop['google_location'])): ?>
                                 <a href="<?= $prop['google_location'] ?>" target="_blank" class="btn btn-outline-light w-100 rounded-4">
                                     <i class="fas fa-map-marked-alt me-2"></i> View on Google Maps
@@ -271,12 +380,21 @@ if($source == 'auction') {
                                 <span class="text-muted">No Map Link Available</span>
                             <?php endif; ?>
                         </div>
+
+                        <!-- Description -->
+                        <div class="col-12">
+                            <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
+                                <small class="text-uppercase opacity-75">Description</small>
+                                <p class="mt-2"><?= nl2br(htmlspecialchars($prop['description'] ?? '')) ?></p>
+                            </div>
+                        </div>
+
                     </div>
 
                     <!-- Image Section -->
                     <div class="mt-5">
                         <h5 class="text-warning"><i class="fas fa-image me-2"></i>Property Image</h5>
-                        <?php if(!empty($image_url) && $show_images): ?>
+                        <?php if(!empty($image_url)): ?>
                             <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.05);">
                                 <a href="<?= htmlspecialchars($image_url) ?>" target="_blank">
                                     <img src="<?= htmlspecialchars($image_url) ?>" class="img-fluid" style="width:100%; max-height:400px; object-fit:contain; cursor:pointer;">
@@ -289,13 +407,13 @@ if($source == 'auction') {
                             <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; height:200px;">
                                 <div class="text-center p-4">
                                     <i class="fas fa-image" style="font-size:60px; opacity:0.3;"></i>
-                                    <p class="mt-2 opacity-75"><?= ($show_images ? 'No Image Available' : 'Subscribe to view image') ?></p>
+                                    <p class="mt-2 opacity-75">No Image Available</p>
                                 </div>
                             </div>
                         <?php endif; ?>
                     </div>
 
-                    <!-- ===== SIMILAR PROPERTIES SECTION (only for auction) ===== -->
+                    <!-- Similar Properties (only for auction) -->
                     <?php if($source == 'auction' && count($similar_props) > 0): ?>
                     <div class="mt-5">
                         <h5 class="text-warning"><i class="fas fa-list-ul me-2"></i>Similar Properties</h5>
@@ -303,7 +421,7 @@ if($source == 'auction') {
                             <?php foreach($similar_props as $sim): ?>
                             <div class="col-md-4">
                                 <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background:rgba(255,255,255,0.05); color:#fff;">
-                                    <?php if($show_images && !empty($sim['image_url'])): ?>
+                                    <?php if(!empty($sim['image_url'])): ?>
                                         <img src="<?= htmlspecialchars($sim['image_url']) ?>" style="height:150px; object-fit:cover;" alt="<?= htmlspecialchars($sim['title']) ?>">
                                     <?php else: ?>
                                         <div style="height:150px; background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center;">
@@ -323,19 +441,19 @@ if($source == 'auction') {
                         </div>
                     </div>
                     <?php endif; ?>
-                    <!-- ===== END SIMILAR PROPERTIES ===== -->
 
-                </div>
-            </div>
+                </div> <!-- /card-body -->
+            </div> <!-- /card -->
         </div>
     </div>
 </div>
+
 <style>
     .shadow-xxl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important; }
     .rounded-4 { border-radius: 1.25rem !important; }
 </style>
 
-<!-- Copy Data Logging JavaScript -->
+<!-- Copy Data Logging (Optional) -->
 <script>
 document.addEventListener('copy', function(e) {
     var text = window.getSelection().toString();
