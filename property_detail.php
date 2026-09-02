@@ -83,20 +83,21 @@ if (!$has_subscription && $source == 'auction') {
                                     <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></h6>
                                 </div>
                             </div>
+                            <!-- 🔥 FIXED: Label "Auction Date" and format d.m.Y -->
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fce4ec; border-left: 5px solid #ef5350;">
-                                    <small class="text-muted text-uppercase fw-bold">📅 Auction Date & Time</small>
+                                    <small class="text-muted text-uppercase fw-bold">Auction Date</small>
                                     <h6 class="fw-bold mb-0">
                                         <?php 
+                                        $date_display = 'N/A';
                                         if (!empty($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty') {
-                                            echo '🔑 Private Treaty';
-                                        } elseif (!empty($prop['auction_start_time'])) {
-                                            echo date('d M Y h:i A', strtotime($prop['auction_start_time']));
+                                            $date_display = '🔑 Private Treaty';
                                         } elseif (!empty($prop['auction_date'])) {
-                                            echo date('d M Y', strtotime($prop['auction_date']));
-                                        } else {
-                                            echo 'N/A';
+                                            $date_display = date('d.m.Y', strtotime($prop['auction_date']));
+                                        } elseif (!empty($prop['auction_start_time'])) {
+                                            $date_display = date('d.m.Y', strtotime($prop['auction_start_time']));
                                         }
+                                        echo $date_display;
                                         ?>
                                     </h6>
                                 </div>
@@ -233,7 +234,7 @@ if ($source == 'auction') {
                             </div>
                         </div>
 
-                        <!-- 🔥 FIXED: Possession – अब सही वैल्यू दिखेगी -->
+                        <!-- Possession -->
                         <div class="col-md-4">
                             <div class="p-3 rounded-4" style="background:rgba(255,255,255,0.08);">
                                 <small class="text-uppercase opacity-75">Possession</small>
