@@ -1,6 +1,17 @@
 <?php
+// ============================================================
+// ✅ REGISTER – With Referral Code Capture from URL
+// ============================================================
+
+session_start(); // 🔥 MUST BE FIRST
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
+
+// ====== 🔥 FIX: Capture Referral Code from URL ======
+if (isset($_GET['ref']) && !empty($_GET['ref'])) {
+    $_SESSION['referral_code'] = trim($_GET['ref']);
+}
 
 $error = '';
 $success = '';
@@ -11,7 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = trim($_POST['phone']);
     $password = $_POST['password'];
     $confirm = $_POST['confirm_password'];
+    
+    // ====== 🔥 FIX: Get referral code from POST or Session ======
     $ref_code = trim($_POST['referral_code'] ?? '');
+    if (empty($ref_code) && isset($_SESSION['referral_code'])) {
+        $ref_code = $_SESSION['referral_code'];
+    }
 
     if (empty($name) || empty($email) || empty($password)) {
         $error = 'All fields are required.';
@@ -37,6 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'active', NOW())");
             $stmt->execute([$name, $email, $phone, $hashed, $new_code, $ref_by]);
+
+            // ====== 🔥 FIX: Clear session referral code after successful registration ======
+            unset($_SESSION['referral_code']);
 
             $success = 'Account created! You can now login.';
             // Optionally auto-login
@@ -124,6 +143,19 @@ include 'header.php';
         border-radius: 8px;
         color: #14532d;
     }
+    .referral-info {
+        background: #f0f5ff;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 0.9rem;
+        color: #1e3a8a;
+        border: 1px solid #dbeafe;
+        margin-top: 5px;
+        display: <?= (isset($_SESSION['referral_code']) && !empty($_SESSION['referral_code'])) ? 'block' : 'none' ?>;
+    }
+    .referral-info i {
+        margin-right: 6px;
+    }
     @media (max-width: 576px) {
         .register-card { padding: 30px 20px; }
     }
@@ -161,10 +193,21 @@ include 'header.php';
                 <label class="form-label">Confirm Password</label>
                 <input type="password" name="confirm_password" class="form-control" placeholder="••••••••" required>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Referral Code (optional)</label>
-                <input type="text" name="referral_code" class="form-control" placeholder="Enter code if you have one">
+            
+            <!-- ====== 🔥 FIX: Hidden field to carry referral code ====== -->
+            <input type="hidden" name="referral_code" value="<?= isset($_SESSION['referral_code']) ? htmlspecialchars($_SESSION['referral_code']) : '' ?>">
+
+            <!-- ====== 🔥 FIX: Show referral info if code is present ====== -->
+            <div class="referral-info" id="referralInfo">
+                <i class="fas fa-gift"></i> 
+                <strong>🎉 Referral Code Applied:</strong> 
+                <span style="font-weight:700; color:#1e40af;">
+                    <?= isset($_SESSION['referral_code']) ? htmlspecialchars($_SESSION['referral_code']) : '' ?>
+                </span>
+                <br>
+                <small style="color:#64748b;">You will get a special bonus on registration!</small>
             </div>
+
             <button type="submit" class="btn btn-primary w-100">Create Account</button>
         </form>
 
@@ -173,4 +216,5 @@ include 'header.php';
         </p>
     </div>
 </div>
+
 <?php include 'footer.php'; ?>
