@@ -287,23 +287,23 @@ include 'header.php';
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">EMD Deadline</label>
-                        <input type="text" name="emd_deadline" class="form-control" placeholder="e.g., Mon, 22 Jun 2026 06:00 PM" value="<?= $edit_mode ? htmlspecialchars($prop['emd_deadline']) : '' ?>">
+                        <input type="text" name="emd_deadline" class="form-control" step="0.01" value="<?= $edit_mode ? htmlspecialchars($prop['emd_deadline']) : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Start</label>
-                        <input type="text" name="auction_start_time" class="form-control" placeholder="e.g., Mon, 22 Jun 2026 02:00 PM" value="<?= $edit_mode ? htmlspecialchars($prop['auction_start_time']) : '' ?>">
+                        <input type="text" name="auction_start_time" class="form-control" step="0.01" value="<?= $edit_mode ? htmlspecialchars($prop['auction_start_time']) : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction End</label>
-                        <input type="text" name="auction_end_time" class="form-control" placeholder="e.g., Mon, 22 Jun 2026 06:00 PM" value="<?= $edit_mode ? htmlspecialchars($prop['auction_end_time']) : '' ?>">
+                        <input type="text" name="auction_end_time" class="form-control" step="0.01" value="<?= $edit_mode ? htmlspecialchars($prop['auction_end_time']) : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Inspection Date (DD/MM/YYYY)</label>
-                        <input type="text" name="inspection_date" class="form-control" placeholder="DD/MM/YYYY" value="<?= $edit_mode && $prop['inspection_date'] ? date('d/m/Y', strtotime($prop['inspection_date'])) : '' ?>">
+                        <input type="text" name="inspection_date" class="form-control" step="0.01" value="<?= $edit_mode && $prop['inspection_date'] ? date('d/m/Y', strtotime($prop['inspection_date'])) : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Date (DD/MM/YYYY) *</label>
-                        <input type="text" name="auction_date" class="form-control" placeholder="DD/MM/YYYY" required value="<?= $edit_mode && $prop['auction_date'] ? date('d/m/Y', strtotime($prop['auction_date'])) : '' ?>">
+                        <input type="text" name="auction_date" class="form-control" step="0.01" required value="<?= $edit_mode && $prop['auction_date'] ? date('d/m/Y', strtotime($prop['auction_date'])) : '' ?>">
                         <small class="text-muted">Enter only date (e.g., 24/08/2026). Time will be ignored.</small>
                     </div>
                     <div class="col-md-4">
