@@ -155,7 +155,7 @@ if (!$has_subscription && $source == 'auction') {
 }
 
 // ============================================================
-// 2️⃣ PAID USER VIEW (Active Subscription) – LIGHT LUXURY LOOK
+// 2️⃣ PAID USER VIEW (Active Subscription) – STAR QUALITY STYLISH
 // ============================================================
 
 $image_url  = $prop['image_url'] ?? '';
@@ -196,172 +196,227 @@ if ($source == 'auction') {
 ?>
 
 <style>
-    /* Light Luxury Theme */
-    .luxury-card {
+    /* ===== STAR QUALITY STYLISH ===== */
+    .sq-card {
         background: #ffffff;
-        border-radius: 28px;
+        border-radius: 24px;
         border: none;
-        box-shadow: 0 15px 50px rgba(0,0,0,0.06), 0 5px 20px rgba(0,0,0,0.02);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.04), 0 2px 10px rgba(0,0,0,0.02);
         overflow: hidden;
+        transition: all 0.3s ease;
     }
-    .luxury-card .card-header {
-        background: #f8fafc;
-        border-bottom: 1px solid #eef2f6;
-        padding: 28px 30px;
+    .sq-card:hover {
+        box-shadow: 0 15px 40px rgba(0,0,0,0.06);
     }
-    .luxury-card .card-body {
-        padding: 30px;
+    .sq-card-header {
+        background: #fafcfd;
+        border-bottom: 1px solid #edf2f7;
+        padding: 20px 28px;
     }
-    .luxury-title {
-        font-size: 2rem;
+    .sq-card-body {
+        padding: 24px 28px 28px;
+    }
+    .sq-title {
+        font-size: 1.6rem;
         font-weight: 700;
-        color: #0f172a;
-        letter-spacing: -0.5px;
+        color: #0a0f1a;
+        letter-spacing: -0.3px;
+        margin: 0;
     }
-    .luxury-badge {
-        background: #f1f5f9;
-        color: #1e293b;
-        padding: 6px 18px;
-        border-radius: 50px;
-        font-weight: 600;
-        font-size: 0.9rem;
-        display: inline-block;
-    }
-    .luxury-badge i {
-        color: #2563eb;
-        margin-right: 6px;
-    }
-    .luxury-subtitle {
-        color: #64748b;
-        font-size: 1rem;
-        margin-top: 4px;
-    }
-    .detail-grid-luxury {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 18px;
-        margin-top: 20px;
-    }
-    .detail-item-luxury {
-        background: #f8fafc;
-        border-radius: 16px;
-        padding: 16px 18px;
-        border: 1px solid #eef2f6;
-        transition: all 0.2s ease;
-    }
-    .detail-item-luxury:hover {
-        background: #f1f5f9;
-        border-color: #d1d9e6;
-    }
-    .detail-item-luxury .label {
-        font-size: 0.7rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #94a3b8;
-        font-weight: 600;
-    }
-    .detail-item-luxury .value {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #0f172a;
-        margin-top: 4px;
-    }
-    .detail-item-luxury .value a {
-        color: #2563eb;
-        text-decoration: none;
-    }
-    .detail-item-luxury .value a:hover {
-        text-decoration: underline;
-    }
-    .price-tag {
-        background: linear-gradient(135deg, #fbbf24, #f59e0b);
-        color: #0f172a;
-        border-radius: 16px;
-        padding: 16px 20px;
-        text-align: center;
-        font-weight: 700;
-        box-shadow: 0 4px 15px rgba(251,191,36,0.25);
-    }
-    .price-tag .amount {
-        font-size: 2rem;
-        font-weight: 800;
-    }
-    .price-tag .label {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        opacity: 0.7;
-        font-weight: 600;
-    }
-    .section-title-luxury {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #0f172a;
-        margin: 30px 0 15px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #eef2f6;
-    }
-    .section-title-luxury i {
+    .sq-title i {
         color: #2563eb;
         margin-right: 8px;
     }
-    .similar-card {
-        background: #ffffff;
+    .sq-badge {
+        background: #f1f5f9;
+        color: #1e293b;
+        padding: 4px 14px;
+        border-radius: 50px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        display: inline-block;
+        letter-spacing: 0.3px;
+    }
+    .sq-badge i {
+        margin-right: 4px;
+        color: #2563eb;
+    }
+    .sq-badge-subscribed {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    .sq-price-tag {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        color: #0a0f1a;
+        border-radius: 14px;
+        padding: 12px 20px;
+        text-align: center;
+        min-width: 140px;
+        box-shadow: 0 4px 12px rgba(251,191,36,0.25);
+    }
+    .sq-price-tag .label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        opacity: 0.7;
+        font-weight: 600;
+    }
+    .sq-price-tag .amount {
+        font-size: 1.6rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+    .sq-address-box {
+        background: #f8fafc;
+        border-radius: 14px;
+        padding: 14px 18px;
+        border-left: 4px solid #2563eb;
+        font-size: 0.9rem;
+        color: #1e293b;
+        margin-bottom: 20px;
+    }
+    .sq-address-box i {
+        color: #2563eb;
+        margin-right: 6px;
+    }
+    .sq-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .sq-grid-item {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 12px 14px;
+        border: 1px solid #edf2f7;
+        transition: all 0.15s ease;
+    }
+    .sq-grid-item:hover {
+        background: #f1f5f9;
+        border-color: #d1d9e6;
+    }
+    .sq-grid-item .label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #94a3b8;
+        font-weight: 600;
+        display: block;
+        margin-bottom: 2px;
+    }
+    .sq-grid-item .value {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0a0f1a;
+        word-break: break-word;
+    }
+    .sq-grid-item .value a {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .sq-grid-item .value a:hover {
+        text-decoration: underline;
+    }
+    .sq-section-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #0a0f1a;
+        margin: 24px 0 14px 0;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #edf2f7;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .sq-section-title i {
+        color: #2563eb;
+        font-size: 1rem;
+    }
+    .sq-image-box {
         border-radius: 16px;
-        border: 1px solid #eef2f6;
-        transition: all 0.2s;
         overflow: hidden;
+        background: #fafcfd;
+        border: 1px solid #edf2f7;
+        margin-top: 12px;
     }
-    .similar-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+    .sq-image-box img {
+        width: 100%;
+        max-height: 400px;
+        object-fit: contain;
+        display: block;
     }
-    .btn-luxury-primary {
+    .sq-image-box .caption {
+        background: #f8fafc;
+        text-align: center;
+        padding: 6px;
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+    .sq-similar-card {
+        background: #ffffff;
+        border-radius: 14px;
+        border: 1px solid #edf2f7;
+        overflow: hidden;
+        transition: all 0.2s;
+        height: 100%;
+    }
+    .sq-similar-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+    }
+    .sq-similar-card .body {
+        padding: 14px;
+    }
+    .sq-similar-card .body h6 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #0a0f1a;
+    }
+    .sq-similar-card .body .price {
+        font-weight: 700;
+        color: #2563eb;
+        font-size: 0.95rem;
+    }
+    .btn-sq {
         background: #2563eb;
         color: #fff;
         border: none;
-        padding: 10px 28px;
+        padding: 6px 18px;
         border-radius: 50px;
+        font-size: 0.8rem;
         font-weight: 600;
-        transition: all 0.3s;
+        transition: all 0.2s;
     }
-    .btn-luxury-primary:hover {
+    .btn-sq:hover {
         background: #1d4ed8;
-        box-shadow: 0 8px 25px rgba(37,99,235,0.25);
-        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(37,99,235,0.25);
+        transform: translateY(-1px);
     }
-    .btn-luxury-outline {
+    .btn-sq-outline {
         background: transparent;
         color: #2563eb;
         border: 1px solid #d1d9e6;
-        padding: 10px 28px;
+        padding: 6px 18px;
         border-radius: 50px;
+        font-size: 0.8rem;
         font-weight: 600;
-        transition: all 0.3s;
+        transition: all 0.2s;
     }
-    .btn-luxury-outline:hover {
+    .btn-sq-outline:hover {
         background: #f1f5f9;
         border-color: #2563eb;
     }
-    .property-image-container {
-        border-radius: 20px;
-        overflow: hidden;
-        background: #f8fafc;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.04);
-        margin-top: 20px;
-    }
-    .property-image-container img {
-        width: 100%;
-        max-height: 450px;
-        object-fit: contain;
-        background: #ffffff;
-    }
     @media (max-width: 768px) {
-        .luxury-title { font-size: 1.5rem; }
-        .detail-grid-luxury { grid-template-columns: 1fr 1fr; }
-        .price-tag .amount { font-size: 1.5rem; }
+        .sq-title { font-size: 1.3rem; }
+        .sq-price-tag .amount { font-size: 1.3rem; }
+        .sq-grid { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 576px) {
-        .detail-grid-luxury { grid-template-columns: 1fr; }
+        .sq-grid { grid-template-columns: 1fr; }
+        .sq-card-header { flex-direction: column; align-items: stretch; }
+        .sq-price-tag { margin-top: 10px; }
     }
 </style>
 
@@ -370,110 +425,110 @@ if ($source == 'auction') {
         <div class="col-lg-10">
 
             <!-- Back Button -->
-            <a href="javascript:history.back()" class="btn btn-luxury-outline mb-4">
-                <i class="fas fa-arrow-left me-2"></i>Back
+            <a href="javascript:history.back()" class="btn btn-sq-outline mb-3">
+                <i class="fas fa-arrow-left me-1"></i> Back
             </a>
 
             <!-- Main Card -->
-            <div class="luxury-card">
+            <div class="sq-card">
 
                 <!-- Header -->
-                <div class="card-header d-flex flex-wrap justify-content-between align-items-center">
+                <div class="sq-card-header d-flex flex-wrap justify-content-between align-items-center">
                     <div>
-                        <h1 class="luxury-title"><i class="fas fa-gavel me-2" style="color: #2563eb;"></i><?= htmlspecialchars($prop['title']) ?></h1>
-                        <div class="luxury-subtitle">
-                            <span class="luxury-badge"><i class="fas fa-university"></i> <?= htmlspecialchars($prop['bank_name'] ?? ($source=='customer' ? 'Customer Property' : 'Bank Auction')) ?></span>
+                        <h1 class="sq-title"><i class="fas fa-gavel"></i><?= htmlspecialchars($prop['title']) ?></h1>
+                        <div class="mt-1">
+                            <span class="sq-badge"><i class="fas fa-university"></i> <?= htmlspecialchars($prop['bank_name'] ?? ($source=='customer' ? 'Customer Property' : 'Bank Auction')) ?></span>
                             <?php if ($source == 'auction'): ?>
-                                <span class="luxury-badge ms-2" style="background: #dbeafe; color: #1e40af;"><i class="fas fa-check-circle"></i> Subscribed</span>
+                                <span class="sq-badge sq-badge-subscribed ms-1"><i class="fas fa-check-circle"></i> Subscribed</span>
                             <?php else: ?>
-                                <span class="luxury-badge ms-2" style="background: #d1fae5; color: #065f46;"><i class="fas fa-home"></i> Customer Listed</span>
+                                <span class="sq-badge ms-1" style="background:#d1fae5; color:#065f46;"><i class="fas fa-home"></i> Customer Listed</span>
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="mt-2 mt-md-0">
-                        <div class="price-tag">
-                            <div class="label">Reserve Price</div>
-                            <div class="amount">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
-                        </div>
+                    <div class="sq-price-tag">
+                        <div class="label">Reserve Price</div>
+                        <div class="amount">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
                     </div>
                 </div>
 
                 <!-- Body -->
-                <div class="card-body">
+                <div class="sq-card-body">
 
                     <!-- Address -->
-                    <div class="p-3 rounded-4" style="background: #f8fafc; border-left: 4px solid #2563eb;">
-                        <i class="fas fa-map-pin me-2" style="color: #2563eb;"></i>
-                        <strong>Address / Location:</strong>
-                        <?= nl2br(htmlspecialchars($prop['address'] ?? $prop['location'] ?? 'N/A')) ?>
+                    <?php $address = $prop['address'] ?? $prop['location'] ?? ''; ?>
+                    <?php if (!empty($address)): ?>
+                    <div class="sq-address-box">
+                        <i class="fas fa-map-pin"></i> 
+                        <strong>Address / Location:</strong> <?= nl2br(htmlspecialchars($address)) ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Main Details Grid -->
+                    <div class="sq-grid">
+                        <div class="sq-grid-item">
+                            <span class="label">Borrower Name</span>
+                            <span class="value"><?= htmlspecialchars($prop['borrower_name'] ?? ($source=='customer' ? 'Customer Listed' : 'N/A')) ?></span>
+                        </div>
+                        <div class="sq-grid-item">
+                            <span class="label">Property Type</span>
+                            <span class="value"><?= htmlspecialchars($prop['type'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="sq-grid-item">
+                            <span class="label">Possession</span>
+                            <span class="value"><?= getPossessionValue($prop) ?></span>
+                        </div>
+                        <div class="sq-grid-item">
+                            <span class="label">Locality</span>
+                            <span class="value"><?= htmlspecialchars($prop['locality'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="sq-grid-item">
+                            <span class="label">City</span>
+                            <span class="value"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="sq-grid-item">
+                            <span class="label">State</span>
+                            <span class="value"><?= htmlspecialchars($prop['state'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="sq-grid-item">
+                            <span class="label">Area (Sq Ft)</span>
+                            <span class="value"><?= number_format($prop['sqft'] ?? 0, 2) ?></span>
+                        </div>
+                        <div class="sq-grid-item">
+                            <span class="label">Price per Sq Ft</span>
+                            <span class="value">₹ <?= number_format($prop['price_per_sqft'] ?? 0, 2) ?></span>
+                        </div>
                     </div>
 
-                    <!-- Detail Grid -->
-                    <div class="detail-grid-luxury">
-                        <div class="detail-item-luxury">
-                            <div class="label">Borrower Name</div>
-                            <div class="value"><?= htmlspecialchars($prop['borrower_name'] ?? ($source=='customer' ? 'Customer Listed' : 'N/A')) ?></div>
+                    <!-- Financial & Auction Section -->
+                    <div class="sq-section-title"><i class="fas fa-coins"></i> Financial & Auction Details</div>
+                    <div class="sq-grid">
+                        <div class="sq-grid-item">
+                            <span class="label">EMD Amount</span>
+                            <span class="value">₹ <?= indianCurrencyFormat($prop['emd_amount'] ?? 0) ?></span>
                         </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Property Type</div>
-                            <div class="value"><?= htmlspecialchars($prop['type'] ?? 'N/A') ?></div>
+                        <div class="sq-grid-item">
+                            <span class="label">Bid Increment</span>
+                            <span class="value">₹ <?= indianCurrencyFormat($prop['bid_increment'] ?? 0) ?></span>
                         </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Possession</div>
-                            <div class="value"><?= getPossessionValue($prop) ?></div>
+                        <div class="sq-grid-item">
+                            <span class="label">EMD Deadline</span>
+                            <span class="value"><?= empty($prop['emd_deadline']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['emd_deadline'])) ?></span>
                         </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Locality</div>
-                            <div class="value"><?= htmlspecialchars($prop['locality'] ?? 'N/A') ?></div>
+                        <div class="sq-grid-item">
+                            <span class="label">Auction Start</span>
+                            <span class="value"><?= empty($prop['auction_start_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_start_time'])) ?></span>
                         </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">City</div>
-                            <div class="value"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></div>
+                        <div class="sq-grid-item">
+                            <span class="label">Auction End</span>
+                            <span class="value"><?= empty($prop['auction_end_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_end_time'])) ?></span>
                         </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">State</div>
-                            <div class="value"><?= htmlspecialchars($prop['state'] ?? 'N/A') ?></div>
+                        <div class="sq-grid-item">
+                            <span class="label">Inspection Date</span>
+                            <span class="value"><?= empty($prop['inspection_date']) ? 'N/A' : date('d M Y', strtotime($prop['inspection_date'])) ?></span>
                         </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Area (Sq Ft)</div>
-                            <div class="value"><?= number_format($prop['sqft'] ?? 0, 2) ?></div>
-                        </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Price per Sq Ft</div>
-                            <div class="value">₹ <?= number_format($prop['price_per_sqft'] ?? 0, 2) ?></div>
-                        </div>
-                    </div>
-
-                    <!-- Financial & Auction Details -->
-                    <div class="section-title-luxury"><i class="fas fa-coins"></i> Financial & Auction Details</div>
-                    <div class="detail-grid-luxury">
-                        <div class="detail-item-luxury">
-                            <div class="label">EMD Amount</div>
-                            <div class="value">₹ <?= indianCurrencyFormat($prop['emd_amount'] ?? 0) ?></div>
-                        </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Bid Increment</div>
-                            <div class="value">₹ <?= indianCurrencyFormat($prop['bid_increment'] ?? 0) ?></div>
-                        </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">EMD Deadline</div>
-                            <div class="value"><?= empty($prop['emd_deadline']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['emd_deadline'])) ?></div>
-                        </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Auction Start</div>
-                            <div class="value"><?= empty($prop['auction_start_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_start_time'])) ?></div>
-                        </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Auction End</div>
-                            <div class="value"><?= empty($prop['auction_end_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_end_time'])) ?></div>
-                        </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Inspection Date</div>
-                            <div class="value"><?= empty($prop['inspection_date']) ? 'N/A' : date('d M Y', strtotime($prop['inspection_date'])) ?></div>
-                        </div>
-                        <div class="detail-item-luxury" style="grid-column: span 2;">
-                            <div class="label">Auction Date</div>
-                            <div class="value">
+                        <div class="sq-grid-item" style="grid-column: span 2;">
+                            <span class="label">Auction Date</span>
+                            <span class="value">
                                 <?php 
                                 if (!empty($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty') {
                                     echo '🔑 Private Treaty';
@@ -483,78 +538,76 @@ if ($source == 'auction') {
                                     echo 'N/A';
                                 }
                                 ?>
-                            </div>
+                            </span>
                         </div>
-                        <div class="detail-item-luxury">
-                            <div class="label">Contact Number</div>
-                            <div class="value">
+                        <div class="sq-grid-item">
+                            <span class="label">Contact Number</span>
+                            <span class="value">
                                 <?php if(!empty($prop['contact_number'])): ?>
                                     <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $prop['contact_number']) ?>" target="_blank">
-                                        <?= htmlspecialchars($prop['contact_number']) ?> <i class="fab fa-whatsapp ms-1" style="color: #25D366;"></i>
+                                        <?= htmlspecialchars($prop['contact_number']) ?> <i class="fab fa-whatsapp" style="color:#25D366;"></i>
                                     </a>
                                 <?php else: ?>
                                     N/A
                                 <?php endif; ?>
-                            </div>
+                            </span>
                         </div>
                         <?php if(!empty($prop['google_location'])): ?>
-                        <div class="detail-item-luxury" style="grid-column: span 2;">
-                            <div class="label">Map Location</div>
-                            <div class="value">
-                                <a href="<?= $prop['google_location'] ?>" target="_blank" class="btn btn-sm btn-luxury-primary">
-                                    <i class="fas fa-map-marked-alt me-1"></i> View on Google Maps
+                        <div class="sq-grid-item" style="grid-column: span 2;">
+                            <span class="label">Map Location</span>
+                            <span class="value">
+                                <a href="<?= $prop['google_location'] ?>" target="_blank" class="btn btn-sq btn-sm">
+                                    <i class="fas fa-map-marked-alt me-1"></i> View on Map
                                 </a>
-                            </div>
+                            </span>
                         </div>
                         <?php endif; ?>
                     </div>
 
                     <!-- Description -->
                     <?php if(!empty($prop['description'])): ?>
-                    <div class="section-title-luxury"><i class="fas fa-align-left"></i> Description</div>
-                    <div class="p-3 rounded-4" style="background: #f8fafc; color: #334155; line-height: 1.8;">
+                    <div class="sq-section-title"><i class="fas fa-align-left"></i> Description</div>
+                    <div style="background:#f8fafc; border-radius:14px; padding:14px 18px; color:#334155; font-size:0.9rem; line-height:1.7;">
                         <?= nl2br(htmlspecialchars($prop['description'])) ?>
                     </div>
                     <?php endif; ?>
 
                     <!-- Image -->
-                    <div class="section-title-luxury"><i class="fas fa-image"></i> Property Image</div>
-                    <div class="property-image-container">
+                    <div class="sq-section-title"><i class="fas fa-image"></i> Property Image</div>
+                    <div class="sq-image-box">
                         <?php if(!empty($image_url)): ?>
                             <a href="<?= htmlspecialchars($image_url) ?>" target="_blank">
                                 <img src="<?= htmlspecialchars($image_url) ?>" alt="Property Image">
                             </a>
-                            <div class="text-center py-2" style="background: #f8fafc; font-size: 0.85rem; color: #94a3b8;">
-                                <i class="fas fa-expand me-1"></i> Click to view full size
-                            </div>
+                            <div class="caption"><i class="fas fa-expand me-1"></i> Click to view full size</div>
                         <?php else: ?>
-                            <div style="height:200px; display:flex; align-items:center; justify-content:center; background: #f8fafc; color: #94a3b8;">
-                                <i class="fas fa-image fa-3x opacity-25"></i>
-                                <span class="ms-3">No Image Available</span>
+                            <div style="height:180px; display:flex; align-items:center; justify-content:center; background:#fafcfd; color:#94a3b8;">
+                                <i class="fas fa-image fa-2x opacity-25"></i>
+                                <span class="ms-2" style="font-size:0.9rem;">No Image Available</span>
                             </div>
                         <?php endif; ?>
                     </div>
 
                     <!-- Similar Properties -->
                     <?php if($source == 'auction' && count($similar_props) > 0): ?>
-                    <div class="section-title-luxury"><i class="fas fa-list-ul"></i> Similar Properties</div>
+                    <div class="sq-section-title"><i class="fas fa-list-ul"></i> Similar Properties</div>
                     <div class="row g-3">
                         <?php foreach($similar_props as $sim): ?>
                         <div class="col-md-4">
-                            <div class="similar-card">
+                            <div class="sq-similar-card">
                                 <?php if(!empty($sim['image_url'])): ?>
-                                    <img src="<?= htmlspecialchars($sim['image_url']) ?>" style="height:150px; width:100%; object-fit:cover;" alt="<?= htmlspecialchars($sim['title']) ?>">
+                                    <img src="<?= htmlspecialchars($sim['image_url']) ?>" style="height:130px; width:100%; object-fit:cover;" alt="<?= htmlspecialchars($sim['title']) ?>">
                                 <?php else: ?>
-                                    <div style="height:150px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8;">
+                                    <div style="height:130px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8;">
                                         <i class="fas fa-home fa-2x"></i>
                                     </div>
                                 <?php endif; ?>
-                                <div class="p-3">
-                                    <h6 class="fw-bold"><?= htmlspecialchars($sim['title']) ?></h6>
-                                    <div class="text-muted small">🏦 <?= htmlspecialchars($sim['bank_name'] ?? 'Bank') ?></div>
-                                    <div class="fw-bold text-primary">₹ <?= indianCurrencyFormat($sim['price']) ?></div>
-                                    <div class="small text-muted"><?= htmlspecialchars($sim['city']) ?></div>
-                                    <a href="property_detail.php?id=<?= $sim['id'] ?>&source=auction" class="btn btn-sm btn-luxury-primary w-100 mt-2">View</a>
+                                <div class="body">
+                                    <h6><?= htmlspecialchars($sim['title']) ?></h6>
+                                    <div style="font-size:0.75rem; color:#64748b;">🏦 <?= htmlspecialchars($sim['bank_name'] ?? 'Bank') ?></div>
+                                    <div class="price">₹ <?= indianCurrencyFormat($sim['price']) ?></div>
+                                    <div style="font-size:0.75rem; color:#94a3b8;"><?= htmlspecialchars($sim['city']) ?></div>
+                                    <a href="property_detail.php?id=<?= $sim['id'] ?>&source=auction" class="btn btn-sq w-100 mt-2">View</a>
                                 </div>
                             </div>
                         </div>
@@ -563,7 +616,7 @@ if ($source == 'auction') {
                     <?php endif; ?>
 
                 </div> <!-- card-body -->
-            </div> <!-- luxury-card -->
+            </div> <!-- card -->
         </div>
     </div>
 </div>
