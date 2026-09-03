@@ -19,11 +19,11 @@ $stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user_city = $stmt->fetchColumn() ?: '';
 
-// ---- Get current slot (based on time) ----
+// ---- Get current slot ----
 $hour = (int)date('H');
-if ($hour < 8) $slot = 1;      // 12 AM – 8 AM
-elseif ($hour < 14) $slot = 2; // 8 AM – 2 PM
-else $slot = 3;                // 2 PM – 12 AM
+if ($hour < 8) $slot = 1;
+elseif ($hour < 14) $slot = 2;
+else $slot = 3;
 
 // ---- Get or create spin record ----
 $stmt = $pdo->prepare("SELECT spins_used, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
@@ -40,7 +40,7 @@ if (!$data) {
     $coins_earned = (int)$data['coins_earned'];
 }
 
-// ---- Check limit (max 5 spins per slot) ----
+// ---- Check limit ----
 if ($spins_used >= 5) {
     echo json_encode([
         'success' => false,
@@ -49,20 +49,16 @@ if ($spins_used >= 5) {
     exit;
 }
 
-// ---- Random outcome: 70% chance coins, 30% chance property ----
+// ---- Random outcome ----
 $is_coins = (rand(1, 100) <= 70);
 
 if ($is_coins) {
-    // Coin amount: random 1–10
     $coin_amount = rand(1, 10);
-    // Update user coins
     $stmt = $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?");
     $stmt->execute([$coin_amount, $user_id]);
     
     $new_spins = $spins_used + 1;
     $new_coins = $coins_earned + $coin_amount;
-    
-    // Update spin record
     $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ? WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
     $stmt->execute([$new_spins, $new_coins, $user_id, $today, $slot]);
     
@@ -77,7 +73,7 @@ if ($is_coins) {
     
 } else {
     // ---- Property reward ----
-    // First: try user's city, upcoming, lowest price
+    // First try user's city upcoming
     $sql = "SELECT * FROM properties 
             WHERE status = 'available' 
               AND auction_date > CURRENT_DATE 
@@ -89,8 +85,8 @@ if ($is_coins) {
     $stmt->execute(['%' . $user_city . '%']);
     $property = $stmt->fetch();
     
-    // If not found, get any upcoming with lowest price
     if (!$property) {
+        // Any city upcoming lowest price
         $sql = "SELECT * FROM properties 
                 WHERE status = 'available' 
                   AND auction_date > CURRENT_DATE 
@@ -103,7 +99,6 @@ if ($is_coins) {
     }
     
     if ($property) {
-        // Update spin record (no coins)
         $new_spins = $spins_used + 1;
         $new_coins = $coins_earned;
         $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ? WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
@@ -128,7 +123,7 @@ if ($is_coins) {
             'message' => '🏠 Check out this property!'
         ];
     } else {
-        // No property available, fallback to coins
+        // No property, fallback coins
         $coin_amount = rand(1, 5);
         $stmt = $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?");
         $stmt->execute([$coin_amount, $user_id]);
