@@ -1,11 +1,40 @@
 <!-- ============================================================
-     🎡 SPIN WIDGET – No Labels, Single Spin, Property + Coins
+     🎡 SPIN WIDGET – Slot Info + Clean Wheel + Property Modal
      ============================================================ -->
 
 <?php
 // This file is included in user_dashboard.php
-// It expects $user_id, $pdo, and $slot_statuses, $current_slot, $current_slot_data
-if (!isset($user_id)) return;
+// It expects $user_id, $pdo, and $current_slot_data, $current_slot, $slot_statuses if defined
+// If not defined, we will fetch data ourselves.
+
+// If the variables are not set, we can fetch them directly.
+if (!isset($user_id)) {
+    // Assuming session started and user logged in
+    $user_id = $_SESSION['user_id'] ?? null;
+    if (!$user_id) return;
+}
+
+// ---- Get current slot and spin data ----
+$today = date('Y-m-d');
+$hour = (int)date('H');
+if ($hour < 8) $slot = 1;
+elseif ($hour < 14) $slot = 2;
+else $slot = 3;
+
+$slot_names = [1 => '12 AM – 8 AM', 2 => '8 AM – 2 PM', 3 => '2 PM – 12 AM'];
+$current_slot = $slot_names[$slot];
+
+$stmt = $pdo->prepare("SELECT spins_used, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
+$stmt->execute([$user_id, $today, $slot]);
+$data = $stmt->fetch();
+if (!$data) {
+    $spins_used = 0;
+    $coins_earned = 0;
+} else {
+    $spins_used = (int)$data['spins_used'];
+    $coins_earned = (int)$data['coins_earned'];
+}
+$current_slot_data = ['spins_used' => $spins_used, 'coins_earned' => $coins_earned];
 ?>
 
 <style>
@@ -109,6 +138,16 @@ if (!isset($user_id)) return;
     .spin-wheel.pulse {
         animation: spinPulse 1s infinite;
     }
+    .property-modal-content {
+        background: #fff;
+        border-radius: 20px;
+        padding: 20px;
+        color: #0f172a;
+    }
+    .property-modal-content .btn-primary {
+        background: #2563eb;
+        border: none;
+    }
 </style>
 
 <div class="spin-container text-center">
@@ -120,7 +159,7 @@ if (!isset($user_id)) return;
         <div class="spin-wheel" id="spinWheel"></div>
     </div>
 
-    <button class="spin-btn mt-3" id="spinBtn" <?= ($current_slot_data['spins_used'] ?? 0) >= 5 ? 'disabled' : '' ?>>
+    <button class="spin-btn mt-3" id="spinBtn" <?= ($spins_used >= 5) ? 'disabled' : '' ?>>
         <i class="fas fa-sync-alt me-2"></i> SPIN!
     </button>
 
@@ -128,8 +167,27 @@ if (!isset($user_id)) return;
 
     <div class="spin-stats">
         <div>🎰 Slot: <strong><?= $current_slot ?></strong></div>
-        <div>🔄 Spins Used: <strong><span id="spinCount"><?= $current_slot_data['spins_used'] ?? 0 ?></span>/5</strong></div>
-        <div>🪙 Coins Earned: <strong><span id="slotCoins"><?= $current_slot_data['coins_earned'] ?? 0 ?></span>/22</strong></div>
+        <div>🔄 Spins Used: <strong><span id="spinCount"><?= $spins_used ?></span>/5</strong></div>
+        <div>🪙 Coins Earned: <strong><span id="slotCoins"><?= $coins_earned ?></span>/22</strong></div>
+    </div>
+</div>
+
+<!-- ====== PROPERTY MODAL (included here) ====== -->
+<div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content property-modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title"><i class="fas fa-gift text-warning"></i> 🎉 Congratulations!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center" id="propertyModalContent">
+                <!-- Dynamic content will be injected here -->
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="#" id="viewPropertyLink" class="btn btn-primary">View Details</a>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -150,16 +208,15 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = true;
         spinMessage.innerHTML = '🔄 Spinning...';
 
-        // ---- ONE ROTATION (no extra) ----
+        // ---- ONE ROTATION ----
         const extra = Math.floor(Math.random() * 360);
-        const total = 360 * 5 + extra; // 5 full spins + random
+        const total = 360 * 5 + extra;
         currentRotation += total;
 
         wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
         wheel.style.transform = `rotate(${currentRotation}deg)`;
         wheel.classList.add('pulse');
 
-        // ---- AJAX Call ----
         fetch('spin_ajax.php')
             .then(response => {
                 if (!response.ok) throw new Error('Network error');
@@ -174,20 +231,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     slotCoins.textContent = data.total_coins_earned || 0;
 
                     if (data.show_property && data.property) {
-                        // Show property modal
                         const p = data.property;
                         const modalContent = document.getElementById('propertyModalContent');
                         if (modalContent) {
                             const imageHtml = p.image_url ? 
                                 `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` :
-                                `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
+                                `<div style="height:150px; background:#f1f5f9; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
                             modalContent.innerHTML = `
                                 ${imageHtml}
                                 <h5 class="fw-bold">🏠 ${p.title}</h5>
                                 <p class="text-muted">🏦 ${p.bank_name || 'Bank'}</p>
                                 <p class="text-warning fw-bold">₹ ${parseInt(p.price).toLocaleString('en-IN')}</p>
                                 <p><i class="fas fa-map-pin"></i> ${p.city || 'N/A'}</p>
-                                <p><small class="text-muted">Type: ${p.type || 'N/A'}</small></p>
+                                <p><small>Type: ${p.type || 'N/A'}</small></p>
                                 <div class="mt-2 p-2 bg-success bg-opacity-25 rounded-3">
                                     <i class="fas fa-calendar-check me-1"></i> Auction Date: ${p.auction_date ? new Date(p.auction_date).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}) : 'N/A'}
                                 </div>
@@ -198,29 +254,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             propertyModal.show();
                             spinMessage.innerHTML = '🏠 Check out this property!';
                             propertyModal._element.addEventListener('hidden.bs.modal', function() {
-                                spinBtn.disabled = false;
+                                spinBtn.disabled = (data.spins_used >= 5);
                             });
                         } else {
                             spinMessage.innerHTML = '🏠 Property found!';
-                            spinBtn.disabled = false;
+                            spinBtn.disabled = (data.spins_used >= 5);
                         }
                     } else if (data.coins > 0) {
                         spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
-                        // Update coin display on dashboard (optional)
                         const coinStat = document.querySelector('.stat-card .stat-number');
                         if (coinStat) {
                             let cur = parseInt(coinStat.textContent.replace(/,/g, ''));
                             if (!isNaN(cur)) coinStat.textContent = (cur + data.coins).toLocaleString();
                         }
-                        if (data.spins_used >= 5) {
-                            spinBtn.disabled = true;
-                            spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
-                        } else {
-                            spinBtn.disabled = false;
-                        }
+                        spinBtn.disabled = (data.spins_used >= 5);
                     } else {
                         spinMessage.innerHTML = data.message || 'Spin done!';
-                        spinBtn.disabled = false;
+                        spinBtn.disabled = (data.spins_used >= 5);
                     }
                 } else {
                     spinMessage.innerHTML = `❌ ${data.message || 'Something went wrong'}`;
