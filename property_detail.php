@@ -155,7 +155,7 @@ if (!$has_subscription && $source == 'auction') {
 }
 
 // ============================================================
-// 2️⃣ PAID USER VIEW (Active Subscription) – WHITE + BLUE THEME
+// 2️⃣ PAID USER VIEW – SUPER BOLD + STYLISH
 // ============================================================
 
 $image_url  = $prop['image_url'] ?? '';
@@ -196,229 +196,261 @@ if ($source == 'auction') {
 ?>
 
 <style>
-    /* ===== WHITE + BLUE THEME ===== */
-    .wb-card {
+    /* ===== SUPER BOLD + STYLISH THEME ===== */
+    .sb-card {
         background: #ffffff;
-        border-radius: 20px;
-        border: 1px solid #e8edf4;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        border-radius: 24px;
+        border: none;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08), 0 2px 15px rgba(0,0,0,0.03);
         overflow: hidden;
         transition: all 0.3s ease;
     }
-    .wb-card-header {
-        background: #ffffff;
-        border-bottom: 1px solid #e8edf4;
-        padding: 20px 28px;
+    .sb-card:hover {
+        box-shadow: 0 20px 60px rgba(0,0,0,0.10);
     }
-    .wb-card-body {
-        padding: 24px 28px 28px;
+    .sb-card-header {
+        background: linear-gradient(135deg, #f8faff, #ffffff);
+        border-bottom: 2px solid #e8edf4;
+        padding: 24px 32px;
+    }
+    .sb-card-body {
+        padding: 28px 32px 32px;
         background: #ffffff;
     }
-    .wb-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #0f172a;
-        letter-spacing: -0.3px;
+    .sb-title {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #0a0f1a;
+        letter-spacing: -0.5px;
         margin: 0;
     }
-    .wb-title i {
+    .sb-title i {
         color: #2563eb;
-        margin-right: 8px;
+        margin-right: 10px;
     }
-    .wb-badge {
+    .sb-badge {
         background: #f1f5f9;
         color: #1e293b;
-        padding: 4px 14px;
+        padding: 6px 18px;
         border-radius: 50px;
-        font-size: 0.7rem;
-        font-weight: 600;
+        font-size: 0.75rem;
+        font-weight: 700;
         display: inline-block;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.4px;
+        border: 1px solid #e8edf4;
     }
-    .wb-badge i {
-        margin-right: 4px;
+    .sb-badge i {
+        margin-right: 6px;
         color: #2563eb;
     }
-    .wb-badge-subscribed {
+    .sb-badge-subscribed {
         background: #dbeafe;
         color: #1e40af;
+        border-color: #93b5e8;
     }
-    .wb-price-tag {
-        background: linear-gradient(135deg, #1e40af, #2563eb);
-        color: #ffffff;
-        border-radius: 14px;
-        padding: 12px 20px;
+    .sb-price-tag {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        color: #0a0f1a;
+        border-radius: 16px;
+        padding: 14px 24px;
         text-align: center;
-        min-width: 140px;
-        box-shadow: 0 4px 15px rgba(37,99,235,0.25);
+        min-width: 160px;
+        box-shadow: 0 6px 25px rgba(251,191,36,0.35);
+        border: 2px solid rgba(255,255,255,0.3);
     }
-    .wb-price-tag .label {
-        font-size: 0.6rem;
+    .sb-price-tag .label {
+        font-size: 0.65rem;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        opacity: 0.8;
-        font-weight: 600;
+        letter-spacing: 0.8px;
+        opacity: 0.7;
+        font-weight: 700;
     }
-    .wb-price-tag .amount {
-        font-size: 1.6rem;
-        font-weight: 800;
+    .sb-price-tag .amount {
+        font-size: 1.8rem;
+        font-weight: 900;
         line-height: 1.2;
     }
-    .wb-address-box {
-        background: #f0f5ff;
-        border-radius: 12px;
-        padding: 14px 18px;
-        border-left: 4px solid #2563eb;
-        font-size: 0.9rem;
-        color: #1e293b;
-        margin-bottom: 20px;
-    }
-    .wb-address-box i {
-        color: #2563eb;
-        margin-right: 6px;
-    }
-    .wb-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 12px;
-        margin-bottom: 20px;
-    }
-    .wb-grid-item {
-        background: #f8fafc;
-        border-radius: 12px;
-        padding: 12px 14px;
-        border: 1px solid #e8edf4;
-        transition: all 0.15s ease;
-    }
-    .wb-grid-item:hover {
-        background: #f0f5ff;
-        border-color: #b8cbe8;
-    }
-    .wb-grid-item .label {
-        font-size: 0.6rem;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        color: #64748b;
-        font-weight: 600;
-        display: block;
-        margin-bottom: 2px;
-    }
-    .wb-grid-item .value {
-        font-size: 0.95rem;
+    .sb-address-box {
+        background: linear-gradient(135deg, #eff6ff, #dbeafe);
+        border-radius: 14px;
+        padding: 16px 20px;
+        border-left: 6px solid #2563eb;
+        font-size: 1rem;
         font-weight: 600;
         color: #0f172a;
+        margin-bottom: 24px;
+        border: 1px solid #bfdbfe;
+    }
+    .sb-address-box i {
+        color: #2563eb;
+        margin-right: 8px;
+        font-size: 1.1rem;
+    }
+    .sb-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 24px;
+    }
+    .sb-grid-item {
+        background: #f8fafc;
+        border-radius: 14px;
+        padding: 14px 16px;
+        border: 2px solid #e8edf4;
+        transition: all 0.2s ease;
+    }
+    .sb-grid-item:hover {
+        background: #eff6ff;
+        border-color: #93b5e8;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(37,99,235,0.08);
+    }
+    .sb-grid-item .label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: #64748b;
+        font-weight: 700;
+        display: block;
+        margin-bottom: 4px;
+    }
+    .sb-grid-item .value {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #0a0f1a;
         word-break: break-word;
     }
-    .wb-grid-item .value a {
+    .sb-grid-item .value a {
         color: #2563eb;
         text-decoration: none;
-        font-weight: 600;
-    }
-    .wb-grid-item .value a:hover {
-        text-decoration: underline;
-    }
-    .wb-section-title {
-        font-size: 0.95rem;
         font-weight: 700;
-        color: #0f172a;
-        margin: 24px 0 14px 0;
-        padding-bottom: 8px;
-        border-bottom: 2px solid #e8edf4;
+    }
+    .sb-grid-item .value a:hover {
+        text-decoration: underline;
+        color: #1d4ed8;
+    }
+    .sb-section-title {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #0a0f1a;
+        margin: 28px 0 16px 0;
+        padding-bottom: 10px;
+        border-bottom: 3px solid #2563eb;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
+        letter-spacing: -0.3px;
     }
-    .wb-section-title i {
+    .sb-section-title i {
         color: #2563eb;
-        font-size: 1rem;
+        font-size: 1.2rem;
+        background: #eff6ff;
+        padding: 8px;
+        border-radius: 10px;
     }
-    .wb-image-box {
-        border-radius: 14px;
+    .sb-image-box {
+        border-radius: 16px;
         overflow: hidden;
         background: #f8fafc;
-        border: 1px solid #e8edf4;
-        margin-top: 12px;
+        border: 2px solid #e8edf4;
+        margin-top: 14px;
     }
-    .wb-image-box img {
+    .sb-image-box img {
         width: 100%;
-        max-height: 400px;
+        max-height: 450px;
         object-fit: contain;
         display: block;
         background: #ffffff;
     }
-    .wb-image-box .caption {
+    .sb-image-box .caption {
         background: #f8fafc;
         text-align: center;
-        padding: 6px;
-        font-size: 0.7rem;
-        color: #94a3b8;
+        padding: 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        border-top: 1px solid #e8edf4;
     }
-    .wb-similar-card {
+    .sb-similar-card {
         background: #ffffff;
-        border-radius: 14px;
-        border: 1px solid #e8edf4;
+        border-radius: 16px;
+        border: 2px solid #e8edf4;
         overflow: hidden;
-        transition: all 0.2s;
+        transition: all 0.25s ease;
         height: 100%;
     }
-    .wb-similar-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+    .sb-similar-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 35px rgba(0,0,0,0.08);
         border-color: #2563eb;
     }
-    .wb-similar-card .body {
-        padding: 14px;
+    .sb-similar-card .body {
+        padding: 16px;
     }
-    .wb-similar-card .body h6 {
-        font-size: 0.9rem;
-        font-weight: 700;
-        color: #0f172a;
-    }
-    .wb-similar-card .body .price {
-        font-weight: 700;
-        color: #2563eb;
+    .sb-similar-card .body h6 {
         font-size: 0.95rem;
+        font-weight: 800;
+        color: #0a0f1a;
     }
-    .btn-wb {
-        background: #2563eb;
+    .sb-similar-card .body .price {
+        font-weight: 800;
+        color: #2563eb;
+        font-size: 1rem;
+    }
+    .btn-sb {
+        background: linear-gradient(135deg, #1e40af, #2563eb);
         color: #fff;
         border: none;
-        padding: 6px 18px;
+        padding: 8px 22px;
         border-radius: 50px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        transition: all 0.2s;
+        font-size: 0.85rem;
+        font-weight: 700;
+        transition: all 0.25s ease;
+        box-shadow: 0 4px 15px rgba(37,99,235,0.2);
     }
-    .btn-wb:hover {
-        background: #1d4ed8;
-        box-shadow: 0 4px 15px rgba(37,99,235,0.25);
-        transform: translateY(-1px);
+    .btn-sb:hover {
+        background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+        box-shadow: 0 8px 25px rgba(37,99,235,0.35);
+        transform: translateY(-2px);
         color: #fff;
     }
-    .btn-wb-outline {
+    .btn-sb-outline {
         background: transparent;
         color: #2563eb;
-        border: 1px solid #d1d9e6;
-        padding: 6px 18px;
+        border: 2px solid #d1d9e6;
+        padding: 8px 22px;
         border-radius: 50px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        transition: all 0.2s;
+        font-size: 0.85rem;
+        font-weight: 700;
+        transition: all 0.25s ease;
     }
-    .btn-wb-outline:hover {
-        background: #f0f5ff;
+    .btn-sb-outline:hover {
+        background: #eff6ff;
         border-color: #2563eb;
         color: #2563eb;
+        transform: translateY(-2px);
+    }
+    .sb-description-box {
+        background: #f8fafc;
+        border-radius: 14px;
+        padding: 16px 20px;
+        color: #0f172a;
+        font-size: 0.95rem;
+        font-weight: 600;
+        line-height: 1.8;
+        border: 2px solid #e8edf4;
     }
     @media (max-width: 768px) {
-        .wb-title { font-size: 1.3rem; }
-        .wb-price-tag .amount { font-size: 1.3rem; }
-        .wb-grid { grid-template-columns: 1fr 1fr; }
-        .wb-card-header { flex-direction: column; align-items: stretch; }
-        .wb-price-tag { margin-top: 10px; }
+        .sb-title { font-size: 1.4rem; }
+        .sb-price-tag .amount { font-size: 1.4rem; }
+        .sb-price-tag { min-width: 120px; padding: 10px 16px; }
+        .sb-grid { grid-template-columns: 1fr 1fr; }
+        .sb-card-header { flex-direction: column; align-items: stretch; padding: 18px 20px; }
+        .sb-price-tag { margin-top: 12px; }
+        .sb-card-body { padding: 18px 18px 22px; }
     }
     @media (max-width: 576px) {
-        .wb-grid { grid-template-columns: 1fr; }
+        .sb-grid { grid-template-columns: 1fr; }
     }
 </style>
 
@@ -427,108 +459,108 @@ if ($source == 'auction') {
         <div class="col-lg-10">
 
             <!-- Back Button -->
-            <a href="javascript:history.back()" class="btn btn-wb-outline mb-3">
+            <a href="javascript:history.back()" class="btn btn-sb-outline mb-3">
                 <i class="fas fa-arrow-left me-1"></i> Back
             </a>
 
             <!-- Main Card -->
-            <div class="wb-card">
+            <div class="sb-card">
 
                 <!-- Header -->
-                <div class="wb-card-header d-flex flex-wrap justify-content-between align-items-center">
+                <div class="sb-card-header d-flex flex-wrap justify-content-between align-items-center">
                     <div>
-                        <h1 class="wb-title"><i class="fas fa-gavel"></i><?= htmlspecialchars($prop['title']) ?></h1>
-                        <div class="mt-1">
-                            <span class="wb-badge"><i class="fas fa-university"></i> <?= htmlspecialchars($prop['bank_name'] ?? ($source=='customer' ? 'Customer Property' : 'Bank Auction')) ?></span>
+                        <h1 class="sb-title"><i class="fas fa-gavel"></i><?= htmlspecialchars($prop['title']) ?></h1>
+                        <div class="mt-2">
+                            <span class="sb-badge"><i class="fas fa-university"></i> <?= htmlspecialchars($prop['bank_name'] ?? ($source=='customer' ? 'Customer Property' : 'Bank Auction')) ?></span>
                             <?php if ($source == 'auction'): ?>
-                                <span class="wb-badge wb-badge-subscribed ms-1"><i class="fas fa-check-circle"></i> Subscribed</span>
+                                <span class="sb-badge sb-badge-subscribed ms-1"><i class="fas fa-check-circle"></i> Subscribed</span>
                             <?php else: ?>
-                                <span class="wb-badge ms-1" style="background:#d1fae5; color:#065f46;"><i class="fas fa-home"></i> Customer Listed</span>
+                                <span class="sb-badge ms-1" style="background:#d1fae5; color:#065f46; border-color:#6ee7b7;"><i class="fas fa-home"></i> Customer Listed</span>
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="wb-price-tag">
+                    <div class="sb-price-tag">
                         <div class="label">Reserve Price</div>
                         <div class="amount">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
                     </div>
                 </div>
 
                 <!-- Body -->
-                <div class="wb-card-body">
+                <div class="sb-card-body">
 
                     <!-- Address -->
                     <?php $address = $prop['address'] ?? $prop['location'] ?? ''; ?>
                     <?php if (!empty($address)): ?>
-                    <div class="wb-address-box">
+                    <div class="sb-address-box">
                         <i class="fas fa-map-pin"></i> 
                         <strong>Address / Location:</strong> <?= nl2br(htmlspecialchars($address)) ?>
                     </div>
                     <?php endif; ?>
 
                     <!-- Main Details Grid -->
-                    <div class="wb-grid">
-                        <div class="wb-grid-item">
+                    <div class="sb-grid">
+                        <div class="sb-grid-item">
                             <span class="label">Borrower Name</span>
                             <span class="value"><?= htmlspecialchars($prop['borrower_name'] ?? ($source=='customer' ? 'Customer Listed' : 'N/A')) ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Property Type</span>
                             <span class="value"><?= htmlspecialchars($prop['type'] ?? 'N/A') ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Possession</span>
                             <span class="value"><?= getPossessionValue($prop) ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Locality</span>
                             <span class="value"><?= htmlspecialchars($prop['locality'] ?? 'N/A') ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">City</span>
                             <span class="value"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">State</span>
                             <span class="value"><?= htmlspecialchars($prop['state'] ?? 'N/A') ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Area (Sq Ft)</span>
                             <span class="value"><?= number_format($prop['sqft'] ?? 0, 2) ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Price per Sq Ft</span>
                             <span class="value">₹ <?= number_format($prop['price_per_sqft'] ?? 0, 2) ?></span>
                         </div>
                     </div>
 
                     <!-- Financial & Auction Section -->
-                    <div class="wb-section-title"><i class="fas fa-coins"></i> Financial & Auction Details</div>
-                    <div class="wb-grid">
-                        <div class="wb-grid-item">
+                    <div class="sb-section-title"><i class="fas fa-coins"></i> Financial & Auction Details</div>
+                    <div class="sb-grid">
+                        <div class="sb-grid-item">
                             <span class="label">EMD Amount</span>
                             <span class="value">₹ <?= indianCurrencyFormat($prop['emd_amount'] ?? 0) ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Bid Increment</span>
                             <span class="value">₹ <?= indianCurrencyFormat($prop['bid_increment'] ?? 0) ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">EMD Deadline</span>
                             <span class="value"><?= empty($prop['emd_deadline']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['emd_deadline'])) ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Auction Start</span>
                             <span class="value"><?= empty($prop['auction_start_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_start_time'])) ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Auction End</span>
                             <span class="value"><?= empty($prop['auction_end_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_end_time'])) ?></span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Inspection Date</span>
                             <span class="value"><?= empty($prop['inspection_date']) ? 'N/A' : date('d M Y', strtotime($prop['inspection_date'])) ?></span>
                         </div>
-                        <div class="wb-grid-item" style="grid-column: span 2;">
+                        <div class="sb-grid-item" style="grid-column: span 2;">
                             <span class="label">Auction Date</span>
                             <span class="value">
                                 <?php 
@@ -542,7 +574,7 @@ if ($source == 'auction') {
                                 ?>
                             </span>
                         </div>
-                        <div class="wb-grid-item">
+                        <div class="sb-grid-item">
                             <span class="label">Contact Number</span>
                             <span class="value">
                                 <?php if(!empty($prop['contact_number'])): ?>
@@ -555,10 +587,10 @@ if ($source == 'auction') {
                             </span>
                         </div>
                         <?php if(!empty($prop['google_location'])): ?>
-                        <div class="wb-grid-item" style="grid-column: span 2;">
+                        <div class="sb-grid-item" style="grid-column: span 2;">
                             <span class="label">Map Location</span>
                             <span class="value">
-                                <a href="<?= $prop['google_location'] ?>" target="_blank" class="btn btn-wb btn-sm">
+                                <a href="<?= $prop['google_location'] ?>" target="_blank" class="btn btn-sb btn-sm">
                                     <i class="fas fa-map-marked-alt me-1"></i> View on Map
                                 </a>
                             </span>
@@ -568,48 +600,48 @@ if ($source == 'auction') {
 
                     <!-- Description -->
                     <?php if(!empty($prop['description'])): ?>
-                    <div class="wb-section-title"><i class="fas fa-align-left"></i> Description</div>
-                    <div style="background:#f8fafc; border-radius:12px; padding:14px 18px; color:#334155; font-size:0.9rem; line-height:1.7; border:1px solid #e8edf4;">
+                    <div class="sb-section-title"><i class="fas fa-align-left"></i> Description</div>
+                    <div class="sb-description-box">
                         <?= nl2br(htmlspecialchars($prop['description'])) ?>
                     </div>
                     <?php endif; ?>
 
                     <!-- Image -->
-                    <div class="wb-section-title"><i class="fas fa-image"></i> Property Image</div>
-                    <div class="wb-image-box">
+                    <div class="sb-section-title"><i class="fas fa-image"></i> Property Image</div>
+                    <div class="sb-image-box">
                         <?php if(!empty($image_url)): ?>
                             <a href="<?= htmlspecialchars($image_url) ?>" target="_blank">
                                 <img src="<?= htmlspecialchars($image_url) ?>" alt="Property Image">
                             </a>
                             <div class="caption"><i class="fas fa-expand me-1"></i> Click to view full size</div>
                         <?php else: ?>
-                            <div style="height:180px; display:flex; align-items:center; justify-content:center; background:#fafcfd; color:#94a3b8;">
-                                <i class="fas fa-image fa-2x opacity-25"></i>
-                                <span class="ms-2" style="font-size:0.9rem;">No Image Available</span>
+                            <div style="height:200px; display:flex; align-items:center; justify-content:center; background:#fafcfd; color:#94a3b8; font-weight:700;">
+                                <i class="fas fa-image fa-2x opacity-25 me-2"></i>
+                                <span style="font-size:1rem;">No Image Available</span>
                             </div>
                         <?php endif; ?>
                     </div>
 
                     <!-- Similar Properties -->
                     <?php if($source == 'auction' && count($similar_props) > 0): ?>
-                    <div class="wb-section-title"><i class="fas fa-list-ul"></i> Similar Properties</div>
+                    <div class="sb-section-title"><i class="fas fa-list-ul"></i> Similar Properties</div>
                     <div class="row g-3">
                         <?php foreach($similar_props as $sim): ?>
                         <div class="col-md-4">
-                            <div class="wb-similar-card">
+                            <div class="sb-similar-card">
                                 <?php if(!empty($sim['image_url'])): ?>
-                                    <img src="<?= htmlspecialchars($sim['image_url']) ?>" style="height:130px; width:100%; object-fit:cover;" alt="<?= htmlspecialchars($sim['title']) ?>">
+                                    <img src="<?= htmlspecialchars($sim['image_url']) ?>" style="height:140px; width:100%; object-fit:cover;" alt="<?= htmlspecialchars($sim['title']) ?>">
                                 <?php else: ?>
-                                    <div style="height:130px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8;">
+                                    <div style="height:140px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8;">
                                         <i class="fas fa-home fa-2x"></i>
                                     </div>
                                 <?php endif; ?>
                                 <div class="body">
                                     <h6><?= htmlspecialchars($sim['title']) ?></h6>
-                                    <div style="font-size:0.75rem; color:#64748b;">🏦 <?= htmlspecialchars($sim['bank_name'] ?? 'Bank') ?></div>
+                                    <div style="font-size:0.8rem; font-weight:600; color:#64748b;">🏦 <?= htmlspecialchars($sim['bank_name'] ?? 'Bank') ?></div>
                                     <div class="price">₹ <?= indianCurrencyFormat($sim['price']) ?></div>
-                                    <div style="font-size:0.75rem; color:#94a3b8;"><?= htmlspecialchars($sim['city']) ?></div>
-                                    <a href="property_detail.php?id=<?= $sim['id'] ?>&source=auction" class="btn btn-wb w-100 mt-2">View</a>
+                                    <div style="font-size:0.8rem; font-weight:600; color:#94a3b8;"><?= htmlspecialchars($sim['city']) ?></div>
+                                    <a href="property_detail.php?id=<?= $sim['id'] ?>&source=auction" class="btn btn-sb w-100 mt-2">View</a>
                                 </div>
                             </div>
                         </div>
