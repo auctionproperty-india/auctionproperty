@@ -1,134 +1,118 @@
 <?php
 // ============================================================
-// spin_ajax.php – Final with Admin Settings & Next Slot Time
+// 🎰 Spin AJAX – One Spin, Coins + Upcoming Property (City-wise)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
+header('Content-Type: application/json');
+
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Not logged in']);
+    echo json_encode(['success' => false, 'message' => 'Please login first']);
     exit;
 }
 
 $user_id = $_SESSION['user_id'];
 
-// ----- Helper: Next slot start time -----
-function getNextSlotStartTime() {
-    $hour = (int)date('H');
-    if ($hour < 8) return date('Y-m-d 08:00:00');
-    elseif ($hour < 14) return date('Y-m-d 14:00:00');
-    else return date('Y-m-d 00:00:00', strtotime('+1 day'));
-}
+// ---- Get user's city ----
+$stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
+$stmt->execute([$user_id]);
+$user_city = $stmt->fetchColumn() ?: '';
 
-// ----- Admin settings -----
-$enabled = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'spin_special_enabled'")->fetchColumn() ?: 1;
-$gold_triggers = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'spin_gold_triggers'")->fetchColumn() ?: '1,3,5';
-$diamond_triggers = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'spin_diamond_triggers'")->fetchColumn() ?: '2,4';
-
-$gold_numbers = array_filter(array_map('trim', explode(',', $gold_triggers)));
-$diamond_numbers = array_filter(array_map('trim', explode(',', $diamond_triggers)));
-
-// ----- Current slot -----
-$slot = getCurrentSlot();
-$today = date('Y-m-d');
-
-$stmt = $pdo->prepare("SELECT spins_used, coins_earned FROM user_spins WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
-$stmt->execute([$user_id, $today, $slot]);
-$data = $stmt->fetch();
-
-if (!$data) {
-    $stmt = $pdo->prepare("INSERT INTO user_spins (user_id, slot_date, slot_number, spins_used, coins_earned) VALUES (?, ?, ?, 0, 0)");
-    $stmt->execute([$user_id, $today, $slot]);
-    $spins_used = 0;
-    $coins_earned = 0;
-} else {
-    $spins_used = (int)$data['spins_used'];
-    $coins_earned = (int)$data['coins_earned'];
-}
-
-if ($spins_used >= 5) {
-    $next_time = getNextSlotStartTime();
-    $formatted_time = date('h:i A', strtotime($next_time));
-    echo json_encode([
-        'success' => false,
-        'message' => "All spins used. Next slot at <strong>{$formatted_time}</strong>",
-        'next_slot_time' => $next_time
-    ]);
+// ---- Check spin eligibility ----
+$spin_data = getSpinData($pdo, $user_id);
+if (!$spin_data || $spin_data['spins_used'] >= 5) {
+    echo json_encode(['success' => false, 'message' => 'You have used all spins today']);
     exit;
 }
 
-$next_spin_number = $spins_used + 1;
-$reward_type = 'property';
-$targetSegment = null;
+// ---- Perform spin ----
+// Randomly decide reward: 70% coins, 30% property (or adjust)
+$is_reward = (rand(1, 100) <= 70); // 70% coins, 30% property
 
-if ($enabled) {
-    if (in_array($next_spin_number, $diamond_numbers)) {
-        $reward_type = 'diamond';
-        $targetSegment = 4;
-    } elseif (in_array($next_spin_number, $gold_numbers)) {
-        $reward_type = 'gold';
-        $targetSegment = 0;
+$coins_earned = 0;
+$property = null;
+$show_property = false;
+
+if ($is_reward) {
+    // Coin reward: random between 1 and 10 (or based on your logic)
+    $coins_earned = rand(1, 10);
+    // Update user coins
+    $stmt = $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?");
+    $stmt->execute([$coins_earned, $user_id]);
+} else {
+    // Property reward: find an upcoming property
+    // First try user's city
+    $sql = "SELECT * FROM properties 
+            WHERE status = 'available' 
+              AND auction_date > CURRENT_DATE 
+              AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty')
+              AND city ILIKE ? 
+            ORDER BY price ASC 
+            LIMIT 1";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(['%' . $user_city . '%']);
+    $property = $stmt->fetch();
+
+    // If not found, get any upcoming with lowest price
+    if (!$property) {
+        $sql = "SELECT * FROM properties 
+                WHERE status = 'available' 
+                  AND auction_date > CURRENT_DATE 
+                  AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty')
+                ORDER BY price ASC 
+                LIMIT 1";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $property = $stmt->fetch();
+    }
+
+    if ($property) {
+        $show_property = true;
+        $coins_earned = 0; // no coins for property spin
+        // Optionally give some coins too? We'll give 0 for property.
+        // We can also give a small coin bonus, but keep it simple.
+    } else {
+        // If no property found, fallback to coin reward
+        $coins_earned = rand(1, 5);
+        $stmt = $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?");
+        $stmt->execute([$coins_earned, $user_id]);
+        $is_reward = true;
+        $show_property = false;
     }
 }
 
-if ($reward_type === 'property') {
-    $available = [1,2,3,5,6,7];
-    $targetSegment = $available[array_rand($available)];
-}
+// ---- Update spin usage ----
+updateSpinUsage($pdo, $user_id);
 
-// ----- Perform spin -----
-$coin_settings = getSpinCoinSettings($pdo);
-$min = $coin_settings['min'];
-$max = $coin_settings['max'];
-$cap_per_slot = 22;
+// ---- Get updated spin data ----
+$spin_data = getSpinData($pdo, $user_id);
 
-$coin_amount = rand((int)$min, (int)$max);
-if ($coins_earned + $coin_amount > $cap_per_slot) {
-    $coin_amount = max(0, $cap_per_slot - $coins_earned);
-}
-
-$new_spins = $spins_used + 1;
-$new_coins = $coins_earned + $coin_amount;
-
-$stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = NOW() WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
-$stmt->execute([$new_spins, $new_coins, $user_id, $today, $slot]);
-
-if ($coin_amount > 0) {
-    $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
-}
-
-$is_reward = ($new_spins == 5);
-if ($is_reward) {
-    $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
-}
-
+// ---- Response ----
 $response = [
     'success' => true,
-    'spins_used' => $new_spins,
-    'coins' => $coin_amount,
-    'total_coins_earned' => $new_coins,
-    'is_reward' => $is_reward,
-    'reward_type' => $reward_type,
-    'target_segment' => $targetSegment
+    'is_reward' => $is_reward && !$show_property,
+    'coins' => $coins_earned,
+    'spins_used' => $spin_data['spins_used'],
+    'total_coins_earned' => $spin_data['total_coins_earned'] ?? 0,
+    'show_property' => $show_property,
 ];
 
-if ($reward_type === 'property') {
-    $prop = getRandomLowPriceProperty($pdo);
-    if ($prop) {
-        $response['show_property'] = true;
-        $response['property'] = $prop;
-    } else {
-        $response['show_property'] = false;
-    }
+if ($show_property && $property) {
+    $response['property'] = [
+        'id' => $property['id'],
+        'title' => $property['title'],
+        'price' => $property['price'],
+        'bank_name' => $property['bank_name'] ?? 'Bank',
+        'city' => $property['city'] ?? '',
+        'type' => $property['type'] ?? '',
+        'image_url' => $property['image_url'] ?? '',
+        'auction_date' => $property['auction_date'] ?? '',
+    ];
+    $response['message'] = '🏠 You won a property!';
 } else {
-    $response['show_property'] = false;
-}
-
-if ($new_spins >= 5) {
-    $next_time = getNextSlotStartTime();
-    $response['next_slot_time'] = $next_time;
-    $response['message'] = "All spins used. Next slot at " . date('h:i A', strtotime($next_time));
+    $response['message'] = '🎉 You earned ' . $coins_earned . ' coins!';
 }
 
 echo json_encode($response);
