@@ -243,14 +243,19 @@ include 'header.php';
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Property Type</label>
+                        <!-- ====== 🔥 UPDATED: Full Property Type List ====== -->
                         <select name="type" class="form-control">
                             <option value="Flat" <?= $edit_mode && $prop['type'] == 'Flat' ? 'selected' : '' ?>>Flat</option>
                             <option value="Plot" <?= $edit_mode && $prop['type'] == 'Plot' ? 'selected' : '' ?>>Plot</option>
                             <option value="Shop" <?= $edit_mode && $prop['type'] == 'Shop' ? 'selected' : '' ?>>Shop</option>
                             <option value="Land" <?= $edit_mode && $prop['type'] == 'Land' ? 'selected' : '' ?>>Land</option>
                             <option value="House" <?= $edit_mode && $prop['type'] == 'House' ? 'selected' : '' ?>>House</option>
-                            <option value="Car" <?= $edit_mode && $prop['type'] == 'Car' ? 'selected' : '' ?>>Car / Vehicle</option>
+                            <option value="Car/Vehicle" <?= $edit_mode && ($prop['type'] == 'Car/Vehicle' || $prop['type'] == 'Car') ? 'selected' : '' ?>>Car / Vehicle</option>
                             <option value="Commercial" <?= $edit_mode && $prop['type'] == 'Commercial' ? 'selected' : '' ?>>Commercial</option>
+                            <option value="Office" <?= $edit_mode && $prop['type'] == 'Office' ? 'selected' : '' ?>>Office</option>
+                            <option value="Row House" <?= $edit_mode && $prop['type'] == 'Row House' ? 'selected' : '' ?>>Row House</option>
+                            <option value="Bungalow" <?= $edit_mode && $prop['type'] == 'Bungalow' ? 'selected' : '' ?>>Bungalow</option>
+                            <option value="Other" <?= $edit_mode && $prop['type'] == 'Other' ? 'selected' : '' ?>>Other</option>
                         </select>
                     </div>
                     <div class="col-md-4">
