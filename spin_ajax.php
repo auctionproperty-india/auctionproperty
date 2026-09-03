@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// spin_ajax.php – Simple Spin (No Gold/Diamond, No Admin Settings)
+// spin_ajax.php – Simple Spin (No Gold/Diamond, Only Coins/Property)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -53,7 +53,7 @@ if ($spins_used >= 5) {
 $is_coins = (rand(1, 100) <= 70);
 
 if ($is_coins) {
-    // Coin amount: random 1–10 (or you can set min/max)
+    // Coin amount: random 1–10
     $coin_amount = rand(1, 10);
     // Update user coins
     $stmt = $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?");
@@ -71,7 +71,6 @@ if ($is_coins) {
         'spins_used' => $new_spins,
         'coins' => $coin_amount,
         'total_coins_earned' => $new_coins,
-        'is_reward' => false,
         'show_property' => false,
         'message' => '🎉 You earned ' . $coin_amount . ' coins!'
     ];
@@ -104,9 +103,9 @@ if ($is_coins) {
     }
     
     if ($property) {
-        // Update spin record (no coins, just property)
+        // Update spin record (no coins)
         $new_spins = $spins_used + 1;
-        $new_coins = $coins_earned; // no change
+        $new_coins = $coins_earned;
         $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ? WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
         $stmt->execute([$new_spins, $user_id, $today, $slot]);
         
@@ -115,7 +114,6 @@ if ($is_coins) {
             'spins_used' => $new_spins,
             'coins' => 0,
             'total_coins_earned' => $new_coins,
-            'is_reward' => false,
             'show_property' => true,
             'property' => [
                 'id' => $property['id'],
@@ -145,7 +143,6 @@ if ($is_coins) {
             'spins_used' => $new_spins,
             'coins' => $coin_amount,
             'total_coins_earned' => $new_coins,
-            'is_reward' => false,
             'show_property' => false,
             'message' => '🎉 You earned ' . $coin_amount . ' coins!'
         ];
