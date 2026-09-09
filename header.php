@@ -75,7 +75,23 @@ if ($is_logged_in && $role == 'user') {
     <style>
         /* ====== Global ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #f4f7fc; 
+            overflow-x: hidden; 
+            /* 🔥 Disable text selection globally */
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        /* Allow selection in input fields and textareas */
+        input, textarea, [contenteditable="true"] {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+        }
         body { padding-top: 70px; }
         body.top-nav-hidden { padding-top: 0; }
         body.role-admin { background: #f8fafc; }
@@ -610,7 +626,10 @@ if ($is_logged_in && $role == 'user') {
         .badge-sales { background: #f59e0b; color: #000; }
     </style>
 </head>
-<body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>">
+<!-- 🔥 Added oncontextmenu and onkeydown to prevent copy & developer tools -->
+<body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>"
+      oncontextmenu="return false;"
+      onkeydown="if(event.ctrlKey && (event.key === 'c' || event.key === 'v' || event.key === 's' || event.key === 'u' || event.key === 'f12')) return false;">
 
 <!-- ====== TOP NAV – on index, login, register ====== -->
 <?php if (!$hide_top_nav): ?>
@@ -723,7 +742,7 @@ if ($is_logged_in && $role == 'user') {
         <?php endif; ?>
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         <a href="admin_social_links.php"><i class="fas fa-share-alt"></i> <span>Social Links</span></a>
-    <!-- 🔥 Notification Manager Link – सही कोड -->
+    <!-- 🔥 Notification Manager Link -->
     <a href="admin_notification.php">
         <i class="fas fa-bullhorn"></i> 
         <span>Manage Popup Notification</span>
