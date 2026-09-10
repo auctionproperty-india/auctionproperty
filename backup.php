@@ -1,181 +1,127 @@
 <?php
 // ============================================================
-// 📦 Daily Backup Script – Email: bliveindia2018@gmail.com
+// 📦 DAILY BACKUP – Email पर भेजने वाली सरल Script
 // ============================================================
 
-// ---- Configuration ----
-$BACKUP_EMAIL = 'bliveindia2018@gmail.com';
-$PROJECT_DIR = __DIR__; // Current directory (project root)
-$BACKUP_DIR = __DIR__ . '/temp_backup'; // Temporary backup folder
+// ============ ⚙️ CONFIGURATION (यहाँ बदलाव करें) ============
+$BACKUP_EMAIL = 'bliveindia2018@gmail.com';       // किस Email पर भेजना है
+$SECRET_KEY   = 'backup123456';                    // सुरक्षा के लिए Key (कोई भी रखें)
+// ============================================================
 
-// Email subject with date
-$date = date('Y-m-d');
-$SUBJECT = "Daily Backup – {$date} – Prime Property India";
-
-// ---- Security: Only allow local execution or cron ----
-// If you want to run via URL, set a secret key and check it
-// For cron, we can just allow all (but better to restrict via .htaccess)
-// We'll add a simple key check – set a random key in your .env or here
-$SECRET_KEY = 'YOUR_SUPER_SECRET_BACKUP_KEY'; // CHANGE THIS!
-
-// If called via HTTP, require the key
+// ---- Security Check (सिर्फ Key वाले को अनुमति) ----
 if (php_sapi_name() !== 'cli') {
     if (!isset($_GET['key']) || $_GET['key'] !== $SECRET_KEY) {
-        die('Unauthorized');
+        die('❌ Unauthorized – सही Key डालें');
     }
 }
 
-// ---- Functions ----
-function sendEmailWithAttachment($to, $subject, $body, $attachmentPath) {
-    // Use PHP's mail() with MIME attachment
-    $from = 'noreply@' . $_SERVER['SERVER_NAME'];
+// ---- Log File ----
+$logFile = __DIR__ . '/backup_log.txt';
+function writeLog($msg) {
+    global $logFile;
+    file_put_contents($logFile, date('Y-m-d H:i:s') . " – " . $msg . "\n", FILE_APPEND);
+}
 
-    // Boundaries
-    $boundary = md5(time());
+writeLog("===== Backup Started =====");
 
-    // Headers
-    $headers = "From: $from\r\n";
-    $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= "Content-Type: multipart/mixed; boundary=\"$boundary\"\r\n";
+// ---- Check if ZipArchive is available ----
+if (!class_exists('ZipArchive')) {
+    writeLog("❌ ZipArchive not available on this server");
+    die("❌ ZipArchive Extension ज़रूरी है");
+}
 
-    // Plain text body
-    $message = "--$boundary\r\n";
-    $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
-    $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
-    $message .= $body . "\r\n\r\n";
+// ---- Create ZIP file ----
+$zipFileName = 'backup_' . date('Y-m-d_H-i-s') . '.zip';
+$zipFilePath = __DIR__ . '/' . $zipFileName;
 
-    // Attachment
-    if (file_exists($attachmentPath)) {
-        $fileContent = file_get_contents($attachmentPath);
-        $fileContent = chunk_split(base64_encode($fileContent));
-        $filename = basename($attachmentPath);
+$zip = new ZipArchive();
+if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+    writeLog("❌ Cannot create ZIP file");
+    die("❌ ZIP file नहीं बन सकी");
+}
 
-        $message .= "--$boundary\r\n";
-        $message .= "Content-Type: application/octet-stream; name=\"$filename\"\r\n";
-        $message .= "Content-Transfer-Encoding: base64\r\n";
-        $message .= "Content-Disposition: attachment; filename=\"$filename\"\r\n\r\n";
-        $message .= $fileContent . "\r\n\r\n";
+// ---- Add all files from project folder (skip certain files/folders) ----
+$skipFolders = ['temp_backup', 'node_modules', '.git'];
+$skipFiles   = ['backup_log.txt'];
+
+$projectDir = __DIR__;
+$files = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($projectDir, RecursiveDirectoryIterator::SKIP_DOTS),
+    RecursiveIteratorIterator::LEAVES_ONLY
+);
+
+$fileCount = 0;
+foreach ($files as $file) {
+    if (!$file->isFile()) continue;
+
+    $filePath = $file->getRealPath();
+    $relativePath = str_replace($projectDir . DIRECTORY_SEPARATOR, '', $filePath);
+    $relativePath = str_replace('\\', '/', $relativePath);
+
+    // Skip unwanted files/folders
+    $skip = false;
+    foreach ($skipFolders as $folder) {
+        if (strpos($relativePath, $folder . '/') === 0) { $skip = true; break; }
     }
+    foreach ($skipFiles as $f) {
+        if ($relativePath === $f) { $skip = true; break; }
+    }
+    // Skip the backup zip itself
+    if (strpos($relativePath, 'backup_') === 0 && substr($relativePath, -4) === '.zip') $skip = true;
+    
+    if ($skip) continue;
 
-    $message .= "--$boundary--";
-
-    // Send
-    return mail($to, $subject, $message, $headers);
+    $zip->addFile($filePath, $relativePath);
+    $fileCount++;
 }
 
-function logMessage($msg) {
-    echo date('Y-m-d H:i:s') . " - " . $msg . "\n";
-    // Also write to log file
-    file_put_contents(__DIR__ . '/backup_log.txt', date('Y-m-d H:i:s') . " - " . $msg . "\n", FILE_APPEND);
+$zip->close();
+writeLog("✅ ZIP created: $zipFileName ($fileCount files)");
+
+// ---- Send Email with Attachment ----
+$to      = $BACKUP_EMAIL;
+$subject = 'Daily Backup – ' . date('d M Y') . ' – Prime Property India';
+$from    = 'noreply@' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+
+$boundary = md5(uniqid(time()));
+
+$headers  = "From: $from\r\n";
+$headers .= "MIME-Version: 1.0\r\n";
+$headers .= "Content-Type: multipart/mixed; boundary=\"$boundary\"\r\n";
+
+$body  = "--$boundary\r\n";
+$body .= "Content-Type: text/html; charset=UTF-8\r\n\r\n";
+$body .= "<h2>📦 Daily Backup</h2>";
+$body .= "<p><b>Date:</b> " . date('d M Y H:i:s') . "</p>";
+$body .= "<p><b>Files:</b> $fileCount</p>";
+$body .= "<p><b>Size:</b> " . round(filesize($zipFilePath) / 1024 / 1024, 2) . " MB</p>";
+$body .= "<p>Backup file attached below.</p>\r\n\r\n";
+
+// Attach ZIP
+if (file_exists($zipFilePath)) {
+    $fileData = chunk_split(base64_encode(file_get_contents($zipFilePath)));
+    $body .= "--$boundary\r\n";
+    $body .= "Content-Type: application/zip; name=\"$zipFileName\"\r\n";
+    $body .= "Content-Transfer-Encoding: base64\r\n";
+    $body .= "Content-Disposition: attachment; filename=\"$zipFileName\"\r\n\r\n";
+    $body .= $fileData . "\r\n\r\n";
 }
+$body .= "--$boundary--";
 
-// ---- Start Backup ----
-logMessage("Backup started...");
-
-// 1. Create temp directory if not exists
-if (!is_dir($BACKUP_DIR)) {
-    mkdir($BACKUP_DIR, 0755, true);
-}
-
-// 2. Generate archive name with date
-$archiveName = "backup_" . date('Y-m-d_H-i-s') . ".tar.gz";
-$archivePath = $BACKUP_DIR . '/' . $archiveName;
-
-// 3. Create tar.gz of the entire project (excluding temp_backup and backup_* files)
-logMessage("Creating tar archive...");
-
-// Exclude temp_backup, backup_*.tar.gz, and log files
-$exclude = "--exclude='{$BACKUP_DIR}' --exclude='*.tar.gz' --exclude='backup_log.txt'";
-$command = "cd {$PROJECT_DIR} && tar -czf {$archivePath} . {$exclude} 2>&1";
-exec($command, $output, $returnVar);
-
-if ($returnVar !== 0) {
-    logMessage("❌ Tar failed: " . implode("\n", $output));
-    die("Tar failed");
-}
-
-logMessage("Tar created: {$archivePath}");
-
-// 4. Export Database (PostgreSQL)
-logMessage("Exporting database...");
-
-// Load database configuration from db.php
-// We need to get the DSN and credentials
-// We'll include db.php to get $pdo, then extract connection info
-include_once __DIR__ . '/db.php';
-
-// If using Supabase, we need the connection string. We can get from $pdo.
-// Attempt to get DB name, user, host, password from $pdo
-// Since we might not have direct access, we can use pg_dump with env variables.
-
-// Parse DSN to get dbname, user, host, port
-$dsn = $pdo->getAttribute(PDO::ATTR_DSN);
-// Example: pgsql:host=aws-0-ap-south-1.pooler.supabase.com;port=6543;dbname=postgres;user=postgres;password=...
-// We'll extract using regex
-$dbname = '';
-$user = '';
-$password = '';
-$host = '';
-$port = '5432';
-
-if (preg_match('/dbname=([^;]+)/', $dsn, $matches)) $dbname = $matches[1];
-if (preg_match('/user=([^;]+)/', $dsn, $matches)) $user = $matches[1];
-if (preg_match('/password=([^;]+)/', $dsn, $matches)) $password = $matches[1];
-if (preg_match('/host=([^;]+)/', $dsn, $matches)) $host = $matches[1];
-if (preg_match('/port=([^;]+)/', $dsn, $matches)) $port = $matches[1];
-
-if (empty($dbname) || empty($user) || empty($host)) {
-    logMessage("❌ Could not extract DB credentials from DSN. Please set manually.");
-    // Fallback: you can set them manually here
-    // $dbname = 'your_db';
-    // $user = 'your_user';
-    // $password = 'your_password';
-    // $host = 'your_host';
-    // $port = '5432';
-}
-
-$dbBackupFile = $BACKUP_DIR . '/db_dump.sql';
-$pgDumpCommand = "PGPASSWORD='{$password}' pg_dump -h {$host} -p {$port} -U {$user} -d {$dbname} -F p > {$dbBackupFile} 2>&1";
-exec($pgDumpCommand, $dumpOutput, $dumpReturn);
-
-if ($dumpReturn !== 0) {
-    logMessage("❌ pg_dump failed: " . implode("\n", $dumpOutput));
-    // Still continue with file backup only
+// Send Mail
+if (mail($to, $subject, $body, $headers)) {
+    writeLog("✅ Email sent to $to");
+    echo "✅ Backup भेज दिया गया – $to\n";
 } else {
-    logMessage("Database dump created: {$dbBackupFile}");
-    // Add the SQL file to the archive
-    $addDbCmd = "cd {$BACKUP_DIR} && tar -rf {$archivePath} db_dump.sql 2>&1";
-    exec($addDbCmd);
-    // Remove the SQL file after adding
-    unlink($dbBackupFile);
+    writeLog("❌ Email sending failed");
+    echo "❌ Email नहीं भेजा जा सका\n";
 }
 
-logMessage("Backup archive finalized: {$archivePath}");
-
-// 5. Email the backup
-logMessage("Sending email to {$BACKUP_EMAIL}...");
-
-$body = "Dear Admin,\n\n";
-$body .= "Please find attached the daily backup for " . date('Y-m-d H:i:s') . ".\n\n";
-$body .= "Backup includes:\n- Full project code\n- Database dump (if successful)\n\n";
-$body .= "File: " . basename($archivePath) . "\n";
-$body .= "Size: " . round(filesize($archivePath) / 1024 / 1024, 2) . " MB\n\n";
-$body .= "Regards,\nBackup System\nPrime Property India";
-
-$sent = sendEmailWithAttachment($BACKUP_EMAIL, $SUBJECT, $body, $archivePath);
-
-if ($sent) {
-    logMessage("✅ Email sent successfully.");
-} else {
-    logMessage("❌ Email sending failed.");
+// ---- Delete ZIP after sending (स्थान बचाने के लिए) ----
+if (file_exists($zipFilePath)) {
+    unlink($zipFilePath);
+    writeLog("🗑️ ZIP file deleted");
 }
 
-// 6. Cleanup: delete the archive and temp folder
-unlink($archivePath);
-rmdir($BACKUP_DIR); // should be empty
-
-logMessage("Backup process completed.");
-
-// ---- End ----
-echo "Backup completed. Check backup_log.txt for details.\n";
-?>
+writeLog("===== Backup Finished =====\n");
+echo "✅ Backup process पूरा हुआ।\n";
