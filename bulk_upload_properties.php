@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📤 Bulk Upload Properties – Excel/CSV
+// 📤 Bulk Upload Properties – Smart CSV/TSV Parser
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -11,31 +11,135 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['
     exit;
 }
 
-$is_admin = ($_SESSION['role'] == 'admin' || $_SESSION['role'] == 'sub_admin');
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
 
-// ---- Helper: parse date from multiple formats ----
+/**
+ * Extract first number from a string
+ * "Built up area 655 sqft" → 655
+ * "₹ 8,80,000" → 880000
+ * "NA" → 0
+ */
+function extractNumber($str) {
+    if (empty($str)) return 0;
+    // Remove commas, currency symbols, spaces
+    $str = str_replace([',', '₹', ' '], '', $str);
+    // Extract first number (integer or decimal)
+    if (preg_match('/-?\d+(\.\d+)?/', $str, $m)) {
+        return (float)$m[0];
+    }
+    return 0;
+}
+
+/**
+ * Check if a value is invalid (like #VALUE!, club, etc.)
+ */
+function isInvalidValue($str) {
+    if (empty($str)) return true;
+    $lower = strtolower(trim($str));
+    $invalid = ['#value!', 'club', 'club case', 'na', 'n/a', '-', 'null'];
+    return in_array($lower, $invalid);
+}
+
+/**
+ * Normalize Property Type
+ */
+function normalizeType($type) {
+    $type = trim($type);
+    if (empty($type)) return 'Other';
+
+    $map = [
+        'flat' => 'Flat',
+        'plot' => 'Plot',
+        'shop' => 'Shop',
+        'land' => 'Land',
+        'house' => 'House',
+        'independent house' => 'House',
+        'independenthouse' => 'House',
+        'row house' => 'Row House',
+        'rowhouse' => 'Row House',
+        'bungalow' => 'Bungalow',
+        'car' => 'Car/Vehicle',
+        'car/vehicle' => 'Car/Vehicle',
+        'vehicle' => 'Car/Vehicle',
+        'commercial' => 'Commercial',
+        'commercial shop' => 'Commercial',
+        'commercial building' => 'Commercial',
+        'commercial unit' => 'Commercial',
+        'office' => 'Office',
+        'other' => 'Other',
+        'club case' => 'Other',
+        'club' => 'Other',
+        'godown' => 'Commercial',
+        'independent slab building' => 'Commercial',
+    ];
+    $key = strtolower($type);
+    return $map[$key] ?? 'Other';
+}
+
+/**
+ * Parse Date from multiple formats
+ */
 function parseDateFlexible($dateStr) {
     if (empty($dateStr)) return null;
     $dateStr = trim($dateStr);
-    // Remove time portion if any (for date-only columns)
-    $parts = explode(' ', $dateStr);
-    $datePart = $parts[0];
 
-    // Try DD/MM/YYYY
-    if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $datePart, $m)) {
-        return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+    // Skip if invalid
+    if (isInvalidValue($dateStr)) return null;
+
+    // Format: 10-Sep-26 (2-digit year)
+    if (preg_match('/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/', $dateStr, $m)) {
+        $months = ['jan'=>'01','feb'=>'02','mar'=>'03','apr'=>'04','may'=>'05','jun'=>'06',
+                   'jul'=>'07','aug'=>'08','sep'=>'09','oct'=>'10','nov'=>'11','dec'=>'12'];
+        $month = $months[strtolower($m[2])] ?? '01';
+        $year = '20' . $m[3];
+        return "$year-$month-" . str_pad($m[1], 2, '0', STR_PAD_LEFT);
     }
-    // Try YYYY-MM-DD
-    if (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/', $datePart, $m)) {
-        return sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3]);
+
+    // Format: 10-Sep-2026 (4-digit year)
+    if (preg_match('/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/', $dateStr, $m)) {
+        $months = ['jan'=>'01','feb'=>'02','mar'=>'03','apr'=>'04','may'=>'05','jun'=>'06',
+                   'jul'=>'07','aug'=>'08','sep'=>'09','oct'=>'10','nov'=>'11','dec'=>'12'];
+        $month = $months[strtolower($m[2])] ?? '01';
+        return "{$m[3]}-$month-" . str_pad($m[1], 2, '0', STR_PAD_LEFT);
     }
-    // Fallback: strtotime
+
+    // Format: 10/09/2026 or 10-09-2026 (DD/MM/YYYY)
+    if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/', $dateStr, $m)) {
+        $year = strlen($m[3]) == 2 ? '20' . $m[3] : $m[3];
+        return "$year-" . str_pad($m[2], 2, '0', STR_PAD_LEFT) . "-" . str_pad($m[1], 2, '0', STR_PAD_LEFT);
+    }
+
+    // Format: 2026-09-10 (YYYY-MM-DD)
+    if (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/', $dateStr, $m)) {
+        return "{$m[1]}-" . str_pad($m[2], 2, '0', STR_PAD_LEFT) . "-" . str_pad($m[3], 2, '0', STR_PAD_LEFT);
+    }
+
+    // Fallback
     $ts = strtotime($dateStr);
-    if ($ts !== false) return date('Y-m-d', $ts);
+    if ($ts !== false && $ts > 0) return date('Y-m-d', $ts);
     return null;
 }
 
-// ---- Handle Upload ----
+/**
+ * Detect delimiter (tab or comma)
+ */
+function detectDelimiter($filepath) {
+    $handle = fopen($filepath, 'r');
+    $firstLine = fgets($handle);
+    fclose($handle);
+    if ($firstLine === false) return ',';
+
+    $tabCount = substr_count($firstLine, "\t");
+    $commaCount = substr_count($firstLine, ',');
+
+    return ($tabCount > $commaCount) ? "\t" : ',';
+}
+
+// ============================================================
+// HANDLE UPLOAD
+// ============================================================
 $report = null;
 $errors = [];
 
@@ -46,25 +150,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
         $errors[] = "File upload error (Code: {$file['error']})";
     } else {
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ['csv', 'txt'])) {
-            $errors[] = "❌ Only .csv files are allowed. (Excel में Save As → CSV करके Upload करें)";
+        if (!in_array($ext, ['csv', 'txt', 'tsv'])) {
+            $errors[] = "❌ Only .csv / .txt files are allowed.";
         } else {
+            // Detect delimiter
+            $delimiter = detectDelimiter($file['tmp_name']);
+
             $handle = fopen($file['tmp_name'], 'r');
             if (!$handle) {
                 $errors[] = "❌ Cannot read file.";
             } else {
-                // Read header row
-                $header = fgetcsv($handle);
-                // Remove BOM if present
+                // Read header
+                $header = fgetcsv($handle, 0, $delimiter);
                 if ($header && isset($header[0])) {
+                    // Remove BOM
                     $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]);
                 }
-
-                // Required columns check
-                $required = ['title', 'city', 'price', 'auction_date'];
                 $header = array_map('trim', $header);
                 $headerLower = array_map('strtolower', $header);
 
+                // Required columns
+                $required = ['title', 'city', 'price', 'auction_date'];
                 foreach ($required as $col) {
                     if (!in_array($col, $headerLower)) {
                         $errors[] = "❌ Missing required column: <strong>$col</strong>";
@@ -72,18 +178,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                 }
 
                 if (empty($errors)) {
-                    // Map column names to indexes
+                    // Map column names → indexes
                     $colMap = [];
                     foreach ($headerLower as $i => $col) {
                         $colMap[$col] = $i;
                     }
 
                     $successCount = 0;
+                    $skipCount = 0;
                     $failCount = 0;
+                    $skipRows = [];
                     $failRows = [];
-                    $rowNum = 1; // header is row 1
+                    $rowNum = 1;
 
-                    // Prepare INSERT
                     $stmt = $pdo->prepare("
                         INSERT INTO properties (
                             title, description, price, location, city, state, type, bank_name,
@@ -94,19 +201,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                     ");
 
-                    while (($row = fgetcsv($handle)) !== false) {
+                    while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
                         $rowNum++;
 
                         // Skip empty rows
                         if (count(array_filter($row)) === 0) continue;
 
-                        // Helper to get value by column name
+                        // Helper to get value
                         $getVal = function($col) use ($row, $colMap) {
                             return isset($colMap[$col]) && isset($row[$colMap[$col]]) 
                                 ? trim($row[$colMap[$col]]) 
                                 : '';
                         };
 
+                        // ---- Raw values ----
                         $title              = $getVal('title');
                         $location           = $getVal('location');
                         $city               = $getVal('city');
@@ -115,58 +223,121 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                         $type               = $getVal('type');
                         $bank_name          = $getVal('bank_name');
                         $borrower_name      = $getVal('borrower_name');
-                        $price              = (float)$getVal('price');
-                        $reserve_price_per_sqft = (float)$getVal('reserve_price_per_sqft');
-                        $sqft               = (float)$getVal('sqft');
+                        $priceRaw           = $getVal('price');
+                        $pricePerSqftRaw    = $getVal('reserve_price_per_sqft');
+                        $sqftRaw            = $getVal('sqft');
                         $possession_type    = $getVal('possession_type');
-                        $emd_amount         = (float)$getVal('emd_amount');
-                        $bid_increment      = (float)$getVal('bid_increment');
+                        $emdRaw             = $getVal('emd_amount');
+                        $bidRaw             = $getVal('bid_increment');
                         $emd_deadline       = $getVal('emd_deadline');
                         $auction_start_time = $getVal('auction_start_time');
                         $auction_end_time   = $getVal('auction_end_time');
                         $auction_date_raw   = $getVal('auction_date');
                         $inspection_date_raw = $getVal('inspection_date');
                         $contact_number     = $getVal('contact_number');
-                        $status             = $getVal('status') ?: 'available';
+                        $statusRaw          = $getVal('status');
                         $description        = $getVal('description');
 
-                        // Validation
-                        if (empty($title) || empty($city) || $price <= 0 || empty($auction_date_raw)) {
-                            $failCount++;
-                            $failRows[] = "Row $rowNum: Missing required fields (title, city, price, auction_date)";
+                        // ---- Skip if price is invalid (like "club") ----
+                        if (isInvalidValue($priceRaw)) {
+                            $skipCount++;
+                            $skipRows[] = "Row $rowNum: Skipped (invalid price: '$priceRaw')";
                             continue;
                         }
 
-                        // Parse auction_date
+                        // ---- Extract numbers ----
+                        $price = extractNumber($priceRaw);
+                        $pricePerSqft = extractNumber($pricePerSqftRaw);
+                        $sqft = extractNumber($sqftRaw);
+                        $emd_amount = extractNumber($emdRaw);
+                        $bid_increment = extractNumber($bidRaw);
+
+                        // ---- Validation ----
+                        if (empty($title) || empty($city) || $price <= 0 || empty($auction_date_raw)) {
+                            $failCount++;
+                            $failRows[] = "Row $rowNum: Missing required (title/city/price/auction_date)";
+                            continue;
+                        }
+
+                        // ---- Parse auction_date ----
                         $auction_date = parseDateFlexible($auction_date_raw);
                         if (!$auction_date) {
                             $failCount++;
-                            $failRows[] = "Row $rowNum: Invalid auction_date format ('$auction_date_raw')";
+                            $failRows[] = "Row $rowNum: Invalid auction_date '$auction_date_raw'";
                             continue;
                         }
 
+                        // ---- Normalize ----
+                        $type = normalizeType($type);
+                        $possession_type = in_array(strtolower($possession_type), ['physical', 'symbolic']) 
+                                            ? ucfirst(strtolower($possession_type)) 
+                                            : 'Physical';
+                        $status = in_array(strtolower($statusRaw), ['available', 'sold', 'pending']) 
+                                    ? strtolower($statusRaw) 
+                                    : 'available';
+
+                        // ---- Parse inspection_date ----
                         $inspection_date = parseDateFlexible($inspection_date_raw);
 
+                        // ---- Parse emd_deadline / auction times ----
+                        $emd_deadline_parsed = null;
+                        if (!empty($emd_deadline) && !isInvalidValue($emd_deadline)) {
+                            $ts = strtotime($emd_deadline);
+                            if ($ts !== false) $emd_deadline_parsed = date('Y-m-d H:i:s', $ts);
+                        }
+
+                        $auction_start_parsed = null;
+                        if (!empty($auction_start_time) && !isInvalidValue($auction_start_time)) {
+                            $ts = strtotime($auction_start_time);
+                            if ($ts !== false) $auction_start_parsed = date('Y-m-d H:i:s', $ts);
+                        }
+
+                        $auction_end_parsed = null;
+                        if (!empty($auction_end_time) && !isInvalidValue($auction_end_time)) {
+                            $ts = strtotime($auction_end_time);
+                            if ($ts !== false) $auction_end_parsed = date('Y-m-d H:i:s', $ts);
+                        }
+
+                        // ---- Insert ----
                         try {
                             $stmt->execute([
-                                $title, $description, $price, $location, $city, $state, $type, $bank_name,
-                                $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
-                                $emd_deadline, $auction_start_time, $auction_end_time, $locality,
-                                $reserve_price_per_sqft, $contact_number, $status, $auction_date,
+                                $title,
+                                $description,
+                                $price,
+                                $location,
+                                $city,
+                                $state,
+                                $type,
+                                $bank_name,
+                                $sqft,
+                                $possession_type,
+                                $borrower_name,
+                                $emd_amount,
+                                $bid_increment,
+                                $emd_deadline_parsed,
+                                $auction_start_parsed,
+                                $auction_end_parsed,
+                                $locality,
+                                $pricePerSqft,
+                                $contact_number,
+                                $status,
+                                $auction_date,
                                 $inspection_date
                             ]);
                             $successCount++;
                         } catch (PDOException $e) {
                             $failCount++;
-                            $failRows[] = "Row $rowNum: DB Error – " . $e->getMessage();
+                            $failRows[] = "Row $rowNum: " . $e->getMessage();
                         }
                     }
 
                     $report = [
                         'success' => $successCount,
+                        'skip' => $skipCount,
                         'fail' => $failCount,
+                        'skip_rows' => $skipRows,
                         'fail_rows' => $failRows,
-                        'total' => $rowNum - 1
+                        'delimiter' => ($delimiter === "\t") ? 'Tab' : 'Comma'
                     ];
                 }
                 fclose($handle);
@@ -199,22 +370,10 @@ include 'header.php';
         border-color: #2563eb;
         background: #eff6ff;
     }
-    .upload-area.dragover {
-        border-color: #10b981;
-        background: #ecfdf5;
-    }
     .upload-area i {
         font-size: 3.5rem;
         color: #2563eb;
         margin-bottom: 12px;
-    }
-    .upload-area h4 {
-        color: #0f172a;
-        font-weight: 700;
-    }
-    .upload-area p {
-        color: #64748b;
-        margin: 0;
     }
     .btn-upload {
         background: linear-gradient(135deg, #1e40af, #2563eb);
@@ -227,11 +386,7 @@ include 'header.php';
         box-shadow: 0 6px 20px rgba(37,99,235,0.25);
         transition: all 0.3s;
     }
-    .btn-upload:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 30px rgba(37,99,235,0.35);
-        color: #fff;
-    }
+    .btn-upload:hover { transform: translateY(-2px); color: #fff; }
     .btn-download {
         background: linear-gradient(135deg, #fbbf24, #f59e0b);
         color: #0f172a;
@@ -244,11 +399,7 @@ include 'header.php';
         box-shadow: 0 6px 20px rgba(251,191,36,0.25);
         transition: all 0.3s;
     }
-    .btn-download:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 30px rgba(251,191,36,0.35);
-        color: #0f172a;
-    }
+    .btn-download:hover { transform: translateY(-2px); color: #0f172a; }
     .info-box {
         background: #eff6ff;
         border-left: 5px solid #2563eb;
@@ -256,42 +407,11 @@ include 'header.php';
         padding: 18px 22px;
         margin-bottom: 24px;
     }
-    .info-box h6 {
-        color: #1e40af;
-        font-weight: 700;
-        margin-bottom: 10px;
-    }
-    .info-box ul {
-        margin: 0;
-        padding-left: 20px;
-        color: #334155;
-        font-size: 0.9rem;
-    }
-    .info-box code {
-        background: #dbeafe;
-        color: #1e40af;
-        padding: 2px 8px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.85rem;
-    }
-    .report-card {
-        border-radius: 16px;
-        padding: 22px;
-        margin-bottom: 20px;
-    }
-    .report-success {
-        background: #ecfdf5;
-        border-left: 5px solid #10b981;
-    }
-    .report-error {
-        background: #fef2f2;
-        border-left: 5px solid #dc2626;
-    }
-    .report-card h5 {
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
+    .report-card { border-radius: 16px; padding: 22px; margin-bottom: 20px; }
+    .report-success { background: #ecfdf5; border-left: 5px solid #10b981; }
+    .report-warning { background: #fffbeb; border-left: 5px solid #f59e0b; }
+    .report-error { background: #fef2f2; border-left: 5px solid #dc2626; }
+    .report-card h5 { font-weight: 700; margin-bottom: 8px; }
 </style>
 
 <div class="container-fluid mt-4">
@@ -299,18 +419,29 @@ include 'header.php';
 
     <?php if ($report): ?>
         <div class="report-card report-success">
-            <h5>✅ Upload Completed!</h5>
-            <p class="mb-1"><strong>Total Rows:</strong> <?= $report['total'] ?></p>
+            <h5>✅ Upload Completed! <small class="text-muted">(Delimiter detected: <?= $report['delimiter'] ?>)</small></h5>
             <p class="mb-1"><strong>Successfully Added:</strong> <span class="text-success fw-bold"><?= $report['success'] ?></span></p>
+            <p class="mb-1"><strong>Skipped (Club/Invalid):</strong> <span class="text-warning fw-bold"><?= $report['skip'] ?></span></p>
             <p class="mb-0"><strong>Failed:</strong> <span class="text-danger fw-bold"><?= $report['fail'] ?></span></p>
         </div>
 
+        <?php if (!empty($report['skip_rows'])): ?>
+            <div class="report-card report-warning">
+                <h5>⚠️ Skipped Rows (Club / Invalid)</h5>
+                <ul class="mb-0" style="max-height: 300px; overflow-y: auto;">
+                    <?php foreach ($report['skip_rows'] as $s): ?>
+                        <li><?= htmlspecialchars($s) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
+
         <?php if (!empty($report['fail_rows'])): ?>
             <div class="report-card report-error">
-                <h5>❌ Failed Rows (Error Details)</h5>
-                <ul class="mb-0">
-                    <?php foreach ($report['fail_rows'] as $err): ?>
-                        <li><?= htmlspecialchars($err) ?></li>
+                <h5>❌ Failed Rows</h5>
+                <ul class="mb-0" style="max-height: 300px; overflow-y: auto;">
+                    <?php foreach ($report['fail_rows'] as $e): ?>
+                        <li><?= htmlspecialchars($e) ?></li>
                     <?php endforeach; ?>
                 </ul>
             </div>
@@ -327,33 +458,33 @@ include 'header.php';
         </div>
     <?php endif; ?>
 
-    <!-- Info Box -->
     <div class="info-box">
-        <h6><i class="fas fa-info-circle me-2"></i> How to Use</h6>
-        <ul>
-            <li><strong>Step 1:</strong> नीचे दिए गए बटन से <code>Sample CSV Template</code> डाउनलोड करें</li>
-            <li><strong>Step 2:</strong> उसे <strong>Excel / Google Sheets</strong> में खोलें और अपनी Properties का Data भरें</li>
-            <li><strong>Step 3:</strong> Excel में <strong>File → Save As → CSV (Comma delimited)</strong> चुनकर सेव करें</li>
-            <li><strong>Step 4:</strong> नीचे Upload Box में CSV फ़ाइल को Drag करें या Click करके चुनें</li>
-            <li><strong>Step 5:</strong> <strong>Upload</strong> बटन दबाएँ – आपकी सारी Properties एक साथ Add हो जाएँगी!</li>
-        </ul>
+        <h6><i class="fas fa-info-circle me-2"></i> सही तरीके से Excel से CSV बनाने का तरीका</h6>
+        <ol class="mb-0" style="font-size: 0.9rem;">
+            <li>Template डाउनलोड करें और <strong>Excel</strong> में खोलें</li>
+            <li>Data भरें (Price में सिर्फ Number – जैसे <code>880000</code>, <code>Club</code> नहीं)</li>
+            <li>Excel में <strong>File → Save As</strong> करें</li>
+            <li>File Type चुनें: <strong>CSV UTF-8 (Comma delimited) (*.csv)</strong> – यह ज़रूरी है! ⚠️</li>
+            <li>उस CSV फ़ाइल को यहाँ Upload करें</li>
+        </ol>
+        <p class="mt-2 mb-0 small text-muted">
+            <strong>नोट:</strong> स्क्रिप्ट Tab और Comma दोनों Format Handle करती है। "Club case" जैसी Rows Automatically Skip हो जाएँगी।
+        </p>
     </div>
 
-    <!-- Download Template -->
     <div class="text-center mb-4">
         <a href="download_template.php" class="btn-download">
             <i class="fas fa-download me-2"></i> Download Sample CSV Template
         </a>
     </div>
 
-    <!-- Upload Card -->
     <div class="upload-card">
         <form method="POST" enctype="multipart/form-data" id="uploadForm">
             <div class="upload-area" id="uploadArea">
                 <i class="fas fa-cloud-upload-alt"></i>
                 <h4>Drag & Drop CSV File Here</h4>
                 <p>या क्लिक करके फ़ाइल चुनें</p>
-                <input type="file" name="csv_file" id="csvFile" accept=".csv" style="display:none;" required>
+                <input type="file" name="csv_file" id="csvFile" accept=".csv,.txt,.tsv" style="display:none;" required>
                 <div id="fileName" class="mt-3 fw-bold text-success"></div>
             </div>
             <div class="text-center mt-4">
@@ -363,46 +494,6 @@ include 'header.php';
             </div>
         </form>
     </div>
-
-    <!-- Column Format Reference -->
-    <div class="upload-card mt-4">
-        <h5 class="fw-bold mb-3"><i class="fas fa-table me-2"></i> Column Format Reference</h5>
-        <div class="table-responsive">
-            <table class="table table-bordered table-sm">
-                <thead class="table-primary">
-                    <tr>
-                        <th>Column</th>
-                        <th>Required?</th>
-                        <th>Format / Example</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td><code>title</code></td><td><span class="badge bg-danger">Yes</span></td><td>Shop in Govind Nagar, Mathura</td></tr>
-                    <tr><td><code>location</code></td><td>No</td><td>Full Address</td></tr>
-                    <tr><td><code>city</code></td><td><span class="badge bg-danger">Yes</span></td><td>Mathura</td></tr>
-                    <tr><td><code>state</code></td><td>No</td><td>Uttar Pradesh</td></tr>
-                    <tr><td><code>locality</code></td><td>No</td><td>Govind Nagar</td></tr>
-                    <tr><td><code>type</code></td><td>No</td><td>Flat / Plot / Shop / Land / House / Car/Vehicle / Commercial / Office / Row House / Bungalow / Other</td></tr>
-                    <tr><td><code>bank_name</code></td><td>No</td><td>SMFG India Home Finance</td></tr>
-                    <tr><td><code>borrower_name</code></td><td>No</td><td>Sameer Khan</td></tr>
-                    <tr><td><code>price</code></td><td><span class="badge bg-danger">Yes</span></td><td>880000 (सिर्फ Number)</td></tr>
-                    <tr><td><code>reserve_price_per_sqft</code></td><td>No</td><td>0</td></tr>
-                    <tr><td><code>sqft</code></td><td>No</td><td>167.17</td></tr>
-                    <tr><td><code>possession_type</code></td><td>No</td><td>Physical / Symbolic</td></tr>
-                    <tr><td><code>emd_amount</code></td><td>No</td><td>88000</td></tr>
-                    <tr><td><code>bid_increment</code></td><td>No</td><td>25000</td></tr>
-                    <tr><td><code>emd_deadline</code></td><td>No</td><td>19/08/2026 12:00 PM</td></tr>
-                    <tr><td><code>auction_start_time</code></td><td>No</td><td>20/08/2026 11:00 AM</td></tr>
-                    <tr><td><code>auction_end_time</code></td><td>No</td><td>20/08/2026 01:00 PM</td></tr>
-                    <tr><td><code>auction_date</code></td><td><span class="badge bg-danger">Yes</span></td><td>20/08/2026</td></tr>
-                    <tr><td><code>inspection_date</code></td><td>No</td><td>18/08/2026</td></tr>
-                    <tr><td><code>contact_number</code></td><td>No</td><td>8878190275</td></tr>
-                    <tr><td><code>status</code></td><td>No</td><td>available / sold / pending (Default: available)</td></tr>
-                    <tr><td><code>description</code></td><td>No</td><td>Property description</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -410,41 +501,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadArea = document.getElementById('uploadArea');
     const csvFile = document.getElementById('csvFile');
     const fileName = document.getElementById('fileName');
-    const form = document.getElementById('uploadForm');
 
-    // Click to open file dialog
-    uploadArea.addEventListener('click', function() {
-        csvFile.click();
-    });
-
-    // Drag & Drop
+    uploadArea.addEventListener('click', function() { csvFile.click(); });
     uploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
-        uploadArea.classList.add('dragover');
+        uploadArea.style.borderColor = '#10b981';
+        uploadArea.style.background = '#ecfdf5';
     });
     uploadArea.addEventListener('dragleave', function(e) {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
+        uploadArea.style.borderColor = '#b8cbe8';
+        uploadArea.style.background = '#f8faff';
     });
     uploadArea.addEventListener('drop', function(e) {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
+        uploadArea.style.borderColor = '#b8cbe8';
+        uploadArea.style.background = '#f8faff';
         if (e.dataTransfer.files.length > 0) {
             csvFile.files = e.dataTransfer.files;
-            showFileName(e.dataTransfer.files[0].name);
+            fileName.innerHTML = '<i class="fas fa-check-circle"></i> ' + e.dataTransfer.files[0].name;
         }
     });
-
-    // File select
     csvFile.addEventListener('change', function() {
         if (this.files.length > 0) {
-            showFileName(this.files[0].name);
+            fileName.innerHTML = '<i class="fas fa-check-circle"></i> ' + this.files[0].name;
         }
     });
-
-    function showFileName(name) {
-        fileName.innerHTML = '<i class="fas fa-check-circle"></i> Selected: ' + name;
-    }
 });
 </script>
 
