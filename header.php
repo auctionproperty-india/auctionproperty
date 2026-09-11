@@ -707,6 +707,7 @@ if ($is_logged_in && $role == 'user') {
         <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <?php if (hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
+    <a href="bulk_upload_properties.php"><i class="fas fa-file-upload"></i> <span>Bulk Upload Properties</span></a>
         <?php endif; ?>
         <?php if ($is_super_admin): ?>
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
