@@ -66,7 +66,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
 }
 
 // ============================================================
-// HELPER: Parse Date (only date part)
+// 🔥 HELPER: Parse Date (only date part)
 // ============================================================
 function parseDate($dateStr) {
     if (empty($dateStr) || trim($dateStr) === '') return null;
@@ -74,9 +74,11 @@ function parseDate($dateStr) {
     $parts = explode(' ', $dateStr);
     $dateStr = $parts[0];
 
+    // DD/MM/YYYY
     if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $dateStr, $m)) {
         return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
     }
+    // YYYY-MM-DD
     if (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/', $dateStr, $m)) {
         return sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3]);
     }
@@ -86,50 +88,80 @@ function parseDate($dateStr) {
 }
 
 // ============================================================
-// HELPER: Parse Date-Time (with time component)
+// 🔥 HELPER: Parse Date-Time (MANUAL – 100% Reliable)
+// Handles: 19/08/2026 12:00 PM, 1/9/2026 17:00, 2/9/2026 14:00 etc.
 // ============================================================
 function parseDateTimeFlexible($str) {
     if (empty($str) || trim($str) === '') return null;
     $str = trim($str);
 
-    if (in_array(strtolower($str), ['#value!', 'na', 'n/a', 'null', '-', 'club', 'club case'])) return null;
-
-    // Normalize: Convert "1/9/2026 17:00" → "01/09/2026 17:00"
-    if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\s+(.+)$/', $str, $m)) {
-        $day = str_pad($m[1], 2, '0', STR_PAD_LEFT);
-        $month = str_pad($m[2], 2, '0', STR_PAD_LEFT);
-        $year = strlen($m[3]) == 2 ? '20' . $m[3] : $m[3];
-        $timePart = trim($m[4]);
-        $str = "$day/$month/$year $timePart";
+    // Skip invalid values
+    $lower = strtolower($str);
+    if (in_array($lower, ['#value!', 'na', 'n/a', 'null', '-', 'club', 'club case'])) {
+        return null;
     }
 
-    $formats = [
-        'd/m/Y h:i A',
-        'd/m/Y g:i A',
-        'd/m/Y H:i',
-        'd/m/Y H:i:s',
-        'd-m-Y h:i A',
-        'd-m-Y H:i',
-        'd-m-Y H:i:s',
-        'Y-m-d H:i:s',
-        'Y-m-d H:i',
-        'd/m/Y',
-        'd-m-Y',
-        'Y-m-d',
-    ];
-    foreach ($formats as $fmt) {
-        $dt = DateTime::createFromFormat($fmt, $str);
-        if ($dt !== false) {
-            $errors = DateTime::getLastErrors();
-            if ($errors === false || ($errors['warning_count'] == 0 && $errors['error_count'] == 0)) {
-                return $dt->format('Y-m-d H:i:s');
-            }
+    $year = 0; $month = 0; $day = 0; $timePart = '';
+
+    // Pattern 1: YYYY-MM-DD HH:MM (Year first)
+    if (preg_match('/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})\s*(.*)$/', $str, $m)) {
+        $year = (int)$m[1];
+        $month = (int)$m[2];
+        $day = (int)$m[3];
+        $timePart = trim($m[4]);
+    }
+    // Pattern 2: DD/MM/YYYY HH:MM (Day first)
+    elseif (preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s*(.*)$/', $str, $m)) {
+        $day = (int)$m[1];
+        $month = (int)$m[2];
+        $year = (int)$m[3];
+        if ($year < 100) $year += 2000;
+        $timePart = trim($m[4]);
+    }
+    else {
+        // Fallback to strtotime
+        $ts = strtotime($str);
+        if ($ts !== false && $ts > 0) return date('Y-m-d H:i:s', $ts);
+        return null;
+    }
+
+    // ---- Parse Time Part ----
+    $hour = 0; $minute = 0; $second = 0;
+
+    if (!empty($timePart)) {
+        // Format: 12:00 PM / 5:00 PM
+        if (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM|am|pm)$/', $timePart, $t)) {
+            $hour = (int)$t[1];
+            $minute = (int)$t[2];
+            $second = isset($t[3]) && $t[3] !== '' ? (int)$t[3] : 0;
+            $ampm = strtoupper($t[4]);
+            if ($ampm === 'PM' && $hour < 12) $hour += 12;
+            if ($ampm === 'AM' && $hour == 12) $hour = 0;
+        }
+        // Format: 17:00 / 17:00:00 (24-hour)
+        elseif (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/', $timePart, $t)) {
+            $hour = (int)$t[1];
+            $minute = (int)$t[2];
+            $second = isset($t[3]) && $t[3] !== '' ? (int)$t[3] : 0;
+        }
+        // Format: 17 (hour only)
+        elseif (preg_match('/^(\d{1,2})$/', $timePart, $t)) {
+            $hour = (int)$t[1];
         }
     }
 
-    $ts = strtotime($str);
-    if ($ts !== false && $ts > 0) return date('Y-m-d H:i:s', $ts);
-    return null;
+    // ---- Validate ----
+    if ($month < 1 || $month > 12) return null;
+    if ($day < 1 || $day > 31) return null;
+    if ($year < 1900 || $year > 2100) return null;
+    if ($hour < 0 || $hour > 23) return null;
+    if ($minute < 0 || $minute > 59) return null;
+    if ($second < 0 || $second > 59) return null;
+
+    // Check date validity
+    if (!checkdate($month, $day, $year)) return null;
+
+    return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second);
 }
 
 // ============================================================
@@ -321,7 +353,7 @@ include 'header.php';
                         <input type="number" name="bid_increment" class="form-control" step="0.01" value="<?= $edit_mode ? ($prop['bid_increment'] ?? '') : '' ?>">
                     </div>
 
-                    <!-- 🔥 EMD Deadline – बिना Placeholder -->
+                    <!-- EMD Deadline -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">EMD Deadline</label>
                         <input type="text" name="emd_deadline" class="form-control"
@@ -330,7 +362,7 @@ include 'header.php';
                                         : '' ?>">
                     </div>
 
-                    <!-- 🔥 Auction Start – बिना Placeholder -->
+                    <!-- Auction Start -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Start</label>
                         <input type="text" name="auction_start_time" class="form-control"
@@ -339,7 +371,7 @@ include 'header.php';
                                         : '' ?>">
                     </div>
 
-                    <!-- 🔥 Auction End – बिना Placeholder -->
+                    <!-- Auction End -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction End</label>
                         <input type="text" name="auction_end_time" class="form-control"
@@ -348,7 +380,7 @@ include 'header.php';
                                         : '' ?>">
                     </div>
 
-                    <!-- 🔥 Inspection Date – बिना Placeholder -->
+                    <!-- Inspection Date -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Inspection Date (DD/MM/YYYY)</label>
                         <input type="text" name="inspection_date" class="form-control"
@@ -357,7 +389,7 @@ include 'header.php';
                                         : '' ?>">
                     </div>
 
-                    <!-- 🔥 Auction Date – बिना Placeholder -->
+                    <!-- Auction Date -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Date (DD/MM/YYYY) *</label>
                         <input type="text" name="auction_date" class="form-control" required
