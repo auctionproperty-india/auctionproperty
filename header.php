@@ -79,18 +79,18 @@ if ($is_logged_in && $role == 'user') {
             font-family: 'Inter', sans-serif; 
             background: #f4f7fc; 
             overflow-x: hidden; 
-            /* 🔥 Disable text selection globally */
-            user-select: none;
+            /* 🔥 Selection Disable – लेकिन Input में Allow */
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
+            user-select: none;
         }
-        /* Allow selection in input fields and textareas */
-        input, textarea, [contenteditable="true"] {
-            user-select: text !important;
+        /* 🔥 Input/Textarea/Select में Selection Allow करें */
+        input, textarea, select, [contenteditable="true"] {
             -webkit-user-select: text !important;
             -moz-user-select: text !important;
             -ms-user-select: text !important;
+            user-select: text !important;
         }
         body { padding-top: 70px; }
         body.top-nav-hidden { padding-top: 0; }
@@ -626,10 +626,17 @@ if ($is_logged_in && $role == 'user') {
         .badge-sales { background: #f59e0b; color: #000; }
     </style>
 </head>
-<!-- 🔥 Added oncontextmenu and onkeydown to prevent copy & developer tools -->
+<!-- 🔥 Copy Protection – लेकिन Input/Textarea में Paste Allow -->
 <body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>"
-      oncontextmenu="return false;"
-      onkeydown="if(event.ctrlKey && (event.key === 'c' || event.key === 'v' || event.key === 's' || event.key === 'u' || event.key === 'f12')) return false;">
+      oncontextmenu="var tag = event.target.tagName; if(tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return false;"
+      onkeydown="
+        var tag = event.target.tagName;
+        var isInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target.isContentEditable);
+        if (isInput) return true;
+        if (event.key === 'F12') return false;
+        if (event.ctrlKey && (event.key === 'u' || event.key === 's' || event.key === 'p')) return false;
+        if (event.ctrlKey && event.shiftKey && (event.key === 'I' || event.key === 'J' || event.key === 'C')) return false;
+      ">
 
 <!-- ====== TOP NAV – on index, login, register ====== -->
 <?php if (!$hide_top_nav): ?>
