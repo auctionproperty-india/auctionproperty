@@ -65,45 +65,73 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     exit;
 }
 
-// ---- Function to safely parse date ----
+// ============================================================
+// HELPER: Parse Date (only date part)
+// ============================================================
 function parseDate($dateStr) {
-    if (empty($dateStr)) return null;
-    // Remove any extra spaces and time portion (keep only date part)
+    if (empty($dateStr) || trim($dateStr) === '') return null;
     $dateStr = trim($dateStr);
-    // If contains space, take only first part (assuming date part is before space)
     $parts = explode(' ', $dateStr);
-    $dateStr = $parts[0]; // take only the first token
-    
-    // Try to parse with strtotime (supports many formats)
-    $timestamp = strtotime($dateStr);
-    if ($timestamp !== false) {
-        return date('Y-m-d', $timestamp);
+    $dateStr = $parts[0];
+
+    // DD/MM/YYYY
+    if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $dateStr, $m)) {
+        return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
     }
-    
-    // Fallback: try DD/MM/YYYY or DD-MM-YYYY
-    if (strpos($dateStr, '/') !== false) {
-        $d = explode('/', $dateStr);
-        if (count($d) === 3) {
-            // Assume DD/MM/YYYY
-            return $d[2] . '-' . $d[1] . '-' . $d[0];
-        }
-    } elseif (strpos($dateStr, '-') !== false) {
-        $d = explode('-', $dateStr);
-        if (count($d) === 3) {
-            // Could be DD-MM-YYYY or YYYY-MM-DD
-            // Check if first part is 4-digit year
-            if (strlen($d[0]) === 4) {
-                return $d[0] . '-' . $d[1] . '-' . $d[2];
-            } else {
-                return $d[2] . '-' . $d[1] . '-' . $d[0];
-            }
-        }
+    // YYYY-MM-DD
+    if (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/', $dateStr, $m)) {
+        return sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3]);
     }
-    // If all fails, return null
+    // Fallback
+    $ts = strtotime($dateStr);
+    if ($ts !== false && $ts > 0) return date('Y-m-d', $ts);
     return null;
 }
 
-// ---- Handle Form Submission ----
+// ============================================================
+// HELPER: Parse Date-Time (with time component)
+// ============================================================
+function parseDateTimeFlexible($str) {
+    if (empty($str) || trim($str) === '') return null;
+    $str = trim($str);
+
+    // Skip invalid values
+    if (in_array(strtolower($str), ['#value!', 'na', 'n/a', 'null', '-'])) return null;
+
+    // Try known formats
+    $formats = [
+        'd/m/Y H:i',       // 19/08/2026 12:00
+        'd/m/Y h:i A',     // 19/08/2026 12:00 PM
+        'd/m/Y g:i A',     // 19/08/2026 5:00 PM
+        'd/m/Y H:i:s',
+        'd-m-Y H:i',
+        'd-m-Y h:i A',
+        'd-m-Y H:i:s',
+        'Y-m-d H:i:s',
+        'Y-m-d H:i',
+        'd/m/Y',
+        'd-m-Y',
+        'Y-m-d',
+    ];
+    foreach ($formats as $fmt) {
+        $dt = DateTime::createFromFormat($fmt, $str);
+        if ($dt !== false) {
+            $errors = DateTime::getLastErrors();
+            if ($errors === false || ($errors['warning_count'] == 0 && $errors['error_count'] == 0)) {
+                return $dt->format('Y-m-d H:i:s');
+            }
+        }
+    }
+
+    // Fallback to strtotime
+    $ts = strtotime($str);
+    if ($ts !== false && $ts > 0) return date('Y-m-d H:i:s', $ts);
+    return null;
+}
+
+// ============================================================
+// Handle Form Submission
+// ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
@@ -128,9 +156,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_date = trim($_POST['auction_date'] ?? '');
     $inspection_date = trim($_POST['inspection_date'] ?? '');
 
-    // Parse dates safely
-    $auction_date = parseDate($auction_date);
-    $inspection_date = parseDate($inspection_date);
+    // Parse dates
+    $auction_date_parsed = parseDate($auction_date);
+    $inspection_date_parsed = parseDate($inspection_date);
+    $emd_deadline_parsed = parseDateTimeFlexible($emd_deadline);
+    $auction_start_parsed = parseDateTimeFlexible($auction_start_time);
+    $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
     $action = $_POST['action'];
 
@@ -147,9 +178,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $stmt->execute([
             $title, $description, $price, $location, $city, $state, $type, $bank_name,
             $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
-            $emd_deadline, $auction_start_time, $auction_end_time, $locality,
-            $reserve_price_per_sqft, $contact_number, $status, $auction_date,
-            $inspection_date
+            $emd_deadline_parsed, $auction_start_parsed, $auction_end_parsed, $locality,
+            $reserve_price_per_sqft, $contact_number, $status, $auction_date_parsed,
+            $inspection_date_parsed
         ]);
         header("Location: properties.php?msg=added");
         exit;
@@ -167,9 +198,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $stmt->execute([
             $title, $description, $price, $location, $city, $state, $type, $bank_name,
             $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
-            $emd_deadline, $auction_start_time, $auction_end_time, $locality,
-            $reserve_price_per_sqft, $contact_number, $status, $auction_date,
-            $inspection_date, $id
+            $emd_deadline_parsed, $auction_start_parsed, $auction_end_parsed, $locality,
+            $reserve_price_per_sqft, $contact_number, $status, $auction_date_parsed,
+            $inspection_date_parsed, $id
         ]);
         header("Location: properties.php?msg=updated");
         exit;
@@ -198,7 +229,7 @@ include 'header.php';
     <?php endif; ?>
 
     <!-- ============================================================
-    ADD/EDIT FORM
+    ADD/EDIT FORM (NULL Safe + Full Property Types)
     ============================================================ -->
     <?php if (isset($_GET['add']) || $edit_mode): ?>
     <div class="card shadow-lg rounded-4 mb-5 border-0">
@@ -209,118 +240,141 @@ include 'header.php';
             <form method="POST">
                 <input type="hidden" name="action" value="<?= $edit_mode ? 'edit' : 'add' ?>">
                 <?php if ($edit_mode): ?>
-                    <input type="hidden" name="id" value="<?= $prop['id'] ?>">
+                    <input type="hidden" name="id" value="<?= htmlspecialchars($prop['id'] ?? '') ?>">
                 <?php endif; ?>
 
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Title *</label>
-                        <input type="text" name="title" class="form-control" required value="<?= $edit_mode ? htmlspecialchars($prop['title']) : '' ?>">
+                        <input type="text" name="title" class="form-control" required value="<?= $edit_mode ? htmlspecialchars($prop['title'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Address / Location *</label>
-                        <input type="text" name="location" class="form-control" required value="<?= $edit_mode ? htmlspecialchars($prop['location']) : '' ?>">
+                        <input type="text" name="location" class="form-control" required value="<?= $edit_mode ? htmlspecialchars($prop['location'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Reserve Price (₹) *</label>
-                        <input type="number" name="price" class="form-control" required step="0.01" value="<?= $edit_mode ? $prop['price'] : '' ?>">
+                        <input type="number" name="price" class="form-control" required step="0.01" value="<?= $edit_mode ? ($prop['price'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Price per Sq Ft</label>
-                        <input type="number" name="reserve_price_per_sqft" class="form-control" step="0.01" value="<?= $edit_mode ? $prop['reserve_price_per_sqft'] : '' ?>">
+                        <input type="number" name="reserve_price_per_sqft" class="form-control" step="0.01" value="<?= $edit_mode ? ($prop['reserve_price_per_sqft'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Area (Sq Ft)</label>
-                        <input type="number" name="sqft" class="form-control" value="<?= $edit_mode ? $prop['sqft'] : '' ?>">
+                        <input type="number" name="sqft" class="form-control" value="<?= $edit_mode ? ($prop['sqft'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Borrower Name</label>
-                        <input type="text" name="borrower_name" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['borrower_name']) : '' ?>">
+                        <input type="text" name="borrower_name" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['borrower_name'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Bank Name</label>
-                        <input type="text" name="bank_name" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['bank_name']) : '' ?>">
+                        <input type="text" name="bank_name" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['bank_name'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Property Type</label>
-                        <!-- ====== 🔥 UPDATED: Full Property Type List ====== -->
+                        <?php $currentType = $edit_mode ? ($prop['type'] ?? '') : ''; ?>
                         <select name="type" class="form-control">
-                            <option value="Flat" <?= $edit_mode && $prop['type'] == 'Flat' ? 'selected' : '' ?>>Flat</option>
-                            <option value="Plot" <?= $edit_mode && $prop['type'] == 'Plot' ? 'selected' : '' ?>>Plot</option>
-                            <option value="Shop" <?= $edit_mode && $prop['type'] == 'Shop' ? 'selected' : '' ?>>Shop</option>
-                            <option value="Land" <?= $edit_mode && $prop['type'] == 'Land' ? 'selected' : '' ?>>Land</option>
-                            <option value="House" <?= $edit_mode && $prop['type'] == 'House' ? 'selected' : '' ?>>House</option>
-                            <option value="Car/Vehicle" <?= $edit_mode && ($prop['type'] == 'Car/Vehicle' || $prop['type'] == 'Car') ? 'selected' : '' ?>>Car / Vehicle</option>
-                            <option value="Commercial" <?= $edit_mode && $prop['type'] == 'Commercial' ? 'selected' : '' ?>>Commercial</option>
-                            <option value="Office" <?= $edit_mode && $prop['type'] == 'Office' ? 'selected' : '' ?>>Office</option>
-                            <option value="Row House" <?= $edit_mode && $prop['type'] == 'Row House' ? 'selected' : '' ?>>Row House</option>
-                            <option value="Bungalow" <?= $edit_mode && $prop['type'] == 'Bungalow' ? 'selected' : '' ?>>Bungalow</option>
-                            <option value="Other" <?= $edit_mode && $prop['type'] == 'Other' ? 'selected' : '' ?>>Other</option>
+                            <option value="Flat" <?= $currentType == 'Flat' ? 'selected' : '' ?>>Flat</option>
+                            <option value="Plot" <?= $currentType == 'Plot' ? 'selected' : '' ?>>Plot</option>
+                            <option value="Shop" <?= $currentType == 'Shop' ? 'selected' : '' ?>>Shop</option>
+                            <option value="Land" <?= $currentType == 'Land' ? 'selected' : '' ?>>Land</option>
+                            <option value="House" <?= $currentType == 'House' ? 'selected' : '' ?>>House</option>
+                            <option value="Car/Vehicle" <?= ($currentType == 'Car/Vehicle' || $currentType == 'Car') ? 'selected' : '' ?>>Car / Vehicle</option>
+                            <option value="Commercial" <?= $currentType == 'Commercial' ? 'selected' : '' ?>>Commercial</option>
+                            <option value="Office" <?= $currentType == 'Office' ? 'selected' : '' ?>>Office</option>
+                            <option value="Row House" <?= $currentType == 'Row House' ? 'selected' : '' ?>>Row House</option>
+                            <option value="Bungalow" <?= $currentType == 'Bungalow' ? 'selected' : '' ?>>Bungalow</option>
+                            <option value="Other" <?= $currentType == 'Other' ? 'selected' : '' ?>>Other</option>
                         </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Possession</label>
+                        <?php $currentPoss = $edit_mode ? ($prop['possession_type'] ?? '') : ''; ?>
                         <select name="possession_type" class="form-control">
-                            <option value="Physical" <?= $edit_mode && $prop['possession_type'] == 'Physical' ? 'selected' : '' ?>>Physical</option>
-                            <option value="Symbolic" <?= $edit_mode && $prop['possession_type'] == 'Symbolic' ? 'selected' : '' ?>>Symbolic</option>
+                            <option value="Physical" <?= $currentPoss == 'Physical' ? 'selected' : '' ?>>Physical</option>
+                            <option value="Symbolic" <?= $currentPoss == 'Symbolic' ? 'selected' : '' ?>>Symbolic</option>
                         </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Locality</label>
-                        <input type="text" name="locality" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['locality']) : '' ?>">
+                        <input type="text" name="locality" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['locality'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">City *</label>
-                        <input type="text" name="city" class="form-control" required value="<?= $edit_mode ? htmlspecialchars($prop['city']) : '' ?>">
+                        <input type="text" name="city" class="form-control" required value="<?= $edit_mode ? htmlspecialchars($prop['city'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">State</label>
-                        <input type="text" name="state" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['state']) : '' ?>">
+                        <input type="text" name="state" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['state'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">EMD Amount (₹)</label>
-                        <input type="number" name="emd_amount" class="form-control" step="0.01" value="<?= $edit_mode ? $prop['emd_amount'] : '' ?>">
+                        <input type="number" name="emd_amount" class="form-control" step="0.01" value="<?= $edit_mode ? ($prop['emd_amount'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">BID Increment (₹)</label>
-                        <input type="number" name="bid_increment" class="form-control" step="0.01" value="<?= $edit_mode ? $prop['bid_increment'] : '' ?>">
+                        <input type="number" name="bid_increment" class="form-control" step="0.01" value="<?= $edit_mode ? ($prop['bid_increment'] ?? '') : '' ?>">
                     </div>
+
+                    <!-- 🔥 FIXED: EMD Deadline (NULL Safe) -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">EMD Deadline</label>
-                        <input type="text" name="emd_deadline" class="form-control" step="0.01" value="<?= $edit_mode ? htmlspecialchars($prop['emd_deadline']) : '' ?>">
+                        <input type="text" name="emd_deadline" class="form-control"
+                               placeholder="DD/MM/YYYY HH:MM AM/PM"
+                               value="<?= $edit_mode ? htmlspecialchars($prop['emd_deadline'] ?? '') : '' ?>">
                     </div>
+
+                    <!-- 🔥 FIXED: Auction Start (NULL Safe) -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Start</label>
-                        <input type="text" name="auction_start_time" class="form-control" step="0.01" value="<?= $edit_mode ? htmlspecialchars($prop['auction_start_time']) : '' ?>">
+                        <input type="text" name="auction_start_time" class="form-control"
+                               placeholder="DD/MM/YYYY HH:MM AM/PM"
+                               value="<?= $edit_mode ? htmlspecialchars($prop['auction_start_time'] ?? '') : '' ?>">
                     </div>
+
+                    <!-- 🔥 FIXED: Auction End (NULL Safe) -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction End</label>
-                        <input type="text" name="auction_end_time" class="form-control" step="0.01" value="<?= $edit_mode ? htmlspecialchars($prop['auction_end_time']) : '' ?>">
+                        <input type="text" name="auction_end_time" class="form-control"
+                               placeholder="DD/MM/YYYY HH:MM AM/PM"
+                               value="<?= $edit_mode ? htmlspecialchars($prop['auction_end_time'] ?? '') : '' ?>">
                     </div>
+
+                    <!-- 🔥 FIXED: Inspection Date (NULL Safe) -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Inspection Date (DD/MM/YYYY)</label>
-                        <input type="text" name="inspection_date" class="form-control" step="0.01" value="<?= $edit_mode && $prop['inspection_date'] ? date('d/m/Y', strtotime($prop['inspection_date'])) : '' ?>">
+                        <input type="text" name="inspection_date" class="form-control"
+                               placeholder="DD/MM/YYYY"
+                               value="<?= ($edit_mode && !empty($prop['inspection_date'])) ? date('d/m/Y', strtotime($prop['inspection_date'])) : '' ?>">
                     </div>
+
+                    <!-- 🔥 FIXED: Auction Date (NULL Safe) -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Date (DD/MM/YYYY) *</label>
-                        <input type="text" name="auction_date" class="form-control" step="0.01" required value="<?= $edit_mode && $prop['auction_date'] ? date('d/m/Y', strtotime($prop['auction_date'])) : '' ?>">
-                        <small class="text-muted">Enter only date (e.g., 24/08/2026). Time will be ignored.</small>
+                        <input type="text" name="auction_date" class="form-control" required
+                               placeholder="DD/MM/YYYY"
+                               value="<?= ($edit_mode && !empty($prop['auction_date'])) ? date('d/m/Y', strtotime($prop['auction_date'])) : '' ?>">
+                        <small class="text-muted">Enter only date (e.g., 24/08/2026).</small>
                     </div>
+
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Contact Number</label>
-                        <input type="text" name="contact_number" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['contact_number']) : '' ?>">
+                        <input type="text" name="contact_number" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['contact_number'] ?? '') : '' ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Status</label>
+                        <?php $currentStatus = $edit_mode ? ($prop['status'] ?? 'available') : 'available'; ?>
                         <select name="status" class="form-control">
-                            <option value="available" <?= $edit_mode && $prop['status'] == 'available' ? 'selected' : '' ?>>Available</option>
-                            <option value="sold" <?= $edit_mode && $prop['status'] == 'sold' ? 'selected' : '' ?>>Sold</option>
-                            <option value="pending" <?= $edit_mode && $prop['status'] == 'pending' ? 'selected' : '' ?>>Pending</option>
+                            <option value="available" <?= $currentStatus == 'available' ? 'selected' : '' ?>>Available</option>
+                            <option value="sold" <?= $currentStatus == 'sold' ? 'selected' : '' ?>>Sold</option>
+                            <option value="pending" <?= $currentStatus == 'pending' ? 'selected' : '' ?>>Pending</option>
                         </select>
                     </div>
                     <div class="col-12">
                         <label class="form-label fw-bold">Description</label>
-                        <textarea name="description" class="form-control" rows="3"><?= $edit_mode ? htmlspecialchars($prop['description']) : '' ?></textarea>
+                        <textarea name="description" class="form-control" rows="3"><?= $edit_mode ? htmlspecialchars($prop['description'] ?? '') : '' ?></textarea>
                     </div>
                     <div class="col-12">
                         <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill shadow">
@@ -393,11 +447,11 @@ include 'header.php';
                 <tbody>
                     <?php foreach ($properties as $row): ?>
                         <tr>
-                            <td><?= $row['id'] ?></td>
-                            <td><?= htmlspecialchars($row['title']) ?></td>
+                            <td><?= htmlspecialchars($row['id'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($row['title'] ?? '') ?></td>
                             <td><?= htmlspecialchars($row['bank_name'] ?? 'N/A') ?></td>
                             <td><?= htmlspecialchars($row['city'] ?? 'N/A') ?></td>
-                            <td>₹ <?= number_format($row['price'], 2) ?></td>
+                            <td>₹ <?= number_format($row['price'] ?? 0, 2) ?></td>
                             <td>
                                 <?php if (!empty($row['auction_date'])): ?>
                                     <?= date('d M Y', strtotime($row['auction_date'])) ?>
@@ -405,7 +459,13 @@ include 'header.php';
                                     <span class="text-muted">N/A</span>
                                 <?php endif; ?>
                             </td>
-                            <td><span class="badge bg-<?= $row['status'] == 'available' ? 'success' : ($row['status'] == 'sold' ? 'danger' : 'warning') ?>"><?= $row['status'] ?></span></td>
+                            <td>
+                                <?php 
+                                $statusVal = $row['status'] ?? 'available';
+                                $badgeClass = ($statusVal == 'available') ? 'success' : (($statusVal == 'sold') ? 'danger' : 'warning');
+                                ?>
+                                <span class="badge bg-<?= $badgeClass ?>"><?= htmlspecialchars($statusVal) ?></span>
+                            </td>
                             <td>
                                 <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></a>
                                 <?php if ($is_admin): ?>
