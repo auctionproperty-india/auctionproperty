@@ -74,15 +74,12 @@ function parseDate($dateStr) {
     $parts = explode(' ', $dateStr);
     $dateStr = $parts[0];
 
-    // DD/MM/YYYY
     if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $dateStr, $m)) {
         return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
     }
-    // YYYY-MM-DD
     if (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/', $dateStr, $m)) {
         return sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3]);
     }
-    // Fallback
     $ts = strtotime($dateStr);
     if ($ts !== false && $ts > 0) return date('Y-m-d', $ts);
     return null;
@@ -95,17 +92,24 @@ function parseDateTimeFlexible($str) {
     if (empty($str) || trim($str) === '') return null;
     $str = trim($str);
 
-    // Skip invalid values
-    if (in_array(strtolower($str), ['#value!', 'na', 'n/a', 'null', '-'])) return null;
+    if (in_array(strtolower($str), ['#value!', 'na', 'n/a', 'null', '-', 'club', 'club case'])) return null;
 
-    // Try known formats
+    // Normalize: Convert "1/9/2026 17:00" → "01/09/2026 17:00"
+    if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\s+(.+)$/', $str, $m)) {
+        $day = str_pad($m[1], 2, '0', STR_PAD_LEFT);
+        $month = str_pad($m[2], 2, '0', STR_PAD_LEFT);
+        $year = strlen($m[3]) == 2 ? '20' . $m[3] : $m[3];
+        $timePart = trim($m[4]);
+        $str = "$day/$month/$year $timePart";
+    }
+
     $formats = [
-        'd/m/Y H:i',       // 19/08/2026 12:00
-        'd/m/Y h:i A',     // 19/08/2026 12:00 PM
-        'd/m/Y g:i A',     // 19/08/2026 5:00 PM
+        'd/m/Y h:i A',
+        'd/m/Y g:i A',
+        'd/m/Y H:i',
         'd/m/Y H:i:s',
-        'd-m-Y H:i',
         'd-m-Y h:i A',
+        'd-m-Y H:i',
         'd-m-Y H:i:s',
         'Y-m-d H:i:s',
         'Y-m-d H:i',
@@ -123,7 +127,6 @@ function parseDateTimeFlexible($str) {
         }
     }
 
-    // Fallback to strtotime
     $ts = strtotime($str);
     if ($ts !== false && $ts > 0) return date('Y-m-d H:i:s', $ts);
     return null;
@@ -229,7 +232,7 @@ include 'header.php';
     <?php endif; ?>
 
     <!-- ============================================================
-    ADD/EDIT FORM (NULL Safe + Full Property Types)
+    ADD/EDIT FORM
     ============================================================ -->
     <?php if (isset($_GET['add']) || $edit_mode): ?>
     <div class="card shadow-lg rounded-4 mb-5 border-0">
@@ -318,44 +321,49 @@ include 'header.php';
                         <input type="number" name="bid_increment" class="form-control" step="0.01" value="<?= $edit_mode ? ($prop['bid_increment'] ?? '') : '' ?>">
                     </div>
 
-                    <!-- 🔥 FIXED: EMD Deadline (NULL Safe) -->
+                    <!-- 🔥 EMD Deadline – बिना Placeholder -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">EMD Deadline</label>
                         <input type="text" name="emd_deadline" class="form-control"
-                               placeholder="DD/MM/YYYY HH:MM AM/PM"
-                               value="<?= $edit_mode ? htmlspecialchars($prop['emd_deadline'] ?? '') : '' ?>">
+                               value="<?= ($edit_mode && !empty($prop['emd_deadline'])) 
+                                        ? date('d/m/Y h:i A', strtotime($prop['emd_deadline'])) 
+                                        : '' ?>">
                     </div>
 
-                    <!-- 🔥 FIXED: Auction Start (NULL Safe) -->
+                    <!-- 🔥 Auction Start – बिना Placeholder -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Start</label>
                         <input type="text" name="auction_start_time" class="form-control"
-                               placeholder="DD/MM/YYYY HH:MM AM/PM"
-                               value="<?= $edit_mode ? htmlspecialchars($prop['auction_start_time'] ?? '') : '' ?>">
+                               value="<?= ($edit_mode && !empty($prop['auction_start_time'])) 
+                                        ? date('d/m/Y h:i A', strtotime($prop['auction_start_time'])) 
+                                        : '' ?>">
                     </div>
 
-                    <!-- 🔥 FIXED: Auction End (NULL Safe) -->
+                    <!-- 🔥 Auction End – बिना Placeholder -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction End</label>
                         <input type="text" name="auction_end_time" class="form-control"
-                               placeholder="DD/MM/YYYY HH:MM AM/PM"
-                               value="<?= $edit_mode ? htmlspecialchars($prop['auction_end_time'] ?? '') : '' ?>">
+                               value="<?= ($edit_mode && !empty($prop['auction_end_time'])) 
+                                        ? date('d/m/Y h:i A', strtotime($prop['auction_end_time'])) 
+                                        : '' ?>">
                     </div>
 
-                    <!-- 🔥 FIXED: Inspection Date (NULL Safe) -->
+                    <!-- 🔥 Inspection Date – बिना Placeholder -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Inspection Date (DD/MM/YYYY)</label>
                         <input type="text" name="inspection_date" class="form-control"
-                               placeholder="DD/MM/YYYY"
-                               value="<?= ($edit_mode && !empty($prop['inspection_date'])) ? date('d/m/Y', strtotime($prop['inspection_date'])) : '' ?>">
+                               value="<?= ($edit_mode && !empty($prop['inspection_date'])) 
+                                        ? date('d/m/Y', strtotime($prop['inspection_date'])) 
+                                        : '' ?>">
                     </div>
 
-                    <!-- 🔥 FIXED: Auction Date (NULL Safe) -->
+                    <!-- 🔥 Auction Date – बिना Placeholder -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Date (DD/MM/YYYY) *</label>
                         <input type="text" name="auction_date" class="form-control" required
-                               placeholder="DD/MM/YYYY"
-                               value="<?= ($edit_mode && !empty($prop['auction_date'])) ? date('d/m/Y', strtotime($prop['auction_date'])) : '' ?>">
+                               value="<?= ($edit_mode && !empty($prop['auction_date'])) 
+                                        ? date('d/m/Y', strtotime($prop['auction_date'])) 
+                                        : '' ?>">
                         <small class="text-muted">Enter only date (e.g., 24/08/2026).</small>
                     </div>
 
