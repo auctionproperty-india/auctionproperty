@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📤 Bulk Upload Properties – UTF-8 Safe + Re-Prepare on Error
+// 📤 Bulk Upload Properties – UTF-8 Safe + EMD Auto-Set
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -20,42 +20,32 @@ function cleanUTF8($str) {
     if ($str === null) return '';
     $str = (string)$str;
 
-    // Step 1: Convert from Windows-1252 to UTF-8 (fixes smart quotes)
     if (!mb_check_encoding($str, 'UTF-8')) {
-        // Try converting from Windows-1252
         $converted = @iconv('Windows-1252', 'UTF-8//IGNORE', $str);
         if ($converted !== false) {
             $str = $converted;
         } else {
-            // Fallback: remove invalid bytes
             $str = mb_convert_encoding($str, 'UTF-8', 'UTF-8');
         }
     }
 
-    // Step 2: Replace common smart characters
     $replacements = [
-        "\xE2\x80\x9C" => '"',   // Left double quote
-        "\xE2\x80\x9D" => '"',   // Right double quote
-        "\xE2\x80\x98" => "'",   // Left single quote
-        "\xE2\x80\x99" => "'",   // Right single quote
-        "\xE2\x80\x93" => '-',   // En-dash
-        "\xE2\x80\x94" => '-',   // Em-dash
-        "\xE2\x80\xA6" => '...', // Ellipsis
-        "\xC2\xA0"     => ' ',   // Non-breaking space
+        "\xE2\x80\x9C" => '"',
+        "\xE2\x80\x9D" => '"',
+        "\xE2\x80\x98" => "'",
+        "\xE2\x80\x99" => "'",
+        "\xE2\x80\x93" => '-',
+        "\xE2\x80\x94" => '-',
+        "\xE2\x80\xA6" => '...',
+        "\xC2\xA0"     => ' ',
     ];
     $str = str_replace(array_keys($replacements), array_values($replacements), $str);
-
-    // Step 3: Remove any remaining invalid UTF-8 bytes
     $str = mb_convert_encoding($str, 'UTF-8', 'UTF-8');
-
-    // Step 4: Trim
-    $str = trim($str);
-
-    return $str;
+    return trim($str);
 }
 
 // ============================================================
-// HELPER: Extract first number from string
+// HELPER: Extract first number
 // ============================================================
 function extractNumber($str) {
     if (empty($str)) return 0;
@@ -67,7 +57,7 @@ function extractNumber($str) {
 }
 
 // ============================================================
-// HELPER: Check if invalid value
+// HELPER: Check invalid value
 // ============================================================
 function isInvalidValue($str) {
     if (empty($str)) return true;
@@ -118,7 +108,7 @@ function parseDate($dateStr) {
 }
 
 // ============================================================
-// HELPER: Parse Date-Time (Manual – 100% Reliable)
+// HELPER: Parse Date-Time
 // ============================================================
 function parseDateTimeFlexible($str) {
     if (empty($str) || trim($str) === '') return null;
@@ -227,7 +217,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                     $failRows = [];
                     $rowNum = 1;
 
-                    // 🔥 Prepared statement SQL (re-use on each row)
                     $insertSQL = "
                         INSERT INTO properties (
                             title, description, price, location, city, state, type, bank_name,
@@ -243,7 +232,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
 
                         if (count(array_filter($row)) === 0) continue;
 
-                        // ✅ Clean ALL values to valid UTF-8
                         $row = array_map('cleanUTF8', $row);
 
                         $getVal = function($col) use ($row, $colMap) {
@@ -275,7 +263,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                         $statusRaw          = $getVal('status');
                         $description        = $getVal('description');
 
-                        // Skip invalid
                         if (isInvalidValue($priceRaw)) {
                             $skipCount++;
                             $skipRows[] = "Row $rowNum: Skipped (invalid price: '$priceRaw')";
@@ -310,11 +297,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                                     : 'available';
 
                         $inspection_date = parseDate($inspection_date_raw);
-                        $emd_deadline_parsed = parseDateTimeFlexible($emd_deadline);
                         $auction_start_parsed = parseDateTimeFlexible($auction_start_time);
                         $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
-                        // 🔥 RE-PREPARE the statement for each row (fixes corruption after errors)
+                        // ============================================================
+                        // 🔥 EMD DEADLINE – अगर खाली है तो Auction Date से 1 दिन पहले Auto-Set
+                        // ============================================================
+                        $emd_deadline_parsed = parseDateTimeFlexible($emd_deadline);
+                        if (empty($emd_deadline_parsed) && !empty($auction_date)) {
+                            $emd_deadline_parsed = date('Y-m-d 17:00:00', strtotime($auction_date . ' -1 day'));
+                        }
+
                         try {
                             $stmt = $pdo->prepare($insertSQL);
                             $stmt->execute([
@@ -328,7 +321,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                         } catch (PDOException $e) {
                             $failCount++;
                             $failRows[] = "Row $rowNum: " . cleanUTF8($e->getMessage());
-                            // No need to unset $stmt - it will be re-prepared on next iteration
                         }
                     }
 
@@ -416,8 +408,9 @@ include 'header.php';
     <?php endif; ?>
 
     <div class="info-box">
-        <h6><i class="fas fa-shield-alt me-2"></i> 🔥 यह Script अब UTF-8 Safe है</h6>
+        <h6><i class="fas fa-shield-alt me-2"></i> 🔥 Features</h6>
         <ul class="mb-0" style="font-size: 0.9rem;">
+            <li><strong>EMD Deadline Auto-Set:</strong> अगर खाली है तो <strong>Auction Date से 1 दिन पहले शाम 5:00 बजे</strong> अपने आप Set हो जाएगी</li>
             <li>Smart Quotes (<code>" " ' '</code>) और En-dash (<code>–</code>) Auto-Fix होंगे</li>
             <li>Windows-1252 Characters UTF-8 में Convert होंगे</li>
             <li>किसी भी Row में Error आने पर Statement Auto-Re-Prepare होगा</li>
