@@ -1,6 +1,7 @@
 <?php
 // ============================================================
-// 📤 Bulk Upload Properties – UTF-8 Safe + EMD Auto-Set
+// 📤 Bulk Upload Properties – UTF-8 Safe + EMD Auto (Always)
+// EMD Deadline = Auction Date − 1 Day (हमेशा)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -14,30 +15,21 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['
 $is_admin = ($_SESSION['role'] == 'admin' || $_SESSION['role'] == 'sub_admin');
 
 // ============================================================
-// 🔥 HELPER: Clean UTF-8 (Remove invalid bytes, fix smart quotes)
+// 🔥 HELPER: Clean UTF-8
 // ============================================================
 function cleanUTF8($str) {
     if ($str === null) return '';
     $str = (string)$str;
-
     if (!mb_check_encoding($str, 'UTF-8')) {
         $converted = @iconv('Windows-1252', 'UTF-8//IGNORE', $str);
-        if ($converted !== false) {
-            $str = $converted;
-        } else {
-            $str = mb_convert_encoding($str, 'UTF-8', 'UTF-8');
-        }
+        if ($converted !== false) { $str = $converted; }
+        else { $str = mb_convert_encoding($str, 'UTF-8', 'UTF-8'); }
     }
-
     $replacements = [
-        "\xE2\x80\x9C" => '"',
-        "\xE2\x80\x9D" => '"',
-        "\xE2\x80\x98" => "'",
-        "\xE2\x80\x99" => "'",
-        "\xE2\x80\x93" => '-',
-        "\xE2\x80\x94" => '-',
-        "\xE2\x80\xA6" => '...',
-        "\xC2\xA0"     => ' ',
+        "\xE2\x80\x9C" => '"', "\xE2\x80\x9D" => '"',
+        "\xE2\x80\x98" => "'", "\xE2\x80\x99" => "'",
+        "\xE2\x80\x93" => '-', "\xE2\x80\x94" => '-',
+        "\xE2\x80\xA6" => '...', "\xC2\xA0" => ' ',
     ];
     $str = str_replace(array_keys($replacements), array_values($replacements), $str);
     $str = mb_convert_encoding($str, 'UTF-8', 'UTF-8');
@@ -50,9 +42,7 @@ function cleanUTF8($str) {
 function extractNumber($str) {
     if (empty($str)) return 0;
     $str = str_replace([',', '₹', ' '], '', $str);
-    if (preg_match('/-?\d+(\.\d+)?/', $str, $m)) {
-        return (float)$m[0];
-    }
+    if (preg_match('/-?\d+(\.\d+)?/', $str, $m)) return (float)$m[0];
     return 0;
 }
 
@@ -72,7 +62,6 @@ function isInvalidValue($str) {
 function normalizeType($type) {
     $type = trim($type);
     if (empty($type)) return 'Other';
-
     $map = [
         'flat' => 'Flat', 'plot' => 'Plot', 'shop' => 'Shop', 'land' => 'Land',
         'house' => 'House', 'independent house' => 'House', 'independenthouse' => 'House',
@@ -83,19 +72,17 @@ function normalizeType($type) {
         'office' => 'Office', 'other' => 'Other', 'club case' => 'Other', 'club' => 'Other',
         'godown' => 'Commercial', 'independent slab building' => 'Commercial',
     ];
-    $key = strtolower($type);
-    return $map[$key] ?? 'Other';
+    return $map[strtolower($type)] ?? 'Other';
 }
 
 // ============================================================
-// HELPER: Parse Date (only date part)
+// HELPER: Parse Date
 // ============================================================
 function parseDate($dateStr) {
     if (empty($dateStr) || trim($dateStr) === '') return null;
     $dateStr = trim($dateStr);
     $parts = explode(' ', $dateStr);
     $dateStr = $parts[0];
-
     if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $dateStr, $m)) {
         return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
     }
@@ -105,54 +92,6 @@ function parseDate($dateStr) {
     $ts = strtotime($dateStr);
     if ($ts !== false && $ts > 0) return date('Y-m-d', $ts);
     return null;
-}
-
-// ============================================================
-// HELPER: Parse Date-Time
-// ============================================================
-function parseDateTimeFlexible($str) {
-    if (empty($str) || trim($str) === '') return null;
-    $str = trim($str);
-    $lower = strtolower($str);
-    if (in_array($lower, ['#value!', 'na', 'n/a', 'null', '-', 'club', 'club case'])) return null;
-
-    $year = 0; $month = 0; $day = 0; $timePart = '';
-
-    if (preg_match('/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})\s*(.*)$/', $str, $m)) {
-        $year = (int)$m[1]; $month = (int)$m[2]; $day = (int)$m[3];
-        $timePart = trim($m[4]);
-    } elseif (preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s*(.*)$/', $str, $m)) {
-        $day = (int)$m[1]; $month = (int)$m[2]; $year = (int)$m[3];
-        if ($year < 100) $year += 2000;
-        $timePart = trim($m[4]);
-    } else {
-        $ts = strtotime($str);
-        if ($ts !== false && $ts > 0) return date('Y-m-d H:i:s', $ts);
-        return null;
-    }
-
-    $hour = 0; $minute = 0; $second = 0;
-    if (!empty($timePart)) {
-        if (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM|am|pm)$/', $timePart, $t)) {
-            $hour = (int)$t[1]; $minute = (int)$t[2];
-            $second = isset($t[3]) && $t[3] !== '' ? (int)$t[3] : 0;
-            $ampm = strtoupper($t[4]);
-            if ($ampm === 'PM' && $hour < 12) $hour += 12;
-            if ($ampm === 'AM' && $hour == 12) $hour = 0;
-        } elseif (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/', $timePart, $t)) {
-            $hour = (int)$t[1]; $minute = (int)$t[2];
-            $second = isset($t[3]) && $t[3] !== '' ? (int)$t[3] : 0;
-        } elseif (preg_match('/^(\d{1,2})$/', $timePart, $t)) {
-            $hour = (int)$t[1];
-        }
-    }
-
-    if ($month < 1 || $month > 12) return null;
-    if ($day < 1 || $day > 31) return null;
-    if ($year < 1900 || $year > 2100) return null;
-    if (!checkdate($month, $day, $year)) return null;
-
-    return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second);
 }
 
 // ============================================================
@@ -229,15 +168,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
 
                     while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
                         $rowNum++;
-
                         if (count(array_filter($row)) === 0) continue;
 
                         $row = array_map('cleanUTF8', $row);
 
                         $getVal = function($col) use ($row, $colMap) {
-                            return isset($colMap[$col]) && isset($row[$colMap[$col]])
-                                ? $row[$colMap[$col]]
-                                : '';
+                            return isset($colMap[$col]) && isset($row[$colMap[$col]]) ? $row[$colMap[$col]] : '';
                         };
 
                         $title              = $getVal('title');
@@ -254,7 +190,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                         $possession_type    = $getVal('possession_type');
                         $emdRaw             = $getVal('emd_amount');
                         $bidRaw             = $getVal('bid_increment');
-                        $emd_deadline       = $getVal('emd_deadline');
                         $auction_start_time = $getVal('auction_start_time');
                         $auction_end_time   = $getVal('auction_end_time');
                         $auction_date_raw   = $getVal('auction_date');
@@ -263,6 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                         $statusRaw          = $getVal('status');
                         $description        = $getVal('description');
 
+                        // Skip invalid price (Club cases)
                         if (isInvalidValue($priceRaw)) {
                             $skipCount++;
                             $skipRows[] = "Row $rowNum: Skipped (invalid price: '$priceRaw')";
@@ -297,15 +233,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                                     : 'available';
 
                         $inspection_date = parseDate($inspection_date_raw);
-                        $auction_start_parsed = parseDateTimeFlexible($auction_start_time);
-                        $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
                         // ============================================================
-                        // 🔥 EMD DEADLINE – अगर खाली है तो Auction Date से 1 दिन पहले Auto-Set
+                        // 🔥 EMD DEADLINE = AUCTION DATE − 1 DAY (हमेशा)
+                        // चाहे CSV में कुछ भी हो, हम इसे Override करेंगे
                         // ============================================================
-                        $emd_deadline_parsed = parseDateTimeFlexible($emd_deadline);
-                        if (empty($emd_deadline_parsed) && !empty($auction_date)) {
+                        $emd_deadline_parsed = null;
+                        if (!empty($auction_date)) {
+                            // Auction Date से 1 दिन पहले, शाम 5:00 बजे
                             $emd_deadline_parsed = date('Y-m-d 17:00:00', strtotime($auction_date . ' -1 day'));
+                        }
+
+                        // Auction Start / End Time (अगर CSV में हो)
+                        $auction_start_parsed = null;
+                        if (!empty($auction_start_time) && !isInvalidValue($auction_start_time)) {
+                            $ts = strtotime($auction_start_time);
+                            if ($ts !== false) $auction_start_parsed = date('Y-m-d H:i:s', $ts);
+                        }
+                        $auction_end_parsed = null;
+                        if (!empty($auction_end_time) && !isInvalidValue($auction_end_time)) {
+                            $ts = strtotime($auction_end_time);
+                            if ($ts !== false) $auction_end_parsed = date('Y-m-d H:i:s', $ts);
                         }
 
                         try {
@@ -410,10 +358,10 @@ include 'header.php';
     <div class="info-box">
         <h6><i class="fas fa-shield-alt me-2"></i> 🔥 Features</h6>
         <ul class="mb-0" style="font-size: 0.9rem;">
-            <li><strong>EMD Deadline Auto-Set:</strong> अगर खाली है तो <strong>Auction Date से 1 दिन पहले शाम 5:00 बजे</strong> अपने आप Set हो जाएगी</li>
+            <li><strong style="color: #dc2626;">EMD Deadline हमेशा Auction Date से 1 दिन पहले (शाम 5:00 बजे) Set होगी</strong></li>
             <li>Smart Quotes (<code>" " ' '</code>) और En-dash (<code>–</code>) Auto-Fix होंगे</li>
             <li>Windows-1252 Characters UTF-8 में Convert होंगे</li>
-            <li>किसी भी Row में Error आने पर Statement Auto-Re-Prepare होगा</li>
+            <li>Club Case वाली Rows Auto-Skip होंगी</li>
             <li>Excel में Save करते समय <strong>CSV UTF-8</strong> ही चुनें</li>
         </ul>
     </div>
