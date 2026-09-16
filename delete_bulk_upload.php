@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🗑️ Delete Bulk Uploaded Properties – Batch-wise
+// 🗑️ Delete Bulk Uploaded Properties – Batch-wise (FIXED)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -20,50 +20,73 @@ $action = $_GET['action'] ?? 'list';
 $deletedCount = 0;
 
 // ============================================================
+// 🔥 HELPER: Safely quote values for inline SQL
+// ============================================================
+function sqlQuote($pdo, $value) {
+    if ($value === null || $value === '') return 'NULL';
+    return $pdo->quote($value);
+}
+
+// ============================================================
 // Handle DELETE (by exact timestamp range of a batch)
 // ============================================================
 if ($action === 'delete' && isset($_POST['batch_start']) && isset($_POST['batch_end']) && isset($_POST['confirm'])) {
     $batchStart = $_POST['batch_start'];
     $batchEnd   = $_POST['batch_end'];
 
-    $stmt = $pdo->prepare("DELETE FROM properties WHERE created_at >= ? AND created_at <= ?");
-    $stmt->execute([$batchStart, $batchEnd]);
-    $deletedCount = $stmt->rowCount();
+    // 🔥 Use query() with quoted values instead of prepare()
+    $sql = "DELETE FROM properties WHERE created_at >= " . sqlQuote($pdo, $batchStart)
+         . " AND created_at <= " . sqlQuote($pdo, $batchEnd);
+
+    try {
+        $deletedCount = $pdo->exec($sql);
+    } catch (PDOException $e) {
+        $errorMsg = "Delete failed: " . $e->getMessage();
+    }
     $action = 'deleted';
 }
 
 // ============================================================
 // Get Properties Grouped by Time Batches (5-minute window)
+// 🔥 Using single query() instead of prepare()
 // ============================================================
-$stmt = $pdo->query("
-    SELECT 
-        MIN(created_at) as batch_start,
-        MAX(created_at) as batch_end,
-        COUNT(*) as total,
-        MIN(id) as min_id,
-        MAX(id) as max_id
-    FROM (
-        SELECT id, created_at,
-            (EXTRACT(EPOCH FROM created_at)::bigint / 300) AS batch_group
-        FROM properties
-    ) sub
-    GROUP BY batch_group
-    ORDER BY batch_start DESC
-");
-$batches = $stmt->fetchAll();
+$batches = [];
+try {
+    $sql = "
+        SELECT 
+            MIN(created_at) as batch_start,
+            MAX(created_at) as batch_end,
+            COUNT(*) as total,
+            MIN(id) as min_id,
+            MAX(id) as max_id
+        FROM (
+            SELECT id, created_at,
+                (EXTRACT(EPOCH FROM created_at)::bigint / 300) AS batch_group
+            FROM properties
+        ) sub
+        GROUP BY batch_group
+        ORDER BY batch_start DESC
+    ";
+    $stmt = $pdo->query($sql);
+    $batches = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $errorMsg = "Batch query failed: " . $e->getMessage();
+}
 
 // ---- Get sample titles for each batch ----
 $batchDetails = [];
 foreach ($batches as $b) {
-    $stmt = $pdo->prepare("
-        SELECT id, title, city, created_at 
-        FROM properties 
-        WHERE created_at >= ? AND created_at <= ? 
-        ORDER BY id ASC 
-        LIMIT 5
-    ");
-    $stmt->execute([$b['batch_start'], $b['batch_end']]);
-    $samples = $stmt->fetchAll();
+    try {
+        $sSql = "SELECT id, title, city, created_at 
+                 FROM properties 
+                 WHERE created_at >= " . sqlQuote($pdo, $b['batch_start'])
+              . " AND created_at <= " . sqlQuote($pdo, $b['batch_end'])
+              . " ORDER BY id ASC LIMIT 5";
+        $sStmt = $pdo->query($sSql);
+        $samples = $sStmt->fetchAll();
+    } catch (PDOException $e) {
+        $samples = [];
+    }
 
     $batchDetails[] = [
         'batch_start' => $b['batch_start'],
@@ -75,7 +98,12 @@ foreach ($batches as $b) {
     ];
 }
 
-$totalProps = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
+// Total Count
+try {
+    $totalProps = $pdo->query("SELECT COUNT(*) FROM properties")->fetchColumn();
+} catch (PDOException $e) {
+    $totalProps = 0;
+}
 
 include 'header.php';
 ?>
@@ -96,6 +124,7 @@ include 'header.php';
     .btn-backup:hover { color: #fff; transform: translateY(-2px); }
     .btn-secondary-big { background: #e2e8f0; color: #1e293b; padding: 12px 30px; border: none; border-radius: 50px; font-weight: 700; text-decoration: none; display: inline-block; }
     .success-box { background: #ecfdf5; border-left: 5px solid #10b981; padding: 20px; border-radius: 12px; margin-bottom: 20px; font-weight: 700; color: #065f46; }
+    .error-box { background: #fef2f2; border-left: 5px solid #dc2626; padding: 20px; border-radius: 12px; margin-bottom: 20px; color: #991b1b; }
     .sample-list { background: #fff; border-radius: 10px; padding: 12px 16px; border: 1px solid #e8edf4; margin-bottom: 14px; }
     .sample-list li { font-size: 0.85rem; padding: 3px 0; color: #334155; }
     .big-count { font-size: 2.5rem; font-weight: 900; color: #dc2626; text-align: center; }
@@ -103,6 +132,12 @@ include 'header.php';
 
 <div class="container">
     <div class="del-container">
+
+        <?php if (!empty($errorMsg)): ?>
+            <div class="error-box">
+                ❌ <strong>Error:</strong> <?= htmlspecialchars($errorMsg) ?>
+            </div>
+        <?php endif; ?>
 
         <?php if ($action === 'deleted'): ?>
             <div class="success-box">
@@ -140,12 +175,12 @@ include 'header.php';
             </h5>
 
             <?php if (count($batchDetails) > 0): ?>
-                <?php foreach ($batchDetails as $batch): ?>
+                <?php foreach ($batchDetails as $index => $batch): ?>
                     <div class="batch-card">
                         <div class="batch-header">
                             <div>
                                 <div class="batch-title">
-                                    <i class="fas fa-layer-group me-2"></i> Upload Batch
+                                    <i class="fas fa-layer-group me-2"></i> Upload Batch #<?= $index + 1 ?>
                                 </div>
                                 <div class="batch-time">
                                     <i class="far fa-clock me-1"></i>
