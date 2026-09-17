@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📦 Admin: Manage Packages (No .00, Center Align)
+// 🎁 Admin Packages Manager – Dynamic Fields Support
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -11,233 +11,483 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit;
 }
 
-include 'header.php';
-
 $message = '';
+$message_type = '';
 
-if (isset($_GET['delete'])) {
-    $id = (int)$_GET['delete'];
-    $pdo->prepare("DELETE FROM packages WHERE id = ?")->execute([$id]);
-    $message = "<div class='alert alert-success'>✅ Package deleted.</div>";
-}
+// ============================================================
+// HANDLE: Add/Delete Field
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-    $name = trim($_POST['name']);
-    $price = (float)$_POST['price'];
-    $discount_price = !empty($_POST['discount_price']) ? (float)$_POST['discount_price'] : null;
-    $duration_months = (int)$_POST['duration_months'];
-    $validity = trim($_POST['validity'] ?? '');
-    $property_search = trim($_POST['property_search'] ?? '');
-    $company_support = trim($_POST['company_support'] ?? '');
-    $sales_team_support = trim($_POST['sales_team_support'] ?? '');
-    $self_refer_incentive = trim($_POST['self_refer_incentive'] ?? '');
-    $team_refer_incentive = trim($_POST['team_refer_incentive'] ?? '');
-    $property_sale_incentive = trim($_POST['property_sale_incentive'] ?? '');
-    $team_sale_incentive = trim($_POST['team_sale_incentive'] ?? '');
-    $free_property_visit = trim($_POST['free_property_visit'] ?? '');
+    // --- Add New Field ---
+    if ($_POST['action'] === 'add_field') {
+        $field_key = preg_replace('/[^a-z0-9_]/', '_', strtolower(trim($_POST['field_key'] ?? '')));
+        $field_label = trim($_POST['field_label'] ?? '');
+        $field_type = trim($_POST['field_type'] ?? 'text');
+        $default_value = trim($_POST['default_value'] ?? '');
+        $display_order = (int)($_POST['display_order'] ?? 0);
 
-    if ($id > 0) {
-        $sql = "UPDATE packages SET 
-            name = ?, price = ?, discount_price = ?, duration_months = ?,
-            validity = ?, property_search = ?, company_support = ?, sales_team_support = ?,
-            self_refer_incentive = ?, team_refer_incentive = ?, property_sale_incentive = ?, team_sale_incentive = ?,
-            free_property_visit = ?
-            WHERE id = ?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$name, $price, $discount_price, $duration_months,
-            $validity, $property_search, $company_support, $sales_team_support,
-            $self_refer_incentive, $team_refer_incentive, $property_sale_incentive, $team_sale_incentive,
-            $free_property_visit, $id]);
-        $message = "<div class='alert alert-success'>✅ Package updated.</div>";
-    } else {
-        $sql = "INSERT INTO packages (name, price, discount_price, duration_months,
-            validity, property_search, company_support, sales_team_support,
-            self_refer_incentive, team_refer_incentive, property_sale_incentive, team_sale_incentive,
-            free_property_visit)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$name, $price, $discount_price, $duration_months,
-            $validity, $property_search, $company_support, $sales_team_support,
-            $self_refer_incentive, $team_refer_incentive, $property_sale_incentive, $team_sale_incentive,
-            $free_property_visit]);
-        $message = "<div class='alert alert-success'>✅ Package added.</div>";
+        if (empty($field_key) || empty($field_label)) {
+            $message = "Field Key और Label ज़रूरी हैं!";
+            $message_type = "danger";
+        } else {
+            try {
+                $stmt = $pdo->prepare("INSERT INTO package_fields (field_key, field_label, field_type, default_value, display_order, is_active) VALUES (?, ?, ?, ?, ?, TRUE)");
+                $stmt->execute([$field_key, $field_label, $field_type, $default_value, $display_order]);
+                $message = "✅ Field '$field_label' successfully added!";
+                $message_type = "success";
+            } catch (PDOException $e) {
+                $message = "❌ Error: " . $e->getMessage();
+                $message_type = "danger";
+            }
+        }
+    }
+
+    // --- Delete Field ---
+    if ($_POST['action'] === 'delete_field') {
+        $field_id = (int)$_POST['field_id'];
+        try {
+            $pdo->prepare("DELETE FROM package_fields WHERE id = ?")->execute([$field_id]);
+            $message = "Field deleted successfully!";
+            $message_type = "success";
+        } catch (PDOException $e) {
+            $message = "Error: " . $e->getMessage();
+            $message_type = "danger";
+        }
+    }
+
+    // --- Toggle Field Active ---
+    if ($_POST['action'] === 'toggle_field') {
+        $field_id = (int)$_POST['field_id'];
+        $pdo->prepare("UPDATE package_fields SET is_active = NOT is_active WHERE id = ?")->execute([$field_id]);
+        $message = "Field status updated!";
+        $message_type = "success";
+    }
+
+    // --- Add New Package ---
+    if ($_POST['action'] === 'add_package') {
+        $name = trim($_POST['name'] ?? '');
+        $price = (float)($_POST['price'] ?? 0);
+        $discount_price = !empty($_POST['discount_price']) ? (float)$_POST['discount_price'] : null;
+        $duration = (int)($_POST['duration'] ?? 0);
+
+        if (empty($name) || $price <= 0) {
+            $message = "Package Name और Price ज़रूरी हैं!";
+            $message_type = "danger";
+        } else {
+            try {
+                $stmt = $pdo->prepare("INSERT INTO packages (name, price, discount_price, duration) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$name, $price, $discount_price, $duration]);
+                $package_id = $pdo->lastInsertId();
+
+                // Save dynamic field values
+                $fields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE")->fetchAll();
+                foreach ($fields as $f) {
+                    $val = trim($_POST['field_' . $f['id']] ?? '');
+                    $stmt = $pdo->prepare("INSERT INTO package_field_values (package_id, field_id, field_value) VALUES (?, ?, ?)");
+                    $stmt->execute([$package_id, $f['id'], $val]);
+                }
+
+                $message = "✅ Package '$name' added successfully!";
+                $message_type = "success";
+            } catch (PDOException $e) {
+                $message = "❌ Error: " . $e->getMessage();
+                $message_type = "danger";
+            }
+        }
+    }
+
+    // --- Update Package ---
+    if ($_POST['action'] === 'update_package') {
+        $id = (int)$_POST['package_id'];
+        $name = trim($_POST['name'] ?? '');
+        $price = (float)($_POST['price'] ?? 0);
+        $discount_price = !empty($_POST['discount_price']) ? (float)$_POST['discount_price'] : null;
+        $duration = (int)($_POST['duration'] ?? 0);
+
+        try {
+            $stmt = $pdo->prepare("UPDATE packages SET name = ?, price = ?, discount_price = ?, duration = ? WHERE id = ?");
+            $stmt->execute([$name, $price, $discount_price, $duration, $id]);
+
+            // Update field values
+            $fields = $pdo->query("SELECT * FROM package_fields")->fetchAll();
+            foreach ($fields as $f) {
+                $val = trim($_POST['field_' . $f['id']] ?? '');
+                $stmt = $pdo->prepare("
+                    INSERT INTO package_field_values (package_id, field_id, field_value) VALUES (?, ?, ?)
+                    ON CONFLICT (package_id, field_id) DO UPDATE SET field_value = EXCLUDED.field_value
+                ");
+                $stmt->execute([$id, $f['id'], $val]);
+            }
+
+            $message = "✅ Package updated successfully!";
+            $message_type = "success";
+        } catch (PDOException $e) {
+            $message = "❌ Error: " . $e->getMessage();
+            $message_type = "danger";
+        }
+    }
+
+    // --- Delete Package ---
+    if ($_POST['action'] === 'delete_package') {
+        $id = (int)$_POST['package_id'];
+        try {
+            $pdo->prepare("DELETE FROM packages WHERE id = ?")->execute([$id]);
+            $message = "Package deleted!";
+            $message_type = "success";
+        } catch (PDOException $e) {
+            $message = "Error: " . $e->getMessage();
+            $message_type = "danger";
+        }
     }
 }
 
-$packages = $pdo->query("SELECT * FROM packages ORDER BY duration_months")->fetchAll();
+// ============================================================
+// FETCH DATA
+// ============================================================
+$fields = $pdo->query("SELECT * FROM package_fields ORDER BY display_order ASC, id ASC")->fetchAll();
+
+$packages = $pdo->query("SELECT * FROM packages ORDER BY id ASC")->fetchAll();
+
+// Get all field values
+$fieldValues = [];
+$stmt = $pdo->query("SELECT * FROM package_field_values");
+while ($row = $stmt->fetch()) {
+    $fieldValues[$row['package_id']][$row['field_id']] = $row['field_value'];
+}
+
+// Edit mode
+$editMode = false;
+$editPackage = null;
+if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
+    $stmt = $pdo->prepare("SELECT * FROM packages WHERE id = ?");
+    $stmt->execute([(int)$_GET['edit']]);
+    $editPackage = $stmt->fetch();
+    if ($editPackage) $editMode = true;
+}
+
+include 'header.php';
 ?>
 
 <style>
-    .package-form { background: #f8fafc; padding: 25px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 30px; }
-    .package-table th { background: #f1f5f9; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: #475569; text-align: center; vertical-align: middle; }
-    .package-table td { vertical-align: middle; text-align: center; font-size: 0.9rem; }
-    .btn-edit { background: #f59e0b; color: white; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; }
-    .btn-edit:hover { background: #d97706; color: white; }
-    .btn-delete { background: #ef4444; color: white; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; }
-    .btn-delete:hover { background: #dc2626; color: white; }
+    .pkg-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        border: 1px solid #e8edf4;
+        margin-bottom: 24px;
+    }
+    .pkg-card h5 {
+        font-weight: 800;
+        color: #1e3a8a;
+        margin-bottom: 18px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #eef2f6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .field-row {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid #eef2f6;
+        transition: all 0.2s;
+    }
+    .field-row:hover {
+        background: #f0f5ff;
+        border-color: #bfdbfe;
+    }
+    .field-row.inactive {
+        opacity: 0.5;
+        background: #f8fafc;
+    }
+    .field-key {
+        font-family: monospace;
+        background: #dbeafe;
+        color: #1e40af;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .field-type {
+        background: #dcfce7;
+        color: #166534;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        margin-left: 6px;
+    }
+    .pkg-table {
+        font-size: 0.82rem;
+        margin-bottom: 0;
+        white-space: nowrap;
+    }
+    .pkg-table th {
+        background: #1e293b;
+        color: #fff;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        padding: 10px 8px;
+        font-weight: 700;
+    }
+    .pkg-table td {
+        padding: 10px 8px;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .btn-sm-custom {
+        padding: 4px 10px;
+        font-size: 0.72rem;
+        border-radius: 6px;
+    }
 </style>
 
-<div class="card-premium">
-    <h4><i class="fas fa-boxes me-2"></i>Manage Packages</h4>
-    <?= $message ?>
+<div class="container-fluid">
+    <h3 class="text-light mb-4"><i class="fas fa-box-open me-2"></i> Package Manager</h3>
 
-    <div class="package-form" id="package-form">
-        <h5 id="form-title"><i class="fas fa-plus-circle me-2"></i>Add New Package</h5>
-        <form method="POST" id="package-form-element">
-            <input type="hidden" name="id" id="package-id" value="0">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold">Package Name</label>
-                    <input type="text" name="name" id="pkg-name" class="form-control" required>
+    <?php if (!empty($message)): ?>
+        <div class="alert alert-<?= htmlspecialchars($message_type) ?> alert-dismissible fade show">
+            <?= htmlspecialchars($message) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
+    <div class="row">
+        <!-- ============================================================ -->
+        <!-- LEFT: FIELD MANAGER -->
+        <!-- ============================================================ -->
+        <div class="col-lg-5">
+            <div class="pkg-card">
+                <h5>
+                    <span><i class="fas fa-columns me-2"></i> Field Manager</span>
+                    <span class="badge bg-primary"><?= count($fields) ?></span>
+                </h5>
+
+                <!-- Existing Fields -->
+                <div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+                    <?php foreach ($fields as $f): ?>
+                        <div class="field-row <?= $f['is_active'] ? '' : 'inactive' ?>">
+                            <div>
+                                <div style="font-weight: 700; color: #0f172a; font-size: 0.9rem;">
+                                    <?= htmlspecialchars($f['field_label']) ?>
+                                    <span class="field-type"><?= htmlspecialchars($f['field_type']) ?></span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">
+                                    Key: <span class="field-key"><?= htmlspecialchars($f['field_key']) ?></span>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 4px;">
+                                <form method="POST" style="display:inline;">
+                                    <input type="hidden" name="action" value="toggle_field">
+                                    <input type="hidden" name="field_id" value="<?= $f['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-sm-custom <?= $f['is_active'] ? 'btn-warning' : 'btn-success' ?>" title="<?= $f['is_active'] ? 'Disable' : 'Enable' ?>">
+                                        <i class="fas fa-<?= $f['is_active'] ? 'eye-slash' : 'eye' ?>"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" style="display:inline;" onsubmit="return confirm('Delete this field? It will also remove all data associated with it.');">
+                                    <input type="hidden" name="action" value="delete_field">
+                                    <input type="hidden" name="field_id" value="<?= $f['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-sm-custom btn-danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">Price (₹)</label>
-                    <input type="number" step="0.01" name="price" id="pkg-price" class="form-control" required>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">Discount Price</label>
-                    <input type="number" step="0.01" name="discount_price" id="pkg-discount" class="form-control" placeholder="Optional">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">Duration (months)</label>
-                    <input type="number" name="duration_months" id="pkg-duration" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Validity</label>
-                    <input type="text" name="validity" id="pkg-validity" class="form-control" placeholder="e.g. 1 month">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Property Search</label>
-                    <input type="text" name="property_search" id="pkg-property_search" class="form-control" placeholder="e.g. All India">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Company Support</label>
-                    <input type="text" name="company_support" id="pkg-company_support" class="form-control" placeholder="e.g. 1 month">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Sales Team Support</label>
-                    <input type="text" name="sales_team_support" id="pkg-sales_team_support" class="form-control" placeholder="e.g. lifetime">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Self Refer Incentive</label>
-                    <input type="text" name="self_refer_incentive" id="pkg-self_refer_incentive" class="form-control" placeholder="e.g. Coin">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Team Refer Incentive</label>
-                    <input type="text" name="team_refer_incentive" id="pkg-team_refer_incentive" class="form-control" placeholder="e.g. Coin">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Property Sale Incentive</label>
-                    <input type="text" name="property_sale_incentive" id="pkg-property_sale_incentive" class="form-control" placeholder="e.g. 1% or 0%">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Team Sale Incentive</label>
-                    <input type="text" name="team_sale_incentive" id="pkg-team_sale_incentive" class="form-control" placeholder="e.g. 0">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Free Property Visit</label>
-                    <input type="text" name="free_property_visit" id="pkg-free_property_visit" class="form-control" placeholder="e.g. 1 or Unlimited">
-                </div>
-                <div class="col-12 mt-3">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save Package</button>
-                    <button type="reset" class="btn btn-secondary" onclick="resetForm()"><i class="fas fa-times me-1"></i>Cancel</button>
-                </div>
+
+                <hr>
+
+                <!-- Add New Field Form -->
+                <h6 class="fw-bold mb-3" style="color: #1e3a8a;">
+                    <i class="fas fa-plus-circle me-2"></i> नया Field जोड़ें
+                </h6>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_field">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Field Label *</label>
+                            <input type="text" name="field_label" class="form-control form-control-sm" required placeholder="e.g. Free Property Visit">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Field Key * (English)</label>
+                            <input type="text" name="field_key" class="form-control form-control-sm" required placeholder="e.g. free_property_visit">
+                            <small class="text-muted" style="font-size: 0.65rem;">सिर्फ a-z, 0-9, _</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Type</label>
+                            <select name="field_type" class="form-control form-control-sm">
+                                <option value="text">Text</option>
+                                <option value="number">Number</option>
+                                <option value="textarea">Textarea</option>
+                                <option value="select">Dropdown</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Default Value</label>
+                            <input type="text" name="default_value" class="form-control form-control-sm" placeholder="e.g. Unlimited">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Display Order</label>
+                            <input type="number" name="display_order" class="form-control form-control-sm" value="<?= count($fields) + 1 ?>">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100 btn-sm-custom">
+                                <i class="fas fa-plus"></i> Add Field
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
-        </form>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- RIGHT: PACKAGE FORM -->
+        <!-- ============================================================ -->
+        <div class="col-lg-7">
+            <div class="pkg-card">
+                <h5>
+                    <span><i class="fas fa-<?= $editMode ? 'edit' : 'plus' ?> me-2"></i> <?= $editMode ? 'Edit Package' : 'Add New Package' ?></span>
+                    <?php if ($editMode): ?>
+                        <a href="admin_packages.php" class="btn btn-sm btn-secondary btn-sm-custom">Cancel Edit</a>
+                    <?php endif; ?>
+                </h5>
+
+                <form method="POST">
+                    <input type="hidden" name="action" value="<?= $editMode ? 'update_package' : 'add_package' ?>">
+                    <?php if ($editMode): ?>
+                        <input type="hidden" name="package_id" value="<?= $editMode ? $editPackage['id'] : '' ?>">
+                    <?php endif; ?>
+
+                    <div class="row g-3">
+                        <!-- Basic Fields -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">Package Name *</label>
+                            <input type="text" name="name" class="form-control" required
+                                   value="<?= $editMode ? htmlspecialchars($editPackage['name'] ?? '') : '' ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Price (₹) *</label>
+                            <input type="number" name="price" class="form-control" step="0.01" required
+                                   value="<?= $editMode ? ($editPackage['price'] ?? '') : '' ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Discount Price</label>
+                            <input type="number" name="discount_price" class="form-control" step="0.01"
+                                   value="<?= $editMode ? ($editPackage['discount_price'] ?? '') : '' ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">Duration (months)</label>
+                            <input type="number" name="duration" class="form-control"
+                                   value="<?= $editMode ? ($editPackage['duration'] ?? '') : '' ?>">
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+                    <h6 class="fw-bold small mb-3" style="color: #1e3a8a;">
+                        <i class="fas fa-list me-1"></i> Dynamic Fields
+                    </h6>
+
+                    <div class="row g-3">
+                        <?php foreach ($fields as $f): 
+                            if (!$f['is_active']) continue;
+                            $val = $editMode && isset($fieldValues[$editPackage['id']][$f['id']]) 
+                                ? $fieldValues[$editPackage['id']][$f['id']] 
+                                : ($f['default_value'] ?? '');
+                        ?>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small"><?= htmlspecialchars($f['field_label']) ?></label>
+                                <?php if ($f['field_type'] === 'textarea'): ?>
+                                    <textarea name="field_<?= $f['id'] ?>" class="form-control" rows="2"><?= htmlspecialchars($val) ?></textarea>
+                                <?php elseif ($f['field_type'] === 'number'): ?>
+                                    <input type="number" name="field_<?= $f['id'] ?>" class="form-control" value="<?= htmlspecialchars($val) ?>">
+                                <?php else: ?>
+                                    <input type="text" name="field_<?= $f['id'] ?>" class="form-control" value="<?= htmlspecialchars($val) ?>">
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary rounded-pill px-4">
+                            <i class="fas fa-save me-2"></i> <?= $editMode ? 'Update Package' : 'Save Package' ?>
+                        </button>
+                        <a href="admin_packages.php" class="btn btn-secondary rounded-pill px-4 ms-2">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table package-table table-bordered table-hover">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Price</th>
-                    <th>Discount</th>
-                    <th>Duration</th>
-                    <th>Validity</th>
-                    <th>Property Search</th>
-                    <th>Company Support</th>
-                    <th>Sales Team</th>
-                    <th>Self Refer</th>
-                    <th>Team Refer</th>
-                    <th>Property Sale</th>
-                    <th>Team Sale</th>
-                    <th>Free Visit</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($packages as $pkg): ?>
+    <!-- ============================================================ -->
+    <!-- PACKAGE TABLE (Dynamic Columns) -->
+    <!-- ============================================================ -->
+    <div class="pkg-card">
+        <h5><i class="fas fa-table me-2"></i> All Packages <span class="badge bg-primary"><?= count($packages) ?></span></h5>
+        <div class="table-responsive">
+            <table class="table pkg-table">
+                <thead>
                     <tr>
-                        <td><?= $pkg['id'] ?></td>
-                        <td><strong><?= htmlspecialchars($pkg['name']) ?></strong></td>
-                        <!-- .00 हटाने के लिए number_format में 0 decimal -->
-                        <td>₹<?= number_format($pkg['price'], 0) ?></td>
-                        <td><?= $pkg['discount_price'] ? '₹'.number_format($pkg['discount_price'], 0) : '-' ?></td>
-                        <td><?= $pkg['duration_months'] ?> mo</td>
-                        <td><?= htmlspecialchars($pkg['validity'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($pkg['property_search'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($pkg['company_support'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($pkg['sales_team_support'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($pkg['self_refer_incentive'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($pkg['team_refer_incentive'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($pkg['property_sale_incentive'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($pkg['team_sale_incentive'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($pkg['free_property_visit'] ?? '') ?></td>
-                        <td>
-                            <button class="btn-edit" onclick="editPackage(<?= htmlspecialchars(json_encode($pkg)) ?>)">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                            <a href="?delete=<?= $pkg['id'] ?>" class="btn-delete" onclick="return confirm('Delete this package?')">
-                                <i class="fas fa-trash"></i> Delete
-                            </a>
-                        </td>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Discount</th>
+                        <th>Duration</th>
+                        <?php foreach ($fields as $f): ?>
+                            <?php if (!$f['is_active']) continue; ?>
+                            <th><?= htmlspecialchars($f['field_label']) ?></th>
+                        <?php endforeach; ?>
+                        <th style="text-align:right;">Actions</th>
                     </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <?php if (empty($packages)): ?>
+                        <tr><td colspan="6" class="text-center text-muted py-4">No packages yet.</td></tr>
+                    <?php endif; ?>
+                    <?php foreach ($packages as $p): ?>
+                        <tr>
+                            <td><strong>#<?= $p['id'] ?></strong></td>
+                            <td><strong><?= htmlspecialchars($p['name']) ?></strong></td>
+                            <td>₹ <?= number_format($p['price'] ?? 0) ?></td>
+                            <td>
+                                <?php if (!empty($p['discount_price'])): ?>
+                                    <span style="text-decoration: line-through; color: #94a3b8;">₹ <?= number_format($p['price']) ?></span>
+                                    <br><strong style="color: #10b981;">₹ <?= number_format($p['discount_price']) ?></strong>
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= htmlspecialchars($p['duration'] ?? 0) ?> mo</td>
+                            <?php foreach ($fields as $f): ?>
+                                <?php if (!$f['is_active']) continue; ?>
+                                <td><?= htmlspecialchars($fieldValues[$p['id']][$f['id']] ?? '—') ?></td>
+                            <?php endforeach; ?>
+                            <td style="text-align:right;">
+                                <a href="?edit=<?= $p['id'] ?>" class="btn btn-sm btn-sm-custom btn-primary" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form method="POST" style="display:inline;" onsubmit="return confirm('Delete this package?');">
+                                    <input type="hidden" name="action" value="delete_package">
+                                    <input type="hidden" name="package_id" value="<?= $p['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-sm-custom btn-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
-
-<script>
-function editPackage(data) {
-    document.getElementById('package-id').value = data.id;
-    document.getElementById('pkg-name').value = data.name;
-    document.getElementById('pkg-price').value = data.price;
-    document.getElementById('pkg-discount').value = data.discount_price || '';
-    document.getElementById('pkg-duration').value = data.duration_months;
-    document.getElementById('pkg-validity').value = data.validity || '';
-    document.getElementById('pkg-property_search').value = data.property_search || '';
-    document.getElementById('pkg-company_support').value = data.company_support || '';
-    document.getElementById('pkg-sales_team_support').value = data.sales_team_support || '';
-    document.getElementById('pkg-self_refer_incentive').value = data.self_refer_incentive || '';
-    document.getElementById('pkg-team_refer_incentive').value = data.team_refer_incentive || '';
-    document.getElementById('pkg-property_sale_incentive').value = data.property_sale_incentive || '';
-    document.getElementById('pkg-team_sale_incentive').value = data.team_sale_incentive || '';
-    document.getElementById('pkg-free_property_visit').value = data.free_property_visit || '';
-    document.getElementById('form-title').innerHTML = '<i class="fas fa-edit me-2"></i>Edit Package';
-    document.getElementById('package-form').scrollIntoView({ behavior: 'smooth' });
-}
-
-function resetForm() {
-    document.getElementById('package-id').value = 0;
-    document.getElementById('pkg-name').value = '';
-    document.getElementById('pkg-price').value = '';
-    document.getElementById('pkg-discount').value = '';
-    document.getElementById('pkg-duration').value = '';
-    document.getElementById('pkg-validity').value = '';
-    document.getElementById('pkg-property_search').value = '';
-    document.getElementById('pkg-company_support').value = '';
-    document.getElementById('pkg-sales_team_support').value = '';
-    document.getElementById('pkg-self_refer_incentive').value = '';
-    document.getElementById('pkg-team_refer_incentive').value = '';
-    document.getElementById('pkg-property_sale_incentive').value = '';
-    document.getElementById('pkg-team_sale_incentive').value = '';
-    document.getElementById('pkg-free_property_visit').value = '';
-    document.getElementById('form-title').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Add New Package';
-}
-</script>
 
 <?php include 'footer.php'; ?>
