@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📤 Bulk Upload Properties – Excel (.xlsx) + CSV दोनों Support
+// 📤 Bulk Upload Properties – Excel (.xlsx) + CSV Support
 // EMD Deadline = Auction Date − 1 Day (हमेशा)
 // ============================================================
 
@@ -243,7 +243,7 @@ function parseSheetXml($sheetXml, $ss) {
 }
 
 // ============================================================
-// 🔥 CSV ROWS READER
+// 🔥 CSV READER
 // ============================================================
 function readCsvRows($filepath) {
     $handle = fopen($filepath, 'r');
@@ -256,10 +256,9 @@ function readCsvRows($filepath) {
 }
 
 // ============================================================
-// 🔥 DETECT: Is this a "MASTER" PNB-style file, or a Bulk-format CSV?
+// 🔥 DETECT: MASTER or Bulk Format?
 // ============================================================
 function isMasterFormat($rows) {
-    // Look for known MASTER headers in first 10 rows
     foreach ($rows as $i => $row) {
         if ($i > 10) break;
         $joined = strtolower(implode(' ', $row));
@@ -496,7 +495,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
 
         try {
             if ($ext === 'xlsx') {
-                // Excel File
                 $rows = readXlsxFile($file['tmp_name'], 'MASTER');
                 $report = processMaster($rows, $pdo);
                 $report['type'] = 'Excel (MASTER)';
@@ -505,9 +503,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                 $errors[] = "पुराना .xls Support नहीं है। Excel में File खोलें → Save As → .xlsx करें।";
 
             } elseif (in_array($ext, ['csv', 'txt', 'tsv'])) {
-                // CSV File – Check if it's MASTER format or Bulk format
                 $rows = readCsvRows($file['tmp_name']);
-
                 if (isMasterFormat($rows)) {
                     $report = processMaster($rows, $pdo);
                     $report['type'] = 'CSV (MASTER)';
@@ -612,7 +608,7 @@ include 'header.php';
                 <i class="fas fa-cloud-upload-alt"></i>
                 <h4>Drag & Drop Excel / CSV File Here</h4>
                 <p>या क्लिक करके फ़ाइल चुनें</p>
-                <input type="file" name="csv_file" id="csvFile" accept=".xlsx,.xls,.csv,.txt,.tsv" style="display:none;" required>
+                <input type="file" name="csv_file" id="csvFile" style="display:none;" required>
                 <div id="fileName" class="mt-3 fw-bold text-success"></div>
             </div>
             <div class="text-center mt-4">
