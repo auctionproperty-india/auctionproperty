@@ -1,7 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (With Referral Filter)
-// Compact Table + NULL Safe
+// 👥 User Management – Admin Panel (Fixed: Role + Data Clean)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -12,7 +11,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit;
 }
 
-// ---- Helper: Safe Date Format ----
 if (!function_exists('safeDateFormat')) {
     function safeDateFormat($dateStr) {
         if (empty($dateStr) || strtotime($dateStr) === false) {
@@ -22,11 +20,50 @@ if (!function_exists('safeDateFormat')) {
     }
 }
 
+// ============================================================
+// 🔥 HELPER: Detect Error Text (Data Corruption Fix)
+// ============================================================
+function cleanDisplayValue($value, $fallback = 'N/A') {
+    if (empty($value)) return $fallback;
+    $value = trim((string)$value);
+    if (
+        strpos($value, 'Deprecated') !== false ||
+        strpos($value, 'htmlspecialchars') !== false ||
+        strpos($value, 'Fatal error') !== false ||
+        strpos($value, 'Warning') !== false ||
+        strpos($value, '<br') !== false ||
+        strpos($value, '<b>') !== false ||
+        strpos($value, 'admin_edit_user') !== false ||
+        (strpos($value, '.php') !== false && strpos($value, 'line') !== false)
+    ) {
+        return $fallback;
+    }
+    return $value;
+}
+
+// ============================================================
+// 🔥 HELPER: Get User Role Label
+// ============================================================
+function getUserRoleLabel($user) {
+    $role = strtolower($user['role'] ?? 'user');
+    $isSuper = !empty($user['is_super_admin']);
+
+    if ($role === 'admin' || $role === 'sub_admin') {
+        if ($isSuper && $role === 'admin') {
+            return ['label' => 'Super Admin', 'class' => 'badge-role-super'];
+        }
+        return ['label' => 'Sub Admin', 'class' => 'badge-role-subadmin'];
+    }
+    if ($role === 'sales') {
+        return ['label' => 'Sales', 'class' => 'badge-role-sales'];
+    }
+    return ['label' => 'User', 'class' => 'badge-role-user'];
+}
+
 // ---- Handle Actions ----
 $message = '';
 $message_type = '';
 
-// Delete User
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $id = (int)$_GET['delete'];
     if ($id != $_SESSION['user_id']) {
@@ -40,7 +77,6 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     }
 }
 
-// Block/Unblock
 if (isset($_GET['toggle_block']) && is_numeric($_GET['toggle_block'])) {
     $id = (int)$_GET['toggle_block'];
     $stmt = $pdo->prepare("SELECT status FROM users WHERE id = ?");
@@ -55,7 +91,6 @@ if (isset($_GET['toggle_block']) && is_numeric($_GET['toggle_block'])) {
     }
 }
 
-// Make/Remove Admin
 if (isset($_GET['toggle_admin']) && is_numeric($_GET['toggle_admin'])) {
     $id = (int)$_GET['toggle_admin'];
     if ($id != $_SESSION['user_id']) {
@@ -95,7 +130,6 @@ if ($referral_filter == 'with_referrer') {
     $search_condition .= " AND u.referred_by IS NULL";
 }
 
-// ---- Fetch users with referrer ----
 $sql = "
     SELECT 
         u.*,
@@ -128,7 +162,6 @@ include 'header.php';
 ?>
 
 <style>
-    /* ===== Compact User Table ===== */
     .user-table-wrap {
         background: #fff;
         border-radius: 16px;
@@ -162,12 +195,8 @@ include 'header.php';
         vertical-align: middle;
         color: #1e293b;
     }
-    .user-table tbody tr:hover {
-        background: #f8faff;
-    }
-    .user-table .actions {
-        white-space: nowrap;
-    }
+    .user-table tbody tr:hover { background: #f8faff; }
+    .user-table .actions { white-space: nowrap; }
     .user-table .actions .btn {
         padding: 3px 7px;
         font-size: 0.7rem;
@@ -200,8 +229,47 @@ include 'header.php';
         vertical-align: middle;
     }
 
-    .badge-role-admin { background: #dc2626; color: #fff; }
-    .badge-role-user { background: #64748b; color: #fff; }
+    .badge-role-super {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        color: #fff;
+        padding: 3px 10px;
+        border-radius: 30px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        display: inline-block;
+        white-space: nowrap;
+    }
+    .badge-role-subadmin {
+        background: linear-gradient(135deg, #7c3aed, #6d28d9);
+        color: #fff;
+        padding: 3px 10px;
+        border-radius: 30px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        display: inline-block;
+        white-space: nowrap;
+    }
+    .badge-role-sales {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: #fff;
+        padding: 3px 10px;
+        border-radius: 30px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        display: inline-block;
+        white-space: nowrap;
+    }
+    .badge-role-user {
+        background: #64748b;
+        color: #fff;
+        padding: 3px 10px;
+        border-radius: 30px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        display: inline-block;
+        white-space: nowrap;
+    }
+
     .badge-package { background: #2563eb; color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; }
     .badge-package-free { background: #94a3b8; color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; }
     .badge-coins { background: #fbbf24; color: #0f172a; padding: 3px 10px; border-radius: 30px; font-size: 0.7rem; font-weight: 700; display: inline-block; }
@@ -209,7 +277,6 @@ include 'header.php';
     .date-stack { font-size: 0.75rem; line-height: 1.4; }
     .date-stack .lbl { color: #94a3b8; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
 
-    /* Search box */
     .search-box {
         background: #fff;
         padding: 14px 18px;
@@ -252,7 +319,6 @@ include 'header.php';
         <span class="badge bg-primary" style="font-size: 0.85rem; padding: 8px 16px;">Total: <?= count($users) ?> users</span>
     </div>
 
-    <!-- Search + Filter Bar -->
     <div class="search-box">
         <form method="GET" class="d-flex gap-2 flex-wrap align-items-center w-100">
             <input type="text" name="search" placeholder="🔍 Search name, email, phone..." value="<?= htmlspecialchars($search ?? '') ?>">
@@ -301,43 +367,38 @@ include 'header.php';
 
                     <?php foreach ($users as $user): ?>
                     <tr>
-                        <!-- ID -->
                         <td><strong>#<?= htmlspecialchars($user['id'] ?? '') ?></strong></td>
 
-                        <!-- Name + Email -->
                         <td>
                             <div style="font-weight: 700; color: #0f172a;">
-                                <?= htmlspecialchars($user['name'] ?? 'Unknown') ?>
+                                <?= htmlspecialchars(cleanDisplayValue($user['name'] ?? '', 'Unknown')) ?>
                             </div>
                             <div style="font-size: 0.72rem; color: #64748b;">
-                                <?= htmlspecialchars($user['email'] ?? 'N/A') ?>
+                                <?= htmlspecialchars(cleanDisplayValue($user['email'] ?? '', 'N/A')) ?>
                             </div>
                         </td>
 
-                        <!-- Phone -->
+                        <!-- ✅ PHONE FIX -->
                         <td>
                             <div style="font-size: 0.78rem;">
-                                <?= htmlspecialchars($user['phone'] ?? 'N/A') ?>
+                                <?= htmlspecialchars(cleanDisplayValue($user['phone'] ?? '', 'N/A')) ?>
                             </div>
                         </td>
 
-                        <!-- Coins -->
                         <td>
                             <span class="badge-coins">🪙 <?= number_format($user['user_coins'] ?? 0) ?></span>
                         </td>
 
-                        <!-- Referrer -->
                         <td>
                             <?php if (!empty($user['referrer_name']) || !empty($user['referrer_email'])): ?>
-                                <span class="badge-referrer" title="<?= htmlspecialchars($user['referrer_name'] ?? $user['referrer_email'] ?? '') ?>">
-                                    👤 <?= htmlspecialchars($user['referrer_name'] ?? $user['referrer_email'] ?? '') ?>
+                                <span class="badge-referrer" title="<?= htmlspecialchars(cleanDisplayValue($user['referrer_name'] ?? '', $user['referrer_email'] ?? '')) ?>">
+                                    👤 <?= htmlspecialchars(cleanDisplayValue($user['referrer_name'] ?? '', $user['referrer_email'] ?? '')) ?>
                                 </span>
                             <?php else: ?>
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
 
-                        <!-- Reg Date + Act Date (Combined) -->
                         <td>
                             <div class="date-stack">
                                 <div><span class="lbl">Reg:</span> <?= safeDateFormat($user['created_at'] ?? '') ?></div>
@@ -345,7 +406,6 @@ include 'header.php';
                             </div>
                         </td>
 
-                        <!-- Package + Expiry (Combined) -->
                         <td>
                             <?php if (!empty($user['package_name'])): ?>
                                 <div><span class="badge-package"><?= htmlspecialchars($user['package_name']) ?></span></div>
@@ -357,7 +417,6 @@ include 'header.php';
                             <?php endif; ?>
                         </td>
 
-                        <!-- Status -->
                         <td>
                             <?php
                             $status = $user['status'] ?? 'inactive';
@@ -369,16 +428,12 @@ include 'header.php';
                             <span class="badge-status <?= $status_class ?>"><?= $status_label ?></span>
                         </td>
 
-                        <!-- Role -->
+                        <!-- ✅ ROLE FIX -->
                         <td>
-                            <?php if (!empty($user['is_super_admin'])): ?>
-                                <span class="badge badge-role-admin">Admin</span>
-                            <?php else: ?>
-                                <span class="badge badge-role-user">User</span>
-                            <?php endif; ?>
+                            <?php $roleInfo = getUserRoleLabel($user); ?>
+                            <span class="<?= $roleInfo['class'] ?>"><?= $roleInfo['label'] ?></span>
                         </td>
 
-                        <!-- Actions -->
                         <td class="actions" style="text-align: right;">
                             <a href="admin_edit_user.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-primary" title="Edit">
                                 <i class="fas fa-edit"></i>
