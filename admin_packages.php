@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🎁 Admin Packages Manager – Dynamic Fields Support
+// 🎁 Admin Packages Manager – Per-Package Field Control
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -15,7 +15,7 @@ $message = '';
 $message_type = '';
 
 // ============================================================
-// HANDLE: Add/Delete Field
+// HANDLE ACTIONS
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
@@ -43,12 +43,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // --- Delete Field ---
+    // --- Delete Field (globally) ---
     if ($_POST['action'] === 'delete_field') {
         $field_id = (int)$_POST['field_id'];
         try {
             $pdo->prepare("DELETE FROM package_fields WHERE id = ?")->execute([$field_id]);
-            $message = "Field deleted successfully!";
+            $message = "Field deleted from all packages!";
             $message_type = "success";
         } catch (PDOException $e) {
             $message = "Error: " . $e->getMessage();
@@ -56,12 +56,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // --- Toggle Field Active ---
-    if ($_POST['action'] === 'toggle_field') {
+    // --- Rename Field ---
+    if ($_POST['action'] === 'rename_field') {
         $field_id = (int)$_POST['field_id'];
-        $pdo->prepare("UPDATE package_fields SET is_active = NOT is_active WHERE id = ?")->execute([$field_id]);
-        $message = "Field status updated!";
-        $message_type = "success";
+        $new_label = trim($_POST['field_label'] ?? '');
+        if (!empty($new_label)) {
+            $pdo->prepare("UPDATE package_fields SET field_label = ? WHERE id = ?")->execute([$new_label, $field_id]);
+            $message = "Field renamed to '$new_label'";
+            $message_type = "success";
+        }
     }
 
     // --- Add New Package ---
@@ -80,11 +83,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $stmt->execute([$name, $price, $discount_price, $duration]);
                 $package_id = $pdo->lastInsertId();
 
-                // Save dynamic field values
+                // Save fields that are marked visible
                 $fields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE")->fetchAll();
                 foreach ($fields as $f) {
+                    $is_visible = isset($_POST['visible_' . $f['id']]) ? 1 : 0;
+                    if (!$is_visible) continue; // Skip hidden fields
+
                     $val = trim($_POST['field_' . $f['id']] ?? '');
-                    $stmt = $pdo->prepare("INSERT INTO package_field_values (package_id, field_id, field_value) VALUES (?, ?, ?)");
+                    $stmt = $pdo->prepare("INSERT INTO package_field_values (package_id, field_id, field_value, is_visible) VALUES (?, ?, ?, TRUE)");
                     $stmt->execute([$package_id, $f['id'], $val]);
                 }
 
@@ -109,14 +115,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $stmt = $pdo->prepare("UPDATE packages SET name = ?, price = ?, discount_price = ?, duration = ? WHERE id = ?");
             $stmt->execute([$name, $price, $discount_price, $duration, $id]);
 
-            // Update field values
+            // First remove all existing values for this package
+            $pdo->prepare("DELETE FROM package_field_values WHERE package_id = ?")->execute([$id]);
+
+            // Re-insert based on checkboxes
             $fields = $pdo->query("SELECT * FROM package_fields")->fetchAll();
             foreach ($fields as $f) {
+                $is_visible = isset($_POST['visible_' . $f['id']]) ? 1 : 0;
+                if (!$is_visible) continue;
+
                 $val = trim($_POST['field_' . $f['id']] ?? '');
-                $stmt = $pdo->prepare("
-                    INSERT INTO package_field_values (package_id, field_id, field_value) VALUES (?, ?, ?)
-                    ON CONFLICT (package_id, field_id) DO UPDATE SET field_value = EXCLUDED.field_value
-                ");
+                $stmt = $pdo->prepare("INSERT INTO package_field_values (package_id, field_id, field_value, is_visible) VALUES (?, ?, ?, TRUE)");
                 $stmt->execute([$id, $f['id'], $val]);
             }
 
@@ -140,18 +149,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $message_type = "danger";
         }
     }
+
+    // --- Clear Field for a Package (Hide) ---
+    if ($_POST['action'] === 'clear_package_field') {
+        $package_id = (int)$_POST['package_id'];
+        $field_id = (int)$_POST['field_id'];
+        try {
+            $pdo->prepare("DELETE FROM package_field_values WHERE package_id = ? AND field_id = ?")->execute([$package_id, $field_id]);
+            $message = "Field removed from this package only!";
+            $message_type = "success";
+        } catch (PDOException $e) {
+            $message = "Error: " . $e->getMessage();
+            $message_type = "danger";
+        }
+    }
 }
 
 // ============================================================
 // FETCH DATA
 // ============================================================
 $fields = $pdo->query("SELECT * FROM package_fields ORDER BY display_order ASC, id ASC")->fetchAll();
-
 $packages = $pdo->query("SELECT * FROM packages ORDER BY id ASC")->fetchAll();
 
-// Get all field values
+// Get all field values with visibility
 $fieldValues = [];
-$stmt = $pdo->query("SELECT * FROM package_field_values");
+$stmt = $pdo->query("SELECT * FROM package_field_values WHERE is_visible = TRUE");
 while ($row = $stmt->fetch()) {
     $fieldValues[$row['package_id']][$row['field_id']] = $row['field_value'];
 }
@@ -191,8 +213,8 @@ include 'header.php';
     .field-row {
         background: #f8fafc;
         border-radius: 12px;
-        padding: 14px 16px;
-        margin-bottom: 10px;
+        padding: 12px 14px;
+        margin-bottom: 8px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -203,17 +225,13 @@ include 'header.php';
         background: #f0f5ff;
         border-color: #bfdbfe;
     }
-    .field-row.inactive {
-        opacity: 0.5;
-        background: #f8fafc;
-    }
     .field-key {
         font-family: monospace;
         background: #dbeafe;
         color: #1e40af;
         padding: 2px 8px;
         border-radius: 6px;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         font-weight: 700;
     }
     .field-type {
@@ -221,7 +239,7 @@ include 'header.php';
         color: #166534;
         padding: 2px 8px;
         border-radius: 6px;
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         font-weight: 700;
         margin-left: 6px;
     }
@@ -248,6 +266,27 @@ include 'header.php';
         font-size: 0.72rem;
         border-radius: 6px;
     }
+    .field-checkbox-row {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 8px;
+        border: 1px solid #eef2f6;
+    }
+    .field-checkbox-row.included {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+    }
+    .form-check-input {
+        width: 1.2em;
+        height: 1.2em;
+        margin-top: 0.15em;
+        cursor: pointer;
+    }
+    .form-check-input:checked {
+        background-color: #10b981;
+        border-color: #10b981;
+    }
 </style>
 
 <div class="container-fluid">
@@ -267,35 +306,34 @@ include 'header.php';
         <div class="col-lg-5">
             <div class="pkg-card">
                 <h5>
-                    <span><i class="fas fa-columns me-2"></i> Field Manager</span>
+                    <span><i class="fas fa-columns me-2"></i> Global Fields (Master List)</span>
                     <span class="badge bg-primary"><?= count($fields) ?></span>
                 </h5>
+                <p class="text-muted" style="font-size: 0.8rem;">
+                    ⚠️ यह Master List है। इन Fields को हर Package में अलग-अलग Add/Remove किया जा सकता है।
+                </p>
 
-                <!-- Existing Fields -->
-                <div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+                <div style="max-height: 380px; overflow-y: auto; margin-bottom: 20px;">
                     <?php foreach ($fields as $f): ?>
-                        <div class="field-row <?= $f['is_active'] ? '' : 'inactive' ?>">
+                        <div class="field-row">
                             <div>
-                                <div style="font-weight: 700; color: #0f172a; font-size: 0.9rem;">
+                                <div style="font-weight: 700; color: #0f172a; font-size: 0.88rem;">
                                     <?= htmlspecialchars($f['field_label']) ?>
                                     <span class="field-type"><?= htmlspecialchars($f['field_type']) ?></span>
                                 </div>
-                                <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">
+                                <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">
                                     Key: <span class="field-key"><?= htmlspecialchars($f['field_key']) ?></span>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 4px;">
-                                <form method="POST" style="display:inline;">
-                                    <input type="hidden" name="action" value="toggle_field">
-                                    <input type="hidden" name="field_id" value="<?= $f['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-sm-custom <?= $f['is_active'] ? 'btn-warning' : 'btn-success' ?>" title="<?= $f['is_active'] ? 'Disable' : 'Enable' ?>">
-                                        <i class="fas fa-<?= $f['is_active'] ? 'eye-slash' : 'eye' ?>"></i>
-                                    </button>
-                                </form>
-                                <form method="POST" style="display:inline;" onsubmit="return confirm('Delete this field? It will also remove all data associated with it.');">
+                                <button type="button" class="btn btn-sm btn-sm-custom btn-info"
+                                        onclick="renameField(<?= $f['id'] ?>, '<?= htmlspecialchars($f['field_label'], ENT_QUOTES) ?>')" title="Rename">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <form method="POST" style="display:inline;" onsubmit="return confirm('⚠️ यह Field सभी Packages से DELETE हो जाएगा!\n\nक्या आप वाकई Delete करना चाहते हैं?');">
                                     <input type="hidden" name="action" value="delete_field">
                                     <input type="hidden" name="field_id" value="<?= $f['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-sm-custom btn-danger" title="Delete">
+                                    <button type="submit" class="btn btn-sm btn-sm-custom btn-danger" title="Delete from all">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
@@ -306,7 +344,6 @@ include 'header.php';
 
                 <hr>
 
-                <!-- Add New Field Form -->
                 <h6 class="fw-bold mb-3" style="color: #1e3a8a;">
                     <i class="fas fa-plus-circle me-2"></i> नया Field जोड़ें
                 </h6>
@@ -315,12 +352,12 @@ include 'header.php';
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Field Label *</label>
-                            <input type="text" name="field_label" class="form-control form-control-sm" required placeholder="e.g. Free Property Visit">
+                            <input type="text" name="field_label" class="form-control form-control-sm" required placeholder="e.g. Free Parking">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Field Key * (English)</label>
-                            <input type="text" name="field_key" class="form-control form-control-sm" required placeholder="e.g. free_property_visit">
-                            <small class="text-muted" style="font-size: 0.65rem;">सिर्फ a-z, 0-9, _</small>
+                            <input type="text" name="field_key" class="form-control form-control-sm" required placeholder="e.g. free_parking">
+                            <small class="text-muted" style="font-size: 0.62rem;">सिर्फ a-z, 0-9, _</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Type</label>
@@ -328,12 +365,11 @@ include 'header.php';
                                 <option value="text">Text</option>
                                 <option value="number">Number</option>
                                 <option value="textarea">Textarea</option>
-                                <option value="select">Dropdown</option>
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Default Value</label>
-                            <input type="text" name="default_value" class="form-control form-control-sm" placeholder="e.g. Unlimited">
+                            <input type="text" name="default_value" class="form-control form-control-sm" placeholder="Optional">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Display Order</label>
@@ -341,7 +377,7 @@ include 'header.php';
                         </div>
                         <div class="col-md-6 d-flex align-items-end">
                             <button type="submit" class="btn btn-primary w-100 btn-sm-custom">
-                                <i class="fas fa-plus"></i> Add Field
+                                <i class="fas fa-plus"></i> Add Field to Master
                             </button>
                         </div>
                     </div>
@@ -355,7 +391,7 @@ include 'header.php';
         <div class="col-lg-7">
             <div class="pkg-card">
                 <h5>
-                    <span><i class="fas fa-<?= $editMode ? 'edit' : 'plus' ?> me-2"></i> <?= $editMode ? 'Edit Package' : 'Add New Package' ?></span>
+                    <span><i class="fas fa-<?= $editMode ? 'edit' : 'plus' ?> me-2"></i> <?= $editMode ? 'Edit Package: ' . htmlspecialchars($editPackage['name'] ?? '') : 'Add New Package' ?></span>
                     <?php if ($editMode): ?>
                         <a href="admin_packages.php" class="btn btn-sm btn-secondary btn-sm-custom">Cancel Edit</a>
                     <?php endif; ?>
@@ -364,12 +400,11 @@ include 'header.php';
                 <form method="POST">
                     <input type="hidden" name="action" value="<?= $editMode ? 'update_package' : 'add_package' ?>">
                     <?php if ($editMode): ?>
-                        <input type="hidden" name="package_id" value="<?= $editMode ? $editPackage['id'] : '' ?>">
+                        <input type="hidden" name="package_id" value="<?= $editPackage['id'] ?>">
                     <?php endif; ?>
 
-                    <div class="row g-3">
-                        <!-- Basic Fields -->
-                        <div class="col-md-6">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-5">
                             <label class="form-label fw-bold small">Package Name *</label>
                             <input type="text" name="name" class="form-control" required
                                    value="<?= $editMode ? htmlspecialchars($editPackage['name'] ?? '') : '' ?>">
@@ -379,39 +414,57 @@ include 'header.php';
                             <input type="number" name="price" class="form-control" step="0.01" required
                                    value="<?= $editMode ? ($editPackage['price'] ?? '') : '' ?>">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small">Discount Price</label>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold small">Discount</label>
                             <input type="number" name="discount_price" class="form-control" step="0.01"
                                    value="<?= $editMode ? ($editPackage['discount_price'] ?? '') : '' ?>">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small">Duration (months)</label>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold small">Duration</label>
                             <input type="number" name="duration" class="form-control"
                                    value="<?= $editMode ? ($editPackage['duration'] ?? '') : '' ?>">
                         </div>
                     </div>
 
                     <hr class="my-3">
-                    <h6 class="fw-bold small mb-3" style="color: #1e3a8a;">
-                        <i class="fas fa-list me-1"></i> Dynamic Fields
+                    <h6 class="fw-bold small mb-2" style="color: #1e3a8a;">
+                        <i class="fas fa-check-square me-1"></i> इस Package में कौन-कौन से Fields रखने हैं?
                     </h6>
+                    <p class="text-muted" style="font-size: 0.78rem;">
+                        👉 जो Field चाहिए उसका <strong>Checkbox Tick</strong> करें और Value भरें। जो नहीं चाहिए उसका <strong>Tick हटा दें</strong>।
+                    </p>
 
-                    <div class="row g-3">
-                        <?php foreach ($fields as $f): 
-                            if (!$f['is_active']) continue;
-                            $val = $editMode && isset($fieldValues[$editPackage['id']][$f['id']]) 
-                                ? $fieldValues[$editPackage['id']][$f['id']] 
+                    <div class="row g-2">
+                        <?php foreach ($fields as $f):
+                            $isIncluded = $editMode && isset($fieldValues[$editPackage['id']][$f['id']]);
+                            $val = $isIncluded
+                                ? $fieldValues[$editPackage['id']][$f['id']]
                                 : ($f['default_value'] ?? '');
                         ?>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small"><?= htmlspecialchars($f['field_label']) ?></label>
-                                <?php if ($f['field_type'] === 'textarea'): ?>
-                                    <textarea name="field_<?= $f['id'] ?>" class="form-control" rows="2"><?= htmlspecialchars($val) ?></textarea>
-                                <?php elseif ($f['field_type'] === 'number'): ?>
-                                    <input type="number" name="field_<?= $f['id'] ?>" class="form-control" value="<?= htmlspecialchars($val) ?>">
-                                <?php else: ?>
-                                    <input type="text" name="field_<?= $f['id'] ?>" class="form-control" value="<?= htmlspecialchars($val) ?>">
-                                <?php endif; ?>
+                            <div class="col-md-12">
+                                <div class="field-checkbox-row <?= $isIncluded ? 'included' : '' ?>">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <input type="checkbox"
+                                               name="visible_<?= $f['id'] ?>"
+                                               id="vis_<?= $f['id'] ?>"
+                                               class="form-check-input"
+                                               <?= $isIncluded ? 'checked' : '' ?>
+                                               onchange="toggleFieldRow(this, <?= $f['id'] ?>)">
+                                        <label for="vis_<?= $f['id'] ?>" class="form-check-label fw-bold" style="cursor:pointer; font-size: 0.88rem;">
+                                            <?= htmlspecialchars($f['field_label']) ?>
+                                            <span class="field-key"><?= htmlspecialchars($f['field_key']) ?></span>
+                                        </label>
+                                    </div>
+                                    <div id="field-input-<?= $f['id'] ?>" style="<?= $isIncluded ? '' : 'display:none;' ?>">
+                                        <?php if ($f['field_type'] === 'textarea'): ?>
+                                            <textarea name="field_<?= $f['id'] ?>" class="form-control form-control-sm" rows="2"><?= htmlspecialchars($val) ?></textarea>
+                                        <?php elseif ($f['field_type'] === 'number'): ?>
+                                            <input type="number" name="field_<?= $f['id'] ?>" class="form-control form-control-sm" value="<?= htmlspecialchars($val) ?>">
+                                        <?php else: ?>
+                                            <input type="text" name="field_<?= $f['id'] ?>" class="form-control form-control-sm" value="<?= htmlspecialchars($val) ?>">
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -428,7 +481,7 @@ include 'header.php';
     </div>
 
     <!-- ============================================================ -->
-    <!-- PACKAGE TABLE (Dynamic Columns) -->
+    <!-- PACKAGE TABLE -->
     <!-- ============================================================ -->
     <div class="pkg-card">
         <h5><i class="fas fa-table me-2"></i> All Packages <span class="badge bg-primary"><?= count($packages) ?></span></h5>
@@ -439,10 +492,8 @@ include 'header.php';
                         <th>ID</th>
                         <th>Name</th>
                         <th>Price</th>
-                        <th>Discount</th>
                         <th>Duration</th>
                         <?php foreach ($fields as $f): ?>
-                            <?php if (!$f['is_active']) continue; ?>
                             <th><?= htmlspecialchars($f['field_label']) ?></th>
                         <?php endforeach; ?>
                         <th style="text-align:right;">Actions</th>
@@ -450,25 +501,31 @@ include 'header.php';
                 </thead>
                 <tbody>
                     <?php if (empty($packages)): ?>
-                        <tr><td colspan="6" class="text-center text-muted py-4">No packages yet.</td></tr>
+                        <tr><td colspan="<?= 5 + count($fields) ?>" class="text-center text-muted py-4">No packages yet.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($packages as $p): ?>
                         <tr>
                             <td><strong>#<?= $p['id'] ?></strong></td>
                             <td><strong><?= htmlspecialchars($p['name']) ?></strong></td>
-                            <td>₹ <?= number_format($p['price'] ?? 0) ?></td>
                             <td>
                                 <?php if (!empty($p['discount_price'])): ?>
-                                    <span style="text-decoration: line-through; color: #94a3b8;">₹ <?= number_format($p['price']) ?></span>
+                                    <span style="text-decoration: line-through; color: #94a3b8; font-size: 0.75rem;">₹ <?= number_format($p['price']) ?></span>
                                     <br><strong style="color: #10b981;">₹ <?= number_format($p['discount_price']) ?></strong>
                                 <?php else: ?>
-                                    <span class="text-muted">—</span>
+                                    ₹ <?= number_format($p['price'] ?? 0) ?>
                                 <?php endif; ?>
                             </td>
                             <td><?= htmlspecialchars($p['duration'] ?? 0) ?> mo</td>
                             <?php foreach ($fields as $f): ?>
-                                <?php if (!$f['is_active']) continue; ?>
-                                <td><?= htmlspecialchars($fieldValues[$p['id']][$f['id']] ?? '—') ?></td>
+                                <td>
+                                    <?php if (isset($fieldValues[$p['id']][$f['id']])): ?>
+                                        <span style="color: #0f172a; font-size: 0.78rem;">
+                                            <?= htmlspecialchars($fieldValues[$p['id']][$f['id']]) ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted" title="इस Package में नहीं है">—</span>
+                                    <?php endif; ?>
+                                </td>
                             <?php endforeach; ?>
                             <td style="text-align:right;">
                                 <a href="?edit=<?= $p['id'] ?>" class="btn btn-sm btn-sm-custom btn-primary" title="Edit">
@@ -489,5 +546,33 @@ include 'header.php';
         </div>
     </div>
 </div>
+
+<script>
+function toggleFieldRow(checkbox, fieldId) {
+    const row = document.getElementById('field-input-' + fieldId);
+    const parent = checkbox.closest('.field-checkbox-row');
+    if (checkbox.checked) {
+        row.style.display = '';
+        parent.classList.add('included');
+    } else {
+        row.style.display = 'none';
+        parent.classList.remove('included');
+    }
+}
+
+function renameField(fieldId, currentLabel) {
+    const newLabel = prompt('Enter new label:', currentLabel);
+    if (!newLabel || newLabel === currentLabel) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.innerHTML = `
+        <input type="hidden" name="action" value="rename_field">
+        <input type="hidden" name="field_id" value="${fieldId}">
+        <input type="hidden" name="field_label" value="${newLabel}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+</script>
 
 <?php include 'footer.php'; ?>
