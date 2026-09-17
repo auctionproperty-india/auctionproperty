@@ -1,6 +1,7 @@
 <?php
 // ============================================================
-// 💎 User Packages – Premium Green/Blue World-Class Design
+// 💎 User Packages – 4 Cards per Row (Comparison Friendly)
+// Green/Blue Premium Design + Dynamic Fields
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -45,13 +46,13 @@ $pending_check->execute([$user_id]);
 $has_pending = $pending_check->rowCount() > 0;
 
 // ============================================================
-// 🔥 DYNAMIC FIELDS
-// ============================================================// 🔥 Sort by display_order (Sequence) – Smallest first
+// 🔥 DYNAMIC FIELDS – Sorted by Sequence
+// ============================================================
 $packages = $pdo->query("SELECT * FROM packages ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
 $allFields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE ORDER BY display_order ASC, id ASC")->fetchAll();
 
 $fieldValues = [];
-$stmt = $pdo->query("SELECT * FROM package_field_values WHERE is_visible = TRUE");
+$stmt = $pdo->query("SELECT * FROM package_field_values WHERE COALESCE(is_visible, TRUE) = TRUE");
 while ($row = $stmt->fetch()) {
     $fieldValues[$row['package_id']][$row['field_id']] = $row['field_value'];
 }
@@ -92,44 +93,44 @@ function getFieldIcon($fieldKey) {
             radial-gradient(circle at 15% 15%, rgba(37,99,235,0.05) 0%, transparent 45%),
             radial-gradient(circle at 85% 85%, rgba(16,185,129,0.05) 0%, transparent 45%),
             linear-gradient(180deg, #f8fafc 0%, #ffffff 50%, #f0fdf4 100%);
-        padding: 50px 0;
+        padding: 40px 0;
         min-height: 100vh;
     }
 
     /* ---- Header ---- */
     .page-header {
         text-align: center;
-        margin-bottom: 50px;
+        margin-bottom: 35px;
     }
     .page-header .premium-title {
-        font-size: 3rem;
+        font-size: 2.4rem;
         font-weight: 900;
-        letter-spacing: -1.5px;
+        letter-spacing: -1px;
         background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 40%, #10b981 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     .page-header .premium-subtitle {
         color: #64748b;
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: 500;
     }
     .page-header .premium-divider {
-        width: 80px;
+        width: 70px;
         height: 4px;
         background: linear-gradient(90deg, #2563eb, #10b981);
-        margin: 18px auto 0;
+        margin: 14px auto 0;
         border-radius: 4px;
     }
 
     /* ---- Premium Card ---- */
     .premium-card {
-        border-radius: 32px;
+        border-radius: 22px;
         overflow: hidden;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.03);
-        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 6px 25px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.03);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         height: 100%;
         display: flex;
         flex-direction: column;
@@ -138,34 +139,34 @@ function getFieldIcon($fieldKey) {
         border: 1.5px solid #e2e8f0;
     }
     .premium-card:hover {
-        transform: translateY(-12px);
-        box-shadow: 0 30px 70px rgba(0,0,0,0.14), 0 6px 20px rgba(37,99,235,0.08);
+        transform: translateY(-8px);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.12), 0 4px 15px rgba(37,99,235,0.06);
         border-color: #93c5fd;
     }
     .premium-card.recommended {
         border-color: #10b981;
-        box-shadow: 0 10px 40px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.04);
+        box-shadow: 0 8px 30px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.04);
     }
     .premium-card.active-plan {
         border: 2.5px solid #10b981;
-        box-shadow: 0 15px 50px rgba(16,185,129,0.25);
+        box-shadow: 0 12px 40px rgba(16,185,129,0.25);
     }
 
     /* ---- Recommended Badge ---- */
     .premium-recommended {
         position: absolute;
-        top: 20px;
-        right: 20px;
+        top: 12px;
+        right: 12px;
         background: linear-gradient(135deg, #10b981, #059669);
         color: #fff;
-        padding: 7px 18px;
+        padding: 4px 12px;
         border-radius: 30px;
-        font-size: 0.68rem;
+        font-size: 0.58rem;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 0.6px;
         z-index: 10;
-        box-shadow: 0 6px 20px rgba(16,185,129,0.45);
+        box-shadow: 0 4px 15px rgba(16,185,129,0.45);
         animation: pulseGreen 2s infinite;
     }
     @keyframes pulseGreen {
@@ -173,9 +174,9 @@ function getFieldIcon($fieldKey) {
         50% { transform: scale(1.06); }
     }
 
-    /* ---- Header Band (Green/Blue) ---- */
+    /* ---- Header Band ---- */
     .premium-header {
-        padding: 35px 30px 30px;
+        padding: 22px 18px 18px;
         text-align: center;
         color: #fff;
         position: relative;
@@ -203,26 +204,26 @@ function getFieldIcon($fieldKey) {
         bottom: 0;
         left: 0;
         right: 0;
-        height: 30px;
+        height: 25px;
         background: linear-gradient(180deg, transparent, rgba(0,0,0,0.08));
         pointer-events: none;
     }
 
     .premium-header .plan-name {
-        font-size: 2.4rem;
+        font-size: 1.6rem;
         font-weight: 900;
-        letter-spacing: -1px;
-        margin-bottom: 4px;
-        text-shadow: 0 3px 15px rgba(0,0,0,0.2);
+        letter-spacing: -0.5px;
+        margin-bottom: 2px;
+        text-shadow: 0 3px 12px rgba(0,0,0,0.2);
         position: relative;
     }
     .premium-header .plan-duration {
-        font-size: 0.85rem;
+        font-size: 0.7rem;
         font-weight: 600;
         opacity: 0.95;
-        letter-spacing: 2px;
+        letter-spacing: 1px;
         text-transform: uppercase;
-        margin-bottom: 18px;
+        margin-bottom: 10px;
         position: relative;
     }
 
@@ -230,49 +231,49 @@ function getFieldIcon($fieldKey) {
         display: flex;
         align-items: baseline;
         justify-content: center;
-        gap: 14px;
+        gap: 8px;
         flex-wrap: wrap;
         position: relative;
     }
     .price-old {
-        font-size: 1.6rem;
+        font-size: 1rem;
         font-weight: 700;
         color: rgba(255,255,255,0.6);
         text-decoration: line-through;
         text-decoration-thickness: 2px;
     }
     .price-arrow {
-        font-size: 1.6rem;
+        font-size: 1rem;
         font-weight: 300;
         color: rgba(255,255,255,0.8);
     }
     .price-new {
-        font-size: 3rem;
+        font-size: 1.9rem;
         font-weight: 900;
         color: #ffffff;
-        letter-spacing: -1.5px;
-        text-shadow: 0 4px 20px rgba(0,0,0,0.25);
+        letter-spacing: -1px;
+        text-shadow: 0 4px 18px rgba(0,0,0,0.25);
     }
     .save-pill {
         background: #ffffff;
         color: #059669;
-        padding: 5px 16px;
+        padding: 3px 12px;
         border-radius: 30px;
-        font-size: 0.72rem;
+        font-size: 0.65rem;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.4px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        margin-top: 10px;
+        margin-top: 6px;
         display: inline-block;
     }
     .price-wrapper.no-discount .price-new {
-        font-size: 3.2rem;
+        font-size: 2rem;
     }
 
     /* ---- Body ---- */
     .premium-body {
-        padding: 28px 28px 20px;
+        padding: 16px 14px 12px;
         flex: 1;
         background: #ffffff;
         display: flex;
@@ -282,15 +283,15 @@ function getFieldIcon($fieldKey) {
     .features-grid-premium {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 5px;
     }
 
     .feature-row-premium {
         display: flex;
         align-items: center;
-        gap: 14px;
-        padding: 12px 16px;
-        border-radius: 14px;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 10px;
         transition: all 0.25s ease;
         background: #f8fafc;
         border: 1.5px solid transparent;
@@ -298,16 +299,16 @@ function getFieldIcon($fieldKey) {
     .feature-row-premium:hover {
         background: #eff6ff;
         border-color: #bfdbfe;
-        transform: translateX(4px);
+        transform: translateX(3px);
     }
     .feature-icon-box {
-        width: 38px;
-        height: 38px;
-        border-radius: 12px;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1rem;
+        font-size: 0.85rem;
         flex-shrink: 0;
     }
     .feature-icon-box.blue {
@@ -322,24 +323,31 @@ function getFieldIcon($fieldKey) {
         flex: 1;
         display: flex;
         flex-direction: column;
-        gap: 1px;
+        gap: 0;
+        min-width: 0;
     }
     .feature-text-box .lbl {
-        font-size: 0.68rem;
+        font-size: 0.6rem;
         font-weight: 700;
         color: #94a3b8;
         text-transform: uppercase;
-        letter-spacing: 0.6px;
+        letter-spacing: 0.4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .feature-text-box .val {
-        font-size: 0.95rem;
-        font-weight: 800;
+        font-size: 0.82rem;
+        font-weight: 700;
         color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     /* ---- Footer ---- */
     .premium-footer {
-        padding: 22px 28px 26px;
+        padding: 14px 14px 18px;
         text-align: center;
         background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         border-top: 1.5px solid #eef2f6;
@@ -349,30 +357,28 @@ function getFieldIcon($fieldKey) {
         background: linear-gradient(135deg, #1e3a8a, #2563eb);
         color: #fff;
         border: none;
-        padding: 15px 30px;
+        padding: 11px 18px;
         border-radius: 50px;
         font-weight: 800;
         width: 100%;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        font-size: 1rem;
-        letter-spacing: 0.5px;
+        font-size: 0.85rem;
+        letter-spacing: 0.3px;
         display: block;
         text-decoration: none;
-        box-shadow: 0 6px 25px rgba(37,99,235,0.35);
-        position: relative;
-        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(37,99,235,0.3);
     }
     .btn-premium-buy:hover {
         transform: translateY(-2px);
-        box-shadow: 0 12px 35px rgba(37,99,235,0.5);
+        box-shadow: 0 8px 25px rgba(37,99,235,0.45);
         color: #fff;
     }
     .btn-premium-buy.green {
         background: linear-gradient(135deg, #064e3b, #059669);
-        box-shadow: 0 6px 25px rgba(16,185,129,0.35);
+        box-shadow: 0 4px 15px rgba(16,185,129,0.3);
     }
     .btn-premium-buy.green:hover {
-        box-shadow: 0 12px 35px rgba(16,185,129,0.5);
+        box-shadow: 0 8px 25px rgba(16,185,129,0.45);
     }
     .btn-premium-buy:disabled {
         background: #cbd5e1 !important;
@@ -384,13 +390,13 @@ function getFieldIcon($fieldKey) {
 
     .active-status-pill {
         display: inline-block;
-        padding: 10px 24px;
+        padding: 7px 18px;
         border-radius: 50px;
-        font-size: 0.85rem;
+        font-size: 0.7rem;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.6px;
-        margin-bottom: 10px;
+        letter-spacing: 0.4px;
+        margin-bottom: 8px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     }
     .active-status-pill.active {
@@ -405,36 +411,57 @@ function getFieldIcon($fieldKey) {
     /* ---- Empty State ---- */
     .empty-pkg {
         text-align: center;
-        padding: 40px 20px;
+        padding: 24px 12px;
         color: #94a3b8;
-        font-size: 0.9rem;
+        font-size: 0.78rem;
     }
     .empty-pkg i {
-        font-size: 3rem;
+        font-size: 2rem;
         opacity: 0.3;
         display: block;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
     }
 
-    /* ---- Responsive ---- */
-    @media (max-width: 992px) {
-        .page-header .premium-title { font-size: 2.2rem; }
-        .premium-header .plan-name { font-size: 2rem; }
-        .price-new { font-size: 2.4rem; }
-        .price-old { font-size: 1.3rem; }
+    /* ============================================================ */
+    /* 📱 Responsive – 4 Cards → 2 Cards → 1 Card */
+    /* ============================================================ */
+
+    @media (max-width: 1199px) {
+        .premium-header .plan-name { font-size: 1.5rem; }
+        .price-new { font-size: 1.75rem; }
     }
+
+    @media (max-width: 991px) {
+        .page-header .premium-title { font-size: 2rem; }
+        .premium-header .plan-name { font-size: 1.8rem; }
+        .price-new { font-size: 2.2rem; }
+        .price-old { font-size: 1.2rem; }
+        .feature-icon-box {
+            width: 34px;
+            height: 34px;
+            font-size: 0.9rem;
+        }
+        .feature-text-box .lbl { font-size: 0.65rem; }
+        .feature-text-box .val { font-size: 0.88rem; }
+        .btn-premium-buy {
+            padding: 12px 22px;
+            font-size: 0.9rem;
+        }
+    }
+
     @media (max-width: 576px) {
-        .page-header .premium-title { font-size: 1.8rem; }
-        .premium-header { padding: 28px 22px 24px; }
-        .premium-body { padding: 22px 20px 18px; }
-        .premium-footer { padding: 18px 20px 22px; }
+        .page-header .premium-title { font-size: 1.7rem; }
+        .premium-header { padding: 22px 18px 18px; }
+        .premium-body { padding: 18px 16px 12px; }
+        .premium-footer { padding: 16px 18px 20px; }
         .premium-header .plan-name { font-size: 1.7rem; }
         .price-new { font-size: 2rem; }
+        .feature-text-box .val { font-size: 0.9rem; }
     }
 </style>
 
 <div class="premium-section">
-    <div class="container">
+    <div class="container-fluid px-4">
 
         <!-- Header -->
         <div class="page-header">
@@ -449,8 +476,8 @@ function getFieldIcon($fieldKey) {
             </div>
         <?php endif; ?>
 
-        <!-- Packages Grid – 2 per row -->
-        <div class="row g-4 justify-content-center">
+        <!-- Packages Grid – 4 per row -->
+        <div class="row g-3 g-lg-3 justify-content-center">
             <?php 
             $count = count($packages);
             foreach ($packages as $index => $pkg):
@@ -480,8 +507,8 @@ function getFieldIcon($fieldKey) {
                     }
                 }
             ?>
-                <!-- 2 Packages per Row on Desktop -->
-                <div class="col-xl-3 col-lg-3 col-md-6 mb-4">
+                <!-- 🔥 4 Packages per Row on Desktop -->
+                <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 mb-3">
                     <div class="premium-card <?= $is_recommended ? 'recommended' : '' ?> <?= $is_active ? 'active-plan' : '' ?>">
                         
                         <?php if ($is_recommended): ?>
@@ -540,11 +567,11 @@ function getFieldIcon($fieldKey) {
                                 <span class="active-status-pill active">✅ Active (<?= $days_left ?> days left)</span>
                                 <button class="btn-premium-buy" disabled>Currently Active</button>
                             <?php elseif ($has_pending): ?>
-                                <span class="active-status-pill pending">⏳ Pending Approval</span>
+                                <span class="active-status-pill pending">⏳ Pending</span>
                                 <button class="btn-premium-buy" disabled>Request Pending</button>
                             <?php else: ?>
                                 <a href="buy_subscription.php?package_id=<?= $pkg['id'] ?>" class="btn-premium-buy <?= $colorTheme === 'green' ? 'green' : '' ?>">
-                                    <i class="fas fa-arrow-right me-2"></i> Buy Now
+                                    <i class="fas fa-arrow-right me-1"></i> Buy Now
                                 </a>
                             <?php endif; ?>
                         </div>
