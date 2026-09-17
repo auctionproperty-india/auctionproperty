@@ -1,6 +1,7 @@
 <?php
 // ============================================================
-// 🎁 Admin Packages Manager – With Sequence/Display Order
+// 🎁 Admin Packages Manager – Full Updated
+// Features: Sequence + Dynamic Fields + Preserve Old Values
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -122,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // --- Update Package ---
+    // --- Update Package (PRESERVE OLD VALUES) ---
     if ($_POST['action'] === 'update_package') {
         $id = (int)$_POST['package_id'];
         $name = trim($_POST['name'] ?? '');
@@ -132,18 +133,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $display_order = (int)($_POST['display_order'] ?? 0);
 
         try {
+            // Update basic package info
             $stmt = $pdo->prepare("UPDATE packages SET name = ?, price = ?, discount_price = ?, duration = ?, display_order = ? WHERE id = ?");
             $stmt->execute([$name, $price, $discount_price, $duration, $display_order, $id]);
 
-            $pdo->prepare("DELETE FROM package_field_values WHERE package_id = ?")->execute([$id]);
-
+            // Get all fields
             $fields = $pdo->query("SELECT * FROM package_fields")->fetchAll();
+
             foreach ($fields as $f) {
                 $is_visible = isset($_POST['visible_' . $f['id']]) ? 1 : 0;
-                if (!$is_visible) continue;
-                $val = trim($_POST['field_' . $f['id']] ?? '');
-                $stmt = $pdo->prepare("INSERT INTO package_field_values (package_id, field_id, field_value, is_visible) VALUES (?, ?, ?, TRUE)");
-                $stmt->execute([$id, $f['id'], $val]);
+
+                if ($is_visible) {
+                    // 🔥 UPSERT: Insert or Update (Data preserve होगा)
+                    $val = trim($_POST['field_' . $f['id']] ?? '');
+                    $stmt = $pdo->prepare("
+                        INSERT INTO package_field_values (package_id, field_id, field_value, is_visible) 
+                        VALUES (?, ?, ?, TRUE)
+                        ON CONFLICT (package_id, field_id) 
+                        DO UPDATE SET field_value = EXCLUDED.field_value, is_visible = TRUE
+                    ");
+                    $stmt->execute([$id, $f['id'], $val]);
+                } else {
+                    // 🔥 Unchecked – सिर्फ Hide करें, Value DB में सुरक्षित रहेगी
+                    $stmt = $pdo->prepare("
+                        UPDATE package_field_values 
+                        SET is_visible = FALSE 
+                        WHERE package_id = ? AND field_id = ?
+                    ");
+                    $stmt->execute([$id, $f['id']]);
+                }
             }
 
             $message = "✅ Package '$name' updated successfully!";
@@ -174,15 +192,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // FETCH DATA
 // ============================================================
 $fields = $pdo->query("SELECT * FROM package_fields ORDER BY display_order ASC, id ASC")->fetchAll();
-// 🔥 Sort by display_order for Admin too
 $packages = $pdo->query("SELECT * FROM packages ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
 
+// 🔥 Load Values (COALESCE for old NULL records)
 $fieldValues = [];
-$stmt = $pdo->query("SELECT * FROM package_field_values WHERE is_visible = TRUE");
+$stmt = $pdo->query("SELECT * FROM package_field_values WHERE COALESCE(is_visible, TRUE) = TRUE");
 while ($row = $stmt->fetch()) {
     $fieldValues[$row['package_id']][$row['field_id']] = $row['field_value'];
 }
 
+// Selected Package
 $selectedId = isset($_GET['pkg']) && is_numeric($_GET['pkg']) ? (int)$_GET['pkg'] : 0;
 $selectedPackage = null;
 if ($selectedId > 0) {
@@ -366,7 +385,7 @@ include 'header.php';
     </div>
 
     <!-- ============================================================ -->
-    <!-- GLOBAL FIELD MANAGER (Collapsible) -->
+    <!-- GLOBAL FIELD MANAGER -->
     <!-- ============================================================ -->
     <div class="collapse mb-4" id="fieldMaster">
         <div class="pkg-card">
@@ -418,7 +437,7 @@ include 'header.php';
                             <input type="text" name="field_label" class="form-control form-control-sm" required placeholder="Field Label (e.g. Free Parking)">
                         </div>
                         <div class="mb-2">
-                            <input type="text" name="field_key" class="form-control form-control-sm" placeholder="field_key (Optional - Auto Generate हो जाएगा)">
+                            <input type="text" name="field_key" class="form-control form-control-sm" placeholder="field_key (Optional - Auto Generate होगा)">
                         </div>
                         <div class="row g-2 mb-2">
                             <div class="col-6">
@@ -454,7 +473,6 @@ include 'header.php';
                 <span class="badge bg-warning text-dark">ID #<?= $selectedPackage['id'] ?></span>
             </h5>
 
-            <!-- UPDATE FORM -->
             <form method="POST" id="updateForm">
                 <input type="hidden" name="action" value="update_package">
                 <input type="hidden" name="package_id" value="<?= $selectedPackage['id'] ?>">
@@ -481,7 +499,6 @@ include 'header.php';
                         <input type="number" name="duration" class="form-control"
                                value="<?= $selectedPackage['duration'] ?? 0 ?>">
                     </div>
-                    <!-- 🔥 Display Order -->
                     <div class="col-md-3">
                         <label class="form-label fw-bold small" style="color: #dc2626;">
                             🔢 Sequence No.
@@ -489,7 +506,7 @@ include 'header.php';
                         <input type="number" name="display_order" class="form-control" 
                                value="<?= $selectedPackage['display_order'] ?? 0 ?>"
                                placeholder="1, 2, 3...">
-                        <small class="text-muted" style="font-size: 0.65rem;">छोटा नंबर = पहले दिखेगा (1 सबसे पहले)</small>
+                        <small class="text-muted" style="font-size: 0.65rem;">छोटा नंबर = पहले दिखेगा</small>
                     </div>
                 </div>
 
@@ -498,7 +515,8 @@ include 'header.php';
                     <i class="fas fa-check-square me-1"></i> इस Package में कौन-कौन से Fields रखने हैं?
                 </h6>
                 <p class="text-muted mb-3" style="font-size: 0.82rem;">
-                    👉 जो Field चाहिए उसका <strong>Checkbox Tick</strong> करें और Value भरें।
+                    👉 जो Field चाहिए उसका <strong>Checkbox Tick</strong> करें और Value भरें। 
+                    जो नहीं चाहिए उसका <strong>Tick हटा दें</strong> (Value DB में सुरक्षित रहेगी)।
                 </p>
 
                 <div class="row g-2">
@@ -543,7 +561,7 @@ include 'header.php';
                 </div>
             </form>
 
-            <!-- DELETE FORM (Separate - No Nested Forms) -->
+            <!-- DELETE FORM (Separate) -->
             <form method="POST" style="display:inline-block; margin-top: 12px;" 
                   onsubmit="return confirm('⚠️ WARNING!\n\nक्या आप वाकई इस Package को PERMANENTLY DELETE करना चाहते हैं?\n\nPackage: <?= htmlspecialchars($selectedPackage['name']) ?>\n\nयह Action वापस नहीं हो सकता!');">
                 <input type="hidden" name="action" value="delete_package">
@@ -582,7 +600,6 @@ include 'header.php';
                         <label class="form-label fw-bold small">Duration (महीने)</label>
                         <input type="number" name="duration" class="form-control" value="0">
                     </div>
-                    <!-- 🔥 Display Order -->
                     <div class="col-md-3">
                         <label class="form-label fw-bold small" style="color: #dc2626;">
                             🔢 Sequence No.
