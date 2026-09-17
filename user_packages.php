@@ -46,8 +46,8 @@ $has_pending = $pending_check->rowCount() > 0;
 
 // ============================================================
 // 🔥 DYNAMIC FIELDS
-// ============================================================
-$packages = $pdo->query("SELECT * FROM packages ORDER BY id ASC")->fetchAll();
+// ============================================================// 🔥 Sort by display_order (Sequence) – Smallest first
+$packages = $pdo->query("SELECT * FROM packages ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
 $allFields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE ORDER BY display_order ASC, id ASC")->fetchAll();
 
 $fieldValues = [];
