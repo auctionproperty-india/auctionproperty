@@ -1,8 +1,7 @@
 <?php
 // ============================================================
 // 📤 Bulk Upload Properties – 2 Tabs (Convert + Upload)
-// Pure PHP XLSX Reader (No ZipArchive, No unzip needed)
-// EMD Deadline = Auction Date − 1 Day (हमेशा)
+// Pure PHP XLSX Reader + Auto Start/End Date + Retry on Error
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -73,10 +72,16 @@ function parseDate($dateStr) {
     }
     $parts = explode(' ', $dateStr);
     $dateStr = $parts[0];
-    if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $dateStr, $m)) {
-        return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+    if (preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/', $dateStr, $m)) {
+        // 24/9/2026 – पहला नंबर > 12 तो Day है
+        $d = (int)$m[1]; $mo = (int)$m[2]; $y = (int)$m[3];
+        if ($d > 12 && $mo <= 12) {
+            return sprintf('%04d-%02d-%02d', $y, $mo, $d);
+        }
+        // dd/mm/yyyy default
+        return sprintf('%04d-%02d-%02d', $y, $mo, $d);
     }
-    if (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/', $dateStr, $m)) {
+    if (preg_match('/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/', $dateStr, $m)) {
         return sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3]);
     }
     $ts = strtotime($dateStr);
@@ -84,10 +89,56 @@ function parseDate($dateStr) {
     return null;
 }
 
-function parseDateTimeFlexible($str) {
+// 🔥 ROBUST DateTime Parser
+function parseDateTimeRobust($str) {
     if (empty($str) || trim($str) === '') return null;
     $str = trim($str);
     if (in_array(strtolower($str), ['#value!', 'na', 'n/a', 'null', '-', 'club', 'club case'])) return null;
+
+    // Try DD/MM/YYYY HH:MM or DD/MM/YYYY
+    if (preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(?:\s+(.+))?$/', $str, $m)) {
+        $d = (int)$m[1]; $mo = (int)$m[2]; $y = (int)$m[3];
+        if ($y < 100) $y += 2000;
+
+        // 24/9/2026 → d=24, mo=9 → Day first
+        if ($d > 12 && $mo <= 12) {
+            // OK day first
+        } elseif ($mo > 12 && $d <= 12) {
+            // Month first
+            $tmp = $d; $d = $mo; $mo = $tmp;
+        }
+        if (!checkdate($mo, $d, $y)) return null;
+
+        $h = 0; $i = 0; $s = 0;
+        if (!empty($m[4])) {
+            $timePart = trim($m[4]);
+            // HH:MM AM/PM
+            if (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM|am|pm)$/', $timePart, $t)) {
+                $h = (int)$t[1]; $i = (int)$t[2];
+                $s = isset($t[3]) && $t[3] !== '' ? (int)$t[3] : 0;
+                $ampm = strtoupper($t[4]);
+                if ($ampm === 'PM' && $h < 12) $h += 12;
+                if ($ampm === 'AM' && $h == 12) $h = 0;
+            }
+            // HH:MM
+            elseif (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/', $timePart, $t)) {
+                $h = (int)$t[1]; $i = (int)$t[2];
+                $s = isset($t[3]) && $t[3] !== '' ? (int)$t[3] : 0;
+            }
+        }
+        return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $y, $mo, $d, $h, $i, $s);
+    }
+
+    // ISO format
+    if (preg_match('/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})(?:[\sT](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/', $str, $m)) {
+        $y = (int)$m[1]; $mo = (int)$m[2]; $d = (int)$m[3];
+        $h = isset($m[4]) ? (int)$m[4] : 0;
+        $i = isset($m[5]) ? (int)$m[5] : 0;
+        $s = isset($m[6]) ? (int)$m[6] : 0;
+        if (!checkdate($mo, $d, $y)) return null;
+        return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $y, $mo, $d, $h, $i, $s);
+    }
+
     $ts = strtotime($str);
     if ($ts !== false && $ts > 0) return date('Y-m-d H:i:s', $ts);
     return null;
@@ -102,33 +153,25 @@ function detectDelimiter($filepath) {
 }
 
 // ============================================================
-// 🔥 PURE PHP ZIP READER (No ZipArchive needed)
+// PURE PHP ZIP READER
 // ============================================================
 function readZipEntry($zipFile, $entryName) {
     $data = @file_get_contents($zipFile);
     if ($data === false) return false;
     $len = strlen($data);
-
-    // Find EOCD
     $eocdPos = -1;
     $searchStart = max(0, $len - 65558);
     for ($i = $len - 22; $i >= $searchStart; $i--) {
-        if (substr($data, $i, 4) === "PK\x05\x06") {
-            $eocdPos = $i;
-            break;
-        }
+        if (substr($data, $i, 4) === "PK\x05\x06") { $eocdPos = $i; break; }
     }
     if ($eocdPos === -1) return false;
-
     $cdCount = unpack('v', substr($data, $eocdPos + 10, 2))[1];
     $cdOffset = unpack('V', substr($data, $eocdPos + 16, 4))[1];
     if ($cdOffset >= $len) return false;
-
     $pos = $cdOffset;
     for ($i = 0; $i < $cdCount; $i++) {
         if ($pos + 46 > $len) return false;
         if (substr($data, $pos, 4) !== "PK\x01\x02") return false;
-
         $compressionMethod = unpack('v', substr($data, $pos + 10, 2))[1];
         $compressedSize = unpack('V', substr($data, $pos + 20, 4))[1];
         $fileNameLen = unpack('v', substr($data, $pos + 28, 2))[1];
@@ -136,39 +179,27 @@ function readZipEntry($zipFile, $entryName) {
         $commentLen = unpack('v', substr($data, $pos + 32, 2))[1];
         $localHeaderOffset = unpack('V', substr($data, $pos + 42, 4))[1];
         $fileName = substr($data, $pos + 46, $fileNameLen);
-
         if ($fileName === $entryName) {
             if ($localHeaderOffset + 30 > $len) return false;
             if (substr($data, $localHeaderOffset, 4) !== "PK\x03\x04") return false;
-
             $localFileNameLen = unpack('v', substr($data, $localHeaderOffset + 26, 2))[1];
             $localExtraLen = unpack('v', substr($data, $localHeaderOffset + 28, 2))[1];
-
             $dataStart = $localHeaderOffset + 30 + $localFileNameLen + $localExtraLen;
             if ($dataStart + $compressedSize > $len) return false;
-
             $compressedData = substr($data, $dataStart, $compressedSize);
-
             if ($compressionMethod === 0) return $compressedData;
             if ($compressionMethod === 8) {
                 $out = @gzinflate($compressedData);
-                if ($out === false) {
-                    // Try raw deflate
-                    $out = @gzinflate(substr($compressedData, 2));
-                }
+                if ($out === false) $out = @gzinflate(substr($compressedData, 2));
                 return $out;
             }
             return false;
         }
-
         $pos += 46 + $fileNameLen + $extraLen + $commentLen;
     }
     return false;
 }
 
-// ============================================================
-// 🔥 XLSX READER (Pure PHP)
-// ============================================================
 function colLetterToIndex($letters) {
     $letters = strtoupper($letters);
     $num = 0;
@@ -177,9 +208,8 @@ function colLetterToIndex($letters) {
 }
 
 function readXlsxFile($filepath, $preferredSheet = 'MASTER') {
-    // Read shared strings
     $ssXml = readZipEntry($filepath, 'xl/sharedStrings.xml');
-    $sharedStrings = [];
+    $ss = [];
     if ($ssXml !== false) {
         $xml = @simplexml_load_string($ssXml);
         if ($xml && isset($xml->si)) {
@@ -187,24 +217,19 @@ function readXlsxFile($filepath, $preferredSheet = 'MASTER') {
                 $text = '';
                 if (isset($si->t)) $text = (string)$si->t;
                 elseif (isset($si->r)) foreach ($si->r as $r) $text .= (string)$r->t;
-                $sharedStrings[] = $text;
+                $ss[] = $text;
             }
         }
     }
-
-    // Find sheet target
     $sheetTarget = 'xl/worksheets/sheet1.xml';
-    $workbookXml = readZipEntry($filepath, 'xl/workbook.xml');
+    $wbXml = readZipEntry($filepath, 'xl/workbook.xml');
     $relsXml = readZipEntry($filepath, 'xl/_rels/workbook.xml.rels');
-
-    if ($workbookXml !== false && $relsXml !== false) {
-        $wb = @simplexml_load_string($workbookXml);
+    if ($wbXml !== false && $relsXml !== false) {
+        $wb = @simplexml_load_string($wbXml);
         $rels = @simplexml_load_string($relsXml);
         $rIdToTarget = [];
         if ($rels && isset($rels->Relationship)) {
-            foreach ($rels->Relationship as $rel) {
-                $rIdToTarget[(string)$rel['Id']] = (string)$rel['Target'];
-            }
+            foreach ($rels->Relationship as $rel) $rIdToTarget[(string)$rel['Id']] = (string)$rel['Target'];
         }
         $found = false;
         if ($wb && isset($wb->sheets->sheet)) {
@@ -214,8 +239,7 @@ function readXlsxFile($filepath, $preferredSheet = 'MASTER') {
                 if (strtoupper($name) === strtoupper($preferredSheet) && isset($rIdToTarget[$rId])) {
                     $t = $rIdToTarget[$rId];
                     $sheetTarget = (strpos($t, 'xl/') === 0) ? $t : 'xl/' . ltrim($t, '/');
-                    $found = true;
-                    break;
+                    $found = true; break;
                 }
             }
         }
@@ -228,12 +252,10 @@ function readXlsxFile($filepath, $preferredSheet = 'MASTER') {
             }
         }
     }
-
     $sheetXml = readZipEntry($filepath, $sheetTarget);
     if ($sheetXml === false) $sheetXml = readZipEntry($filepath, 'xl/worksheets/sheet1.xml');
-    if ($sheetXml === false) throw new Exception("Cannot read sheet from XLSX");
-
-    return parseSheetXml($sheetXml, $sharedStrings);
+    if ($sheetXml === false) throw new Exception("Cannot read sheet");
+    return parseSheetXml($sheetXml, $ss);
 }
 
 function parseSheetXml($sheetXml, $ss) {
@@ -241,11 +263,9 @@ function parseSheetXml($sheetXml, $ss) {
     if (!$xml || !isset($xml->sheetData->row)) throw new Exception("Cannot parse sheet");
     $rows = [];
     foreach ($xml->sheetData->row as $row) {
-        $rowData = [];
-        $maxCol = -1;
+        $rowData = []; $maxCol = -1;
         foreach ($row->c as $cell) {
-            $ref = (string)$cell['r'];
-            $type = (string)$cell['t'];
+            $ref = (string)$cell['r']; $type = (string)$cell['t'];
             $value = isset($cell->v) ? (string)$cell->v : '';
             if ($type === 's') $value = $ss[(int)$value] ?? '';
             elseif ($type === 'inlineStr') {
@@ -265,9 +285,6 @@ function parseSheetXml($sheetXml, $ss) {
     return $rows;
 }
 
-// ============================================================
-// 🔥 CSV READER
-// ============================================================
 function readCsvRows($filepath) {
     $handle = fopen($filepath, 'r');
     if (!$handle) throw new Exception("Cannot open file");
@@ -278,15 +295,12 @@ function readCsvRows($filepath) {
     return $rows;
 }
 
-// ============================================================
-// 🔥 DETECT MASTER FORMAT
-// ============================================================
 function isMasterFormat($rows) {
     foreach ($rows as $i => $row) {
         if ($i > 10) break;
-        $joined = strtolower(implode(' ', $row));
-        if ((strpos($joined, 's no') !== false || strpos($joined, 'sr') !== false) &&
-            (strpos($joined, 'borrower') !== false || strpos($joined, 'auction') !== false)) {
+        $j = strtolower(implode(' ', $row));
+        if ((strpos($j, 's no') !== false || strpos($j, 'sr') !== false) &&
+            (strpos($j, 'borrower') !== false || strpos($j, 'auction') !== false)) {
             return true;
         }
     }
@@ -294,7 +308,7 @@ function isMasterFormat($rows) {
 }
 
 // ============================================================
-// 🔥 CONVERT MASTER → BULK CSV
+// CONVERT MASTER → BULK CSV
 // ============================================================
 function convertMasterToBulkCsv($rows, $bankName = 'PNB Housing') {
     if (empty($rows)) return [null, 0, 0, []];
@@ -336,9 +350,7 @@ function convertMasterToBulkCsv($rows, $bankName = 'PNB Housing') {
         'status', 'description'
     ]) . "\n";
 
-    $validCount = 0;
-    $skipCount = 0;
-    $skipRows = [];
+    $validCount = 0; $skipCount = 0; $skipRows = [];
 
     for ($i = $headerIdx + 1; $i < count($rows); $i++) {
         $row = $rows[$i];
@@ -380,16 +392,21 @@ function convertMasterToBulkCsv($rows, $bankName = 'PNB Housing') {
         if (!in_array($possession, ['Physical', 'Symbolic'])) $possession = 'Physical';
         $emd = round($price * 0.1, 2);
 
-        // 🔥 EMD DEADLINE = Auction Date − 1 Day (5:00 PM)
+        // 🔥 EMD DEADLINE = Auction Date − 1 Day
         $emdDeadline = date('d/m/Y 05:00 PM', strtotime($auctionDate . ' -1 day'));
         $auctionDateFormatted = date('d/m/Y', strtotime($auctionDate));
+
+        // 🔥 Auction Start = Same as Auction Date, 11 AM
+        // 🔥 Auction End = Same as Auction Date, 02 PM
+        $auctionStartFormatted = date('d/m/Y 11:00 AM', strtotime($auctionDate));
+        $auctionEndFormatted = date('d/m/Y 02:00 PM', strtotime($auctionDate));
 
         $desc = (!empty($mapLink) && strtolower($mapLink) !== 'na') ? 'Location: ' . $mapLink : '';
 
         $csvRow = [
             $title, $address, $location, $state, '', $normalizedType, $bankName,
             $borrower, $price, '', $sqft, $possession, $emd, '', $emdDeadline,
-            '', '', $auctionDateFormatted, '', '', 'available', $desc
+            $auctionStartFormatted, $auctionEndFormatted, $auctionDateFormatted, '', '', 'available', $desc
         ];
 
         $escaped = [];
@@ -406,7 +423,7 @@ function convertMasterToBulkCsv($rows, $bankName = 'PNB Housing') {
 }
 
 // ============================================================
-// 🔥 PROCESS BULK CSV → INSERT INTO DB
+// PROCESS BULK CSV → INSERT INTO DB (with Retry)
 // ============================================================
 function processBulkCsv($filepath, $pdo) {
     $delim = detectDelimiter($filepath);
@@ -420,10 +437,7 @@ function processBulkCsv($filepath, $pdo) {
 
     $required = ['title', 'city', 'price', 'auction_date'];
     foreach ($required as $col) {
-        if (!in_array($col, $headerLower)) {
-            fclose($handle);
-            throw new Exception("Missing required column: $col");
-        }
+        if (!in_array($col, $headerLower)) { fclose($handle); throw new Exception("Missing required column: $col"); }
     }
 
     $colMap = [];
@@ -475,13 +489,22 @@ function processBulkCsv($filepath, $pdo) {
             continue;
         }
 
-        // 🔥 EMD DEADLINE = Auction Date − 1 Day (5:00 PM)
+        // 🔥 EMD = Auction Date − 1 Day (5 PM)
         $emd_deadline_parsed = date('Y-m-d 17:00:00', strtotime($auction_date . ' -1 day'));
 
-        $auction_start_parsed = parseDateTimeFlexible($getVal('auction_start_time'));
-        $auction_end_parsed = parseDateTimeFlexible($getVal('auction_end_time'));
-        $inspection_date = parseDate($getVal('inspection_date'));
+        // 🔥 Auction Start / End – Parse or Auto-Set from Auction Date
+        $auction_start_parsed = parseDateTimeRobust($getVal('auction_start_time'));
+        $auction_end_parsed = parseDateTimeRobust($getVal('auction_end_time'));
 
+        // Fallback: If NULL, use Auction Date with default times
+        if (empty($auction_start_parsed)) {
+            $auction_start_parsed = $auction_date . ' 11:00:00';
+        }
+        if (empty($auction_end_parsed)) {
+            $auction_end_parsed = $auction_date . ' 14:00:00';
+        }
+
+        $inspection_date = parseDate($getVal('inspection_date'));
         $type = normalizeType($getVal('type'));
         $possession_type = in_array(strtolower($getVal('possession_type')), ['physical', 'symbolic'])
                             ? ucfirst(strtolower($getVal('possession_type'))) : 'Physical';
@@ -489,20 +512,31 @@ function processBulkCsv($filepath, $pdo) {
         $status = in_array(strtolower($statusRaw), ['available', 'sold', 'pending'])
                     ? strtolower($statusRaw) : 'available';
 
-        try {
-            $stmt = $pdo->prepare($insertSQL);
-            $stmt->execute([
-                $title, $getVal('description'), $price, $getVal('location'), $city, $getVal('state'),
-                $type, $getVal('bank_name'), extractNumber($getVal('sqft')), $possession_type,
-                $getVal('borrower_name'), extractNumber($getVal('emd_amount')), extractNumber($getVal('bid_increment')),
-                $emd_deadline_parsed, $auction_start_parsed, $auction_end_parsed, $getVal('locality'),
-                extractNumber($getVal('reserve_price_per_sqft')), $getVal('contact_number'),
-                $status, $auction_date, $inspection_date
-            ]);
-            $success++;
-        } catch (PDOException $e) {
+        // 🔥 Retry mechanism for Supabase PDO issues
+        $success_flag = false;
+        $lastError = '';
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $stmt = $pdo->prepare($insertSQL);
+                $stmt->execute([
+                    $title, $getVal('description'), $price, $getVal('location'), $city, $getVal('state'),
+                    $type, $getVal('bank_name'), extractNumber($getVal('sqft')), $possession_type,
+                    $getVal('borrower_name'), extractNumber($getVal('emd_amount')), extractNumber($getVal('bid_increment')),
+                    $emd_deadline_parsed, $auction_start_parsed, $auction_end_parsed, $getVal('locality'),
+                    extractNumber($getVal('reserve_price_per_sqft')), $getVal('contact_number'),
+                    $status, $auction_date, $inspection_date
+                ]);
+                $success++;
+                $success_flag = true;
+                break;
+            } catch (PDOException $e) {
+                $lastError = $e->getMessage();
+                usleep(100000); // 0.1 sec wait before retry
+            }
+        }
+        if (!$success_flag) {
             $fail++;
-            $failRows[] = "Row $rowNum: " . cleanUTF8($e->getMessage());
+            $failRows[] = "Row $rowNum: " . cleanUTF8($lastError);
         }
     }
     fclose($handle);
@@ -511,29 +545,34 @@ function processBulkCsv($filepath, $pdo) {
 }
 
 // ============================================================
+// HANDLE: FIX EXISTING NULL START/END DATES
+// ============================================================
+$fixReport = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fix_existing'])) {
+    try {
+        $c1 = $pdo->exec("UPDATE properties SET auction_start_time = auction_date WHERE auction_start_time IS NULL AND auction_date IS NOT NULL");
+        $c2 = $pdo->exec("UPDATE properties SET auction_end_time = auction_date WHERE auction_end_time IS NULL AND auction_date IS NOT NULL");
+        $fixReport = ['start' => $c1, 'end' => $c2];
+    } catch (PDOException $e) {
+        $fixReport = ['error' => $e->getMessage()];
+    }
+}
+
+// ============================================================
 // HANDLE: TAB 1 (Convert + Download)
 // ============================================================
-$convertReport = null;
-$convertError = '';
-$csvData = '';
-$csvFileName = '';
+$convertReport = null; $convertError = ''; $csvData = ''; $csvFileName = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'convert') {
     try {
         $file = $_FILES['source_file'] ?? null;
         if (!$file || $file['error'] !== UPLOAD_ERR_OK) throw new Exception("File upload error");
-
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
-        if ($ext === 'xlsx') {
-            $rows = readXlsxFile($file['tmp_name'], 'MASTER');
-        } elseif ($ext === 'xls') {
-            throw new Exception("पुराना .xls Support नहीं – Excel → Save As → .xlsx करें");
-        } elseif (in_array($ext, ['csv', 'txt', 'tsv'])) {
-            $rows = readCsvRows($file['tmp_name']);
-        } else {
-            throw new Exception("Unsupported: .$ext");
-        }
+        if ($ext === 'xlsx') $rows = readXlsxFile($file['tmp_name'], 'MASTER');
+        elseif ($ext === 'xls') throw new Exception("पुराना .xls Support नहीं – Excel → Save As → .xlsx करें");
+        elseif (in_array($ext, ['csv', 'txt', 'tsv'])) $rows = readCsvRows($file['tmp_name']);
+        else throw new Exception("Unsupported: .$ext");
 
         if (empty($rows)) throw new Exception("File में Data नहीं मिला");
 
@@ -542,7 +581,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         $convertReport = ['valid' => $validCount, 'skip' => $skipCount, 'skip_rows' => $skipRows];
         $csvFileName = 'bulk_upload_ready_' . date('Y-m-d_H-i-s') . '.csv';
-
     } catch (Exception $e) {
         $convertError = $e->getMessage();
     }
@@ -560,8 +598,7 @@ if (isset($_POST['download']) && $_POST['download'] === '1' && !empty($_POST['cs
 // ============================================================
 // HANDLE: TAB 2 (Upload to DB)
 // ============================================================
-$uploadReport = null;
-$uploadError = '';
+$uploadReport = null; $uploadError = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload') {
     try {
@@ -590,6 +627,8 @@ include 'header.php';
     .btn-primary-custom:hover { transform: translateY(-2px); color: #fff; }
     .btn-success-custom { background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; padding: 14px 40px; border-radius: 50px; font-weight: 700; font-size: 1.1rem; box-shadow: 0 6px 20px rgba(16,185,129,0.25); transition: all 0.3s; }
     .btn-success-custom:hover { transform: translateY(-2px); color: #fff; }
+    .btn-warning-custom { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; border: none; padding: 12px 30px; border-radius: 50px; font-weight: 700; box-shadow: 0 6px 20px rgba(245,158,11,0.25); }
+    .btn-warning-custom:hover { transform: translateY(-2px); color: #fff; }
     .info-box { background: #eff6ff; border-left: 5px solid #2563eb; border-radius: 12px; padding: 18px 22px; margin-bottom: 24px; }
     .report-card { border-radius: 16px; padding: 20px; margin-bottom: 16px; }
     .report-success { background: #ecfdf5; border-left: 5px solid #10b981; }
@@ -599,6 +638,19 @@ include 'header.php';
 
 <div class="container mt-4">
     <h1 class="mb-4"><i class="fas fa-file-excel text-success me-2"></i> Bulk Upload Properties</h1>
+
+    <!-- Fix Existing Properties Panel -->
+    <?php if ($fixReport): ?>
+        <?php if (isset($fixReport['error'])): ?>
+            <div class="alert alert-danger">❌ Fix Error: <?= htmlspecialchars($fixReport['error']) ?></div>
+        <?php else: ?>
+            <div class="alert alert-success">
+                ✅ <strong>Fix Applied!</strong>
+                Start Times Updated: <strong><?= $fixReport['start'] ?></strong> |
+                End Times Updated: <strong><?= $fixReport['end'] ?></strong>
+            </div>
+        <?php endif; ?>
+    <?php endif; ?>
 
     <ul class="nav nav-pills nav-pills-custom mb-4">
         <li class="nav-item">
@@ -614,6 +666,7 @@ include 'header.php';
     </ul>
 
     <?php if ($activeTab === 'convert'): ?>
+        <!-- ==================== TAB 1: CONVERT ==================== -->
         <div class="info-box">
             <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i> Step 1: Excel को CSV में Convert करें</h6>
             <ol class="mb-0" style="font-size: 0.9rem;">
@@ -681,6 +734,7 @@ include 'header.php';
         <?php endif; ?>
 
     <?php else: ?>
+        <!-- ==================== TAB 2: UPLOAD ==================== -->
         <div class="info-box">
             <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i> Step 2: Verified CSV Upload करें</h6>
             <ol class="mb-0" style="font-size: 0.9rem;">
@@ -688,6 +742,20 @@ include 'header.php';
                 <li>अगर Excel में Edit किया है तो <strong>Save as CSV UTF-8</strong> करें</li>
                 <li>"Upload to Database" बटन दबाएँ</li>
             </ol>
+        </div>
+
+        <!-- 🆕 Fix Existing Properties Button -->
+        <div class="card-conv">
+            <h5 class="fw-bold mb-2"><i class="fas fa-tools text-warning me-2"></i> पहले से Upload हुई Properties Fix करें</h5>
+            <p class="text-muted mb-3" style="font-size: 0.9rem;">
+                अगर किसी Property में <strong>Auction Start Time</strong> या <strong>Auction End Time</strong> N/A दिख रही है,
+                तो यह बटन दबाएँ – उन सबमें <strong>Auction Date</strong> वाली तारीख Auto-Set हो जाएगी।
+            </p>
+            <form method="POST">
+                <button type="submit" name="fix_existing" value="1" class="btn-warning-custom">
+                    <i class="fas fa-wrench me-2"></i> Fix NULL Start/End Dates
+                </button>
+            </form>
         </div>
 
         <?php if ($uploadError): ?>
@@ -763,7 +831,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.files.length > 0 && fname) fname.innerHTML = '<i class="fas fa-check-circle"></i> ' + this.files[0].name;
         });
     }
-
     setupUpload('convForm', 'srcFile', 'fileName');
     setupUpload('uploadForm', 'csvFile', 'fileName2');
 });
