@@ -1,6 +1,8 @@
 <?php
 // ============================================================
-// 📤 Bulk Upload Properties – Excel (.xlsx) + CSV Support
+// 📤 Bulk Upload Properties – 2 Tabs (Convert + Upload)
+// Tab 1: Excel/CSV → Convert → Download CSV
+// Tab 2: Verified CSV → Upload to Database
 // EMD Deadline = Auction Date − 1 Day (हमेशा)
 // ============================================================
 
@@ -256,7 +258,7 @@ function readCsvRows($filepath) {
 }
 
 // ============================================================
-// 🔥 DETECT: MASTER or Bulk Format?
+// 🔥 DETECT MASTER FORMAT
 // ============================================================
 function isMasterFormat($rows) {
     foreach ($rows as $i => $row) {
@@ -271,9 +273,11 @@ function isMasterFormat($rows) {
 }
 
 // ============================================================
-// 🔥 PROCESS MASTER (PNB Excel/CSV) → Insert into DB
+// 🔥 CONVERT MASTER → BULK CSV (Return as String for Download)
 // ============================================================
-function processMaster($rows, $pdo) {
+function convertMasterToBulkCsv($rows, $bankName = 'PNB Housing') {
+    if (empty($rows)) return [null, 0, 0, []];
+
     $headerIdx = 0;
     foreach ($rows as $i => $row) {
         if ($i > 10) break;
@@ -283,6 +287,7 @@ function processMaster($rows, $pdo) {
             $headerIdx = $i; break;
         }
     }
+
     $headerRow = $rows[$headerIdx] ?? [];
     $colMap = [];
     foreach ($headerRow as $idx => $col) {
@@ -301,16 +306,18 @@ function processMaster($rows, $pdo) {
     $defaults = ['borrower'=>6,'price'=>7,'auction_date'=>8,'address'=>9,'location'=>10,'state'=>11,'possession'=>12,'type'=>13,'area'=>14,'map'=>26];
     foreach ($defaults as $k => $v) if (!isset($colMap[$k])) $colMap[$k] = $v;
 
-    $success = 0; $skip = 0; $fail = 0;
-    $skipRows = []; $failRows = [];
+    $out = "\xEF\xBB\xBF"; // UTF-8 BOM
+    $out .= implode(',', [
+        'title', 'location', 'city', 'state', 'locality', 'type', 'bank_name',
+        'borrower_name', 'price', 'reserve_price_per_sqft', 'sqft', 'possession_type',
+        'emd_amount', 'bid_increment', 'emd_deadline', 'auction_start_time',
+        'auction_end_time', 'auction_date', 'inspection_date', 'contact_number',
+        'status', 'description'
+    ]) . "\n";
 
-    $insertSQL = "INSERT INTO properties (
-        title, description, price, location, city, state, type, bank_name,
-        sqft, possession_type, borrower_name, emd_amount, bid_increment,
-        emd_deadline, auction_start_time, auction_end_time, locality,
-        reserve_price_per_sqft, contact_number, status, auction_date,
-        inspection_date, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+    $validCount = 0;
+    $skipCount = 0;
+    $skipRows = [];
 
     for ($i = $headerIdx + 1; $i < count($rows); $i++) {
         $row = $rows[$i];
@@ -335,16 +342,16 @@ function processMaster($rows, $pdo) {
         $tL = strtolower($type);
         $pL = strtolower($priceRaw);
         if ($tL === 'club case' || $tL === 'club' || $pL === 'club' || $pL === 'club case' || empty($priceRaw) || !is_numeric(str_replace([',', ' '], '', $priceRaw))) {
-            $skip++;
+            $skipCount++;
             $skipRows[] = "Row " . ($i + 1) . ": Skipped (Club/Invalid)";
             continue;
         }
 
         $price = extractNumber($priceRaw);
-        if ($price <= 0) { $skip++; continue; }
+        if ($price <= 0) { $skipCount++; continue; }
 
         $auctionDate = parseDate($dateRaw);
-        if (!$auctionDate) { $skip++; $skipRows[] = "Row " . ($i + 1) . ": Invalid Date"; continue; }
+        if (!$auctionDate) { $skipCount++; $skipRows[] = "Row " . ($i + 1) . ": Invalid Date"; continue; }
 
         $normalizedType = normalizeType($type);
         $sqft = extractNumber($areaRaw);
@@ -353,29 +360,32 @@ function processMaster($rows, $pdo) {
         $emd = round($price * 0.1, 2);
 
         // 🔥 EMD DEADLINE = Auction Date − 1 Day (5:00 PM)
-        $emdDeadline = $auctionDate . ' 17:00:00';
+        $emdDeadline = date('d/m/Y 05:00 PM', strtotime($auctionDate . ' -1 day'));
+        $auctionDateFormatted = date('d/m/Y', strtotime($auctionDate));
 
         $desc = (!empty($mapLink) && strtolower($mapLink) !== 'na') ? 'Location: ' . $mapLink : '';
 
-        try {
-            $stmt = $pdo->prepare($insertSQL);
-            $stmt->execute([
-                $title, $desc, $price, $address, $location, $state, $normalizedType, 'PNB Housing',
-                $sqft, $possession, $borrower, $emd, 0, $emdDeadline, null, null, '',
-                0, '', 'available', $auctionDate, null
-            ]);
-            $success++;
-        } catch (PDOException $e) {
-            $fail++;
-            $failRows[] = "Row " . ($i + 1) . ": " . cleanUTF8($e->getMessage());
+        $csvRow = [
+            $title, $address, $location, $state, '', $normalizedType, $bankName,
+            $borrower, $price, '', $sqft, $possession, $emd, '', $emdDeadline,
+            '', '', $auctionDateFormatted, '', '', 'available', $desc
+        ];
+
+        $escaped = [];
+        foreach ($csvRow as $v) {
+            $v = (string)$v;
+            $escaped[] = (strpos($v, ',') !== false || strpos($v, '"') !== false || strpos($v, "\n") !== false)
+                ? '"' . str_replace('"', '""', $v) . '"' : $v;
         }
+        $out .= implode(',', $escaped) . "\n";
+        $validCount++;
     }
 
-    return ['success'=>$success, 'skip'=>$skip, 'fail'=>$fail, 'skip_rows'=>$skipRows, 'fail_rows'=>$failRows];
+    return [$out, $validCount, $skipCount, $skipRows];
 }
 
 // ============================================================
-// 🔥 PROCESS BULK-FORMAT CSV → Insert into DB
+// 🔥 PROCESS BULK CSV → INSERT INTO DB
 // ============================================================
 function processBulkCsv($filepath, $pdo) {
     $delim = detectDelimiter($filepath);
@@ -480,169 +490,265 @@ function processBulkCsv($filepath, $pdo) {
 }
 
 // ============================================================
-// HANDLE UPLOAD
+// HANDLE: TAB 1 (Convert + Download)
 // ============================================================
-$report = null;
-$errors = [];
+$convertReport = null;
+$convertError = '';
+$csvData = '';
+$csvFileName = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
-    $file = $_FILES['csv_file'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'convert') {
+    try {
+        $file = $_FILES['source_file'] ?? null;
+        if (!$file || $file['error'] !== UPLOAD_ERR_OK) throw new Exception("File upload error");
 
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        $errors[] = "File upload error (Code: {$file['error']})";
-    } else {
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
-        try {
-            if ($ext === 'xlsx') {
-                $rows = readXlsxFile($file['tmp_name'], 'MASTER');
-                $report = processMaster($rows, $pdo);
-                $report['type'] = 'Excel (MASTER)';
-
-            } elseif ($ext === 'xls') {
-                $errors[] = "पुराना .xls Support नहीं है। Excel में File खोलें → Save As → .xlsx करें।";
-
-            } elseif (in_array($ext, ['csv', 'txt', 'tsv'])) {
-                $rows = readCsvRows($file['tmp_name']);
-                if (isMasterFormat($rows)) {
-                    $report = processMaster($rows, $pdo);
-                    $report['type'] = 'CSV (MASTER)';
-                } else {
-                    $report = processBulkCsv($file['tmp_name'], $pdo);
-                    $report['type'] = 'CSV (Bulk Format)';
-                }
-            } else {
-                $errors[] = "Unsupported file type: .$ext (केवल .xlsx, .csv, .tsv)";
-            }
-        } catch (Exception $e) {
-            $errors[] = $e->getMessage();
+        if ($ext === 'xlsx') {
+            $rows = readXlsxFile($file['tmp_name'], 'MASTER');
+        } elseif ($ext === 'xls') {
+            throw new Exception("पुराना .xls Support नहीं – Excel → Save As → .xlsx करें");
+        } elseif (in_array($ext, ['csv', 'txt', 'tsv'])) {
+            $rows = readCsvRows($file['tmp_name']);
+        } else {
+            throw new Exception("Unsupported: .$ext");
         }
+
+        if (empty($rows)) throw new Exception("File में Data नहीं मिला");
+
+        list($csvData, $validCount, $skipCount, $skipRows) = convertMasterToBulkCsv($rows, 'PNB Housing');
+        if ($validCount === 0) throw new Exception("कोई Valid Property नहीं मिली");
+
+        $convertReport = ['valid' => $validCount, 'skip' => $skipCount, 'skip_rows' => $skipRows];
+        $csvFileName = 'bulk_upload_ready_' . date('Y-m-d_H-i-s') . '.csv';
+
+    } catch (Exception $e) {
+        $convertError = $e->getMessage();
     }
 }
+
+// ---- Direct CSV Download ----
+if (isset($_POST['download']) && $_POST['download'] === '1' && !empty($_POST['csv_content'])) {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . ($_POST['filename'] ?? 'bulk_upload.csv') . '"');
+    header('Pragma: no-cache');
+    echo $_POST['csv_content'];
+    exit;
+}
+
+// ============================================================
+// HANDLE: TAB 2 (Upload to DB)
+// ============================================================
+$uploadReport = null;
+$uploadError = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload') {
+    try {
+        $file = $_FILES['csv_file'] ?? null;
+        if (!$file || $file['error'] !== UPLOAD_ERR_OK) throw new Exception("CSV upload error");
+
+        $uploadReport = processBulkCsv($file['tmp_name'], $pdo);
+    } catch (Exception $e) {
+        $uploadError = $e->getMessage();
+    }
+}
+
+$activeTab = $_GET['tab'] ?? 'convert';
+if (isset($_POST['action']) && $_POST['action'] === 'upload') $activeTab = 'upload';
 
 include 'header.php';
 ?>
 
 <style>
-    .upload-card { background: #fff; border-radius: 24px; padding: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.06); border: 1px solid #e8edf4; }
-    .upload-area { border: 3px dashed #b8cbe8; border-radius: 20px; padding: 40px 20px; text-align: center; background: #f8faff; transition: all 0.3s; cursor: pointer; }
+    .nav-pills-custom .nav-link { color: #475569; font-weight: 700; border-radius: 50px; padding: 12px 30px; margin-right: 8px; }
+    .nav-pills-custom .nav-link.active { background: linear-gradient(135deg, #1e40af, #2563eb); color: #fff; }
+    .card-conv { background: #fff; border-radius: 24px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.06); border: 1px solid #e8edf4; margin-bottom: 24px; }
+    .upload-area { border: 3px dashed #b8cbe8; border-radius: 20px; padding: 40px 20px; text-align: center; background: #f8faff; cursor: pointer; transition: all 0.3s; }
     .upload-area:hover { border-color: #2563eb; background: #eff6ff; }
     .upload-area i { font-size: 3.5rem; color: #2563eb; margin-bottom: 12px; }
-    .btn-upload { background: linear-gradient(135deg, #1e40af, #2563eb); color: #fff; border: none; padding: 14px 40px; border-radius: 50px; font-weight: 700; font-size: 1.1rem; box-shadow: 0 6px 20px rgba(37,99,235,0.25); transition: all 0.3s; }
-    .btn-upload:hover { transform: translateY(-2px); color: #fff; }
-    .btn-download { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #0f172a; border: none; padding: 12px 32px; border-radius: 50px; font-weight: 700; text-decoration: none; display: inline-block; box-shadow: 0 6px 20px rgba(251,191,36,0.25); transition: all 0.3s; }
-    .btn-download:hover { transform: translateY(-2px); color: #0f172a; }
+    .btn-primary-custom { background: linear-gradient(135deg, #1e40af, #2563eb); color: #fff; border: none; padding: 14px 40px; border-radius: 50px; font-weight: 700; font-size: 1.1rem; box-shadow: 0 6px 20px rgba(37,99,235,0.25); transition: all 0.3s; }
+    .btn-primary-custom:hover { transform: translateY(-2px); color: #fff; }
+    .btn-success-custom { background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; padding: 14px 40px; border-radius: 50px; font-weight: 700; font-size: 1.1rem; box-shadow: 0 6px 20px rgba(16,185,129,0.25); transition: all 0.3s; }
+    .btn-success-custom:hover { transform: translateY(-2px); color: #fff; }
     .info-box { background: #eff6ff; border-left: 5px solid #2563eb; border-radius: 12px; padding: 18px 22px; margin-bottom: 24px; }
-    .report-card { border-radius: 16px; padding: 22px; margin-bottom: 20px; }
+    .report-card { border-radius: 16px; padding: 20px; margin-bottom: 16px; }
     .report-success { background: #ecfdf5; border-left: 5px solid #10b981; }
     .report-warning { background: #fffbeb; border-left: 5px solid #f59e0b; }
     .report-error { background: #fef2f2; border-left: 5px solid #dc2626; }
-    .report-card h5 { font-weight: 700; margin-bottom: 8px; }
 </style>
 
-<div class="container-fluid mt-4">
+<div class="container mt-4">
     <h1 class="mb-4"><i class="fas fa-file-excel text-success me-2"></i> Bulk Upload Properties</h1>
 
-    <?php if ($report): ?>
-        <div class="report-card report-success">
-            <h5>✅ Upload Completed! <small class="text-muted">(Type: <?= $report['type'] ?>)</small></h5>
-            <p class="mb-1"><strong>Successfully Added:</strong> <span class="text-success fw-bold"><?= $report['success'] ?></span></p>
-            <p class="mb-1"><strong>Skipped (Club/Invalid):</strong> <span class="text-warning fw-bold"><?= $report['skip'] ?></span></p>
-            <p class="mb-0"><strong>Failed:</strong> <span class="text-danger fw-bold"><?= $report['fail'] ?></span></p>
+    <!-- Tabs -->
+    <ul class="nav nav-pills nav-pills-custom mb-4">
+        <li class="nav-item">
+            <a class="nav-link <?= $activeTab === 'convert' ? 'active' : '' ?>" href="?tab=convert">
+                <i class="fas fa-magic me-2"></i> Step 1: Convert + Download
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= $activeTab === 'upload' ? 'active' : '' ?>" href="?tab=upload">
+                <i class="fas fa-upload me-2"></i> Step 2: Upload to Database
+            </a>
+        </li>
+    </ul>
+
+    <?php if ($activeTab === 'convert'): ?>
+        <!-- ==================== TAB 1: CONVERT ==================== -->
+        <div class="info-box">
+            <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i> Step 1: Excel को CSV में Convert करें</h6>
+            <ol class="mb-0" style="font-size: 0.9rem;">
+                <li>Excel File (.xlsx) या CSV Upload करें</li>
+                <li>"Convert" बटन दबाएँ</li>
+                <li>CSV Download करें – Excel में खोलकर <strong>Verify करें</strong></li>
+                <li>फिर <strong>Step 2 Tab</strong> में जाकर Upload करें</li>
+            </ol>
         </div>
 
-        <?php if (!empty($report['skip_rows'])): ?>
-            <div class="report-card report-warning">
-                <h5>⚠️ Skipped Rows (पहली 30)</h5>
-                <ul class="mb-0" style="max-height: 300px; overflow-y: auto;">
-                    <?php foreach (array_slice($report['skip_rows'], 0, 30) as $s): ?>
-                        <li><?= htmlspecialchars($s) ?></li>
-                    <?php endforeach; ?>
-                </ul>
+        <?php if ($convertError): ?>
+            <div class="alert alert-danger"><strong>❌ Error:</strong> <?= htmlspecialchars($convertError) ?></div>
+        <?php endif; ?>
+
+        <?php if ($convertReport): ?>
+            <div class="report-card report-success">
+                <h5>✅ Conversion Successful!</h5>
+                <p class="mb-1"><strong>Valid Properties:</strong> <span class="text-success fw-bold"><?= $convertReport['valid'] ?></span></p>
+                <p class="mb-0"><strong>Skipped (Club/Invalid):</strong> <span class="text-warning fw-bold"><?= $convertReport['skip'] ?></span></p>
+            </div>
+
+            <?php if (!empty($convertReport['skip_rows'])): ?>
+                <div class="report-card report-warning">
+                    <h6>⚠️ Skipped Rows (पहली 15)</h6>
+                    <ul class="mb-0" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">
+                        <?php foreach (array_slice($convertReport['skip_rows'], 0, 15) as $s): ?>
+                            <li><?= htmlspecialchars($s) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+
+            <div class="card-conv text-center">
+                <h5 class="fw-bold mb-3"><i class="fas fa-download me-2"></i> CSV Download करें</h5>
+                <form method="POST">
+                    <input type="hidden" name="download" value="1">
+                    <input type="hidden" name="filename" value="<?= htmlspecialchars($csvFileName) ?>">
+                    <input type="hidden" name="csv_content" value="<?= htmlspecialchars($csvData) ?>">
+                    <button type="submit" class="btn-success-custom">
+                        <i class="fas fa-download me-2"></i> Download Bulk Upload CSV
+                    </button>
+                </form>
+                <p class="text-muted mt-3 mb-0" style="font-size: 0.85rem;">
+                    CSV Download होने के बाद Excel में खोलें, Verify करें, फिर <strong>Step 2 Tab</strong> में Upload करें।
+                </p>
+            </div>
+        <?php else: ?>
+            <div class="card-conv">
+                <form method="POST" enctype="multipart/form-data" id="convForm">
+                    <input type="hidden" name="action" value="convert">
+                    <label for="srcFile" class="upload-area d-block">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h5>Excel / CSV File चुनें</h5>
+                        <p class="mb-0 text-muted">.xlsx / .csv / .tsv Supported</p>
+                        <input type="file" name="source_file" id="srcFile" style="display:none;" required>
+                        <div id="fileName" class="mt-3 fw-bold text-success"></div>
+                    </label>
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn-primary-custom">
+                            <i class="fas fa-magic me-2"></i> Convert to Bulk CSV
+                        </button>
+                    </div>
+                </form>
             </div>
         <?php endif; ?>
 
-        <?php if (!empty($report['fail_rows'])): ?>
-            <div class="report-card report-error">
-                <h5>❌ Failed Rows (पहली 30)</h5>
-                <ul class="mb-0" style="max-height: 400px; overflow-y: auto;">
-                    <?php foreach (array_slice($report['fail_rows'], 0, 30) as $e): ?>
-                        <li><?= htmlspecialchars($e) ?></li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
+    <?php else: ?>
+        <!-- ==================== TAB 2: UPLOAD ==================== -->
+        <div class="info-box">
+            <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i> Step 2: Verified CSV Upload करें</h6>
+            <ol class="mb-0" style="font-size: 0.9rem;">
+                <li>Step 1 से Download की हुई (Verified) CSV File चुनें</li>
+                <li>अगर Excel में Edit किया है तो <strong>Save as CSV UTF-8</strong> करें</li>
+                <li>"Upload to Database" बटन दबाएँ</li>
+            </ol>
+        </div>
+
+        <?php if ($uploadError): ?>
+            <div class="alert alert-danger"><strong>❌ Error:</strong> <?= htmlspecialchars($uploadError) ?></div>
         <?php endif; ?>
 
-        <a href="properties.php" class="btn btn-primary mb-4"><i class="fas fa-list me-2"></i> View All Properties</a>
-    <?php endif; ?>
-
-    <?php if (!empty($errors)): ?>
-        <div class="alert alert-danger">
-            <?php foreach ($errors as $e): ?><div><?= $e ?></div><?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-
-    <div class="info-box">
-        <h6><i class="fas fa-shield-alt me-2"></i> 🔥 Features</h6>
-        <ul class="mb-0" style="font-size: 0.9rem;">
-            <li><strong>Direct .xlsx Upload</strong> – Excel File सीधे डालें</li>
-            <li><strong>CSV भी Support</strong> – Bulk Format या MASTER Format दोनों</li>
-            <li><strong style="color: #dc2626;">EMD Deadline = Auction Date − 1 Day (5:00 PM) हमेशा Auto-Set</strong></li>
-            <li>Club Case Rows Auto-Skip होंगी</li>
-            <li>UTF-8 Safe – Smart Quotes Auto-Fix</li>
-        </ul>
-    </div>
-
-    <div class="text-center mb-4">
-        <a href="convert_excel.php" class="btn-download">
-            <i class="fas fa-magic me-2"></i> Excel → Bulk CSV Converter
-        </a>
-        <a href="download_template.php" class="btn-download ms-2">
-            <i class="fas fa-download me-2"></i> Download Sample CSV
-        </a>
-    </div>
-
-    <div class="upload-card">
-        <form method="POST" enctype="multipart/form-data" id="uploadForm">
-            <div class="upload-area" id="uploadArea">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <h4>Drag & Drop Excel / CSV File Here</h4>
-                <p>या क्लिक करके फ़ाइल चुनें</p>
-                <input type="file" name="csv_file" id="csvFile" style="display:none;" required>
-                <div id="fileName" class="mt-3 fw-bold text-success"></div>
+        <?php if ($uploadReport): ?>
+            <div class="report-card report-success">
+                <h5>✅ Upload Completed!</h5>
+                <p class="mb-1"><strong>Successfully Added:</strong> <span class="text-success fw-bold"><?= $uploadReport['success'] ?></span></p>
+                <p class="mb-1"><strong>Skipped (Club/Invalid):</strong> <span class="text-warning fw-bold"><?= $uploadReport['skip'] ?></span></p>
+                <p class="mb-0"><strong>Failed:</strong> <span class="text-danger fw-bold"><?= $uploadReport['fail'] ?></span></p>
             </div>
-            <div class="text-center mt-4">
-                <button type="submit" class="btn-upload">
-                    <i class="fas fa-upload me-2"></i> Upload Properties
-                </button>
+
+            <?php if (!empty($uploadReport['fail_rows'])): ?>
+                <div class="report-card report-error">
+                    <h6>❌ Failed Rows</h6>
+                    <ul class="mb-0" style="max-height: 250px; overflow-y: auto; font-size: 0.85rem;">
+                        <?php foreach (array_slice($uploadReport['fail_rows'], 0, 20) as $e): ?>
+                            <li><?= htmlspecialchars($e) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+
+            <a href="properties.php" class="btn btn-primary mb-3"><i class="fas fa-list me-2"></i> View All Properties</a>
+            <a href="?tab=convert" class="btn btn-secondary mb-3"><i class="fas fa-redo me-2"></i> Convert Another File</a>
+        <?php else: ?>
+            <div class="card-conv">
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    <input type="hidden" name="action" value="upload">
+                    <label for="csvFile" class="upload-area d-block">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h5>Verified CSV File चुनें</h5>
+                        <p class="mb-0 text-muted">.csv / .tsv Supported</p>
+                        <input type="file" name="csv_file" id="csvFile" style="display:none;" required>
+                        <div id="fileName2" class="mt-3 fw-bold text-success"></div>
+                    </label>
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn-primary-custom">
+                            <i class="fas fa-upload me-2"></i> Upload to Database
+                        </button>
+                    </div>
+                </form>
             </div>
-        </form>
-    </div>
+        <?php endif; ?>
+    <?php endif; ?>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const uploadArea = document.getElementById('uploadArea');
-    const csvFile = document.getElementById('csvFile');
-    const fileName = document.getElementById('fileName');
+    function setupUpload(formId, inputId, fileNameId) {
+        const form = document.getElementById(formId);
+        if (!form) return;
+        const area = form.querySelector('.upload-area');
+        const input = document.getElementById(inputId);
+        const fname = document.getElementById(fileNameId);
+        if (!area || !input) return;
 
-    uploadArea.addEventListener('click', function() { csvFile.click(); });
-    uploadArea.addEventListener('dragover', function(e) { e.preventDefault(); uploadArea.style.borderColor = '#10b981'; uploadArea.style.background = '#ecfdf5'; });
-    uploadArea.addEventListener('dragleave', function(e) { e.preventDefault(); uploadArea.style.borderColor = '#b8cbe8'; uploadArea.style.background = '#f8faff'; });
-    uploadArea.addEventListener('drop', function(e) {
-        e.preventDefault();
-        uploadArea.style.borderColor = '#b8cbe8';
-        uploadArea.style.background = '#f8faff';
-        if (e.dataTransfer.files.length > 0) {
-            csvFile.files = e.dataTransfer.files;
-            fileName.innerHTML = '<i class="fas fa-check-circle"></i> ' + e.dataTransfer.files[0].name;
-        }
-    });
-    csvFile.addEventListener('change', function() {
-        if (this.files.length > 0) {
-            fileName.innerHTML = '<i class="fas fa-check-circle"></i> ' + this.files[0].name;
-        }
-    });
+        area.addEventListener('click', function() { input.click(); });
+        area.addEventListener('dragover', function(e) { e.preventDefault(); area.style.borderColor = '#10b981'; area.style.background = '#ecfdf5'; });
+        area.addEventListener('dragleave', function(e) { e.preventDefault(); area.style.borderColor = '#b8cbe8'; area.style.background = '#f8faff'; });
+        area.addEventListener('drop', function(e) {
+            e.preventDefault();
+            area.style.borderColor = '#b8cbe8';
+            area.style.background = '#f8faff';
+            if (e.dataTransfer.files.length > 0) {
+                input.files = e.dataTransfer.files;
+                if (fname) fname.innerHTML = '<i class="fas fa-check-circle"></i> ' + e.dataTransfer.files[0].name;
+            }
+        });
+        input.addEventListener('change', function() {
+            if (this.files.length > 0 && fname) fname.innerHTML = '<i class="fas fa-check-circle"></i> ' + this.files[0].name;
+        });
+    }
+
+    setupUpload('convForm', 'srcFile', 'fileName');
+    setupUpload('uploadForm', 'csvFile', 'fileName2');
 });
 </script>
 
