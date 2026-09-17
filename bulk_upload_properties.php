@@ -1,8 +1,7 @@
 <?php
 // ============================================================
 // 📤 Bulk Upload Properties – 2 Tabs (Convert + Upload)
-// Tab 1: Excel/CSV → Convert → Download CSV
-// Tab 2: Verified CSV → Upload to Database
+// Pure PHP XLSX Reader (No ZipArchive, No unzip needed)
 // EMD Deadline = Auction Date − 1 Day (हमेशा)
 // ============================================================
 
@@ -103,7 +102,72 @@ function detectDelimiter($filepath) {
 }
 
 // ============================================================
-// 🔥 XLSX READER
+// 🔥 PURE PHP ZIP READER (No ZipArchive needed)
+// ============================================================
+function readZipEntry($zipFile, $entryName) {
+    $data = @file_get_contents($zipFile);
+    if ($data === false) return false;
+    $len = strlen($data);
+
+    // Find EOCD
+    $eocdPos = -1;
+    $searchStart = max(0, $len - 65558);
+    for ($i = $len - 22; $i >= $searchStart; $i--) {
+        if (substr($data, $i, 4) === "PK\x05\x06") {
+            $eocdPos = $i;
+            break;
+        }
+    }
+    if ($eocdPos === -1) return false;
+
+    $cdCount = unpack('v', substr($data, $eocdPos + 10, 2))[1];
+    $cdOffset = unpack('V', substr($data, $eocdPos + 16, 4))[1];
+    if ($cdOffset >= $len) return false;
+
+    $pos = $cdOffset;
+    for ($i = 0; $i < $cdCount; $i++) {
+        if ($pos + 46 > $len) return false;
+        if (substr($data, $pos, 4) !== "PK\x01\x02") return false;
+
+        $compressionMethod = unpack('v', substr($data, $pos + 10, 2))[1];
+        $compressedSize = unpack('V', substr($data, $pos + 20, 4))[1];
+        $fileNameLen = unpack('v', substr($data, $pos + 28, 2))[1];
+        $extraLen = unpack('v', substr($data, $pos + 30, 2))[1];
+        $commentLen = unpack('v', substr($data, $pos + 32, 2))[1];
+        $localHeaderOffset = unpack('V', substr($data, $pos + 42, 4))[1];
+        $fileName = substr($data, $pos + 46, $fileNameLen);
+
+        if ($fileName === $entryName) {
+            if ($localHeaderOffset + 30 > $len) return false;
+            if (substr($data, $localHeaderOffset, 4) !== "PK\x03\x04") return false;
+
+            $localFileNameLen = unpack('v', substr($data, $localHeaderOffset + 26, 2))[1];
+            $localExtraLen = unpack('v', substr($data, $localHeaderOffset + 28, 2))[1];
+
+            $dataStart = $localHeaderOffset + 30 + $localFileNameLen + $localExtraLen;
+            if ($dataStart + $compressedSize > $len) return false;
+
+            $compressedData = substr($data, $dataStart, $compressedSize);
+
+            if ($compressionMethod === 0) return $compressedData;
+            if ($compressionMethod === 8) {
+                $out = @gzinflate($compressedData);
+                if ($out === false) {
+                    // Try raw deflate
+                    $out = @gzinflate(substr($compressedData, 2));
+                }
+                return $out;
+            }
+            return false;
+        }
+
+        $pos += 46 + $fileNameLen + $extraLen + $commentLen;
+    }
+    return false;
+}
+
+// ============================================================
+// 🔥 XLSX READER (Pure PHP)
 // ============================================================
 function colLetterToIndex($letters) {
     $letters = strtoupper($letters);
@@ -113,15 +177,9 @@ function colLetterToIndex($letters) {
 }
 
 function readXlsxFile($filepath, $preferredSheet = 'MASTER') {
-    if (class_exists('ZipArchive')) return readXlsxWithZip($filepath, $preferredSheet);
-    else return readXlsxWithUnzip($filepath, $preferredSheet);
-}
-
-function readXlsxWithZip($filepath, $preferredSheet) {
-    $zip = new ZipArchive();
-    if ($zip->open($filepath) !== true) throw new Exception("Cannot open XLSX");
-    $ss = [];
-    $ssXml = $zip->getFromName('xl/sharedStrings.xml');
+    // Read shared strings
+    $ssXml = readZipEntry($filepath, 'xl/sharedStrings.xml');
+    $sharedStrings = [];
     if ($ssXml !== false) {
         $xml = @simplexml_load_string($ssXml);
         if ($xml && isset($xml->si)) {
@@ -129,18 +187,25 @@ function readXlsxWithZip($filepath, $preferredSheet) {
                 $text = '';
                 if (isset($si->t)) $text = (string)$si->t;
                 elseif (isset($si->r)) foreach ($si->r as $r) $text .= (string)$r->t;
-                $ss[] = $text;
+                $sharedStrings[] = $text;
             }
         }
     }
+
+    // Find sheet target
     $sheetTarget = 'xl/worksheets/sheet1.xml';
-    $wbXml = $zip->getFromName('xl/workbook.xml');
-    $relsXml = $zip->getFromName('xl/_rels/workbook.xml.rels');
-    if ($wbXml !== false && $relsXml !== false) {
-        $wb = @simplexml_load_string($wbXml);
+    $workbookXml = readZipEntry($filepath, 'xl/workbook.xml');
+    $relsXml = readZipEntry($filepath, 'xl/_rels/workbook.xml.rels');
+
+    if ($workbookXml !== false && $relsXml !== false) {
+        $wb = @simplexml_load_string($workbookXml);
         $rels = @simplexml_load_string($relsXml);
         $rIdToTarget = [];
-        if ($rels && isset($rels->Relationship)) foreach ($rels->Relationship as $rel) $rIdToTarget[(string)$rel['Id']] = (string)$rel['Target'];
+        if ($rels && isset($rels->Relationship)) {
+            foreach ($rels->Relationship as $rel) {
+                $rIdToTarget[(string)$rel['Id']] = (string)$rel['Target'];
+            }
+        }
         $found = false;
         if ($wb && isset($wb->sheets->sheet)) {
             foreach ($wb->sheets->sheet as $sheet) {
@@ -163,56 +228,12 @@ function readXlsxWithZip($filepath, $preferredSheet) {
             }
         }
     }
-    $sheetXml = $zip->getFromName($sheetTarget);
-    if ($sheetXml === false) $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
-    $zip->close();
-    if ($sheetXml === false) throw new Exception("Cannot read sheet");
-    return parseSheetXml($sheetXml, $ss);
-}
 
-function readXlsxWithUnzip($filepath, $preferredSheet) {
-    if (!function_exists('exec')) throw new Exception("ZipArchive और exec() unavailable");
-    $tmp = sys_get_temp_dir() . '/xlsx_' . uniqid();
-    @mkdir($tmp, 0755, true);
-    exec("unzip -o " . escapeshellarg($filepath) . " -d " . escapeshellarg($tmp) . " 2>&1", $out, $ret);
-    if ($ret !== 0) throw new Exception("unzip failed");
-    $ss = [];
-    $ssFile = $tmp . '/xl/sharedStrings.xml';
-    if (file_exists($ssFile)) {
-        $xml = @simplexml_load_string(file_get_contents($ssFile));
-        if ($xml && isset($xml->si)) {
-            foreach ($xml->si as $si) {
-                $text = '';
-                if (isset($si->t)) $text = (string)$si->t;
-                elseif (isset($si->r)) foreach ($si->r as $r) $text .= (string)$r->t;
-                $ss[] = $text;
-            }
-        }
-    }
-    $sheetFile = $tmp . '/xl/worksheets/sheet1.xml';
-    $wbFile = $tmp . '/xl/workbook.xml';
-    $relsFile = $tmp . '/xl/_rels/workbook.xml.rels';
-    if (file_exists($wbFile) && file_exists($relsFile)) {
-        $wb = @simplexml_load_string(file_get_contents($wbFile));
-        $rels = @simplexml_load_string(file_get_contents($relsFile));
-        $rIdToTarget = [];
-        if ($rels && isset($rels->Relationship)) foreach ($rels->Relationship as $rel) $rIdToTarget[(string)$rel['Id']] = (string)$rel['Target'];
-        if ($wb && isset($wb->sheets->sheet)) {
-            foreach ($wb->sheets->sheet as $sheet) {
-                $name = (string)$sheet['name'];
-                $rId = (string)$sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships')->id;
-                if (strtoupper($name) === strtoupper($preferredSheet) && isset($rIdToTarget[$rId])) {
-                    $t = $rIdToTarget[$rId];
-                    $sheetFile = (strpos($t, 'xl/') === 0) ? $tmp . '/' . $t : $tmp . '/xl/' . ltrim($t, '/');
-                    break;
-                }
-            }
-        }
-    }
-    if (!file_exists($sheetFile)) throw new Exception("Sheet not found");
-    $sheetXml = file_get_contents($sheetFile);
-    exec("rm -rf " . escapeshellarg($tmp));
-    return parseSheetXml($sheetXml, $ss);
+    $sheetXml = readZipEntry($filepath, $sheetTarget);
+    if ($sheetXml === false) $sheetXml = readZipEntry($filepath, 'xl/worksheets/sheet1.xml');
+    if ($sheetXml === false) throw new Exception("Cannot read sheet from XLSX");
+
+    return parseSheetXml($sheetXml, $sharedStrings);
 }
 
 function parseSheetXml($sheetXml, $ss) {
@@ -273,7 +294,7 @@ function isMasterFormat($rows) {
 }
 
 // ============================================================
-// 🔥 CONVERT MASTER → BULK CSV (Return as String for Download)
+// 🔥 CONVERT MASTER → BULK CSV
 // ============================================================
 function convertMasterToBulkCsv($rows, $bankName = 'PNB Housing') {
     if (empty($rows)) return [null, 0, 0, []];
@@ -306,7 +327,7 @@ function convertMasterToBulkCsv($rows, $bankName = 'PNB Housing') {
     $defaults = ['borrower'=>6,'price'=>7,'auction_date'=>8,'address'=>9,'location'=>10,'state'=>11,'possession'=>12,'type'=>13,'area'=>14,'map'=>26];
     foreach ($defaults as $k => $v) if (!isset($colMap[$k])) $colMap[$k] = $v;
 
-    $out = "\xEF\xBB\xBF"; // UTF-8 BOM
+    $out = "\xEF\xBB\xBF";
     $out .= implode(',', [
         'title', 'location', 'city', 'state', 'locality', 'type', 'bank_name',
         'borrower_name', 'price', 'reserve_price_per_sqft', 'sqft', 'possession_type',
@@ -527,7 +548,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// ---- Direct CSV Download ----
+// ---- Direct Download ----
 if (isset($_POST['download']) && $_POST['download'] === '1' && !empty($_POST['csv_content'])) {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . ($_POST['filename'] ?? 'bulk_upload.csv') . '"');
@@ -546,7 +567,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     try {
         $file = $_FILES['csv_file'] ?? null;
         if (!$file || $file['error'] !== UPLOAD_ERR_OK) throw new Exception("CSV upload error");
-
         $uploadReport = processBulkCsv($file['tmp_name'], $pdo);
     } catch (Exception $e) {
         $uploadError = $e->getMessage();
@@ -580,7 +600,6 @@ include 'header.php';
 <div class="container mt-4">
     <h1 class="mb-4"><i class="fas fa-file-excel text-success me-2"></i> Bulk Upload Properties</h1>
 
-    <!-- Tabs -->
     <ul class="nav nav-pills nav-pills-custom mb-4">
         <li class="nav-item">
             <a class="nav-link <?= $activeTab === 'convert' ? 'active' : '' ?>" href="?tab=convert">
@@ -595,7 +614,6 @@ include 'header.php';
     </ul>
 
     <?php if ($activeTab === 'convert'): ?>
-        <!-- ==================== TAB 1: CONVERT ==================== -->
         <div class="info-box">
             <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i> Step 1: Excel को CSV में Convert करें</h6>
             <ol class="mb-0" style="font-size: 0.9rem;">
@@ -663,7 +681,6 @@ include 'header.php';
         <?php endif; ?>
 
     <?php else: ?>
-        <!-- ==================== TAB 2: UPLOAD ==================== -->
         <div class="info-box">
             <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i> Step 2: Verified CSV Upload करें</h6>
             <ol class="mb-0" style="font-size: 0.9rem;">
