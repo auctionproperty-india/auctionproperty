@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🎁 Admin Packages Manager – Fixed (No Nested Forms + Table Back)
+// 🎁 Admin Packages Manager – With Sequence/Display Order
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -21,20 +21,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     // --- Add New Field ---
     if ($_POST['action'] === 'add_field') {
-        $field_key = preg_replace('/[^a-z0-9_]/', '_', strtolower(trim($_POST['field_key'] ?? '')));
+        $raw_key = trim($_POST['field_key'] ?? '');
+        $field_key = preg_replace('/[^a-z0-9_]/', '_', strtolower($raw_key));
+        if (empty($field_key) || preg_match('/^[0-9_]+$/', $field_key)) {
+            $field_key = strtolower(trim($_POST['field_label'] ?? ''));
+            $field_key = preg_replace('/[^a-z0-9]+/', '_', $field_key);
+            $field_key = trim($field_key, '_');
+        }
+        if (empty($field_key)) $field_key = 'field_' . time();
+
+        // Auto-Unique Key
+        $original_key = $field_key;
+        $counter = 1;
+        while (true) {
+            $check = $pdo->prepare("SELECT id FROM package_fields WHERE field_key = ?");
+            $check->execute([$field_key]);
+            if ($check->rowCount() === 0) break;
+            $field_key = $original_key . '_' . $counter;
+            $counter++;
+            if ($counter > 999) { $field_key = $original_key . '_' . time(); break; }
+        }
+
         $field_label = trim($_POST['field_label'] ?? '');
         $field_type = trim($_POST['field_type'] ?? 'text');
         $default_value = trim($_POST['default_value'] ?? '');
         $display_order = (int)($_POST['display_order'] ?? 0);
 
-        if (empty($field_key) || empty($field_label)) {
-            $message = "Field Key और Label ज़रूरी हैं!";
+        if (empty($field_label)) {
+            $message = "❌ Field Label ज़रूरी है!";
             $message_type = "danger";
         } else {
             try {
                 $stmt = $pdo->prepare("INSERT INTO package_fields (field_key, field_label, field_type, default_value, display_order, is_active) VALUES (?, ?, ?, ?, ?, TRUE)");
                 $stmt->execute([$field_key, $field_label, $field_type, $default_value, $display_order]);
-                $message = "✅ Field '$field_label' successfully added!";
+                $message = "✅ Field '$field_label' added! (Key: $field_key)";
                 $message_type = "success";
             } catch (PDOException $e) {
                 $message = "❌ Error: " . $e->getMessage();
@@ -43,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // --- Delete Field (globally) ---
+    // --- Delete Field ---
     if ($_POST['action'] === 'delete_field') {
         $field_id = (int)$_POST['field_id'];
         try {
@@ -73,14 +93,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $price = (float)($_POST['price'] ?? 0);
         $discount_price = !empty($_POST['discount_price']) ? (float)$_POST['discount_price'] : null;
         $duration = (int)($_POST['duration'] ?? 0);
+        $display_order = (int)($_POST['display_order'] ?? 0);
 
         if (empty($name) || $price <= 0) {
             $message = "Package Name और Price ज़रूरी हैं!";
             $message_type = "danger";
         } else {
             try {
-                $stmt = $pdo->prepare("INSERT INTO packages (name, price, discount_price, duration) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$name, $price, $discount_price, $duration]);
+                $stmt = $pdo->prepare("INSERT INTO packages (name, price, discount_price, duration, display_order) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$name, $price, $discount_price, $duration, $display_order]);
                 $package_id = $pdo->lastInsertId();
 
                 $fields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE")->fetchAll();
@@ -108,15 +129,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $price = (float)($_POST['price'] ?? 0);
         $discount_price = !empty($_POST['discount_price']) ? (float)$_POST['discount_price'] : null;
         $duration = (int)($_POST['duration'] ?? 0);
+        $display_order = (int)($_POST['display_order'] ?? 0);
 
         try {
-            $stmt = $pdo->prepare("UPDATE packages SET name = ?, price = ?, discount_price = ?, duration = ? WHERE id = ?");
-            $stmt->execute([$name, $price, $discount_price, $duration, $id]);
+            $stmt = $pdo->prepare("UPDATE packages SET name = ?, price = ?, discount_price = ?, duration = ?, display_order = ? WHERE id = ?");
+            $stmt->execute([$name, $price, $discount_price, $duration, $display_order, $id]);
 
-            // Remove all existing values
             $pdo->prepare("DELETE FROM package_field_values WHERE package_id = ?")->execute([$id]);
 
-            // Re-insert based on checkboxes
             $fields = $pdo->query("SELECT * FROM package_fields")->fetchAll();
             foreach ($fields as $f) {
                 $is_visible = isset($_POST['visible_' . $f['id']]) ? 1 : 0;
@@ -141,7 +161,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $pdo->prepare("DELETE FROM packages WHERE id = ?")->execute([$id]);
             $message = "✅ Package deleted!";
             $message_type = "success";
-            // Reset selected package to avoid showing deleted one
             header("Location: admin_packages.php");
             exit;
         } catch (PDOException $e) {
@@ -155,16 +174,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // FETCH DATA
 // ============================================================
 $fields = $pdo->query("SELECT * FROM package_fields ORDER BY display_order ASC, id ASC")->fetchAll();
-$packages = $pdo->query("SELECT * FROM packages ORDER BY id ASC")->fetchAll();
+// 🔥 Sort by display_order for Admin too
+$packages = $pdo->query("SELECT * FROM packages ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
 
-// Field values map
 $fieldValues = [];
 $stmt = $pdo->query("SELECT * FROM package_field_values WHERE is_visible = TRUE");
 while ($row = $stmt->fetch()) {
     $fieldValues[$row['package_id']][$row['field_id']] = $row['field_value'];
 }
 
-// Selected Package (default: first)
 $selectedId = isset($_GET['pkg']) && is_numeric($_GET['pkg']) ? (int)$_GET['pkg'] : 0;
 $selectedPackage = null;
 if ($selectedId > 0) {
@@ -296,6 +314,17 @@ include 'header.php';
     .pkg-table tr:hover {
         background: #f8faff;
     }
+    .seq-badge {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: #fff;
+        padding: 6px 14px;
+        border-radius: 30px;
+        font-size: 0.85rem;
+        font-weight: 800;
+        display: inline-block;
+        min-width: 40px;
+        text-align: center;
+    }
 </style>
 
 <div class="container-fluid">
@@ -320,7 +349,7 @@ include 'header.php';
                 <select name="pkg" onchange="document.getElementById('pkgSelectForm').submit();">
                     <?php foreach ($packages as $p): ?>
                         <option value="<?= $p['id'] ?>" <?= ($selectedPackage && $selectedPackage['id'] == $p['id']) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($p['name']) ?> (₹<?= number_format($p['price'] ?? 0) ?>)
+                            [<?= htmlspecialchars($p['display_order'] ?? 0) ?>] <?= htmlspecialchars($p['name']) ?> (₹<?= number_format($p['price'] ?? 0) ?>)
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -389,7 +418,7 @@ include 'header.php';
                             <input type="text" name="field_label" class="form-control form-control-sm" required placeholder="Field Label (e.g. Free Parking)">
                         </div>
                         <div class="mb-2">
-                            <input type="text" name="field_key" class="form-control form-control-sm" required placeholder="field_key (e.g. free_parking)">
+                            <input type="text" name="field_key" class="form-control form-control-sm" placeholder="field_key (Optional - Auto Generate हो जाएगा)">
                         </div>
                         <div class="row g-2 mb-2">
                             <div class="col-6">
@@ -425,24 +454,24 @@ include 'header.php';
                 <span class="badge bg-warning text-dark">ID #<?= $selectedPackage['id'] ?></span>
             </h5>
 
-            <!-- 🔥 UPDATE FORM (Separate) -->
+            <!-- UPDATE FORM -->
             <form method="POST" id="updateForm">
                 <input type="hidden" name="action" value="update_package">
                 <input type="hidden" name="package_id" value="<?= $selectedPackage['id'] ?>">
 
-                <!-- Basic Fields -->
+                <!-- Basic Fields with Display Order -->
                 <div class="row g-3 mb-4">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label fw-bold small">Package Name *</label>
                         <input type="text" name="name" class="form-control" required
                                value="<?= htmlspecialchars($selectedPackage['name'] ?? '') ?>">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label fw-bold small">Price (₹) *</label>
                         <input type="number" name="price" class="form-control" step="0.01" required
                                value="<?= $selectedPackage['price'] ?? '' ?>">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label fw-bold small">Discount Price</label>
                         <input type="number" name="discount_price" class="form-control" step="0.01"
                                value="<?= $selectedPackage['discount_price'] ?? '' ?>">
@@ -451,6 +480,16 @@ include 'header.php';
                         <label class="form-label fw-bold small">Duration (महीने)</label>
                         <input type="number" name="duration" class="form-control"
                                value="<?= $selectedPackage['duration'] ?? 0 ?>">
+                    </div>
+                    <!-- 🔥 Display Order -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small" style="color: #dc2626;">
+                            🔢 Sequence No.
+                        </label>
+                        <input type="number" name="display_order" class="form-control" 
+                               value="<?= $selectedPackage['display_order'] ?? 0 ?>"
+                               placeholder="1, 2, 3...">
+                        <small class="text-muted" style="font-size: 0.65rem;">छोटा नंबर = पहले दिखेगा (1 सबसे पहले)</small>
                     </div>
                 </div>
 
@@ -496,15 +535,15 @@ include 'header.php';
                     <?php endforeach; ?>
                 </div>
 
-                <div class="mt-4 d-flex gap-2 flex-wrap">
+                <div class="mt-4">
                     <button type="submit" class="btn btn-primary rounded-pill px-4">
                         <i class="fas fa-save me-2"></i> Update Package
                     </button>
-                    <a href="admin_packages.php" class="btn btn-secondary rounded-pill px-4">Cancel</a>
+                    <a href="admin_packages.php" class="btn btn-secondary rounded-pill px-4 ms-2">Cancel</a>
                 </div>
             </form>
 
-            <!-- 🔥 DELETE FORM (OUTSIDE Update Form) -->
+            <!-- DELETE FORM (Separate - No Nested Forms) -->
             <form method="POST" style="display:inline-block; margin-top: 12px;" 
                   onsubmit="return confirm('⚠️ WARNING!\n\nक्या आप वाकई इस Package को PERMANENTLY DELETE करना चाहते हैं?\n\nPackage: <?= htmlspecialchars($selectedPackage['name']) ?>\n\nयह Action वापस नहीं हो सकता!');">
                 <input type="hidden" name="action" value="delete_package">
@@ -527,21 +566,30 @@ include 'header.php';
                 <input type="hidden" name="action" value="add_package">
 
                 <div class="row g-3 mb-4">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label fw-bold small">Package Name *</label>
                         <input type="text" name="name" class="form-control" required placeholder="e.g. Platinum">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label fw-bold small">Price (₹) *</label>
                         <input type="number" name="price" class="form-control" step="0.01" required>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label fw-bold small">Discount Price</label>
                         <input type="number" name="discount_price" class="form-control" step="0.01">
                     </div>
                     <div class="col-md-2">
                         <label class="form-label fw-bold small">Duration (महीने)</label>
                         <input type="number" name="duration" class="form-control" value="0">
+                    </div>
+                    <!-- 🔥 Display Order -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small" style="color: #dc2626;">
+                            🔢 Sequence No.
+                        </label>
+                        <input type="number" name="display_order" class="form-control" 
+                               placeholder="1, 2, 3..." value="0">
+                        <small class="text-muted" style="font-size: 0.65rem;">छोटा नंबर = पहले (1 सबसे पहले)</small>
                     </div>
                 </div>
 
@@ -587,7 +635,7 @@ include 'header.php';
     <?php endif; ?>
 
     <!-- ============================================================ -->
-    <!-- 📋 ALL PACKAGES TABLE (Added Back) -->
+    <!-- ALL PACKAGES TABLE -->
     <!-- ============================================================ -->
     <div class="pkg-card">
         <h5>
@@ -600,6 +648,7 @@ include 'header.php';
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>🔢 Seq</th>
                         <th>Name</th>
                         <th>Price</th>
                         <th>Discount</th>
@@ -610,13 +659,16 @@ include 'header.php';
                 </thead>
                 <tbody>
                     <?php if (empty($packages)): ?>
-                        <tr><td colspan="7" class="text-center text-muted py-4">No packages yet.</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted py-4">No packages yet.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($packages as $p):
                         $fieldCount = isset($fieldValues[$p['id']]) ? count($fieldValues[$p['id']]) : 0;
                     ?>
                         <tr>
                             <td><strong>#<?= $p['id'] ?></strong></td>
+                            <td>
+                                <span class="seq-badge"><?= htmlspecialchars($p['display_order'] ?? 0) ?></span>
+                            </td>
                             <td><strong><?= htmlspecialchars($p['name']) ?></strong></td>
                             <td>₹ <?= number_format($p['price'] ?? 0) ?></td>
                             <td>
