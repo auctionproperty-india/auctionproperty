@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🎁 Admin Packages Manager – Package Selector + Edit Panel
+// 🎁 Admin Packages Manager – Fixed (No Nested Forms + Table Back)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $stmt->execute([$id, $f['id'], $val]);
             }
 
-            $message = "✅ Package updated successfully!";
+            $message = "✅ Package '$name' updated successfully!";
             $message_type = "success";
         } catch (PDOException $e) {
             $message = "❌ Error: " . $e->getMessage();
@@ -139,8 +139,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $id = (int)$_POST['package_id'];
         try {
             $pdo->prepare("DELETE FROM packages WHERE id = ?")->execute([$id]);
-            $message = "Package deleted!";
+            $message = "✅ Package deleted!";
             $message_type = "success";
+            // Reset selected package to avoid showing deleted one
+            header("Location: admin_packages.php");
+            exit;
         } catch (PDOException $e) {
             $message = "Error: " . $e->getMessage();
             $message_type = "danger";
@@ -276,6 +279,23 @@ include 'header.php';
         cursor: pointer;
         font-size: 0.9rem;
     }
+    .pkg-table { font-size: 0.85rem; margin-bottom: 0; }
+    .pkg-table th {
+        background: #1e293b;
+        color: #fff;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        padding: 10px 12px;
+        font-weight: 700;
+    }
+    .pkg-table td {
+        padding: 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .pkg-table tr:hover {
+        background: #f8faff;
+    }
 </style>
 
 <div class="container-fluid">
@@ -289,7 +309,7 @@ include 'header.php';
     <?php endif; ?>
 
     <!-- ============================================================ -->
-    <!-- PACKAGE SELECTOR DROPDOWN -->
+    <!-- PACKAGE SELECTOR -->
     <!-- ============================================================ -->
     <div class="pkg-selector">
         <div class="d-flex align-items-center gap-3 flex-wrap">
@@ -405,7 +425,8 @@ include 'header.php';
                 <span class="badge bg-warning text-dark">ID #<?= $selectedPackage['id'] ?></span>
             </h5>
 
-            <form method="POST">
+            <!-- 🔥 UPDATE FORM (Separate) -->
+            <form method="POST" id="updateForm">
                 <input type="hidden" name="action" value="update_package">
                 <input type="hidden" name="package_id" value="<?= $selectedPackage['id'] ?>">
 
@@ -438,7 +459,7 @@ include 'header.php';
                     <i class="fas fa-check-square me-1"></i> इस Package में कौन-कौन से Fields रखने हैं?
                 </h6>
                 <p class="text-muted mb-3" style="font-size: 0.82rem;">
-                    👉 जो Field चाहिए उसका <strong>Checkbox Tick</strong> करें और Value भरें। जो नहीं चाहिए उसका <strong>Tick हटा दें</strong>।
+                    👉 जो Field चाहिए उसका <strong>Checkbox Tick</strong> करें और Value भरें।
                 </p>
 
                 <div class="row g-2">
@@ -480,20 +501,23 @@ include 'header.php';
                         <i class="fas fa-save me-2"></i> Update Package
                     </button>
                     <a href="admin_packages.php" class="btn btn-secondary rounded-pill px-4">Cancel</a>
-                    <form method="POST" style="display:inline;" onsubmit="return confirm('⚠️ क्या आप वाकई इस Package को DELETE करना चाहते हैं?');">
-                        <input type="hidden" name="action" value="delete_package">
-                        <input type="hidden" name="package_id" value="<?= $selectedPackage['id'] ?>">
-                        <button type="submit" class="btn btn-danger rounded-pill px-4">
-                            <i class="fas fa-trash me-2"></i> Delete Package
-                        </button>
-                    </form>
                 </div>
+            </form>
+
+            <!-- 🔥 DELETE FORM (OUTSIDE Update Form) -->
+            <form method="POST" style="display:inline-block; margin-top: 12px;" 
+                  onsubmit="return confirm('⚠️ WARNING!\n\nक्या आप वाकई इस Package को PERMANENTLY DELETE करना चाहते हैं?\n\nPackage: <?= htmlspecialchars($selectedPackage['name']) ?>\n\nयह Action वापस नहीं हो सकता!');">
+                <input type="hidden" name="action" value="delete_package">
+                <input type="hidden" name="package_id" value="<?= $selectedPackage['id'] ?>">
+                <button type="submit" class="btn btn-danger rounded-pill px-4">
+                    <i class="fas fa-trash me-2"></i> Delete Package
+                </button>
             </form>
         </div>
     <?php endif; ?>
 
     <!-- ============================================================ -->
-    <!-- ADD NEW PACKAGE FORM (Hidden, shown when ?add_new=1) -->
+    <!-- ADD NEW PACKAGE FORM -->
     <!-- ============================================================ -->
     <?php if (isset($_GET['add_new'])): ?>
         <div class="pkg-card">
@@ -561,6 +585,72 @@ include 'header.php';
             </form>
         </div>
     <?php endif; ?>
+
+    <!-- ============================================================ -->
+    <!-- 📋 ALL PACKAGES TABLE (Added Back) -->
+    <!-- ============================================================ -->
+    <div class="pkg-card">
+        <h5>
+            <span><i class="fas fa-table me-2"></i> All Packages</span>
+            <span class="badge bg-primary"><?= count($packages) ?></span>
+        </h5>
+
+        <div class="table-responsive">
+            <table class="table pkg-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Discount</th>
+                        <th>Duration</th>
+                        <th>Fields</th>
+                        <th style="text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($packages)): ?>
+                        <tr><td colspan="7" class="text-center text-muted py-4">No packages yet.</td></tr>
+                    <?php endif; ?>
+                    <?php foreach ($packages as $p):
+                        $fieldCount = isset($fieldValues[$p['id']]) ? count($fieldValues[$p['id']]) : 0;
+                    ?>
+                        <tr>
+                            <td><strong>#<?= $p['id'] ?></strong></td>
+                            <td><strong><?= htmlspecialchars($p['name']) ?></strong></td>
+                            <td>₹ <?= number_format($p['price'] ?? 0) ?></td>
+                            <td>
+                                <?php if (!empty($p['discount_price'])): ?>
+                                    <span style="text-decoration: line-through; color: #94a3b8; font-size: 0.75rem;">₹ <?= number_format($p['price']) ?></span>
+                                    <br><strong style="color: #10b981;">₹ <?= number_format($p['discount_price']) ?></strong>
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <span class="badge bg-info"><?= htmlspecialchars($p['duration'] ?? 0) ?> mo</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary"><?= $fieldCount ?> fields</span>
+                            </td>
+                            <td style="text-align:right;">
+                                <a href="?pkg=<?= $p['id'] ?>" class="btn btn-sm btn-primary" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form method="POST" style="display:inline;" onsubmit="return confirm('⚠️ Delete this package?');">
+                                    <input type="hidden" name="action" value="delete_package">
+                                    <input type="hidden" name="package_id" value="<?= $p['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <script>
