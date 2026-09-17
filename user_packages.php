@@ -481,7 +481,7 @@ function getFieldIcon($fieldKey) {
                 }
             ?>
                 <!-- 2 Packages per Row on Desktop -->
-                <div class="col-lg-6 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-3 col-md-6 mb-4">
                     <div class="premium-card <?= $is_recommended ? 'recommended' : '' ?> <?= $is_active ? 'active-plan' : '' ?>">
                         
                         <?php if ($is_recommended): ?>
