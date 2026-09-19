@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ REGISTER – With Referral Code Capture from URL
+// ✅ REGISTER – With Referral Code + City Field
 // ============================================================
 
 session_start(); // 🔥 MUST BE FIRST
@@ -17,11 +17,12 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);
-    $password = $_POST['password'];
-    $confirm = $_POST['confirm_password'];
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $city = trim($_POST['city'] ?? '');  // 🔥 NEW
+    $password = $_POST['password'] ?? '';
+    $confirm = $_POST['confirm_password'] ?? '';
     
     // ====== 🔥 FIX: Get referral code from POST or Session ======
     $ref_code = trim($_POST['referral_code'] ?? '');
@@ -29,8 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ref_code = $_SESSION['referral_code'];
     }
 
-    if (empty($name) || empty($email) || empty($password)) {
-        $error = 'All fields are required.';
+    if (empty($name) || empty($email) || empty($password) || empty($city)) {
+        $error = 'All fields are required (Name, Email, City, Password).';
     } elseif ($password !== $confirm) {
         $error = 'Passwords do not match.';
     } elseif (strlen($password) < 6) {
@@ -51,8 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
             $new_code = generateReferralCode();
 
-            $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'active', NOW())");
-            $stmt->execute([$name, $email, $phone, $hashed, $new_code, $ref_by]);
+            // 🔥 NEW: City field Insert
+            $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, city, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
+            $stmt->execute([$name, $email, $phone, $city, $hashed, $new_code, $ref_by]);
 
             // ====== 🔥 FIX: Clear session referral code after successful registration ======
             unset($_SESSION['referral_code']);
@@ -156,6 +158,19 @@ include 'header.php';
     .referral-info i {
         margin-right: 6px;
     }
+    /* 🔥 City Field Helper */
+    .city-helper {
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        color: #78350f;
+        margin-top: 6px;
+    }
+    .city-helper i {
+        margin-right: 4px;
+    }
     @media (max-width: 576px) {
         .register-card { padding: 30px 20px; }
     }
@@ -185,6 +200,19 @@ include 'header.php';
                 <label class="form-label">Phone (optional)</label>
                 <input type="text" name="phone" class="form-control" placeholder="9876543210">
             </div>
+
+            <!-- 🔥 NEW: City Field -->
+            <div class="mb-3">
+                <label class="form-label">
+                    City <span style="color:#dc2626;">*</span>
+                </label>
+                <input type="text" name="city" class="form-control" placeholder="e.g. Indore, Mumbai, Delhi" required>
+                <div class="city-helper">
+                    <i class="fas fa-info-circle"></i>
+                    आपकी City के हिसाब से ही Dashboard पर Properties दिखाई जाएँगी।
+                </div>
+            </div>
+
             <div class="mb-3">
                 <label class="form-label">Password</label>
                 <input type="password" name="password" class="form-control" placeholder="••••••••" required>
