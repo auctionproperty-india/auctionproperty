@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
-    $city = trim($_POST['city'] ?? '');  // 🔥 NEW
+    $city = trim($_POST['city'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirm = $_POST['confirm_password'] ?? '';
     
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
             $new_code = generateReferralCode();
 
-            // 🔥 NEW: City field Insert
+            // 🔥 City field Insert
             $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, city, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
             $stmt->execute([$name, $email, $phone, $city, $hashed, $new_code, $ref_by]);
 
@@ -60,8 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             unset($_SESSION['referral_code']);
 
             $success = 'Account created! You can now login.';
-            // Optionally auto-login
-            // header("Location: login.php?registered=1");
         }
     }
 }
@@ -158,19 +156,6 @@ include 'header.php';
     .referral-info i {
         margin-right: 6px;
     }
-    /* 🔥 City Field Helper */
-    .city-helper {
-        background: #fef3c7;
-        border-left: 4px solid #f59e0b;
-        padding: 8px 12px;
-        border-radius: 8px;
-        font-size: 0.8rem;
-        color: #78350f;
-        margin-top: 6px;
-    }
-    .city-helper i {
-        margin-right: 4px;
-    }
     @media (max-width: 576px) {
         .register-card { padding: 30px 20px; }
     }
@@ -190,42 +175,38 @@ include 'header.php';
         <form method="POST">
             <div class="mb-3">
                 <label class="form-label">Full Name</label>
-                <input type="text" name="name" class="form-control" placeholder="Your name" required>
+                <input type="text" name="name" class="form-control" required>
             </div>
             <div class="mb-3">
                 <label class="form-label">Email Address</label>
-                <input type="email" name="email" class="form-control" placeholder="you@example.com" required>
+                <input type="email" name="email" class="form-control" required>
             </div>
             <div class="mb-3">
                 <label class="form-label">Phone (optional)</label>
-                <input type="text" name="phone" class="form-control" placeholder="9876543210">
+                <input type="text" name="phone" class="form-control">
             </div>
 
-            <!-- 🔥 NEW: City Field -->
+            <!-- 🔥 City Field -->
             <div class="mb-3">
                 <label class="form-label">
                     City <span style="color:#dc2626;">*</span>
                 </label>
-                <input type="text" name="city" class="form-control" placeholder="e.g. Indore, Mumbai, Delhi" required>
-                <div class="city-helper">
-                    <i class="fas fa-info-circle"></i>
-                    आपकी City के हिसाब से ही Dashboard पर Properties दिखाई जाएँगी।
-                </div>
+                <input type="text" name="city" class="form-control" required>
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Password</label>
-                <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                <input type="password" name="password" class="form-control" required>
             </div>
             <div class="mb-3">
                 <label class="form-label">Confirm Password</label>
-                <input type="password" name="confirm_password" class="form-control" placeholder="••••••••" required>
+                <input type="password" name="confirm_password" class="form-control" required>
             </div>
             
-            <!-- ====== 🔥 FIX: Hidden field to carry referral code ====== -->
+            <!-- Hidden field for referral code -->
             <input type="hidden" name="referral_code" value="<?= isset($_SESSION['referral_code']) ? htmlspecialchars($_SESSION['referral_code']) : '' ?>">
 
-            <!-- ====== 🔥 FIX: Show referral info if code is present ====== -->
+            <!-- Referral Info (only shown if code is present) -->
             <div class="referral-info" id="referralInfo">
                 <i class="fas fa-gift"></i> 
                 <strong>🎉 Referral Code Applied:</strong> 
