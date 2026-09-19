@@ -1,6 +1,7 @@
 <?php
 // ============================================================
 // ✅ Header – Top Nav with Hamburger + Sidebar (Index, Login, Register)
+// 🔥 Dynamic Sidebar + Manage Pages Link
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -29,11 +30,14 @@ if ($is_logged_in) {
     }
 }
 
-// ---- Fetch navigation items ----
-$nav_items = $pdo->query("SELECT * FROM navigation_items WHERE is_active = TRUE ORDER BY display_order")->fetchAll();
+// ---- Fetch navigation items (Menu Links) ----
+$nav_items = safeFetchAll($pdo, "SELECT * FROM navigation_items WHERE is_active = TRUE ORDER BY display_order");
+
+// ---- Fetch Dynamic Pages (About, FAQ, Contact, etc.) ----
+$dynamic_pages = safeFetchAll($pdo, "SELECT slug, title, icon FROM dynamic_pages WHERE is_active = TRUE ORDER BY display_order ASC, id ASC");
 
 // ---- Fetch social links ----
-$social_links = $pdo->query("SELECT * FROM social_links WHERE is_active = TRUE ORDER BY display_order")->fetchAll();
+$social_links = safeFetchAll($pdo, "SELECT * FROM social_links WHERE is_active = TRUE ORDER BY display_order");
 
 // ---- User info for top bar ----
 $reg_date = '';
@@ -43,14 +47,11 @@ $days_left = 0;
 
 if ($is_logged_in && $role == 'user') {
     $user_id = $_SESSION['user_id'];
-    $stmt = $pdo->prepare("SELECT name, email, created_at as reg_date FROM users WHERE id = ?");
-    $stmt->execute([$user_id]);
-    $user_sidebar = $stmt->fetch();
+    $user_sidebar = safeFetch($pdo, "SELECT name, email, created_at as reg_date FROM users WHERE id = ?", [$user_id]);
     $reg_date = !empty($user_sidebar['reg_date']) ? date('d M Y', strtotime($user_sidebar['reg_date'])) : 'N/A';
 
-    $sub = $pdo->prepare("SELECT start_date, end_date FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1");
-    $sub->execute([$user_id]);
-    $sub_info = $sub->fetch();
+    $sub_info = safeFetch($pdo, "SELECT start_date, end_date FROM subscriptions WHERE user_id = ? AND status = 'active' AND end_date >= CURRENT_DATE ORDER BY id DESC LIMIT 1", [$user_id]);
+    
     if ($sub_info) {
         $activation_date = date('d M Y', strtotime($sub_info['start_date']));
         $expiry_date = $sub_info['end_date'];
@@ -79,13 +80,11 @@ if ($is_logged_in && $role == 'user') {
             font-family: 'Inter', sans-serif; 
             background: #f4f7fc; 
             overflow-x: hidden; 
-            /* 🔥 Selection Disable – लेकिन Input में Allow */
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
             user-select: none;
         }
-        /* 🔥 Input/Textarea/Select में Selection Allow करें */
         input, textarea, select, [contenteditable="true"] {
             -webkit-user-select: text !important;
             -moz-user-select: text !important;
@@ -98,7 +97,6 @@ if ($is_logged_in && $role == 'user') {
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
         body.role-sales { background: #f0f5fa; }
-        /* Luxury login/register background (optional) */
         body.page-login, body.page-register {
             background: url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed;
             background-size: cover;
@@ -280,7 +278,7 @@ if ($is_logged_in && $role == 'user') {
             margin-right: 10px;
         }
 
-        /* 🔥 Auth links for non-logged users */
+        /* 🔥 Auth links */
         .hamburger-sidebar .auth-links {
             margin-top: 20px;
             border-top: 1px solid #e2e8f0;
@@ -626,7 +624,6 @@ if ($is_logged_in && $role == 'user') {
         .badge-sales { background: #f59e0b; color: #000; }
     </style>
 </head>
-<!-- 🔥 Copy Protection – लेकिन Input/Textarea में Paste Allow -->
 <body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>"
       oncontextmenu="var tag = event.target.tagName; if(tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return false;"
       onkeydown="
@@ -659,7 +656,7 @@ if ($is_logged_in && $role == 'user') {
     </div>
 </nav>
 
-<!-- ====== HAMBURGER SIDEBAR ====== -->
+<!-- ====== HAMBURGER SIDEBAR (🔥 DYNAMIC) ====== -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="hamburger-sidebar" id="hamburgerSidebar">
     <div class="sidebar-header">
@@ -667,30 +664,61 @@ if ($is_logged_in && $role == 'user') {
         <button class="close-btn" id="closeSidebarBtn"><i class="fas fa-times"></i></button>
     </div>
     <ul class="nav-list">
-        <?php foreach ($nav_items as $item): ?>
-            <li>
-                <a href="<?= htmlspecialchars($item['url']) ?>">
-                    <?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?>
-                    <?= htmlspecialchars($item['label']) ?>
-                </a>
-            </li>
-        <?php endforeach; ?>
+        <?php 
+        // 🔥 Priority 1: Dynamic Pages (Admin से Manage होते हैं)
+        if (!empty($dynamic_pages)):
+            foreach ($dynamic_pages as $page): ?>
+                <li>
+                    <a href="page.php?slug=<?= urlencode($page['slug']) ?>">
+                        <i class="fas <?= htmlspecialchars($page['icon']) ?>"></i>
+                        <?= htmlspecialchars($page['title']) ?>
+                    </a>
+                </li>
+            <?php endforeach;
+        // 🔥 Priority 2: Navigation Items (अगर Dynamic Pages खाली हैं)
+        elseif (!empty($nav_items)):
+            foreach ($nav_items as $item): ?>
+                <li>
+                    <a href="<?= htmlspecialchars($item['url']) ?>">
+                        <?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?>
+                        <?= htmlspecialchars($item['label']) ?>
+                    </a>
+                </li>
+            <?php endforeach;
+        // 🔥 Priority 3: Fallback Default Links
+        else: ?>
+            <li><a href="index.php"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="index.php?tab=auction"><i class="fas fa-gavel"></i> Auctions</a></li>
+            <li><a href="index.php?tab=customer"><i class="fas fa-building"></i> Properties</a></li>
+            <li><a href="page.php?slug=about"><i class="fas fa-info-circle"></i> About</a></li>
+            <li><a href="page.php?slug=faq"><i class="fas fa-question-circle"></i> FAQ</a></li>
+            <li><a href="page.php?slug=contact"><i class="fas fa-envelope"></i> Contact</a></li>
+        <?php endif; ?>
     </ul>
-    <!-- 🔥 Auth links for non-logged users -->
+    
+    <!-- Auth links for non-logged users -->
     <?php if (!$is_logged_in): ?>
     <div class="auth-links">
         <a href="login.php"><i class="fas fa-sign-in-alt me-2"></i>Login</a>
         <a href="register.php" class="register-link"><i class="fas fa-user-plus me-2"></i>Create Account</a>
     </div>
     <?php endif; ?>
+    
+    <!-- Social Links -->
     <div class="social-section">
         <h6><i class="fas fa-share-alt me-2"></i>Follow Us</h6>
         <div class="social-icons">
-            <?php foreach ($social_links as $social): ?>
-                <a href="<?= htmlspecialchars($social['url']) ?>" target="_blank" title="<?= htmlspecialchars($social['platform']) ?>">
-                    <i class="<?= htmlspecialchars($social['icon_class']) ?>"></i>
-                </a>
-            <?php endforeach; ?>
+            <?php if (!empty($social_links)): ?>
+                <?php foreach ($social_links as $social): ?>
+                    <a href="<?= htmlspecialchars($social['url']) ?>" target="_blank" title="<?= htmlspecialchars($social['platform']) ?>">
+                        <i class="<?= htmlspecialchars($social['icon_class']) ?>"></i>
+                    </a>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
+                <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -704,64 +732,83 @@ if ($is_logged_in && $role == 'user') {
 
     <?php if ($role == 'admin'): ?>
         <!-- ADMIN SIDEBAR -->
-        <a href="admin_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <a href="admin_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        
         <?php if (hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
-    <a href="bulk_upload_properties.php"><i class="fas fa-file-upload"></i> <span>Bulk Upload Properties</span></a>
+            <a href="bulk_upload_properties.php"><i class="fas fa-file-upload"></i> <span>Bulk Upload Properties</span></a>
         <?php endif; ?>
+        
         <?php if ($is_super_admin): ?>
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
+        
+        <!-- 🔥 NEW: Manage Pages Link -->
+        <a href="admin_pages.php"><i class="fas fa-file-alt"></i> <span>Manage Pages</span></a>
+        
         <?php if (hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
         <?php endif; ?>
+        
         <?php if (hasViewPermission('subscriptions', $pdo)): ?>
             <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
             <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
         <?php endif; ?>
+        
         <?php if (hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
+        
         <?php if (hasViewPermission('deductions', $pdo)): ?>
             <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
         <?php endif; ?>
+        
         <?php if (hasViewPermission('activity_logs', $pdo)): ?>
             <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
         <?php endif; ?>
+        
         <?php if (hasViewPermission('accounting', $pdo)): ?>
             <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
         <?php endif; ?>
+        
         <?php if (hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
-    <a href="admin_spin_settings.php"><i class="fas fa-cog"></i> <span>Spin Settings</span></a>
+        
+        <a href="admin_spin_settings.php"><i class="fas fa-cog"></i> <span>Spin Settings</span></a>
+        
         <?php if (hasViewPermission('kyc', $pdo)): ?>
             <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <?php endif; ?>
+        
         <?php if (hasViewPermission('support', $pdo)): ?>
             <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <?php endif; ?>
+        
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
+        
         <?php if ($is_super_admin): ?>
             <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
         <?php endif; ?>
+        
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         <a href="admin_social_links.php"><i class="fas fa-share-alt"></i> <span>Social Links</span></a>
-    <!-- 🔥 Notification Manager Link -->
-    <a href="admin_notification.php">
-        <i class="fas fa-bullhorn"></i> 
-        <span>Manage Popup Notification</span>
-        <?php if (isset($notif_count) && $notif_count > 0): ?>
-            <span class="badge bg-danger ms-2"><?= $notif_count ?></span>
-        <?php endif; ?>
-    </a>
+        
+        <!-- Notification Manager Link -->
+        <a href="admin_notification.php">
+            <i class="fas fa-bullhorn"></i> 
+            <span>Manage Popup Notification</span>
+            <?php if (isset($notif_count) && $notif_count > 0): ?>
+                <span class="badge bg-danger ms-2"><?= $notif_count ?></span>
+            <?php endif; ?>
+        </a>
 
     <?php elseif ($role == 'sales'): ?>
         <!-- SALES SIDEBAR -->
-        <a href="sales_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <a href="sales_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
         <a href="sales_lead_upload.php"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
         <a href="sales_lead_add.php"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
@@ -771,7 +818,7 @@ if ($is_logged_in && $role == 'user') {
 
     <?php else: ?>
         <!-- USER SIDEBAR -->
-        <a href="user_dashboard.php" class="active"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <a href="user_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
         <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
@@ -789,7 +836,7 @@ if ($is_logged_in && $role == 'user') {
 
 <!-- ====== MAIN CONTENT ====== -->
 <div class="main-content">
-    <!-- Top Bar (User Info) – for all logged-in pages -->
+    <!-- Top Bar (User Info) -->
     <?php if ($is_logged_in): ?>
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
