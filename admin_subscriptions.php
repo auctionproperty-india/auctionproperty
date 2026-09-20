@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📋 Admin – Pending Subscriptions (Full Updated)
+// 📋 Admin – Pending Subscriptions (Full Updated with MLM Income)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -73,7 +73,7 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
         $pdo->prepare("UPDATE users SET activation_date = ? WHERE id = ?")
             ->execute([$start_date, $data['user_id']]);
 
-        // 5. Referral Bonus (if applicable)
+        // 5. Referral Bonus (Old System - if applicable)
         if ($data['referred_by'] && $data['referral_bonus'] > 0) {
             $check = $pdo->prepare("SELECT id FROM user_referral_earnings WHERE user_id = ? AND referred_user_id = ? AND package_id = ?");
             $check->execute([$data['referred_by'], $data['user_id'], $package_id]);
@@ -84,7 +84,7 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
             }
         }
 
-        // 6. Add Income Entry (if function exists)
+        // 6. Add Income Entry (Accounting)
         if (function_exists('addAccountEntry')) {
             $user_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
             $user_stmt->execute([$data['user_id']]);
@@ -94,6 +94,12 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
             $pkgname = $pkg_name->fetchColumn();
             $description = "Subscription payment from {$user_info['name']} ({$user_info['email']}) for package $pkgname";
             addAccountEntry($pdo, 'income', $amount, $description, 'Auction Subscription', $start_date);
+        }
+
+        // 🔥 7. NEW: DISTRIBUTE MLM INCOME (Direct + Team Turnover)
+        // यह फंक्शन functions.php में डिफाइन किया गया है
+        if (function_exists('distributeIncome')) {
+            distributeIncome($pdo, $data['user_id'], $amount);
         }
 
         $pdo->commit();
@@ -139,7 +145,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
     <?php
     if (isset($_GET['msg'])) {
         $msg = $_GET['msg'];
-        if ($msg == 'approved') echo "<div class='alert alert-success'>✅ Activated! Income added to accounting.</div>";
+        if ($msg == 'approved') echo "<div class='alert alert-success'>✅ Activated! Income distributed to sponsors.</div>";
         elseif ($msg == 'rejected') echo "<div class='alert alert-warning'>⛔ Rejected!</div>";
         elseif ($msg == 'already_active') echo "<div class='alert alert-info'>ℹ️ This subscription was already active.</div>";
     }
@@ -172,10 +178,8 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
                                 $slip_url = '';
                                 $slip_display = '<span class="text-muted">No slip</span>';
                                 if (!empty($p['slip_path'])) {
-                                    // Build absolute URL
                                     $base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
                                     $slip_url = $base_url . '/' . ltrim($p['slip_path'], '/');
-                                    // Check if file exists on server
                                     $full_path = __DIR__ . '/' . $p['slip_path'];
                                     if (file_exists($full_path)) {
                                         $slip_display = '<a href="' . $slip_url . '" target="_blank" class="btn btn-sm btn-info">📷 View</a>';
@@ -211,7 +215,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
                                             </div>
                                         </div>
                                         <div class="mt-2">
-                                            <button type="submit" name="activate_sub" class="btn btn-success btn-sm" onclick="return confirm('Activate this subscription with these details? Income will be added to accounting.')">✅ Approve</button>
+                                            <button type="submit" name="activate_sub" class="btn btn-success btn-sm" onclick="return confirm('Activate this subscription? MLM Income will be distributed to the sponsor.')">✅ Approve</button>
                                             <a href="?reject=<?= $p['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Reject this subscription?')">❌ Reject</a>
                                         </div>
                                     </form>
