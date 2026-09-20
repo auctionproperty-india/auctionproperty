@@ -145,19 +145,21 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                 <div class="d-flex justify-content-between align-items-center">
                     <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? ($prop['source']=='customer' ? 'Customer' : 'Bank')) ?></span>
                     
-                    <!-- ====== 🔥 CHANGE: Auction Date for free users ====== -->
-                    <?php if($prop['source'] == 'auction' && !empty($prop['auction_start_time']) && $prop['auction_start_time'] != 'Private Treaty'): ?>
+                    <!-- ====== 🔥 FIX: Auction Date for free users / Private Treaty ====== -->
+                    <?php if($prop['source'] == 'auction'): ?>
                         <div style="text-align:right; line-height:1.3;">
                             <div style="font-size:0.6rem; opacity:0.6; color:<?= $text_color ?>; text-transform:uppercase; letter-spacing:0.3px;">Auction Date</div>
                             <div style="font-size:0.85rem; font-weight:700; color:<?= $text_color ?>;">
                                 <?php 
-                                $dateToShow = 'N/A';
-                                if(!empty($prop['auction_date'])) {
-                                    $dateToShow = date('d.m.Y', strtotime($prop['auction_date']));
+                                if(!empty($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty') {
+                                    echo '🔑 Private Treaty';
+                                } elseif(!empty($prop['auction_date'])) {
+                                    echo date('d.m.Y', strtotime($prop['auction_date']));
                                 } elseif(!empty($prop['auction_start_time'])) {
-                                    $dateToShow = date('d.m.Y', strtotime($prop['auction_start_time']));
+                                    echo date('d.m.Y', strtotime($prop['auction_start_time']));
+                                } else {
+                                    echo 'N/A';
                                 }
-                                echo $dateToShow;
                                 ?>
                             </div>
                         </div>
