@@ -374,6 +374,11 @@ include 'header.php';
                 </select>
             </form>
 
+            <!-- 🔥 NEW BUTTON: Income Settings -->
+            <a href="admin_income_settings.php" class="btn btn-warning btn-sm rounded-pill px-3">
+                <i class="fas fa-coins me-1"></i> Income Settings
+            </a>
+
             <a href="?add_new=1" class="btn btn-success btn-sm rounded-pill px-3" style="margin-left:auto;">
                 <i class="fas fa-plus me-1"></i> नया Package जोड़ें
             </a>
