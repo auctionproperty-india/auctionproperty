@@ -429,7 +429,6 @@ function sendMailFallback($to, $subject, $body, $from_email = null, $from_name =
 }
 
 function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
-    // ... (unchanged)
     return true;
 }
 
@@ -476,7 +475,7 @@ function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
             FROM properties 
             WHERE status = 'available' 
             AND auction_date IS NOT NULL 
-            AND auction_date >= CURRENT_DATE"; // Only upcoming
+            AND auction_date >= CURRENT_DATE"; 
 
     if ($type) {
         if ($type == 'car') {
@@ -498,7 +497,6 @@ function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
     }
     $props = $stmt->fetchAll();
     if (empty($props)) {
-        // Fallback: if no upcoming, get any with auction_date >= today (or NULL)
         $sql = "SELECT id, title, price, city, image_url, bank_name, type 
                 FROM properties 
                 WHERE status = 'available' 
@@ -743,5 +741,88 @@ if (!function_exists('safeDateFormat')) {
         }
         return date('d M Y', strtotime($dateStr));
     }
+}
+
+// ============================================================
+// 💰 NEW: MLM INCOME DISTRIBUTION LOGIC (Direct + Team Turnover)
+// ============================================================
+
+/**
+ * Distributes income to the sponsor when a subscription is activated.
+ */
+function distributeIncome($pdo, $buyer_id, $amount) {
+    // 1. Fetch Buyer's Sponsor (referred_by)
+    $stmt = $pdo->prepare("SELECT referred_by FROM users WHERE id = ?");
+    $stmt->execute([$buyer_id]);
+    $user = $stmt->fetch();
+    
+    if ($user && !empty($user['referred_by'])) {
+        $sponsor_id = $user['referred_by'];
+        
+        // ==========================================
+        // 2. DIRECT INCOME
+        // ==========================================
+        $pctStmt = $pdo->query("SELECT percentage FROM income_settings WHERE income_type = 'direct' AND status = 1 LIMIT 1");
+        $direct_pct = $pctStmt->fetchColumn() ?? 0;
+        
+        if ($direct_pct > 0) {
+            $commission = ($amount * $direct_pct) / 100;
+            $ins = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'direct', 'Direct Referral Income')");
+            $ins->execute([$sponsor_id, $buyer_id, $commission]);
+            
+            // Optionally credit to wallet directly
+            if (function_exists('creditWallet')) {
+                creditWallet($pdo, $sponsor_id, $commission, "Direct Income from User ID: $buyer_id");
+            }
+        }
+        
+        // ==========================================
+        // 3. TEAM TURNOVER INCOME
+        // ==========================================
+        $total_turnover = getTeamTurnover($pdo, $sponsor_id);
+        
+        // Find matching slab based on total team turnover
+        $slabStmt = $pdo->prepare("SELECT * FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 AND min_turnover <= ? AND (max_turnover IS NULL OR max_turnover >= ?) ORDER BY min_turnover DESC LIMIT 1");
+        $slabStmt->execute([$total_turnover, $total_turnover]);
+        $slab = $slabStmt->fetch();
+        
+        if ($slab) {
+            $team_commission = ($total_turnover * $slab['percentage']) / 100;
+            
+            // Check if this turnover slab commission was already given recently to avoid duplicate payments on every new sale
+            // For simplicity, we give it on every new subscription if they qualify.
+            $ins2 = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'team_turnover', 'Team Turnover Income')");
+            $ins2->execute([$sponsor_id, $buyer_id, $team_commission]);
+            
+            // Optionally credit to wallet directly
+            if (function_exists('creditWallet')) {
+                creditWallet($pdo, $sponsor_id, $team_commission, "Team Turnover Income from Team Volume: ₹$total_turnover");
+            }
+        }
+    }
+}
+
+/**
+ * Recursively calculates the total downline turnover for a user.
+ */
+function getTeamTurnover($pdo, $user_id) {
+    $total = 0;
+    
+    // Get direct downlines
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE referred_by = ?");
+    $stmt->execute([$user_id]);
+    $downlines = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    
+    foreach ($downlines as $downline_id) {
+        // Get this downline's personal turnover (Sum of active subscription amounts)
+        $volStmt = $pdo->prepare("SELECT SUM(amount) FROM subscriptions WHERE user_id = ? AND status = 'active'");
+        $volStmt->execute([$downline_id]);
+        $total += $volStmt->fetchColumn() ?? 0;
+        
+        // Recursive call to get downline of downline (Team B, Team C...)
+        $total += getTeamTurnover($pdo, $downline_id);
+    }
+    
+    return $total;
 }
 ?>
