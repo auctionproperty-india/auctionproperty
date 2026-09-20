@@ -174,6 +174,21 @@ function getPossessionValue($prop) {
     return !empty($possession) ? htmlspecialchars($possession) : 'N/A';
 }
 
+// ---- Helper to format date properly (Fixes 1970 issue) ----
+function getAuctionDateDisplay($dateStr, $showTime = true) {
+    if (empty($dateStr) || $dateStr == '0000-00-00' || $dateStr == '0000-00-00 00:00:00') {
+        return 'N/A';
+    }
+    if (trim($dateStr) === 'Private Treaty') {
+        return '🔑 Private Treaty';
+    }
+    $timestamp = strtotime($dateStr);
+    if ($timestamp === false || $timestamp <= 0) {
+        return 'N/A';
+    }
+    return $showTime ? date('d M Y h:i A', $timestamp) : date('d M Y', $timestamp);
+}
+
 // ---- Similar Properties (only for auction) ----
 $similar_props = [];
 if ($source == 'auction') {
@@ -546,32 +561,24 @@ if ($source == 'auction') {
                         </div>
                         <div class="sb-grid-item">
                             <span class="label">EMD Deadline</span>
-                            <span class="value"><?= empty($prop['emd_deadline']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['emd_deadline'])) ?></span>
+                            <span class="value"><?= getAuctionDateDisplay($prop['emd_deadline']) ?></span>
                         </div>
                         <div class="sb-grid-item">
                             <span class="label">Auction Start</span>
-                            <span class="value"><?= empty($prop['auction_start_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_start_time'])) ?></span>
+                            <span class="value"><?= getAuctionDateDisplay($prop['auction_start_time']) ?></span>
                         </div>
                         <div class="sb-grid-item">
                             <span class="label">Auction End</span>
-                            <span class="value"><?= empty($prop['auction_end_time']) ? 'N/A' : date('d M Y h:i A', strtotime($prop['auction_end_time'])) ?></span>
+                            <span class="value"><?= getAuctionDateDisplay($prop['auction_end_time']) ?></span>
                         </div>
                         <div class="sb-grid-item">
                             <span class="label">Inspection Date</span>
-                            <span class="value"><?= empty($prop['inspection_date']) ? 'N/A' : date('d M Y', strtotime($prop['inspection_date'])) ?></span>
+                            <span class="value"><?= getAuctionDateDisplay($prop['inspection_date'], false) ?></span>
                         </div>
                         <div class="sb-grid-item" style="grid-column: span 2;">
                             <span class="label">Auction Date</span>
                             <span class="value">
-                                <?php 
-                                if (!empty($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty') {
-                                    echo '🔑 Private Treaty';
-                                } elseif (!empty($prop['auction_date'])) {
-                                    echo date('d M Y', strtotime($prop['auction_date']));
-                                } else {
-                                    echo 'N/A';
-                                }
-                                ?>
+                                <?= getAuctionDateDisplay($prop['auction_date'] ?? $prop['auction_start_time'], false) ?>
                             </span>
                         </div>
                         <div class="sb-grid-item">
