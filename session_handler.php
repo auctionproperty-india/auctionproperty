@@ -9,8 +9,10 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
     
     #[\ReturnTypeWillChange]
     public function open($savePath, $sessionName) { return true; }
+    
     #[\ReturnTypeWillChange]
     public function close() { return true; }
+    
     #[\ReturnTypeWillChange]
     public function read($sessionId) {
         try {
@@ -20,16 +22,19 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
             return $row ? $row['data'] : '';
         } catch (Exception $e) { return ''; }
     }
+    
     #[\ReturnTypeWillChange]
     public function write($sessionId, $data) {
         try {
+            // PostgreSQL में last_activity (INT) का उपयोग करके UPSERT
             $stmt = $this->pdo->prepare(
-                "INSERT INTO {$this->table} (id, data, access) VALUES (?, ?, NOW()) 
-                 ON CONFLICT (id) DO UPDATE SET data = ?, access = NOW()"
+                "INSERT INTO {$this->table} (id, data, last_activity) VALUES (?, ?, ?) 
+                 ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, last_activity = EXCLUDED.last_activity"
             );
-            return $stmt->execute([$sessionId, $data, $data]);
+            return $stmt->execute([$sessionId, $data, time()]);
         } catch (Exception $e) { return false; }
     }
+    
     #[\ReturnTypeWillChange]
     public function destroy($sessionId) {
         try {
@@ -37,11 +42,14 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
             return $stmt->execute([$sessionId]);
         } catch (Exception $e) { return false; }
     }
+    
     #[\ReturnTypeWillChange]
     public function gc($maxLifetime) {
         try {
-            $stmt = $this->pdo->prepare("DELETE FROM {$this->table} WHERE access < NOW() - INTERVAL ? SECOND");
-            return $stmt->execute([$maxLifetime]);
+            // time() के साथ तुलना करें
+            $stmt = $this->pdo->prepare("DELETE FROM {$this->table} WHERE last_activity < ?");
+            return $stmt->execute([time() - $maxLifetime]);
         } catch (Exception $e) { return false; }
     }
 }
+?>
