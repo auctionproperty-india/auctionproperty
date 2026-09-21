@@ -1,7 +1,6 @@
 <?php
 // ============================================================
-// functions.php – Complete with Supabase, MLM & Eligibility Support
-// (Updated: Sponsor's own package determines Direct Income %)
+// functions.php – Complete with Supabase, MLM & Level Difference Income
 // ============================================================
 
 // ---- Currency ----
@@ -743,83 +742,100 @@ if (!function_exists('safeDateFormat')) {
 }
 
 // ============================================================
-// 💰 MLM INCOME DISTRIBUTION LOGIC (Direct + Team Turnover)
+// 💰 MLM INCOME DISTRIBUTION LOGIC (Level Difference + Team Turnover)
 // ============================================================
 
 /**
- * Distributes income to the sponsor when a subscription is activated.
- * $package_id is the ID of the package the buyer purchased.
+ * Get the income percentage for a specific user based on their active package or free user status.
+ */
+function getUserIncomePercentage($pdo, $user_id) {
+    // Check if user has an active paid subscription
+    $is_active = userHasActiveSubscription($pdo, $user_id);
+    
+    if ($is_active) {
+        // Get the direct_income_percent of their active package
+        $stmt = $pdo->prepare("
+            SELECT p.direct_income_percent 
+            FROM subscriptions s
+            JOIN packages p ON s.package_id = p.id
+            WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
+            ORDER BY s.id DESC LIMIT 1
+        ");
+        $stmt->execute([$user_id]);
+        return (float)$stmt->fetchColumn();
+    } else {
+        // User is Free. Check if admin enabled income for them and get global free user percentage.
+        $user_check = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
+        $user_check->execute([$user_id]);
+        $is_enabled = $user_check->fetchColumn();
+
+        if ($is_enabled) {
+            $free_setting = $pdo->query("SELECT percentage FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
+            return $free_setting ? (float)$free_setting['percentage'] : 0;
+        }
+        return 0; // Income disabled for this free user
+    }
+}
+
+/**
+ * Distributes Level Difference Income and Team Turnover Income.
  */
 function distributeIncome($pdo, $buyer_id, $amount, $package_id) {
-    // 1. Fetch Buyer's Sponsor (referred_by)
+    // ==========================================
+    // 1. LEVEL DIFFERENCE INCOME (Upline Chain)
+    // ==========================================
+    $current_user_id = $buyer_id;
+    $last_percentage = 0;
+    $total_paid_pct = 0;
+    $level = 1;
+    $max_levels = 10; // Limit to prevent infinite loops
+
+    while ($level <= $max_levels) {
+        // Get the sponsor (upline) of the current user
+        $stmt = $pdo->prepare("SELECT referred_by FROM users WHERE id = ?");
+        $stmt->execute([$current_user_id]);
+        $sponsor_id = $stmt->fetchColumn();
+
+        if (!$sponsor_id) break; // No more uplines
+
+        // Get this sponsor's income percentage based on their own package/free status
+        $sponsor_pct = getUserIncomePercentage($pdo, $sponsor_id);
+
+        // If this sponsor's percentage is higher than the last one, pay the difference
+        if ($sponsor_pct > $last_percentage) {
+            $diff_pct = $sponsor_pct - $last_percentage;
+            $commission = ($amount * $diff_pct) / 100;
+
+            if ($commission > 0) {
+                // Insert into user_earnings
+                $ins = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'direct', ?)");
+                $ins->execute([$sponsor_id, $buyer_id, $commission, "Level $level Difference Income ($diff_pct%) from User ID: $buyer_id"]);
+                
+                // Credit wallet
+                if (function_exists('creditWallet')) {
+                    creditWallet($pdo, $sponsor_id, $commission, "Level $level Difference Income from User ID: $buyer_id");
+                }
+            }
+            $last_percentage = $sponsor_pct;
+            $total_paid_pct += $diff_pct;
+        }
+
+        $current_user_id = $sponsor_id;
+        $level++;
+        
+        // Safety cap: Total paid percentage should not exceed the highest package percentage (e.g., 20%)
+        if ($total_paid_pct >= 20) break; 
+    }
+
+    // ==========================================
+    // 2. TEAM TURNOVER INCOME (For Direct Sponsor Only)
+    // ==========================================
     $stmt = $pdo->prepare("SELECT referred_by FROM users WHERE id = ?");
     $stmt->execute([$buyer_id]);
-    $user = $stmt->fetch();
-    
-    if ($user && !empty($user['referred_by'])) {
-        $sponsor_id = $user['referred_by'];
-        
-        // ==========================================
-        // 2. DIRECT INCOME CALCULATION
-        // ==========================================
-        
-        // Check if Sponsor is a Free User (No active subscription)
-        $is_sponsor_free = !userHasActiveSubscription($pdo, $sponsor_id);
-        
-        $direct_pct = 0;
-        $income_note = '';
+    $direct_sponsor_id = $stmt->fetchColumn();
 
-        if ($is_sponsor_free) {
-            // 🔥 Check if this specific Free User is enabled by Admin
-            $user_check = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
-            $user_check->execute([$sponsor_id]);
-            $is_user_enabled = $user_check->fetchColumn();
-
-            if ($is_user_enabled) {
-                // Check Global Free User Settings
-                $free_setting = $pdo->query("SELECT * FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
-                if ($free_setting && $free_setting['percentage'] > 0) {
-                    $direct_pct = $free_setting['percentage'];
-                    $income_note = 'Free User Direct';
-                } else {
-                    $direct_pct = 0; // Global percentage is 0 or disabled
-                }
-            } else {
-                $direct_pct = 0; // Admin has not enabled income for this specific Free User
-            }
-        } else {
-            // 🔥 UPDATED: Sponsor is Paid User - Get SPONSOR'S OWN package direct income percentage
-            // We no longer use the buyer's package percentage. The sponsor gets the rate based on their own package.
-            $sponsor_pkg_stmt = $pdo->prepare("
-                SELECT p.direct_income_percent 
-                FROM subscriptions s
-                JOIN packages p ON s.package_id = p.id
-                WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
-                ORDER BY s.id DESC LIMIT 1
-            ");
-            $sponsor_pkg_stmt->execute([$sponsor_id]);
-            $direct_pct = $sponsor_pkg_stmt->fetchColumn() ?? 0;
-            $income_note = 'Sponsor Package Direct';
-        }
-
-        if ($direct_pct > 0) {
-            $commission = ($amount * $direct_pct) / 100;
-            
-            // Insert into user_earnings
-            $ins = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'direct', ?)");
-            $ins->execute([$sponsor_id, $buyer_id, $commission, "Direct Income ($income_note) from User ID: $buyer_id"]);
-            
-            // Credit to wallet
-            if (function_exists('creditWallet')) {
-                creditWallet($pdo, $sponsor_id, $commission, "Direct Income from User ID: $buyer_id");
-            }
-        }
-        
-        // ==========================================
-        // 3. TEAM TURNOVER INCOME (With Eligibility Check)
-        // ==========================================
-        
-        // 🔥 Fetch Sponsor's current package details to check Team Turnover Eligibility
+    if ($direct_sponsor_id) {
+        // Check if the direct sponsor's package is eligible for Team Turnover
         $sponsor_pkg_stmt = $pdo->prepare("
             SELECT p.is_team_turnover_eligible
             FROM subscriptions s
@@ -827,14 +843,11 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id) {
             WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
             ORDER BY s.id DESC LIMIT 1
         ");
-        $sponsor_pkg_stmt->execute([$sponsor_id]);
-        $sponsor_pkg = $sponsor_pkg_stmt->fetch();
+        $sponsor_pkg_stmt->execute([$direct_sponsor_id]);
+        $is_team_turnover_eligible = $sponsor_pkg_stmt->fetchColumn() ?? false;
 
-        $is_team_turnover_eligible = $sponsor_pkg ? (bool)$sponsor_pkg['is_team_turnover_eligible'] : false;
-
-        // Only calculate Team Turnover if Sponsor's package is marked as eligible
         if ($is_team_turnover_eligible) {
-            $total_turnover = getTeamTurnover($pdo, $sponsor_id);
+            $total_turnover = getTeamTurnover($pdo, $direct_sponsor_id);
             
             $slabStmt = $pdo->prepare("SELECT * FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 AND min_turnover <= ? AND (max_turnover IS NULL OR max_turnover >= ?) ORDER BY min_turnover DESC LIMIT 1");
             $slabStmt->execute([$total_turnover, $total_turnover]);
@@ -844,10 +857,10 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id) {
                 $team_commission = ($total_turnover * $slab['percentage']) / 100;
                 
                 $ins2 = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'team_turnover', 'Team Turnover Income')");
-                $ins2->execute([$sponsor_id, $buyer_id, $team_commission]);
+                $ins2->execute([$direct_sponsor_id, $buyer_id, $team_commission]);
                 
                 if (function_exists('creditWallet')) {
-                    creditWallet($pdo, $sponsor_id, $team_commission, "Team Turnover Income from Team Volume: ₹$total_turnover");
+                    creditWallet($pdo, $direct_sponsor_id, $team_commission, "Team Turnover Income from Team Volume: ₹$total_turnover");
                 }
             }
         }
