@@ -28,7 +28,6 @@ function hasActiveSubscription($pdo, $user_id, $property_id = null) {
     return $stmt->rowCount() > 0;
 }
 
-// ✅ UPDATED: userHasActiveSubscription – handles NULL end_date
 function userHasActiveSubscription($pdo, $user_id) {
     if(!$user_id) return false;
     $stmt = $pdo->prepare("
@@ -469,7 +468,6 @@ function getUserSpinData($pdo, $user_id, $slot = null) {
     ];
 }
 
-// 🔥 UPDATED: Only upcoming auction properties (auction_date >= CURRENT_DATE)
 function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
     $sql = "SELECT id, title, price, city, image_url, bank_name, type, auction_date 
             FROM properties 
@@ -675,7 +673,7 @@ function logActivity($pdo, $user_id, $activity_type, $details = null) {
 }
 
 // ============================================================
-// 🔥 NEW: Supabase Storage Functions
+// 🔥 Supabase Storage Functions
 // ============================================================
 
 function uploadToSupabase($file, $folder = 'slip', $bucket_name = 'payment_screenshots') {
@@ -771,14 +769,22 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id) {
         $income_note = '';
 
         if ($is_sponsor_free) {
-            // Sponsor is Free User: Check Free User Settings
-            $free_setting = $pdo->query("SELECT * FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
-            if ($free_setting && $free_setting['percentage'] > 0) {
-                $direct_pct = $free_setting['percentage'];
-                $income_note = 'Free User Direct';
+            // 🔥 NEW: Check if this specific Free User is enabled by Admin
+            $user_check = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
+            $user_check->execute([$sponsor_id]);
+            $is_user_enabled = $user_check->fetchColumn();
+
+            if ($is_user_enabled) {
+                // Check Global Free User Settings
+                $free_setting = $pdo->query("SELECT * FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
+                if ($free_setting && $free_setting['percentage'] > 0) {
+                    $direct_pct = $free_setting['percentage'];
+                    $income_note = 'Free User Direct';
+                } else {
+                    $direct_pct = 0; // Global percentage is 0 or disabled
+                }
             } else {
-                // Admin has turned off income for Free Users
-                $direct_pct = 0; 
+                $direct_pct = 0; // Admin has not enabled income for this specific Free User
             }
         } else {
             // Sponsor is Paid User: Get Package specific direct income (of the BUYER's package)
