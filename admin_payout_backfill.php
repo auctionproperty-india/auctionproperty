@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🚀 Admin – Payout Backfill (Generate & Rollback Historical Payouts)
+// 🚀 Admin – Payout Backfill (Generate, Rollback & Force Cleanup)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -19,7 +19,6 @@ $message_type = '';
 if (isset($_POST['generate_backfill'])) {
     $batch_id_generated = 'BACKFILL_' . date('Ymd_His');
     
-    // Fetch all active subscriptions
     $stmt = $pdo->query("
         SELECT s.user_id, s.amount, s.package_id, u.name as user_name 
         FROM subscriptions s 
@@ -34,7 +33,6 @@ if (isset($_POST['generate_backfill'])) {
         $pdo->beginTransaction();
         foreach ($active_subs as $sub) {
             if ($sub['amount'] > 0) {
-                // Call the updated distributeIncome function with the batch_id
                 if (function_exists('distributeIncome')) {
                     distributeIncome($pdo, $sub['user_id'], $sub['amount'], $sub['package_id'], $batch_id_generated);
                 }
@@ -53,7 +51,7 @@ if (isset($_POST['generate_backfill'])) {
 }
 
 // ============================================================
-// 🔥 2. ROLLBACK BACKFILL PAYOUTS
+// 🔥 2. ROLLBACK BACKFILL PAYOUTS (By Batch ID)
 // ============================================================
 if (isset($_POST['rollback_backfill'])) {
     $batch_to_rollback = $_POST['batch_id_to_rollback'] ?? $_SESSION['last_backfill_batch'] ?? '';
@@ -62,22 +60,18 @@ if (isset($_POST['rollback_backfill'])) {
         try {
             $pdo->beginTransaction();
             
-            // 1. Get all earnings for this batch to adjust wallets
             $earn_stmt = $pdo->prepare("SELECT user_id, SUM(amount) as total_amt FROM user_earnings WHERE batch_id = ? GROUP BY user_id");
             $earn_stmt->execute([$batch_to_rollback]);
             $earnings = $earn_stmt->fetchAll();
             
-            // 2. Subtract from user wallets
             foreach ($earnings as $e) {
                 $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance - ? WHERE id = ?")->execute([$e['total_amt'], $e['user_id']]);
             }
             
-            // 3. Delete from user_earnings
             $del1 = $pdo->prepare("DELETE FROM user_earnings WHERE batch_id = ?");
             $del1->execute([$batch_to_rollback]);
             $deleted_earnings = $del1->rowCount();
             
-            // 4. Delete from wallet_transactions
             $del2 = $pdo->prepare("DELETE FROM wallet_transactions WHERE batch_id = ?");
             $del2->execute([$batch_to_rollback]);
             $deleted_wallet = $del2->rowCount();
@@ -93,6 +87,47 @@ if (isset($_POST['rollback_backfill'])) {
         }
     } else {
         $message = "❌ No batch ID provided to rollback.";
+        $message_type = "danger";
+    }
+}
+
+// ============================================================
+// 🔥 3. FORCE DELETE PAYOUTS BY DATE (Danger Zone)
+// ============================================================
+if (isset($_POST['force_delete_by_date'])) {
+    $delete_date = $_POST['delete_date'];
+    $start_time = $delete_date . ' 00:00:00';
+    $end_time = $delete_date . ' 23:59:59';
+    
+    try {
+        $pdo->beginTransaction();
+        
+        // 1. Get all earnings for this date to adjust wallets
+        $earn_stmt = $pdo->prepare("SELECT user_id, SUM(amount) as total_amt FROM user_earnings WHERE created_at >= ? AND created_at <= ? GROUP BY user_id");
+        $earn_stmt->execute([$start_time, $end_time]);
+        $earnings = $earn_stmt->fetchAll();
+        
+        // 2. Subtract from user wallets
+        foreach ($earnings as $e) {
+            $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance - ? WHERE id = ?")->execute([$e['total_amt'], $e['user_id']]);
+        }
+        
+        // 3. Delete from user_earnings
+        $del1 = $pdo->prepare("DELETE FROM user_earnings WHERE created_at >= ? AND created_at <= ?");
+        $del1->execute([$start_time, $end_time]);
+        $deleted_earnings = $del1->rowCount();
+        
+        // 4. Delete from wallet_transactions
+        $del2 = $pdo->prepare("DELETE FROM wallet_transactions WHERE created_at >= ? AND created_at <= ?");
+        $del2->execute([$start_time, $end_time]);
+        $deleted_wallet = $del2->rowCount();
+        
+        $pdo->commit();
+        $message = "✅ Force Cleanup successful for date <b>$delete_date</b>!<br>Deleted <b>$deleted_earnings</b> earnings and <b>$deleted_wallet</b> wallet transactions. Wallets adjusted.";
+        $message_type = "success";
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        $message = "❌ Force Delete Error: " . $e->getMessage();
         $message_type = "danger";
     }
 }
@@ -159,7 +194,6 @@ include 'header.php';
                 </div>
                 <div class="card-body text-center py-4">
                     <?php if (empty($batches)): ?>
-                        <!-- 🔥 Empty State Message -->
                         <div class="alert alert-secondary py-4 mb-0">
                             <i class="fas fa-info-circle fa-2x mb-2 text-muted"></i>
                             <p class="mb-0 fw-bold">No batches generated yet.</p>
@@ -185,6 +219,31 @@ include 'header.php';
                     <?php endif; ?>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 🔥 DANGER ZONE: Force Delete by Date -->
+    <div class="card shadow-sm border-0 rounded-4 mt-4 border-danger">
+        <div class="card-header bg-dark text-white rounded-top-4">
+            <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2 text-warning"></i> Danger Zone: Force Delete Payouts by Date</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-danger fw-bold mb-2">⚠️ Use this only if you generated payouts by mistake and the Batch ID was not saved (e.g., missing database column).</p>
+            <p class="text-muted small mb-3">This will permanently delete <b>ALL</b> earnings and wallet transactions for the selected date and subtract the amounts from user wallets.</p>
+            
+            <form method="POST" onsubmit="return confirm('WARNING: This will permanently DELETE ALL payouts for the selected date and adjust wallets. This cannot be undone. Are you sure?');">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Select Date to Cleanup</label>
+                        <input type="date" name="delete_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" name="force_delete_by_date" class="btn btn-danger w-100">
+                            <i class="fas fa-trash-alt me-2"></i> Force Delete Payouts for this Date
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 
