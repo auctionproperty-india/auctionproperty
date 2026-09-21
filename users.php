@@ -91,17 +91,15 @@ if (isset($_GET['toggle_block']) && is_numeric($_GET['toggle_block'])) {
     }
 }
 
-// (Make Admin logic removed as per request)
-// if (isset($_GET['toggle_admin']) && is_numeric($_GET['toggle_admin'])) { ... }
-
-// 🔥 Handle Free User Income Toggle
+// 🔥 Handle Free User Income Toggle (FIXED: Using 1/0 instead of true/false)
 if (isset($_GET['toggle_free_income']) && is_numeric($_GET['toggle_free_income'])) {
     $id = (int)$_GET['toggle_free_income'];
     $stmt = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
     $stmt->execute([$id]);
     $user = $stmt->fetch();
     if ($user) {
-        $new_status = ($user['free_user_income_enabled']) ? false : true;
+        // PostgreSQL के लिए true/false की जगह 1/0 पास करें
+        $new_status = ($user['free_user_income_enabled']) ? 0 : 1; 
         $stmt = $pdo->prepare("UPDATE users SET free_user_income_enabled = ? WHERE id = ?");
         $stmt->execute([$new_status, $id]);
         $message = "Free User Income " . ($new_status ? 'Enabled' : 'Disabled') . " successfully!";
@@ -340,9 +338,9 @@ include 'header.php';
                         <th>Dates</th>
                         <th>Package</th>
                         <th>Free Income</th>
-                        <th>Status</th> <!-- Status Column Updated -->
+                        <th>Status</th> 
                         <th>Role</th>
-                        <th style="text-align: right;">Actions</th> <!-- Actions Updated -->
+                        <th style="text-align: right;">Actions</th> 
                     </tr>
                 </thead>
                 <tbody>
@@ -401,7 +399,7 @@ include 'header.php';
                             <?php endif; ?>
                         </td>
 
-                        <!-- 🔥 NEW: Free User Income Toggle (ON/OFF) -->
+                        <!-- 🔥 Free User Income Toggle (ON/OFF) -->
                         <td>
                             <?php if (empty($user['package_name'])): ?>
                                 <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" class="text-decoration-none">
@@ -416,7 +414,7 @@ include 'header.php';
                             <?php endif; ?>
                         </td>
 
-                        <!-- 🔥 UPDATED: Status Toggle Button (Replaces Block Button) -->
+                        <!-- 🔥 Status Toggle Button -->
                         <td>
                             <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" 
                                class="btn btn-sm <?= ($user['status'] == 'blocked') ? 'btn-danger' : 'btn-success' ?>"
@@ -430,13 +428,13 @@ include 'header.php';
                             <span class="<?= $roleInfo['class'] ?>"><?= $roleInfo['label'] ?></span>
                         </td>
 
-                        <!-- 🔥 UPDATED: Actions (Removed Make Admin & Block, Added Give Package) -->
+                        <!-- 🔥 Actions -->
                         <td class="actions" style="text-align: right;">
                             <a href="admin_edit_user.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-primary" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
                             
-                            <!-- NEW: Give Package Button -->
+                            <!-- Give Package Button -->
                             <a href="admin_give_package.php?user_id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-success" title="Give Free Package">
                                 <i class="fas fa-gift"></i>
                             </a>
@@ -451,8 +449,6 @@ include 'header.php';
                                    onclick="return confirm('Delete this user?')" title="Delete">
                                     <i class="fas fa-trash"></i>
                                 </a>
-                                <!-- Make Admin Button Removed -->
-                                <!-- Block Button Removed (Moved to Status Column) -->
                             <?php endif; ?>
                         </td>
                     </tr>
