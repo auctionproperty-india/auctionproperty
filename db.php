@@ -22,8 +22,6 @@ try {
         PDO::ATTR_PERSISTENT         => false,
         
         // 🔥 MOST IMPORTANT: Prepared Statement Error Fix
-        // इससे PDO Server-Side पर Statement Store नहीं करेगा
-        // जिससे "prepared statement does not exist" Error नहीं आएगा
         PDO::ATTR_EMULATE_PREPARES   => true,
     ];
     
@@ -38,14 +36,10 @@ try {
 // 🔥 SAFE QUERY HELPERS (Auto-Retry on Statement Errors)
 // ============================================================
 
-/**
- * Safe Query with Auto-Retry on Connection Issues
- */
 if (!function_exists('safeQuery')) {
     function safeQuery($pdo, $sql, $params = []) {
         $maxRetries = 3;
         $attempt = 0;
-        
         while ($attempt < $maxRetries) {
             try {
                 if (empty($params)) {
@@ -58,28 +52,18 @@ if (!function_exists('safeQuery')) {
             } catch (PDOException $e) {
                 $attempt++;
                 $msg = $e->getMessage();
-                
-                // अगर Statement नाम या Connection का Error है तो Retry करें
-                if (strpos($msg, 'does not exist') !== false || 
-                    strpos($msg, '26000') !== false ||
-                    strpos($msg, 'server closed the connection') !== false) {
-                    
+                if (strpos($msg, 'does not exist') !== false || strpos($msg, '26000') !== false || strpos($msg, 'server closed the connection') !== false) {
                     error_log("SafeQuery Retry #{$attempt}: " . $msg);
-                    usleep(150000); // 0.15 sec wait
+                    usleep(150000);
                     continue;
                 }
-                // बाकी Errors तो throw कर दें
                 throw $e;
             }
         }
-        
         throw new Exception("Query failed after {$maxRetries} attempts");
     }
 }
 
-/**
- * Safe Fetch All Rows
- */
 if (!function_exists('safeFetchAll')) {
     function safeFetchAll($pdo, $sql, $params = []) {
         try {
@@ -92,9 +76,6 @@ if (!function_exists('safeFetchAll')) {
     }
 }
 
-/**
- * Safe Fetch Single Row
- */
 if (!function_exists('safeFetch')) {
     function safeFetch($pdo, $sql, $params = []) {
         try {
@@ -107,9 +88,6 @@ if (!function_exists('safeFetch')) {
     }
 }
 
-/**
- * Safe Fetch Single Column Value
- */
 if (!function_exists('safeFetchColumn')) {
     function safeFetchColumn($pdo, $sql, $params = []) {
         try {
@@ -122,14 +100,10 @@ if (!function_exists('safeFetchColumn')) {
     }
 }
 
-/**
- * Safe Execute (Insert/Update/Delete) with Retry
- */
 if (!function_exists('safeExecute')) {
     function safeExecute($pdo, $sql, $params = []) {
         $maxRetries = 3;
         $attempt = 0;
-        
         while ($attempt < $maxRetries) {
             try {
                 $stmt = $pdo->prepare($sql);
@@ -138,11 +112,7 @@ if (!function_exists('safeExecute')) {
             } catch (PDOException $e) {
                 $attempt++;
                 $msg = $e->getMessage();
-                
-                if (strpos($msg, 'does not exist') !== false || 
-                    strpos($msg, '26000') !== false ||
-                    strpos($msg, 'server closed the connection') !== false) {
-                    
+                if (strpos($msg, 'does not exist') !== false || strpos($msg, '26000') !== false || strpos($msg, 'server closed the connection') !== false) {
                     error_log("SafeExecute Retry #{$attempt}: " . $msg);
                     usleep(150000);
                     continue;
@@ -150,13 +120,12 @@ if (!function_exists('safeExecute')) {
                 throw $e;
             }
         }
-        
         throw new Exception("Execute failed after {$maxRetries} attempts");
     }
 }
 
 // ============================================================
-// 🔥 SESSION HANDLER (अगर File मौजूद है तो Load करें)
+// 🔥 SESSION HANDLER INTEGRATION
 // ============================================================
 
 $sessionHandlerFile = __DIR__ . '/session_handler.php';
@@ -171,10 +140,10 @@ if (file_exists($sessionHandlerFile)) {
             if (session_status() == PHP_SESSION_NONE) {
                 session_set_save_handler($handler, true);
                 session_set_cookie_params([
-                    'lifetime' => 86400 * 30,
+                    'lifetime' => 86400 * 30, // 30 Days
                     'path' => '/',
                     'domain' => '',
-                    'secure' => false,
+                    'secure' => false, // Render पर HTTPS है तो true कर सकते हैं, लेकिन false रखना safe है
                     'httponly' => true,
                     'samesite' => 'Lax'
                 ]);
@@ -182,14 +151,13 @@ if (file_exists($sessionHandlerFile)) {
             }
         } catch (Exception $e) {
             error_log("Session Handler Error: " . $e->getMessage());
-            // Fallback: Default PHP Session
             if (session_status() == PHP_SESSION_NONE) {
                 session_start();
             }
         }
     }
 } else {
-    // अगर session_handler.php नहीं है, तो Default PHP Session Use करें
+    // Fallback agar session_handler.php na ho
     if (session_status() == PHP_SESSION_NONE) {
         session_start();
     }
