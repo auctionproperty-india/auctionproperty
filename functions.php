@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// functions.php – Complete with Supabase & MLM Income Support
+// functions.php – Complete with Supabase, MLM & Eligibility Support
 // ============================================================
 
 // ---- Currency ----
@@ -769,7 +769,7 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id) {
         $income_note = '';
 
         if ($is_sponsor_free) {
-            // 🔥 NEW: Check if this specific Free User is enabled by Admin
+            // 🔥 Check if this specific Free User is enabled by Admin
             $user_check = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
             $user_check->execute([$sponsor_id]);
             $is_user_enabled = $user_check->fetchColumn();
@@ -808,22 +808,39 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id) {
         }
         
         // ==========================================
-        // 3. TEAM TURNOVER INCOME
+        // 3. TEAM TURNOVER INCOME (With Eligibility Check)
         // ==========================================
-        $total_turnover = getTeamTurnover($pdo, $sponsor_id);
         
-        $slabStmt = $pdo->prepare("SELECT * FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 AND min_turnover <= ? AND (max_turnover IS NULL OR max_turnover >= ?) ORDER BY min_turnover DESC LIMIT 1");
-        $slabStmt->execute([$total_turnover, $total_turnover]);
-        $slab = $slabStmt->fetch();
-        
-        if ($slab) {
-            $team_commission = ($total_turnover * $slab['percentage']) / 100;
+        // 🔥 NEW: Fetch Sponsor's current package details to check Team Turnover Eligibility
+        $sponsor_pkg_stmt = $pdo->prepare("
+            SELECT p.is_team_turnover_eligible
+            FROM subscriptions s
+            JOIN packages p ON s.package_id = p.id
+            WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
+            ORDER BY s.id DESC LIMIT 1
+        ");
+        $sponsor_pkg_stmt->execute([$sponsor_id]);
+        $sponsor_pkg = $sponsor_pkg_stmt->fetch();
+
+        $is_team_turnover_eligible = $sponsor_pkg ? (bool)$sponsor_pkg['is_team_turnover_eligible'] : false;
+
+        // Only calculate Team Turnover if Sponsor's package is marked as eligible
+        if ($is_team_turnover_eligible) {
+            $total_turnover = getTeamTurnover($pdo, $sponsor_id);
             
-            $ins2 = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'team_turnover', 'Team Turnover Income')");
-            $ins2->execute([$sponsor_id, $buyer_id, $team_commission]);
+            $slabStmt = $pdo->prepare("SELECT * FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 AND min_turnover <= ? AND (max_turnover IS NULL OR max_turnover >= ?) ORDER BY min_turnover DESC LIMIT 1");
+            $slabStmt->execute([$total_turnover, $total_turnover]);
+            $slab = $slabStmt->fetch();
             
-            if (function_exists('creditWallet')) {
-                creditWallet($pdo, $sponsor_id, $team_commission, "Team Turnover Income from Team Volume: ₹$total_turnover");
+            if ($slab) {
+                $team_commission = ($total_turnover * $slab['percentage']) / 100;
+                
+                $ins2 = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'team_turnover', 'Team Turnover Income')");
+                $ins2->execute([$sponsor_id, $buyer_id, $team_commission]);
+                
+                if (function_exists('creditWallet')) {
+                    creditWallet($pdo, $sponsor_id, $team_commission, "Team Turnover Income from Team Volume: ₹$total_turnover");
+                }
             }
         }
     }
