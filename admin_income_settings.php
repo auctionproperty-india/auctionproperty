@@ -25,8 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         try {
             foreach ($package_ids as $index => $pkg_id) {
                 $pct = (float)$percents[$index];
-                // Check if this package ID is in the checked array
-                $is_eligible = in_array($pkg_id, $team_eligibles) ? true : false; 
+                
+                // 🔥 FIX: PostgreSQL के लिए true/false की जगह 1/0 पास करें
+                $is_eligible = in_array($pkg_id, $team_eligibles) ? 1 : 0; 
                 
                 $pdo->prepare("UPDATE packages SET direct_income_percent = ?, is_team_turnover_eligible = ? WHERE id = ?")
                     ->execute([$pct, $is_eligible, $pkg_id]);
