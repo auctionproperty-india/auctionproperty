@@ -13,9 +13,7 @@ if(!hasViewPermission('settings', $pdo)) {
 $message = '';
 $settings_keys = ['default_contact', 'company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent', 'spin_min_coins', 'spin_max_coins'];
 
-// ============================================================
 // 🔒 सुनिश्चित करें कि सभी setting_key की rows मौजूद हैं
-// ============================================================
 foreach ($settings_keys as $key) {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM settings WHERE setting_key = ?");
     $stmt->execute([$key]);
@@ -39,6 +37,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
     $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $admin = $stmt->fetch();
+    
     if(!$admin || !password_verify($admin_password, $admin['password'])) {
         $message = "<div class='alert alert-danger'>❌ Incorrect admin password!</div>";
     } else {
@@ -50,34 +49,39 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_settings'])) {
             }
         }
 
-        // ---- 2. Handle QR Code Upload ----
-        $qr_updated = false;
-        if(isset($_FILES['qr_code']) && $_FILES['qr_code']['error'] == 0) {
-            // New file uploaded – process it
-            $upload_dir = 'uploads/';
-            if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+        // ---- 2. Handle QR Code Upload & Removal ----
+        $upload_dir = 'uploads/';
+        if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+        
+        // Check if admin wants to remove the QR code
+        if (isset($_POST['remove_qr']) && $_POST['remove_qr'] == '1') {
+            $old_qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
+            if ($old_qr && file_exists(__DIR__ . '/' . $old_qr)) {
+                unlink(__DIR__ . '/' . $old_qr);
+            }
+            $pdo->prepare("UPDATE settings SET setting_value = '' WHERE setting_key = 'company_qr_code'")->execute();
+            $message = "<div class='alert alert-success'>✅ QR Code removed successfully!</div>";
+        } 
+        // Check if a new QR code is uploaded
+        elseif(isset($_FILES['qr_code']) && $_FILES['qr_code']['error'] == 0) {
             $ext = pathinfo($_FILES['qr_code']['name'], PATHINFO_EXTENSION);
             $filename = 'qr_' . time() . '.' . $ext;
-            if (move_uploaded_file($_FILES['qr_code']['tmp_name'], $upload_dir . $filename)) {
-                // Delete old QR file if exists (optional)
+            // Use __DIR__ for absolute path
+            if (move_uploaded_file($_FILES['qr_code']['tmp_name'], __DIR__ . '/' . $upload_dir . $filename)) {
+                // Delete old QR file
                 $old_qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
-                if ($old_qr && file_exists($old_qr)) {
-                    unlink($old_qr); // Remove old image
+                if ($old_qr && file_exists(__DIR__ . '/' . $old_qr)) {
+                    unlink(__DIR__ . '/' . $old_qr);
                 }
                 // Save new path
                 $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'company_qr_code'")->execute([$upload_dir . $filename]);
-                $qr_updated = true;
+                $message = "<div class='alert alert-success'>✅ Settings and QR Code updated!</div>";
             } else {
-                $message = "<div class='alert alert-danger'>❌ QR Code upload failed.</div>";
+                $message = "<div class='alert alert-danger'>❌ QR Code upload failed. Check folder permissions.</div>";
             }
-        }
-        // If no new file, do nothing – keep existing QR code.
-
-        if (!$qr_updated && empty($message)) {
-            // No QR update, but other fields saved successfully
-        }
-        if (empty($message)) {
-            $message = "<div class='alert alert-success'>✅ Settings updated!</div>";
+        } else {
+            // No file uploaded, no removal requested
+            $message = "<div class='alert alert-success'>✅ Settings updated (QR Code unchanged).</div>";
         }
     }
 }
@@ -155,10 +159,21 @@ $qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'compa
             <div class="col-12">
                 <label class="fw-bold">UPI QR Code (for Payment Page)</label>
                 <input type="file" name="qr_code" class="form-control" accept="image/*">
-                <?php if($qr && file_exists($qr)): ?>
+                
+                <?php 
+                // Fix path checking using __DIR__
+                $qr_full_path = !empty($qr) ? __DIR__ . '/' . $qr : '';
+                if($qr && file_exists($qr_full_path)): 
+                ?>
                     <div class="mt-3 text-center">
                         <p class="text-muted">Current QR Code:</p>
-                        <img src="<?= $qr ?>" style="max-height:250px; border:1px solid #ddd; border-radius:12px; padding:10px; background:white;">
+                        <img src="<?= htmlspecialchars($qr) ?>" style="max-height:250px; border:1px solid #ddd; border-radius:12px; padding:10px; background:white;">
+                        <div class="form-check mt-2 d-flex justify-content-center">
+                            <input class="form-check-input" type="checkbox" name="remove_qr" value="1" id="remove_qr">
+                            <label class="form-check-label text-danger ms-2" for="remove_qr">
+                                Remove this QR Code
+                            </label>
+                        </div>
                     </div>
                 <?php else: ?>
                     <div class="mt-3 text-center">
