@@ -20,19 +20,24 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
             $stmt->execute([$sessionId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             return $row ? $row['data'] : '';
-        } catch (Exception $e) { return ''; }
+        } catch (Exception $e) { 
+            error_log("Session Read Error: " . $e->getMessage());
+            return ''; 
+        }
     }
     
     #[\ReturnTypeWillChange]
     public function write($sessionId, $data) {
         try {
-            // PostgreSQL में last_activity (INT) का उपयोग करके UPSERT
             $stmt = $this->pdo->prepare(
                 "INSERT INTO {$this->table} (id, data, last_activity) VALUES (?, ?, ?) 
                  ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, last_activity = EXCLUDED.last_activity"
             );
             return $stmt->execute([$sessionId, $data, time()]);
-        } catch (Exception $e) { return false; }
+        } catch (Exception $e) { 
+            error_log("Session Write Error: " . $e->getMessage());
+            return false; 
+        }
     }
     
     #[\ReturnTypeWillChange]
@@ -40,16 +45,21 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
         try {
             $stmt = $this->pdo->prepare("DELETE FROM {$this->table} WHERE id = ?");
             return $stmt->execute([$sessionId]);
-        } catch (Exception $e) { return false; }
+        } catch (Exception $e) { 
+            error_log("Session Destroy Error: " . $e->getMessage());
+            return false; 
+        }
     }
     
     #[\ReturnTypeWillChange]
     public function gc($maxLifetime) {
         try {
-            // time() के साथ तुलना करें
             $stmt = $this->pdo->prepare("DELETE FROM {$this->table} WHERE last_activity < ?");
             return $stmt->execute([time() - $maxLifetime]);
-        } catch (Exception $e) { return false; }
+        } catch (Exception $e) { 
+            error_log("Session GC Error: " . $e->getMessage());
+            return false; 
+        }
     }
 }
 ?>
