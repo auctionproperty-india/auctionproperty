@@ -143,7 +143,7 @@ if (file_exists($sessionHandlerFile)) {
                     'lifetime' => 86400 * 30, // 30 Days
                     'path' => '/',
                     'domain' => '',
-                    'secure' => false, // Render पर HTTPS है तो true कर सकते हैं, लेकिन false रखना safe है
+                    'secure' => true, // Render पर HTTPS है तो true कर सकते हैं, लेकिन false रखना safe है
                     'httponly' => true,
                     'samesite' => 'Lax'
                 ]);
