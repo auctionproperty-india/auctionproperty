@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 💰 My Earnings – Income Statement (Weekly & Monthly Slip)
+// 💰 My Earnings – Income Statement (With Level & Gap Breakdown)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -54,7 +54,6 @@ if ($range == 'this_week') {
     $period_label = "Custom (" . date('d M Y', strtotime($start_date)) . " - " . date('d M Y', strtotime($end_date)) . ")";
 }
 
-// Add time to cover the whole day
 $start_date_time = $start_date . ' 00:00:00';
 $end_date_time = $end_date . ' 23:59:59';
 
@@ -94,7 +93,7 @@ include 'header.php';
         border: 1px solid #e2e8f0;
         box-shadow: 0 4px 20px rgba(0,0,0,0.06);
         overflow: hidden;
-        max-width: 950px;
+        max-width: 1000px;
         margin: 0 auto;
     }
     .slip-header {
@@ -150,29 +149,45 @@ include 'header.php';
     .table-custom th {
         background: #1e293b;
         color: #fff;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         text-transform: uppercase;
-        padding: 12px 10px;
+        padding: 12px 8px;
         letter-spacing: 0.5px;
     }
     .table-custom td {
-        padding: 12px 10px;
+        padding: 12px 8px;
         vertical-align: middle;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         border-bottom: 1px solid #f1f5f9;
     }
     .table-custom tr:hover { background: #f8fafc; }
     
     .badge-income {
-        padding: 4px 10px;
+        padding: 4px 8px;
         border-radius: 20px;
         font-size: 0.65rem;
         font-weight: 700;
     }
     .badge-income.direct { background: #dcfce7; color: #166534; }
     .badge-income.team { background: #ede9fe; color: #5b21b6; }
+    
+    .badge-level {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 700;
+    }
+    .badge-pct {
+        background: #e0f2fe;
+        color: #0369a1;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 700;
+    }
 
-    /* 🔥 Print Styling */
     @media print {
         body { background: #fff !important; margin: 0; padding: 0; }
         .sidebar, .header-top, .navbar, footer, .no-print { display: none !important; }
@@ -184,12 +199,11 @@ include 'header.php';
 </style>
 
 <div class="container mt-4 mb-5">
-    <!-- Header & Filter -->
     <div class="d-flex justify-content-between align-items-center mb-3 no-print flex-wrap gap-2">
         <h3 class="fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> My Income Statement</h3>
     </div>
 
-    <!-- 🔥 Filter Form -->
+    <!-- Filter Form -->
     <div class="card shadow-sm border-0 rounded-4 mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-2 align-items-end">
@@ -227,7 +241,7 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- 🔥 Salary Slip -->
+    <!-- Salary Slip -->
     <div class="slip-card">
         <div class="slip-header">
             <h2>PRIME PROPERTY INDIA</h2>
@@ -268,7 +282,7 @@ include 'header.php';
                 </div>
             </div>
 
-            <!-- Detailed Table -->
+            <!-- Detailed Table with Level & Gap -->
             <h5 class="fw-bold mb-3"><i class="fas fa-list me-2"></i> Income Breakdown (<?= $period_label ?>)</h5>
             <div class="table-responsive">
                 <table class="table table-custom">
@@ -276,6 +290,8 @@ include 'header.php';
                         <tr>
                             <th>Date</th>
                             <th>Type</th>
+                            <th>Level</th>
+                            <th>Percentage</th>
                             <th>From User</th>
                             <th>Description</th>
                             <th style="text-align:right;">Amount</th>
@@ -283,9 +299,28 @@ include 'header.php';
                     </thead>
                     <tbody>
                         <?php if (empty($history)): ?>
-                            <tr><td colspan="5" class="text-center text-muted py-4">No income found for this period.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted py-4">No income found for this period.</td></tr>
                         <?php endif; ?>
-                        <?php foreach ($history as $row): ?>
+                        
+                        <?php foreach ($history as $row): 
+                            // 🔥 Extract Level and Percentage from Description
+                            $level_display = '-';
+                            $pct_display = '-';
+                            
+                            if ($row['income_type'] == 'direct') {
+                                // Description format: "Level X Difference Income (Y%) from User ID: Z"
+                                if (preg_match('/Level (\d+) Difference Income \((\d+(?:\.\d+)?)%\)/', $row['description'], $matches)) {
+                                    $level_display = 'Level ' . $matches[1];
+                                    $pct_display = $matches[2] . '%';
+                                } else {
+                                    $level_display = 'Direct';
+                                    $pct_display = '-';
+                                }
+                            } elseif ($row['income_type'] == 'team_turnover') {
+                                $level_display = 'Team';
+                                $pct_display = '-';
+                            }
+                        ?>
                             <tr>
                                 <td><?= date('d M Y', strtotime($row['created_at'])) ?></td>
                                 <td>
@@ -296,10 +331,26 @@ include 'header.php';
                                     <?php endif; ?>
                                 </td>
                                 <td>
+                                    <?php if ($level_display != '-'): ?>
+                                        <span class="badge-level"><?= $level_display ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($pct_display != '-'): ?>
+                                        <span class="badge-pct"><?= $pct_display ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
                                     <strong><?= htmlspecialchars($row['from_user_name'] ?? 'Unknown') ?></strong>
                                     <div style="font-size:0.7rem; color:#64748b;"><?= htmlspecialchars($row['from_user_email'] ?? '') ?></div>
                                 </td>
-                                <td style="font-size:0.8rem; color:#475569;"><?= htmlspecialchars($row['description'] ?? '') ?></td>
+                                <td style="font-size:0.75rem; color:#475569;">
+                                    <?= htmlspecialchars($row['description'] ?? '') ?>
+                                </td>
                                 <td style="text-align:right; font-weight:700; color:#059669;">
                                     + ₹ <?= indianCurrencyFormat($row['amount']) ?>
                                 </td>
@@ -328,7 +379,7 @@ include 'header.php';
             customFields.forEach(function(field) {
                 field.classList.add('d-none');
             });
-            this.form.submit(); // Auto-submit for predefined ranges
+            this.form.submit();
         }
     });
 </script>
