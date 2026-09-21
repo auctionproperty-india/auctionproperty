@@ -158,22 +158,31 @@ include 'header.php';
                     <h5 class="mb-0"><i class="fas fa-undo-alt me-2"></i> Rollback Generated Payouts</h5>
                 </div>
                 <div class="card-body text-center py-4">
-                    <p class="text-muted">Select a Batch ID to rollback. This will delete the earnings and subtract from wallets.</p>
-                    <form method="POST" onsubmit="return confirm('WARNING: This will DELETE the selected batch payouts and DEDUCT from user wallets. Are you sure?');">
-                        <div class="mb-3">
-                            <select name="batch_id_to_rollback" class="form-select" required>
-                                <option value="">-- Select Batch ID --</option>
-                                <?php foreach ($batches as $b): ?>
-                                    <option value="<?= htmlspecialchars($b['batch_id']) ?>">
-                                        <?= htmlspecialchars($b['batch_id']) ?> (₹<?= number_format($b['total_amount'], 2) ?> - <?= date('d M Y H:i', strtotime($b['generated_at'])) ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                    <?php if (empty($batches)): ?>
+                        <!-- 🔥 Empty State Message -->
+                        <div class="alert alert-secondary py-4 mb-0">
+                            <i class="fas fa-info-circle fa-2x mb-2 text-muted"></i>
+                            <p class="mb-0 fw-bold">No batches generated yet.</p>
+                            <small class="text-muted">Please click "Generate Payouts Now" on the left side first.</small>
                         </div>
-                        <button type="submit" name="rollback_backfill" class="btn btn-danger btn-lg rounded-pill px-5">
-                            <i class="fas fa-trash-alt me-2"></i> Rollback Batch
-                        </button>
-                    </form>
+                    <?php else: ?>
+                        <p class="text-muted">Select a Batch ID to rollback. This will delete the earnings and subtract from wallets.</p>
+                        <form method="POST" onsubmit="return confirm('WARNING: This will DELETE the selected batch payouts and DEDUCT from user wallets. Are you sure?');">
+                            <div class="mb-3">
+                                <select name="batch_id_to_rollback" class="form-select" required>
+                                    <option value="">-- Select Batch ID --</option>
+                                    <?php foreach ($batches as $b): ?>
+                                        <option value="<?= htmlspecialchars($b['batch_id']) ?>">
+                                            <?= htmlspecialchars($b['batch_id']) ?> (₹<?= number_format($b['total_amount'], 2) ?> - <?= date('d M Y H:i', strtotime($b['generated_at'])) ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <button type="submit" name="rollback_backfill" class="btn btn-danger btn-lg rounded-pill px-5">
+                                <i class="fas fa-trash-alt me-2"></i> Rollback Batch
+                            </button>
+                        </form>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
