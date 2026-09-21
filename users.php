@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (Fixed: Role + Data Clean + Free Income Toggle)
+// 👥 User Management – Admin Panel (Fixed: Role + Data Clean + Free Income Toggle + Status Toggle)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -91,26 +91,10 @@ if (isset($_GET['toggle_block']) && is_numeric($_GET['toggle_block'])) {
     }
 }
 
-if (isset($_GET['toggle_admin']) && is_numeric($_GET['toggle_admin'])) {
-    $id = (int)$_GET['toggle_admin'];
-    if ($id != $_SESSION['user_id']) {
-        $stmt = $pdo->prepare("SELECT is_super_admin FROM users WHERE id = ?");
-        $stmt->execute([$id]);
-        $user = $stmt->fetch();
-        if ($user) {
-            $new_admin = ($user['is_super_admin'] == 1) ? 0 : 1;
-            $stmt = $pdo->prepare("UPDATE users SET is_super_admin = ? WHERE id = ?");
-            $stmt->execute([$new_admin, $id]);
-            $message = "Admin status " . ($new_admin ? 'granted' : 'revoked') . " successfully!";
-            $message_type = "success";
-        }
-    } else {
-        $message = "You cannot change your own admin status!";
-        $message_type = "danger";
-    }
-}
+// (Make Admin logic removed as per request)
+// if (isset($_GET['toggle_admin']) && is_numeric($_GET['toggle_admin'])) { ... }
 
-// 🔥 NEW: Handle Free User Income Toggle
+// 🔥 Handle Free User Income Toggle
 if (isset($_GET['toggle_free_income']) && is_numeric($_GET['toggle_free_income'])) {
     $id = (int)$_GET['toggle_free_income'];
     $stmt = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
@@ -290,6 +274,27 @@ include 'header.php';
         .user-table th { font-size: 0.62rem; padding: 8px 5px; }
         .user-table td { padding: 8px 5px; }
     }
+    
+    /* 🔥 Custom style for Free Income Toggle */
+    .toggle-badge {
+        cursor: pointer;
+        padding: 4px 12px;
+        border-radius: 30px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        display: inline-block;
+        transition: all 0.2s;
+    }
+    .toggle-badge.on {
+        background: #10b981;
+        color: #fff;
+        box-shadow: 0 2px 5px rgba(16,185,129,0.4);
+    }
+    .toggle-badge.off {
+        background: #e2e8f0;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+    }
 </style>
 
 <div class="container-fluid">
@@ -334,10 +339,10 @@ include 'header.php';
                         <th>Referrer</th>
                         <th>Dates</th>
                         <th>Package</th>
-                        <th>Free Income</th> <!-- 🔥 NEW COLUMN -->
-                        <th>Status</th>
+                        <th>Free Income</th>
+                        <th>Status</th> <!-- Status Column Updated -->
                         <th>Role</th>
-                        <th style="text-align: right;">Actions</th>
+                        <th style="text-align: right;">Actions</th> <!-- Actions Updated -->
                     </tr>
                 </thead>
                 <tbody>
@@ -396,32 +401,28 @@ include 'header.php';
                             <?php endif; ?>
                         </td>
 
-                        <!-- 🔥 NEW: Free User Income Toggle Button -->
+                        <!-- 🔥 NEW: Free User Income Toggle (ON/OFF) -->
                         <td>
-                            <?php if (empty($user['package_name'])): // Only for Free Users ?>
-                                <?php if (!empty($user['free_user_income_enabled'])): ?>
-                                    <span class="badge bg-success" style="font-size:0.65rem;">Enabled</span>
-                                    <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" 
-                                       class="btn btn-sm btn-outline-danger ms-1" style="padding:2px 6px; font-size:0.65rem;" title="Click to Disable">Disable</a>
-                                <?php else: ?>
-                                    <span class="badge bg-secondary" style="font-size:0.65rem;">Disabled</span>
-                                    <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" 
-                                       class="btn btn-sm btn-outline-success ms-1" style="padding:2px 6px; font-size:0.65rem;" title="Click to Enable">Enable</a>
-                                <?php endif; ?>
+                            <?php if (empty($user['package_name'])): ?>
+                                <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" class="text-decoration-none">
+                                    <?php if (!empty($user['free_user_income_enabled'])): ?>
+                                        <span class="toggle-badge on">ON</span>
+                                    <?php else: ?>
+                                        <span class="toggle-badge off">OFF</span>
+                                    <?php endif; ?>
+                                </a>
                             <?php else: ?>
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
 
+                        <!-- 🔥 UPDATED: Status Toggle Button (Replaces Block Button) -->
                         <td>
-                            <?php
-                            $status = $user['status'] ?? 'inactive';
-                            $status_class = 'inactive';
-                            $status_label = 'Inactive';
-                            if ($status == 'active') { $status_class = 'active'; $status_label = 'Active'; }
-                            elseif ($status == 'blocked') { $status_class = 'blocked'; $status_label = 'Blocked'; }
-                            ?>
-                            <span class="badge-status <?= $status_class ?>"><?= $status_label ?></span>
+                            <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" 
+                               class="btn btn-sm <?= ($user['status'] == 'blocked') ? 'btn-danger' : 'btn-success' ?>"
+                               title="<?= ($user['status'] == 'blocked') ? 'Click to Unblock' : 'Click to Block' ?>">
+                                <?= ($user['status'] == 'blocked') ? 'Blocked' : 'Active' ?>
+                            </a>
                         </td>
 
                         <td>
@@ -429,29 +430,29 @@ include 'header.php';
                             <span class="<?= $roleInfo['class'] ?>"><?= $roleInfo['label'] ?></span>
                         </td>
 
+                        <!-- 🔥 UPDATED: Actions (Removed Make Admin & Block, Added Give Package) -->
                         <td class="actions" style="text-align: right;">
                             <a href="admin_edit_user.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-primary" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
+                            
+                            <!-- NEW: Give Package Button -->
+                            <a href="admin_give_package.php?user_id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-success" title="Give Free Package">
+                                <i class="fas fa-gift"></i>
+                            </a>
+
                             <a href="admin_team.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-info" title="View Team">
                                 <i class="fas fa-sitemap"></i>
                             </a>
+                            
                             <?php if (($user['id'] ?? 0) != $_SESSION['user_id']): ?>
                                 <a href="?delete=<?= htmlspecialchars($user['id'] ?? '') ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>"
                                    class="btn btn-sm btn-danger"
                                    onclick="return confirm('Delete this user?')" title="Delete">
                                     <i class="fas fa-trash"></i>
                                 </a>
-                                <a href="?toggle_block=<?= htmlspecialchars($user['id'] ?? '') ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>"
-                                   class="btn btn-sm btn-warning"
-                                   title="<?= ($user['status'] == 'blocked') ? 'Unblock' : 'Block' ?>">
-                                    <?= ($user['status'] == 'blocked') ? '<i class="fas fa-unlock"></i>' : '<i class="fas fa-lock"></i>' ?>
-                                </a>
-                                <a href="?toggle_admin=<?= htmlspecialchars($user['id'] ?? '') ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>"
-                                   class="btn btn-sm btn-info"
-                                   title="<?= (!empty($user['is_super_admin'])) ? 'Remove Admin' : 'Make Admin' ?>">
-                                    <?= (!empty($user['is_super_admin'])) ? '<i class="fas fa-user-minus"></i>' : '<i class="fas fa-user-plus"></i>' ?>
-                                </a>
+                                <!-- Make Admin Button Removed -->
+                                <!-- Block Button Removed (Moved to Status Column) -->
                             <?php endif; ?>
                         </td>
                     </tr>
