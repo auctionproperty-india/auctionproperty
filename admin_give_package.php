@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🎁 Admin – Give Free Package to User (Without Payment)
+// 🎁 Admin – Give Free Package to User (Without Payment & No Income)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -16,41 +16,58 @@ if (!hasEditPermission('users', $pdo)) {
 $message = '';
 $message_type = '';
 
+// 1. Get User ID from URL
+$user_id = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
+if ($user_id <= 0) {
+    header("Location: users.php");
+    exit;
+}
+
+// 2. Fetch the specific user
+$user_stmt = $pdo->prepare("SELECT id, name, email, phone FROM users WHERE id = ?");
+$user_stmt->execute([$user_id]);
+$user = $user_stmt->fetch();
+
+if (!$user) {
+    die("<div class='alert alert-danger m-5'>❌ User not found!</div>");
+}
+
 // ---- Handle Form Submission ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_package'])) {
-    $user_id = (int)$_POST['user_id'];
     $package_id = (int)$_POST['package_id'];
 
-    if ($user_id > 0 && $package_id > 0) {
+    if ($package_id > 0) {
         try {
             $pdo->beginTransaction();
 
-            // 1. Get Package Duration
+            // Get Package Duration
             $pkg_stmt = $pdo->prepare("SELECT name, duration_months FROM packages WHERE id = ?");
             $pkg_stmt->execute([$package_id]);
             $package = $pkg_stmt->fetch();
             
-            $duration = $package['duration_months'] ?? 1; // Fallback to 1 month if not set
+            $duration = $package['duration_months'] ?? 1;
             $start_date = date('Y-m-d');
             $end_date = date('Y-m-d', strtotime("+$duration months"));
 
-            // 2. Cancel any existing active/pending subscriptions for this user
+            // Cancel any existing active/pending subscriptions for this user
             $pdo->prepare("UPDATE subscriptions SET status = 'cancelled' WHERE user_id = ? AND status IN ('active', 'pending')")
                 ->execute([$user_id]);
 
-            // 3. Insert New Subscription with Amount = 0
+            // 🔥 Insert New Subscription with Amount = 0
+            // ⚠️ NOTE: We are NOT calling distributeIncome() here. 
+            // This ensures that NO upline/sponsor gets any commission from this free assignment.
             $insert = $pdo->prepare("
                 INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at) 
                 VALUES (?, ?, 0.00, 'active', ?, ?, CURRENT_TIMESTAMP)
             ");
             $insert->execute([$user_id, $package_id, $start_date, $end_date]);
 
-            // 4. Update User's activation_date
+            // Update User's activation_date
             $pdo->prepare("UPDATE users SET activation_date = ? WHERE id = ?")
                 ->execute([$start_date, $user_id]);
 
             $pdo->commit();
-            $message = "✅ Package '{$package['name']}' successfully assigned to User ID: $user_id without any payment!";
+            $message = "✅ Package '{$package['name']}' successfully assigned to <b>{$user['name']}</b> for free! (No income distributed to uplines)";
             $message_type = "success";
         } catch (Exception $e) {
             $pdo->rollBack();
@@ -58,13 +75,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_package'])) {
             $message_type = "danger";
         }
     } else {
-        $message = "❌ Please select both a valid User and Package.";
+        $message = "❌ Please select a valid Package.";
         $message_type = "danger";
     }
 }
 
-// ---- Fetch Data ----
-$users = $pdo->query("SELECT id, name, email, phone FROM users ORDER BY id DESC")->fetchAll();
+// ---- Fetch Packages ----
 $packages = $pdo->query("SELECT id, name, price, duration_months FROM packages ORDER BY display_order ASC")->fetchAll();
 
 include 'header.php';
@@ -90,24 +106,21 @@ include 'header.php';
                     <h5 class="mb-0"><i class="fas fa-user-plus me-2"></i> Assign Package Without Payment</h5>
                 </div>
                 <div class="card-body p-4">
-                    <p class="text-muted small mb-4">
-                        Use this form to give a user the benefits of a premium package without them paying. 
-                        This will <b>not</b> add fake income to your accounting, but the user will get all MLM benefits (Direct Income & Team Turnover) of the selected package.
-                    </p>
-                    
+                    <div class="alert alert-warning py-2" style="font-size:0.85rem;">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <b>Important:</b> This is a free assignment. No upline/sponsor will receive any income from this transaction.
+                    </div>
+
                     <form method="POST">
                         <input type="hidden" name="assign_package" value="1">
                         
+                        <!-- 🔥 Display ONLY the selected user -->
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Select User</label>
-                            <select name="user_id" class="form-select" required>
-                                <option value="">-- Choose User --</option>
-                                <?php foreach ($users as $u): ?>
-                                    <option value="<?= $u['id'] ?>">
-                                        #<?= $u['id'] ?> - <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                            <label class="form-label fw-bold">Selected User</label>
+                            <input type="text" class="form-control bg-light" 
+                                   value="#<?= $user['id'] ?> - <?= htmlspecialchars($user['name']) ?> (<?= htmlspecialchars($user['email']) ?>)" 
+                                   readonly>
+                            <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
                         </div>
 
                         <div class="mb-4">
