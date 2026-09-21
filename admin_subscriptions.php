@@ -97,10 +97,10 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
         }
 
         // 🔥 7. NEW: DISTRIBUTE MLM INCOME (Direct + Team Turnover)
-        // यह फंक्शन functions.php में डिफाइन किया गया है
-        if (function_exists('distributeIncome')) {
-            distributeIncome($pdo, $data['user_id'], $amount);
-        }
+if (function_exists('distributeIncome')) {
+    // $package_id पास करना जरूरी है ताकि सिस्टम को पता चले कि बायर ने कौन सा पैकेज खरीदा है
+    distributeIncome($pdo, $data['user_id'], $amount, $package_id);
+}
 
         $pdo->commit();
         header("Location: admin_subscriptions.php?msg=approved");
