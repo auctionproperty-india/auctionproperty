@@ -821,6 +821,10 @@ if ($is_logged_in && $role == 'user') {
         <a href="user_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
+        <a href="my_earnings.php" class="nav-link">
+    <i class="fas fa-file-invoice-dollar"></i>
+    <span>My Earnings</span>
+</a>
         <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
         <a href="user_referrals.php"><i class="fas fa-link"></i> <span>Referrals</span></a>
         <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
