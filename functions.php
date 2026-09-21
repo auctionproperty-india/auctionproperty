@@ -1,6 +1,7 @@
 <?php
 // ============================================================
 // functions.php – Complete with Supabase, MLM & Eligibility Support
+// (Updated: Sponsor's own package determines Direct Income %)
 // ============================================================
 
 // ---- Currency ----
@@ -787,11 +788,18 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id) {
                 $direct_pct = 0; // Admin has not enabled income for this specific Free User
             }
         } else {
-            // Sponsor is Paid User: Get Package specific direct income (of the BUYER's package)
-            $pkg_stmt = $pdo->prepare("SELECT direct_income_percent FROM packages WHERE id = ?");
-            $pkg_stmt->execute([$package_id]);
-            $direct_pct = $pkg_stmt->fetchColumn() ?? 0;
-            $income_note = 'Package Direct';
+            // 🔥 UPDATED: Sponsor is Paid User - Get SPONSOR'S OWN package direct income percentage
+            // We no longer use the buyer's package percentage. The sponsor gets the rate based on their own package.
+            $sponsor_pkg_stmt = $pdo->prepare("
+                SELECT p.direct_income_percent 
+                FROM subscriptions s
+                JOIN packages p ON s.package_id = p.id
+                WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
+                ORDER BY s.id DESC LIMIT 1
+            ");
+            $sponsor_pkg_stmt->execute([$sponsor_id]);
+            $direct_pct = $sponsor_pkg_stmt->fetchColumn() ?? 0;
+            $income_note = 'Sponsor Package Direct';
         }
 
         if ($direct_pct > 0) {
@@ -811,7 +819,7 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id) {
         // 3. TEAM TURNOVER INCOME (With Eligibility Check)
         // ==========================================
         
-        // 🔥 NEW: Fetch Sponsor's current package details to check Team Turnover Eligibility
+        // 🔥 Fetch Sponsor's current package details to check Team Turnover Eligibility
         $sponsor_pkg_stmt = $pdo->prepare("
             SELECT p.is_team_turnover_eligible
             FROM subscriptions s
