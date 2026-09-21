@@ -1,6 +1,7 @@
 <?php
 // ============================================================
 // 📄 Property Detail – Full Detail for Paid / Basic for Free
+// (Updated: High-Tech Blur Effect for Free Users)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -45,26 +46,83 @@ if ($source == 'auction') {
 include 'header.php';
 
 // ============================================================
-// 1️⃣ FREE USER VIEW (No Subscription) – Only Basic Details
+// 1️⃣ FREE USER VIEW (No Subscription) – High-Tech Blur Lock
 // ============================================================
 if (!$has_subscription && $source == 'auction') {
     ?>
+    <style>
+        /* 🔥 High-Tech Blur Effect Styles */
+        .blurred-content {
+            filter: blur(6px);
+            user-select: none;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        .lock-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.9) 100%);
+            z-index: 10;
+            text-align: center;
+            border-radius: 16px;
+            padding: 20px;
+        }
+        .lock-icon {
+            font-size: 3rem;
+            color: #f59e0b;
+            margin-bottom: 15px;
+            animation: pulseLock 2s infinite;
+        }
+        @keyframes pulseLock {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .premium-btn {
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-weight: 700;
+            box-shadow: 0 8px 25px rgba(37,99,235,0.4);
+            transition: all 0.3s;
+        }
+        .premium-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(37,99,235,0.6);
+            color: #fff;
+        }
+    </style>
+
     <div class="container py-5">
         <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="card border-0 shadow-lg" style="border-radius: 30px; overflow: hidden;">
+            <div class="col-lg-9">
+                
+                <!-- Back Button -->
+                <a href="javascript:history.back()" class="btn btn-outline-secondary rounded-pill mb-3">
+                    <i class="fas fa-arrow-left me-1"></i> Back
+                </a>
+
+                <div class="card border-0 shadow-lg" style="border-radius: 24px; overflow: hidden;">
+                    <!-- Header -->
                     <div class="card-header text-white text-center p-4" style="background: linear-gradient(135deg, #1e293b, #3b82f6);">
-                        <h3><i class="fas fa-lock me-2"></i>🔒 Access Restricted</h3>
-                        <p class="mb-0 opacity-75">Subscribe to view full auction property details</p>
+                        <h3><i class="fas fa-lock me-2"></i> Premium Property Details</h3>
+                        <p class="mb-0 opacity-75">Unlock full details by subscribing to a package</p>
                     </div>
+
                     <div class="card-body p-4" style="background: #f8fafc;">
                         <div class="text-center mb-4">
-                            <i class="fas fa-building" style="font-size: 4rem; color: #94a3b8;"></i>
-                            <h4 class="mt-2"><?= htmlspecialchars($prop['title']) ?></h4>
+                            <h4 class="fw-bold"><?= htmlspecialchars($prop['title']) ?></h4>
+                            <span class="badge bg-primary px-3 py-2 rounded-pill">Bank Auction</span>
                         </div>
 
-                        <!-- Basic Details Grid (Free User) -->
-                        <div class="row g-3">
+                        <!-- Visible Basic Info -->
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6">
                                 <div class="p-3 rounded-4 shadow-sm text-center" style="background: #dcfce7; border-left: 5px solid #22c55e;">
                                     <small class="text-muted text-uppercase fw-bold">💰 Reserve Price</small>
@@ -93,57 +151,61 @@ if (!$has_subscription && $source == 'auction') {
                                             $date_display = '🔑 Private Treaty';
                                         } elseif (!empty($prop['auction_date'])) {
                                             $date_display = date('d.m.Y', strtotime($prop['auction_date']));
-                                        } elseif (!empty($prop['auction_start_time'])) {
-                                            $date_display = date('d.m.Y', strtotime($prop['auction_start_time']));
                                         }
                                         echo $date_display;
                                         ?>
                                     </h6>
                                 </div>
                             </div>
-                            <!-- EMD Amount -->
-                            <div class="col-md-6">
-                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #f3e8ff; border-left: 5px solid #a855f7;">
-                                    <small class="text-muted text-uppercase fw-bold">EMD Amount</small>
-                                    <h6 class="fw-bold mb-0">₹ <?= indianCurrencyFormat($prop['emd_amount'] ?? 0) ?></h6>
-                                </div>
+                        </div>
+
+                        <!-- 🔥 Locked / Blurred Section -->
+                        <div class="position-relative">
+                            <!-- Overlay -->
+                            <div class="lock-overlay">
+                                <i class="fas fa-crown lock-icon"></i>
+                                <h4 class="fw-bold text-dark mb-2">Unlock Full Property Details</h4>
+                                <p class="text-muted mb-4 small">Get access to Area (Sq Ft), EMD, Contact Info, Address & more.</p>
+                                <a href="user_packages.php" class="btn premium-btn">
+                                    <i class="fas fa-rocket me-2"></i> View Packages to Buy
+                                </a>
                             </div>
-                            <!-- Bid Increment -->
-                            <div class="col-md-6">
-                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #e0f2fe; border-left: 5px solid #0ea5e9;">
-                                    <small class="text-muted text-uppercase fw-bold">Bid Increment</small>
-                                    <h6 class="fw-bold mb-0">₹ <?= indianCurrencyFormat($prop['bid_increment'] ?? 0) ?></h6>
+                            
+                            <!-- Blurred Grid -->
+                            <div class="row g-3 blurred-content">
+                                <div class="col-md-6">
+                                    <div class="p-3 rounded-4 shadow-sm text-center" style="background: #f3e8ff; border-left: 5px solid #a855f7;">
+                                        <small class="text-muted text-uppercase fw-bold">EMD Amount</small>
+                                        <h6 class="fw-bold mb-0">₹ <?= indianCurrencyFormat($prop['emd_amount'] ?? 0) ?></h6>
+                                    </div>
                                 </div>
-                            </div>
-                            <!-- Area -->
-                            <div class="col-md-6">
-                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fefce8; border-left: 5px solid #eab308;">
-                                    <small class="text-muted text-uppercase fw-bold">Area (Sq Ft)</small>
-                                    <h6 class="fw-bold mb-0"><?= number_format($prop['sqft'] ?? 0, 2) ?></h6>
+                                <div class="col-md-6">
+                                    <div class="p-3 rounded-4 shadow-sm text-center" style="background: #e0f2fe; border-left: 5px solid #0ea5e9;">
+                                        <small class="text-muted text-uppercase fw-bold">Bid Increment</small>
+                                        <h6 class="fw-bold mb-0">₹ <?= indianCurrencyFormat($prop['bid_increment'] ?? 0) ?></h6>
+                                    </div>
                                 </div>
-                            </div>
-                            <!-- Contact -->
-                            <div class="col-md-6">
-                                <div class="p-3 rounded-4 shadow-sm text-center" style="background: #ecfdf5; border-left: 5px solid #10b981;">
-                                    <small class="text-muted text-uppercase fw-bold">Contact</small>
-                                    <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['contact_number'] ?? 'N/A') ?></h6>
+                                <div class="col-md-6">
+                                    <div class="p-3 rounded-4 shadow-sm text-center" style="background: #fefce8; border-left: 5px solid #eab308;">
+                                        <small class="text-muted text-uppercase fw-bold">Area (Sq Ft)</small>
+                                        <h6 class="fw-bold mb-0"><?= number_format($prop['sqft'] ?? 0, 2) ?></h6>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 rounded-4 shadow-sm text-center" style="background: #ecfdf5; border-left: 5px solid #10b981;">
+                                        <small class="text-muted text-uppercase fw-bold">Contact</small>
+                                        <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['contact_number'] ?? 'N/A') ?></h6>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="p-3 rounded-4 shadow-sm" style="background: #f1f5f9; border-left: 5px solid #64748b;">
+                                        <small class="text-muted text-uppercase fw-bold">Address / Location</small>
+                                        <h6 class="fw-bold mb-0"><?= htmlspecialchars($prop['address'] ?? $prop['location'] ?? 'Address details hidden') ?></h6>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Image (if any) -->
-                        <?php if (!empty($prop['image_url'])): ?>
-                            <div class="mt-4 text-center">
-                                <img src="<?= htmlspecialchars($prop['image_url']) ?>" class="img-fluid rounded shadow" style="max-height:250px;" alt="Property Image">
-                            </div>
-                        <?php endif; ?>
-
-                        <div class="text-center mt-4">
-                            <a href="user_packages.php" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow">
-                                <i class="fas fa-rocket me-2"></i> Subscribe Now
-                            </a>
-                            <a href="javascript:history.back()" class="btn btn-outline-secondary btn-lg px-4 ms-2 rounded-pill">⬅ Back</a>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -155,13 +217,12 @@ if (!$has_subscription && $source == 'auction') {
 }
 
 // ============================================================
-// 2️⃣ PAID USER VIEW – SUPER BOLD + STYLISH
+// 2️⃣ PAID USER VIEW – SUPER BOLD + STYLISH (Unchanged)
 // ============================================================
 
 $image_url  = $prop['image_url'] ?? '';
 $show_images = true;
 
-// ---- Helper to get possession value ----
 function getPossessionValue($prop) {
     $possession = '';
     if (isset($prop['possession']) && !empty($prop['possession'])) {
@@ -174,7 +235,6 @@ function getPossessionValue($prop) {
     return !empty($possession) ? htmlspecialchars($possession) : 'N/A';
 }
 
-// ---- Helper to format date properly (Fixes 1970 issue) ----
 function getAuctionDateDisplay($dateStr, $showTime = true) {
     if (empty($dateStr) || $dateStr == '0000-00-00' || $dateStr == '0000-00-00 00:00:00') {
         return 'N/A';
@@ -189,7 +249,6 @@ function getAuctionDateDisplay($dateStr, $showTime = true) {
     return $showTime ? date('d M Y h:i A', $timestamp) : date('d M Y', $timestamp);
 }
 
-// ---- Similar Properties (only for auction) ----
 $similar_props = [];
 if ($source == 'auction') {
     $city = $prop['city'] ?? '';
