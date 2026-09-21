@@ -1,6 +1,7 @@
 <?php
 // ============================================================
 // 💰 Admin Income Settings – Package-wise + Team + Free User
+// (Updated UI: Highlight Premium Packages for Higher Direct Income)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -20,13 +21,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'update_package_income') {
         $package_ids = $_POST['package_id'] ?? [];
         $percents = $_POST['direct_percent'] ?? [];
-        $team_eligibles = $_POST['team_eligible'] ?? []; // Array of IDs that are checked
+        $team_eligibles = $_POST['team_eligible'] ?? []; 
         
         try {
             foreach ($package_ids as $index => $pkg_id) {
                 $pct = (float)$percents[$index];
-                
-                // 🔥 FIX: PostgreSQL के लिए true/false की जगह 1/0 पास करें
+                // PostgreSQL के लिए 1/0 पास करें
                 $is_eligible = in_array($pkg_id, $team_eligibles) ? 1 : 0; 
                 
                 $pdo->prepare("UPDATE packages SET direct_income_percent = ?, is_team_turnover_eligible = ? WHERE id = ?")
@@ -95,6 +95,9 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY COALESCE(display_order,
 $team_settings = $pdo->query("SELECT * FROM income_settings WHERE income_type = 'team_turnover' ORDER BY min_turnover ASC")->fetchAll();
 $free_user_setting = $pdo->query("SELECT * FROM income_settings WHERE income_type = 'free_user_direct' LIMIT 1")->fetch();
 
+// 🔥 PREMIUM PACKAGES LIST (For UI Highlighting)
+$premium_packages = ['gold', 'platinum', 'diamond'];
+
 include 'header.php';
 ?>
 
@@ -121,7 +124,9 @@ include 'header.php';
                     <h5 class="mb-0"><i class="fas fa-box me-2"></i> Package Direct Income & Team Eligibility</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted small">Set direct commission % for each package. Also, tick "Team Turnover" if users with this package should get Team Turnover Income.</p>
+                    <div class="alert alert-info py-2" style="font-size:0.8rem;">
+                        💡 <strong>Tip:</strong> Give higher Direct Income % for <b>Gold, Platinum, Diamond</b> packages. This will motivate users to upgrade their packages.
+                    </div>
                     <form method="POST">
                         <input type="hidden" name="action" value="update_package_income">
                         <div class="table-responsive">
@@ -134,14 +139,21 @@ include 'header.php';
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($packages as $pkg): ?>
-                                        <tr>
+                                    <?php foreach ($packages as $pkg): 
+                                        $is_premium = in_array(strtolower($pkg['name']), $premium_packages);
+                                        $row_class = $is_premium ? 'table-warning' : '';
+                                    ?>
+                                        <tr class="<?= $row_class ?>">
                                             <td>
                                                 <strong><?= htmlspecialchars($pkg['name']) ?></strong>
+                                                <?php if($is_premium): ?>
+                                                    <span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Premium</span>
+                                                <?php endif; ?>
                                                 <input type="hidden" name="package_id[]" value="<?= $pkg['id'] ?>">
                                             </td>
                                             <td>
-                                                <input type="number" step="0.01" name="direct_percent[]" class="form-control form-control-sm" 
+                                                <input type="number" step="0.01" name="direct_percent[]" 
+                                                       class="form-control form-control-sm <?= $is_premium ? 'border-warning fw-bold text-success' : '' ?>" 
                                                        value="<?= htmlspecialchars($pkg['direct_income_percent'] ?? 0) ?>" required>
                                             </td>
                                             <td class="text-center">
@@ -229,10 +241,21 @@ include 'header.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($packages as $pkg): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($pkg['name']) ?></td>
-                                    <td><strong><?= htmlspecialchars($pkg['direct_income_percent'] ?? 0) ?>%</strong></td>
+                            <?php foreach ($packages as $pkg): 
+                                $is_premium = in_array(strtolower($pkg['name']), $premium_packages);
+                            ?>
+                                <tr class="<?= $is_premium ? 'table-warning' : '' ?>">
+                                    <td>
+                                        <?= htmlspecialchars($pkg['name']) ?>
+                                        <?php if($is_premium): ?>
+                                            <span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Premium</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <strong class="<?= $is_premium ? 'text-success fs-6' : '' ?>">
+                                            <?= htmlspecialchars($pkg['direct_income_percent'] ?? 0) ?>%
+                                        </strong>
+                                    </td>
                                     <td>
                                         <?php if (!empty($pkg['is_team_turnover_eligible'])): ?>
                                             <span class="badge bg-success">Yes</span>
