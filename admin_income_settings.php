@@ -16,17 +16,22 @@ $message_type = '';
 // ---- HANDLE ACTIONS ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     
-    // 1. Update Package-wise Direct Income
+    // 1. Update Package-wise Direct Income & Team Eligibility
     if ($_POST['action'] === 'update_package_income') {
         $package_ids = $_POST['package_id'] ?? [];
         $percents = $_POST['direct_percent'] ?? [];
+        $team_eligibles = $_POST['team_eligible'] ?? []; // Array of IDs that are checked
         
         try {
             foreach ($package_ids as $index => $pkg_id) {
                 $pct = (float)$percents[$index];
-                $pdo->prepare("UPDATE packages SET direct_income_percent = ? WHERE id = ?")->execute([$pct, $pkg_id]);
+                // Check if this package ID is in the checked array
+                $is_eligible = in_array($pkg_id, $team_eligibles) ? true : false; 
+                
+                $pdo->prepare("UPDATE packages SET direct_income_percent = ?, is_team_turnover_eligible = ? WHERE id = ?")
+                    ->execute([$pct, $is_eligible, $pkg_id]);
             }
-            $message = "✅ Package-wise Direct Income updated!";
+            $message = "✅ Package-wise Income & Eligibility updated!";
             $message_type = "success";
         } catch (PDOException $e) {
             $message = "❌ Error: " . $e->getMessage();
@@ -109,13 +114,13 @@ include 'header.php';
         <!-- LEFT SIDE: FORMS -->
         <div class="col-md-5">
             
-            <!-- SECTION 1: PACKAGE WISE DIRECT INCOME -->
+            <!-- SECTION 1: PACKAGE WISE DIRECT INCOME & ELIGIBILITY -->
             <div class="card shadow-sm border-0 rounded-4 mb-4">
                 <div class="card-header bg-primary text-white rounded-top-4">
-                    <h5 class="mb-0"><i class="fas fa-box me-2"></i> Package Direct Income (%)</h5>
+                    <h5 class="mb-0"><i class="fas fa-box me-2"></i> Package Direct Income & Team Eligibility</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted small">Set direct commission percentage for each package. When a user buys this package, their sponsor gets this %.</p>
+                    <p class="text-muted small">Set direct commission % for each package. Also, tick "Team Turnover" if users with this package should get Team Turnover Income.</p>
                     <form method="POST">
                         <input type="hidden" name="action" value="update_package_income">
                         <div class="table-responsive">
@@ -123,7 +128,8 @@ include 'header.php';
                                 <thead class="table-light">
                                     <tr>
                                         <th>Package Name</th>
-                                        <th style="width:120px;">Direct %</th>
+                                        <th style="width:100px;">Direct %</th>
+                                        <th style="width:100px;">Team Turnover</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -137,12 +143,17 @@ include 'header.php';
                                                 <input type="number" step="0.01" name="direct_percent[]" class="form-control form-control-sm" 
                                                        value="<?= htmlspecialchars($pkg['direct_income_percent'] ?? 0) ?>" required>
                                             </td>
+                                            <td class="text-center">
+                                                <input type="checkbox" name="team_eligible[]" value="<?= $pkg['id'] ?>" 
+                                                       class="form-check-input" style="width:1.2rem; height:1.2rem;"
+                                                       <?= (!empty($pkg['is_team_turnover_eligible'])) ? 'checked' : '' ?>>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100 rounded-pill mt-2">Save Package Income</button>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill mt-2">Save Package Settings</button>
                     </form>
                 </div>
             </div>
@@ -207,12 +218,13 @@ include 'header.php';
             <!-- PACKAGE INCOME TABLE -->
             <div class="card shadow-sm border-0 rounded-4 mb-4">
                 <div class="card-body">
-                    <h5 class="fw-bold mb-3">Current Package Direct Income</h5>
+                    <h5 class="fw-bold mb-3">Current Package Settings</h5>
                     <table class="table table-sm table-bordered">
                         <thead class="table-dark">
                             <tr>
                                 <th>Package</th>
                                 <th>Direct Income %</th>
+                                <th>Team Turnover Eligible?</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -220,6 +232,13 @@ include 'header.php';
                                 <tr>
                                     <td><?= htmlspecialchars($pkg['name']) ?></td>
                                     <td><strong><?= htmlspecialchars($pkg['direct_income_percent'] ?? 0) ?>%</strong></td>
+                                    <td>
+                                        <?php if (!empty($pkg['is_team_turnover_eligible'])): ?>
+                                            <span class="badge bg-success">Yes</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-danger">No</span>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
