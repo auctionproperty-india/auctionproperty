@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (Fixed: Role + Data Clean)
+// 👥 User Management – Admin Panel (Fixed: Role + Data Clean + Free Income Toggle)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -107,6 +107,21 @@ if (isset($_GET['toggle_admin']) && is_numeric($_GET['toggle_admin'])) {
     } else {
         $message = "You cannot change your own admin status!";
         $message_type = "danger";
+    }
+}
+
+// 🔥 NEW: Handle Free User Income Toggle
+if (isset($_GET['toggle_free_income']) && is_numeric($_GET['toggle_free_income'])) {
+    $id = (int)$_GET['toggle_free_income'];
+    $stmt = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
+    $stmt->execute([$id]);
+    $user = $stmt->fetch();
+    if ($user) {
+        $new_status = ($user['free_user_income_enabled']) ? false : true;
+        $stmt = $pdo->prepare("UPDATE users SET free_user_income_enabled = ? WHERE id = ?");
+        $stmt->execute([$new_status, $id]);
+        $message = "Free User Income " . ($new_status ? 'Enabled' : 'Disabled') . " successfully!";
+        $message_type = "success";
     }
 }
 
@@ -229,46 +244,10 @@ include 'header.php';
         vertical-align: middle;
     }
 
-    .badge-role-super {
-        background: linear-gradient(135deg, #dc2626, #b91c1c);
-        color: #fff;
-        padding: 3px 10px;
-        border-radius: 30px;
-        font-size: 0.68rem;
-        font-weight: 700;
-        display: inline-block;
-        white-space: nowrap;
-    }
-    .badge-role-subadmin {
-        background: linear-gradient(135deg, #7c3aed, #6d28d9);
-        color: #fff;
-        padding: 3px 10px;
-        border-radius: 30px;
-        font-size: 0.68rem;
-        font-weight: 700;
-        display: inline-block;
-        white-space: nowrap;
-    }
-    .badge-role-sales {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        color: #fff;
-        padding: 3px 10px;
-        border-radius: 30px;
-        font-size: 0.68rem;
-        font-weight: 700;
-        display: inline-block;
-        white-space: nowrap;
-    }
-    .badge-role-user {
-        background: #64748b;
-        color: #fff;
-        padding: 3px 10px;
-        border-radius: 30px;
-        font-size: 0.68rem;
-        font-weight: 700;
-        display: inline-block;
-        white-space: nowrap;
-    }
+    .badge-role-super { background: linear-gradient(135deg, #dc2626, #b91c1c); color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; white-space: nowrap; }
+    .badge-role-subadmin { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; white-space: nowrap; }
+    .badge-role-sales { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; white-space: nowrap; }
+    .badge-role-user { background: #64748b; color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; white-space: nowrap; }
 
     .badge-package { background: #2563eb; color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; }
     .badge-package-free { background: #94a3b8; color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; }
@@ -355,6 +334,7 @@ include 'header.php';
                         <th>Referrer</th>
                         <th>Dates</th>
                         <th>Package</th>
+                        <th>Free Income</th> <!-- 🔥 NEW COLUMN -->
                         <th>Status</th>
                         <th>Role</th>
                         <th style="text-align: right;">Actions</th>
@@ -362,7 +342,7 @@ include 'header.php';
                 </thead>
                 <tbody>
                     <?php if (empty($users)): ?>
-                        <tr><td colspan="10" class="text-center text-muted py-4">No users found.</td></tr>
+                        <tr><td colspan="11" class="text-center text-muted py-4">No users found.</td></tr>
                     <?php endif; ?>
 
                     <?php foreach ($users as $user): ?>
@@ -378,7 +358,6 @@ include 'header.php';
                             </div>
                         </td>
 
-                        <!-- ✅ PHONE FIX -->
                         <td>
                             <div style="font-size: 0.78rem;">
                                 <?= htmlspecialchars(cleanDisplayValue($user['phone'] ?? '', 'N/A')) ?>
@@ -417,6 +396,23 @@ include 'header.php';
                             <?php endif; ?>
                         </td>
 
+                        <!-- 🔥 NEW: Free User Income Toggle Button -->
+                        <td>
+                            <?php if (empty($user['package_name'])): // Only for Free Users ?>
+                                <?php if (!empty($user['free_user_income_enabled'])): ?>
+                                    <span class="badge bg-success" style="font-size:0.65rem;">Enabled</span>
+                                    <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" 
+                                       class="btn btn-sm btn-outline-danger ms-1" style="padding:2px 6px; font-size:0.65rem;" title="Click to Disable">Disable</a>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary" style="font-size:0.65rem;">Disabled</span>
+                                    <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" 
+                                       class="btn btn-sm btn-outline-success ms-1" style="padding:2px 6px; font-size:0.65rem;" title="Click to Enable">Enable</a>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <span class="text-muted">—</span>
+                            <?php endif; ?>
+                        </td>
+
                         <td>
                             <?php
                             $status = $user['status'] ?? 'inactive';
@@ -428,7 +424,6 @@ include 'header.php';
                             <span class="badge-status <?= $status_class ?>"><?= $status_label ?></span>
                         </td>
 
-                        <!-- ✅ ROLE FIX -->
                         <td>
                             <?php $roleInfo = getUserRoleLabel($user); ?>
                             <span class="<?= $roleInfo['class'] ?>"><?= $roleInfo['label'] ?></span>
