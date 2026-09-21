@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// functions.php – Complete with Supabase Storage Support
+// functions.php – Complete with Supabase & MLM Income Support
 // ============================================================
 
 // ---- Currency ----
@@ -744,13 +744,14 @@ if (!function_exists('safeDateFormat')) {
 }
 
 // ============================================================
-// 💰 NEW: MLM INCOME DISTRIBUTION LOGIC (Direct + Team Turnover)
+// 💰 MLM INCOME DISTRIBUTION LOGIC (Direct + Team Turnover)
 // ============================================================
 
 /**
  * Distributes income to the sponsor when a subscription is activated.
+ * $package_id is the ID of the package the buyer purchased.
  */
-function distributeIncome($pdo, $buyer_id, $amount) {
+function distributeIncome($pdo, $buyer_id, $amount, $package_id) {
     // 1. Fetch Buyer's Sponsor (referred_by)
     $stmt = $pdo->prepare("SELECT referred_by FROM users WHERE id = ?");
     $stmt->execute([$buyer_id]);
@@ -760,17 +761,41 @@ function distributeIncome($pdo, $buyer_id, $amount) {
         $sponsor_id = $user['referred_by'];
         
         // ==========================================
-        // 2. DIRECT INCOME
+        // 2. DIRECT INCOME CALCULATION
         // ==========================================
-        $pctStmt = $pdo->query("SELECT percentage FROM income_settings WHERE income_type = 'direct' AND status = 1 LIMIT 1");
-        $direct_pct = $pctStmt->fetchColumn() ?? 0;
         
+        // Check if Sponsor is a Free User (No active subscription)
+        $is_sponsor_free = !userHasActiveSubscription($pdo, $sponsor_id);
+        
+        $direct_pct = 0;
+        $income_note = '';
+
+        if ($is_sponsor_free) {
+            // Sponsor is Free User: Check Free User Settings
+            $free_setting = $pdo->query("SELECT * FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
+            if ($free_setting && $free_setting['percentage'] > 0) {
+                $direct_pct = $free_setting['percentage'];
+                $income_note = 'Free User Direct';
+            } else {
+                // Admin has turned off income for Free Users
+                $direct_pct = 0; 
+            }
+        } else {
+            // Sponsor is Paid User: Get Package specific direct income (of the BUYER's package)
+            $pkg_stmt = $pdo->prepare("SELECT direct_income_percent FROM packages WHERE id = ?");
+            $pkg_stmt->execute([$package_id]);
+            $direct_pct = $pkg_stmt->fetchColumn() ?? 0;
+            $income_note = 'Package Direct';
+        }
+
         if ($direct_pct > 0) {
             $commission = ($amount * $direct_pct) / 100;
-            $ins = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'direct', 'Direct Referral Income')");
-            $ins->execute([$sponsor_id, $buyer_id, $commission]);
             
-            // Optionally credit to wallet directly
+            // Insert into user_earnings
+            $ins = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'direct', ?)");
+            $ins->execute([$sponsor_id, $buyer_id, $commission, "Direct Income ($income_note) from User ID: $buyer_id"]);
+            
+            // Credit to wallet
             if (function_exists('creditWallet')) {
                 creditWallet($pdo, $sponsor_id, $commission, "Direct Income from User ID: $buyer_id");
             }
@@ -781,7 +806,6 @@ function distributeIncome($pdo, $buyer_id, $amount) {
         // ==========================================
         $total_turnover = getTeamTurnover($pdo, $sponsor_id);
         
-        // Find matching slab based on total team turnover
         $slabStmt = $pdo->prepare("SELECT * FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 AND min_turnover <= ? AND (max_turnover IS NULL OR max_turnover >= ?) ORDER BY min_turnover DESC LIMIT 1");
         $slabStmt->execute([$total_turnover, $total_turnover]);
         $slab = $slabStmt->fetch();
@@ -789,12 +813,9 @@ function distributeIncome($pdo, $buyer_id, $amount) {
         if ($slab) {
             $team_commission = ($total_turnover * $slab['percentage']) / 100;
             
-            // Check if this turnover slab commission was already given recently to avoid duplicate payments on every new sale
-            // For simplicity, we give it on every new subscription if they qualify.
             $ins2 = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description) VALUES (?, ?, ?, 'team_turnover', 'Team Turnover Income')");
             $ins2->execute([$sponsor_id, $buyer_id, $team_commission]);
             
-            // Optionally credit to wallet directly
             if (function_exists('creditWallet')) {
                 creditWallet($pdo, $sponsor_id, $team_commission, "Team Turnover Income from Team Volume: ₹$total_turnover");
             }
