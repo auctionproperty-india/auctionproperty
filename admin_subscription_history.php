@@ -23,9 +23,10 @@ if (!function_exists('safeDateFormat')) {
 $search = $_GET['search'] ?? '';
 $status_filter = $_GET['status'] ?? '';
 
-$sql = "SELECT s.*, u.name as user_name, p.name as package_name
+$sql = "SELECT s.*, u.name as user_name, u.id as user_id, ref.name as referrer_name, ref.id as referrer_id, p.name as package_name
         FROM subscriptions s
         JOIN users u ON s.user_id = u.id
+        LEFT JOIN users ref ON u.referred_by = ref.id
         LEFT JOIN packages p ON s.package_id = p.id
         WHERE 1=1";
 $params = [];
@@ -75,6 +76,7 @@ $subscriptions = $stmt->fetchAll();
                 <thead class="table-dark">
                     <tr>
                         <th>User</th>
+                        <th>Referrer (Upline)</th>
                         <th>Package</th>
                         <th>Amount</th>
                         <th>Status</th>
@@ -87,7 +89,22 @@ $subscriptions = $stmt->fetchAll();
                 <tbody>
                     <?php foreach ($subscriptions as $row): ?>
                         <tr>
-                            <td><?= htmlspecialchars($row['user_name']) ?></td>
+                            <td>
+                                <!-- Clickable User Name -->
+                                <a href="javascript:void(0)" onclick="openUserPopup(<?= $row['user_id'] ?>)" class="fw-bold text-primary text-decoration-none">
+                                    <?= htmlspecialchars($row['user_name']) ?>
+                                </a>
+                            </td>
+                            <td>
+                                <?php if (!empty($row['referrer_name'])): ?>
+                                    <!-- Clickable Referrer Name -->
+                                    <a href="javascript:void(0)" onclick="openUserPopup(<?= $row['referrer_id'] ?>)" class="text-info text-decoration-none">
+                                        👤 <?= htmlspecialchars($row['referrer_name']) ?>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
                             <td><?= htmlspecialchars($row['package_name'] ?? 'N/A') ?></td>
                             <td>₹ <?= number_format($row['amount'], 2) ?></td>
                             <td>
@@ -108,4 +125,12 @@ $subscriptions = $stmt->fetchAll();
         <div class="alert alert-info">No subscriptions found.</div>
     <?php endif; ?>
 </div>
+
+<script>
+function openUserPopup(userId) {
+    if (!userId || userId == 0) return;
+    window.open('admin_user_popup.php?id=' + userId, 'UserDetailsPopup', 'width=800,height=700,scrollbars=yes,resizable=yes');
+}
+</script>
+
 <?php include 'footer.php'; ?>
