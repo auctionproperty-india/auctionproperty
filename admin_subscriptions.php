@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📋 Admin – Pending Subscriptions (Full Updated with MLM Income)
+// 📋 Admin – Pending Subscriptions (Full Updated with MLM Income + Referrer)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -44,13 +44,11 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
         die("Subscription not found.");
     }
 
-    // If already active, redirect
     if ($data['status'] == 'active') {
         header("Location: admin_subscriptions.php?msg=already_active");
         exit;
     }
 
-    // Start transaction
     $pdo->beginTransaction();
     try {
         // 1. Update subscription amount, package, start_date
@@ -96,11 +94,10 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
             addAccountEntry($pdo, 'income', $amount, $description, 'Auction Subscription', $start_date);
         }
 
-        // 🔥 7. NEW: DISTRIBUTE MLM INCOME (Direct + Team Turnover)
-if (function_exists('distributeIncome')) {
-    // $package_id पास करना जरूरी है ताकि सिस्टम को पता चले कि बायर ने कौन सा पैकेज खरीदा है
-    distributeIncome($pdo, $data['user_id'], $amount, $package_id);
-}
+        // 7. DISTRIBUTE MLM INCOME (Direct + Team Turnover)
+        if (function_exists('distributeIncome')) {
+            distributeIncome($pdo, $data['user_id'], $amount, $package_id);
+        }
 
         $pdo->commit();
         header("Location: admin_subscriptions.php?msg=approved");
@@ -125,11 +122,12 @@ if (isset($_GET['reject'])) {
 
 include 'header.php';
 
-// ---- Fetch pending subscriptions ----
+// ---- Fetch pending subscriptions WITH REFERRER ----
 $pendings = $pdo->query("
-    SELECT s.*, u.name as uname, p.title as ptitle, pk.name as pkg_name 
+    SELECT s.*, u.name as uname, u.id as user_id, ref.name as referrer_name, ref.id as referrer_id, p.title as ptitle, pk.name as pkg_name 
     FROM subscriptions s 
     JOIN users u ON s.user_id = u.id 
+    LEFT JOIN users ref ON u.referred_by = ref.id
     LEFT JOIN properties p ON s.property_id = p.id 
     JOIN packages pk ON s.package_id = pk.id 
     WHERE s.status = 'pending' 
@@ -157,6 +155,7 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
                 <thead>
                     <tr>
                         <th>User</th>
+                        <th>Referrer (Upline)</th>
                         <th>Package</th>
                         <th>Amount</th>
                         <th>UTR</th>
@@ -169,7 +168,22 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
                 <tbody>
                     <?php foreach ($pendings as $p): ?>
                         <tr>
-                            <td><?= htmlspecialchars($p['uname']) ?></td>
+                            <td>
+                                <!-- Clickable User Name -->
+                                <a href="javascript:void(0)" onclick="openUserPopup(<?= $p['user_id'] ?>)" class="fw-bold text-primary text-decoration-none">
+                                    <?= htmlspecialchars($p['uname']) ?>
+                                </a>
+                            </td>
+                            <td>
+                                <?php if (!empty($p['referrer_name'])): ?>
+                                    <!-- Clickable Referrer Name -->
+                                    <a href="javascript:void(0)" onclick="openUserPopup(<?= $p['referrer_id'] ?>)" class="text-info text-decoration-none">
+                                        👤 <?= htmlspecialchars($p['referrer_name']) ?>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
                             <td><?= htmlspecialchars($p['pkg_name']) ?></td>
                             <td>₹<?= $p['amount'] ?></td>
                             <td><?= htmlspecialchars($p['utr'] ?? 'N/A') ?></td>
@@ -230,5 +244,12 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
         <p class="text-muted">No pending requests.</p>
     <?php endif; ?>
 </div>
+
+<script>
+function openUserPopup(userId) {
+    if (!userId || userId == 0) return;
+    window.open('admin_user_popup.php?id=' + userId, 'UserDetailsPopup', 'width=800,height=700,scrollbars=yes,resizable=yes');
+}
+</script>
 
 <?php include 'footer.php'; ?>
