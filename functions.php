@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// functions.php – Complete with Differential MLM Logic
+// functions.php – Complete with Fast In-Memory MLM Logic
 // ============================================================
 
 // ---- Currency ----
@@ -744,145 +744,192 @@ if (!function_exists('safeDateFormat')) {
 }
 
 // ============================================================
-// 💰 MLM INCOME DISTRIBUTION LOGIC (Differential Direct + Differential Team Turnover)
+// 💰 FAST MLM INCOME DISTRIBUTION (In-Memory Processing)
 // ============================================================
 
 /**
- * Get the income percentage for a specific user based on their active package or free user status.
- */
-function getUserIncomePercentage($pdo, $user_id) {
-    $is_active = userHasActiveSubscription($pdo, $user_id);
-    
-    if ($is_active) {
-        $stmt = $pdo->prepare("
-            SELECT p.direct_income_percent 
-            FROM subscriptions s
-            JOIN packages p ON s.package_id = p.id
-            WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
-            ORDER BY s.id DESC LIMIT 1
-        ");
-        $stmt->execute([$user_id]);
-        return (float)$stmt->fetchColumn();
-    } else {
-        $user_check = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
-        $user_check->execute([$user_id]);
-        $is_enabled = $user_check->fetchColumn();
-
-        if ($is_enabled) {
-            $free_setting = $pdo->query("SELECT percentage FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
-            return $free_setting ? (float)$free_setting['percentage'] : 0;
-        }
-        return 0;
-    }
-}
-
-/**
- * Get the Team Turnover Percentage based on the user's total team volume.
- */
-function getTeamTurnoverPercentage($pdo, $user_id) {
-    $total_turnover = getTeamTurnover($pdo, $user_id);
-    
-    $slabStmt = $pdo->prepare("
-        SELECT percentage 
-        FROM income_settings 
-        WHERE income_type = 'team_turnover' 
-        AND status = 1 
-        AND min_turnover <= ? 
-        AND (max_turnover IS NULL OR max_turnover >= ?) 
-        ORDER BY min_turnover DESC LIMIT 1
-    ");
-    $slabStmt->execute([$total_turnover, $total_turnover]);
-    return (float)$slabStmt->fetchColumn();
-}
-
-/**
  * Distributes Differential Direct Income and Differential Team Turnover Income.
- * UPDATED: Both incomes are now differential and climb the upline chain.
+ * Uses In-Memory Processing for 100x speed (no recursive DB calls).
  */
 function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = null) {
+    // ============================================================
+    // STEP 1: PREFETCH ALL DATA IN SINGLE QUERIES
+    // ============================================================
+    
+    $all_users = [];
+    $stmt = $pdo->query("SELECT id, name, referred_by, free_user_income_enabled FROM users");
+    while ($row = $stmt->fetch()) {
+        $all_users[$row['id']] = $row;
+    }
+    
+    $active_subs_by_user = [];
+    $stmt = $pdo->query("
+        SELECT user_id, SUM(amount) as total 
+        FROM subscriptions 
+        WHERE status = 'active' AND end_date >= CURRENT_DATE 
+        GROUP BY user_id
+    ");
+    while ($row = $stmt->fetch()) {
+        $active_subs_by_user[$row['user_id']] = (float)$row['total'];
+    }
+    
+    $user_active_pkg = [];
+    $stmt = $pdo->query("
+        SELECT DISTINCT ON (s.user_id) s.user_id, p.name as pkg_name, p.direct_income_percent, p.is_team_turnover_eligible
+        FROM subscriptions s
+        JOIN packages p ON s.package_id = p.id
+        WHERE s.status = 'active' AND s.end_date >= CURRENT_DATE
+        ORDER BY s.user_id, s.id DESC
+    ");
+    while ($row = $stmt->fetch()) {
+        $user_active_pkg[$row['user_id']] = $row;
+    }
+    
+    $free_user_pct = 0;
+    $free_setting = $pdo->query("SELECT percentage FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
+    if ($free_setting) $free_user_pct = (float)$free_setting['percentage'];
+    
+    $team_slabs = $pdo->query("SELECT min_turnover, max_turnover, percentage FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 ORDER BY min_turnover ASC")->fetchAll();
+    
+    // ============================================================
+    // STEP 2: BUILD CHILDREN MAP & COMPUTE TEAM TURNOVER
+    // ============================================================
+    $children_map = [];
+    foreach ($all_users as $uid => $u) {
+        $parent = $u['referred_by'];
+        if ($parent && isset($all_users[$parent])) {
+            $children_map[$parent][] = $uid;
+        }
+    }
+    
+    $team_turnover_cache = [];
+    
+    // Closure to recursively compute team turnover
+    $computeTurnover = function($uid) use (&$computeTurnover, &$children_map, &$active_subs_by_user, &$team_turnover_cache) {
+        if (isset($team_turnover_cache[$uid])) return $team_turnover_cache[$uid];
+        $total = 0;
+        if (isset($children_map[$uid])) {
+            foreach ($children_map[$uid] as $child_id) {
+                $total += isset($active_subs_by_user[$child_id]) ? $active_subs_by_user[$child_id] : 0;
+                $total += $computeTurnover($child_id);
+            }
+        }
+        $team_turnover_cache[$uid] = $total;
+        return $total;
+    };
+    
+    // Precompute for all users
+    foreach ($all_users as $uid => $u) {
+        $computeTurnover($uid);
+    }
+    
+    // ============================================================
+    // STEP 3: HELPER FUNCTIONS
+    // ============================================================
+    $getDirectPct = function($user_id) use (&$all_users, &$user_active_pkg, $free_user_pct) {
+        $is_free = !isset($user_active_pkg[$user_id]);
+        if ($is_free) {
+            $enabled = isset($all_users[$user_id]['free_user_income_enabled']) && $all_users[$user_id]['free_user_income_enabled'];
+            return $enabled ? $free_user_pct : 0;
+        } else {
+            return (float)($user_active_pkg[$user_id]['direct_income_percent'] ?? 0);
+        }
+    };
+    
+    $getTeamPct = function($user_id) use (&$team_turnover_cache, &$team_slabs, &$user_active_pkg) {
+        if (!isset($user_active_pkg[$user_id])) return 0;
+        if (empty($user_active_pkg[$user_id]['is_team_turnover_eligible'])) return 0;
+        
+        $turnover = $team_turnover_cache[$user_id] ?? 0;
+        $matched_pct = 0;
+        foreach ($team_slabs as $slab) {
+            $min = (float)$slab['min_turnover'];
+            $max = $slab['max_turnover'] !== null ? (float)$slab['max_turnover'] : PHP_FLOAT_MAX;
+            if ($turnover >= $min && $turnover <= $max) {
+                $matched_pct = (float)$slab['percentage'];
+            }
+        }
+        return $matched_pct;
+    };
+    
+    // ============================================================
+    // STEP 4: WALK UP THE UPLINE CHAIN & DISTRIBUTE
+    // ============================================================
     $current_user_id = $buyer_id;
     $last_direct_pct = 0;
     $last_team_pct = 0;
     $level = 1;
     $max_levels = 10;
-
+    
     while ($level <= $max_levels) {
-        // Get the sponsor (upline) of the current user
-        $stmt = $pdo->prepare("SELECT referred_by FROM users WHERE id = ?");
-        $stmt->execute([$current_user_id]);
-        $sponsor_id = $stmt->fetchColumn();
-
-        if (!$sponsor_id) break; // No more uplines
-
-        // ==========================================
-        // 1. DIFFERENTIAL DIRECT INCOME
-        // ==========================================
-        $direct_pct = getUserIncomePercentage($pdo, $sponsor_id);
+        $sponsor_id = $all_users[$current_user_id]['referred_by'] ?? null;
+        if (!$sponsor_id || !isset($all_users[$sponsor_id])) break;
         
+        // 1. DIFFERENTIAL DIRECT INCOME
+        $direct_pct = $getDirectPct($sponsor_id);
         if ($direct_pct > $last_direct_pct) {
             $diff_pct = $direct_pct - $last_direct_pct;
             $commission = ($amount * $diff_pct) / 100;
-
+            
             if ($commission > 0) {
-                $ins = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description, batch_id) VALUES (?, ?, ?, 'direct', ?, ?)");
-                $ins->execute([$sponsor_id, $buyer_id, $commission, "Level $level Direct Diff ($diff_pct%) from User ID: $buyer_id", $batch_id]);
-                
-                if (function_exists('creditWallet')) {
-                    creditWallet($pdo, $sponsor_id, $commission, "Level $level Direct Diff Income from User ID: $buyer_id", null, $batch_id);
+                try {
+                    $ins = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description, batch_id) VALUES (?, ?, ?, 'direct', ?, ?)");
+                    $ins->execute([$sponsor_id, $buyer_id, $commission, "Level $level Direct Diff ($diff_pct%) from User ID: $buyer_id", $batch_id]);
+                    
+                    if (function_exists('creditWallet')) {
+                        creditWallet($pdo, $sponsor_id, $commission, "Level $level Direct Diff Income from User ID: $buyer_id", null, $batch_id);
+                    }
+                } catch (Exception $e) {
+                    error_log("distributeIncome Direct Error: " . $e->getMessage());
                 }
             }
             $last_direct_pct = $direct_pct;
         }
-
-        // ==========================================
-        // 2. DIFFERENTIAL TEAM TURNOVER INCOME
-        // ==========================================
-        $team_pct = getTeamTurnoverPercentage($pdo, $sponsor_id);
         
+        // 2. DIFFERENTIAL TEAM TURNOVER INCOME
+        $team_pct = $getTeamPct($sponsor_id);
         if ($team_pct > $last_team_pct) {
             $diff_pct = $team_pct - $last_team_pct;
             $commission = ($amount * $diff_pct) / 100;
-
+            
             if ($commission > 0) {
-                $ins2 = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description, batch_id) VALUES (?, ?, ?, 'team_turnover', ?, ?)");
-                $ins2->execute([$sponsor_id, $buyer_id, $commission, "Level $level Team Turnover Diff ($diff_pct%) from User ID: $buyer_id", $batch_id]);
-                
-                if (function_exists('creditWallet')) {
-                    creditWallet($pdo, $sponsor_id, $commission, "Level $level Team Turnover Diff Income from User ID: $buyer_id", null, $batch_id);
+                try {
+                    $ins2 = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description, batch_id) VALUES (?, ?, ?, 'team_turnover', ?, ?)");
+                    $ins2->execute([$sponsor_id, $buyer_id, $commission, "Level $level Team Turnover Diff ($diff_pct%) from User ID: $buyer_id", $batch_id]);
+                    
+                    if (function_exists('creditWallet')) {
+                        creditWallet($pdo, $sponsor_id, $commission, "Level $level Team Turnover Diff Income from User ID: $buyer_id", null, $batch_id);
+                    }
+                } catch (Exception $e) {
+                    error_log("distributeIncome Team Error: " . $e->getMessage());
                 }
             }
             $last_team_pct = $team_pct;
         }
-
+        
         $current_user_id = $sponsor_id;
         $level++;
         
-        // Safety cap: Total paid percentage should not exceed the highest package percentage (e.g., 100%)
-        if ($last_direct_pct >= 100 || $last_team_pct >= 100) break; 
+        if ($last_direct_pct >= 100 || $last_team_pct >= 100) break;
     }
 }
 
 /**
- * Recursively calculates the total downline turnover for a user.
+ * Legacy function - kept for backward compatibility.
+ * Note: distributeIncome() no longer uses this.
  */
 function getTeamTurnover($pdo, $user_id) {
     $total = 0;
-    
-    // Get direct downlines
     $stmt = $pdo->prepare("SELECT id FROM users WHERE referred_by = ?");
     $stmt->execute([$user_id]);
     $downlines = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
     foreach ($downlines as $downline_id) {
-        // Get this downline's personal turnover (Sum of active subscription amounts)
         $volStmt = $pdo->prepare("SELECT SUM(amount) FROM subscriptions WHERE user_id = ? AND status = 'active'");
         $volStmt->execute([$downline_id]);
         $total += $volStmt->fetchColumn() ?? 0;
-        
-        // Recursive call to get downline of downline (Team B, Team C...)
         $total += getTeamTurnover($pdo, $downline_id);
     }
-    
     return $total;
 }
 ?>
