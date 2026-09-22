@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// functions.php – Complete with Supabase, MLM & Batch ID Support
+// functions.php – Complete with Differential MLM Logic
 // ============================================================
 
 // ---- Currency ----
@@ -179,7 +179,6 @@ function getUserWalletBalance($pdo, $user_id) {
     return (float) $stmt->fetchColumn();
 }
 
-// 🔥 UPDATED: creditWallet now accepts $batch_id
 function creditWallet($pdo, $user_id, $amount, $description, $reference_id = null, $batch_id = null) {
     if($amount <= 0) return false;
     $stmt = $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?");
@@ -745,7 +744,7 @@ if (!function_exists('safeDateFormat')) {
 }
 
 // ============================================================
-// 💰 MLM INCOME DISTRIBUTION LOGIC (Level Difference + Team Turnover)
+// 💰 MLM INCOME DISTRIBUTION LOGIC (Differential Direct + Differential Team Turnover)
 // ============================================================
 
 /**
@@ -778,86 +777,88 @@ function getUserIncomePercentage($pdo, $user_id) {
 }
 
 /**
- * Distributes Level Difference Income and Team Turnover Income.
- * UPDATED: Accepts $batch_id for backfill and rollback tracking.
+ * Get the Team Turnover Percentage based on the user's total team volume.
+ */
+function getTeamTurnoverPercentage($pdo, $user_id) {
+    $total_turnover = getTeamTurnover($pdo, $user_id);
+    
+    $slabStmt = $pdo->prepare("
+        SELECT percentage 
+        FROM income_settings 
+        WHERE income_type = 'team_turnover' 
+        AND status = 1 
+        AND min_turnover <= ? 
+        AND (max_turnover IS NULL OR max_turnover >= ?) 
+        ORDER BY min_turnover DESC LIMIT 1
+    ");
+    $slabStmt->execute([$total_turnover, $total_turnover]);
+    return (float)$slabStmt->fetchColumn();
+}
+
+/**
+ * Distributes Differential Direct Income and Differential Team Turnover Income.
+ * UPDATED: Both incomes are now differential and climb the upline chain.
  */
 function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = null) {
-    // ==========================================
-    // 1. LEVEL DIFFERENCE INCOME (Upline Chain)
-    // ==========================================
     $current_user_id = $buyer_id;
-    $last_percentage = 0;
-    $total_paid_pct = 0;
+    $last_direct_pct = 0;
+    $last_team_pct = 0;
     $level = 1;
     $max_levels = 10;
 
     while ($level <= $max_levels) {
+        // Get the sponsor (upline) of the current user
         $stmt = $pdo->prepare("SELECT referred_by FROM users WHERE id = ?");
         $stmt->execute([$current_user_id]);
         $sponsor_id = $stmt->fetchColumn();
 
-        if (!$sponsor_id) break;
+        if (!$sponsor_id) break; // No more uplines
 
-        $sponsor_pct = getUserIncomePercentage($pdo, $sponsor_id);
-
-        if ($sponsor_pct > $last_percentage) {
-            $diff_pct = $sponsor_pct - $last_percentage;
+        // ==========================================
+        // 1. DIFFERENTIAL DIRECT INCOME
+        // ==========================================
+        $direct_pct = getUserIncomePercentage($pdo, $sponsor_id);
+        
+        if ($direct_pct > $last_direct_pct) {
+            $diff_pct = $direct_pct - $last_direct_pct;
             $commission = ($amount * $diff_pct) / 100;
 
             if ($commission > 0) {
                 $ins = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description, batch_id) VALUES (?, ?, ?, 'direct', ?, ?)");
-                $ins->execute([$sponsor_id, $buyer_id, $commission, "Level $level Difference Income ($diff_pct%) from User ID: $buyer_id", $batch_id]);
+                $ins->execute([$sponsor_id, $buyer_id, $commission, "Level $level Direct Diff ($diff_pct%) from User ID: $buyer_id", $batch_id]);
                 
                 if (function_exists('creditWallet')) {
-                    creditWallet($pdo, $sponsor_id, $commission, "Level $level Difference Income from User ID: $buyer_id", null, $batch_id);
+                    creditWallet($pdo, $sponsor_id, $commission, "Level $level Direct Diff Income from User ID: $buyer_id", null, $batch_id);
                 }
             }
-            $last_percentage = $sponsor_pct;
-            $total_paid_pct += $diff_pct;
+            $last_direct_pct = $direct_pct;
+        }
+
+        // ==========================================
+        // 2. DIFFERENTIAL TEAM TURNOVER INCOME
+        // ==========================================
+        $team_pct = getTeamTurnoverPercentage($pdo, $sponsor_id);
+        
+        if ($team_pct > $last_team_pct) {
+            $diff_pct = $team_pct - $last_team_pct;
+            $commission = ($amount * $diff_pct) / 100;
+
+            if ($commission > 0) {
+                $ins2 = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description, batch_id) VALUES (?, ?, ?, 'team_turnover', ?, ?)");
+                $ins2->execute([$sponsor_id, $buyer_id, $commission, "Level $level Team Turnover Diff ($diff_pct%) from User ID: $buyer_id", $batch_id]);
+                
+                if (function_exists('creditWallet')) {
+                    creditWallet($pdo, $sponsor_id, $commission, "Level $level Team Turnover Diff Income from User ID: $buyer_id", null, $batch_id);
+                }
+            }
+            $last_team_pct = $team_pct;
         }
 
         $current_user_id = $sponsor_id;
         $level++;
         
-        if ($total_paid_pct >= 100) break; 
-    }
-
-    // ==========================================
-    // 2. TEAM TURNOVER INCOME (For Direct Sponsor Only)
-    // ==========================================
-    $stmt = $pdo->prepare("SELECT referred_by FROM users WHERE id = ?");
-    $stmt->execute([$buyer_id]);
-    $direct_sponsor_id = $stmt->fetchColumn();
-
-    if ($direct_sponsor_id) {
-        $sponsor_pkg_stmt = $pdo->prepare("
-            SELECT p.is_team_turnover_eligible
-            FROM subscriptions s
-            JOIN packages p ON s.package_id = p.id
-            WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
-            ORDER BY s.id DESC LIMIT 1
-        ");
-        $sponsor_pkg_stmt->execute([$direct_sponsor_id]);
-        $is_team_turnover_eligible = $sponsor_pkg_stmt->fetchColumn() ?? false;
-
-        if ($is_team_turnover_eligible) {
-            $total_turnover = getTeamTurnover($pdo, $direct_sponsor_id);
-            
-            $slabStmt = $pdo->prepare("SELECT * FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 AND min_turnover <= ? AND (max_turnover IS NULL OR max_turnover >= ?) ORDER BY min_turnover DESC LIMIT 1");
-            $slabStmt->execute([$total_turnover, $total_turnover]);
-            $slab = $slabStmt->fetch();
-            
-            if ($slab) {
-                $team_commission = ($total_turnover * $slab['percentage']) / 100;
-                
-                $ins2 = $pdo->prepare("INSERT INTO user_earnings (user_id, from_user_id, amount, income_type, description, batch_id) VALUES (?, ?, ?, 'team_turnover', 'Team Turnover Income', ?)");
-                $ins2->execute([$direct_sponsor_id, $buyer_id, $team_commission, $batch_id]);
-                
-                if (function_exists('creditWallet')) {
-                    creditWallet($pdo, $direct_sponsor_id, $team_commission, "Team Turnover Income from Team Volume: ₹$total_turnover", null, $batch_id);
-                }
-            }
-        }
+        // Safety cap: Total paid percentage should not exceed the highest package percentage (e.g., 100%)
+        if ($last_direct_pct >= 100 || $last_team_pct >= 100) break; 
     }
 }
 
@@ -867,15 +868,18 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = nul
 function getTeamTurnover($pdo, $user_id) {
     $total = 0;
     
+    // Get direct downlines
     $stmt = $pdo->prepare("SELECT id FROM users WHERE referred_by = ?");
     $stmt->execute([$user_id]);
     $downlines = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
     foreach ($downlines as $downline_id) {
+        // Get this downline's personal turnover (Sum of active subscription amounts)
         $volStmt = $pdo->prepare("SELECT SUM(amount) FROM subscriptions WHERE user_id = ? AND status = 'active'");
         $volStmt->execute([$downline_id]);
         $total += $volStmt->fetchColumn() ?? 0;
         
+        // Recursive call to get downline of downline (Team B, Team C...)
         $total += getTeamTurnover($pdo, $downline_id);
     }
     
