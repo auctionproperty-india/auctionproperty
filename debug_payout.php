@@ -1,8 +1,8 @@
 <?php
 // ============================================================
-// 🐞 DEBUG & SELECTIVE PAYOUT TOOL
+// 🐞 DEBUG & SELECTIVE PAYOUT TOOL (Full Chain View)
 // Shows Active + Expired Subscriptions, Calculates Differential Direct & Team Turnover
-// Allows Admin to selectively generate payouts via Checkboxes
+// Displays the ENTIRE upline chain so you can see exactly who gets paid what.
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -54,7 +54,7 @@ include 'header.php';
 
 <div class="container mt-4 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold text-danger"><i class="fas fa-bug me-2"></i> Payout Debugger & Selective Generator</h3>
+        <h3 class="fw-bold text-danger"><i class="fas fa-bug me-2"></i> Payout Debugger (Full Chain View)</h3>
         <a href="admin_payout_backfill.php" class="btn btn-outline-primary rounded-pill px-4">Go to Backfill Tool</a>
     </div>
 
@@ -66,7 +66,7 @@ include 'header.php';
     <?php endif; ?>
 
     <div class="alert alert-info py-2 small">
-        <i class="fas fa-info-circle me-1"></i> This tool shows <b>Active</b> and <b>Expired</b> subscriptions. Use the checkboxes to selectively generate payouts. The Team Turnover is calculated using <b>Differential Logic</b> (bottom-up).
+        <i class="fas fa-info-circle me-1"></i> This tool now shows the <b>ENTIRE UPLINE CHAIN</b> for each subscription. Use the checkboxes to selectively generate payouts.
     </div>
 
     <form method="POST">
@@ -82,11 +82,7 @@ include 'header.php';
                                 <th>Amount</th>
                                 <th>Status</th>
                                 <th>Sponsor (Upline)</th>
-                                <th>Sponsor Package</th>
-                                <th>Direct (Level Diff)</th>
-                                <th>Team Turnover</th>
-                                <th>Total Expected</th>
-                                <th>Reason (if 0)</th>
+                                <th>Payout Chain Breakdown (Direct + Team Turnover)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -103,7 +99,7 @@ include 'header.php';
                             $subs = $stmt->fetchAll();
                             
                             if (count($subs) == 0) {
-                                echo "<tr><td colspan='11' class='text-center text-danger py-4'>No active or expired subscriptions found.</td></tr>";
+                                echo "<tr><td colspan='7' class='text-center text-danger py-4'>No active or expired subscriptions found.</td></tr>";
                             }
 
                             foreach ($subs as $sub):
@@ -111,48 +107,37 @@ include 'header.php';
                                 $buyer_id = $sub['buyer_id'];
                                 $amount = $sub['amount'];
                                 $buyer_name = $sub['buyer_name'];
-                                $sponsor_id = $sub['referred_by'];
                                 $sub_status = ($sub['status'] == 'active' && $sub['end_date'] >= date('Y-m-d')) ? 'Active' : 'Expired';
                                 $status_color = ($sub_status == 'Active') ? 'success' : 'secondary';
                                 
-                                $sponsor_name = 'N/A';
-                                $sponsor_pkg = 'N/A';
-                                $direct_amt = 0;
-                                $team_amt = 0;
-                                $total_amt = 0;
-                                $reason = '';
-                                $can_pay = false;
+                                // Build the chain dynamically
+                                $chain_html = '';
+                                $current_user_id = $buyer_id;
+                                $last_direct_pct = 0;
+                                $last_team_pct = 0;
+                                $level = 1;
+                                $max_levels = 5; // Limit to 5 levels for display
+                                $has_any_payout = false;
+                                $total_payout = 0;
                                 
-                                if (empty($sponsor_id)) {
-                                    $reason = "Buyer has no sponsor (referred_by is NULL)";
-                                } else {
-                                    // Get Sponsor Info
+                                while ($level <= $max_levels) {
+                                    $stmt_chain = $pdo->prepare("SELECT referred_by FROM users WHERE id = ?");
+                                    $stmt_chain->execute([$current_user_id]);
+                                    $sponsor_id = $stmt_chain->fetchColumn();
+                                    if (!$sponsor_id) break;
+                                    
+                                    // Get Sponsor Name & Package
                                     $sp_stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
                                     $sp_stmt->execute([$sponsor_id]);
                                     $sponsor_name = $sp_stmt->fetchColumn() ?: 'Unknown';
                                     
                                     // Check if Sponsor is Free
                                     $is_free = !userHasActiveSubscription($pdo, $sponsor_id);
+                                    $sponsor_pkg_name = '';
                                     
                                     if ($is_free) {
-                                        $sponsor_pkg = 'Free User';
-                                        $user_check = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
-                                        $user_check->execute([$sponsor_id]);
-                                        $is_enabled = $user_check->fetchColumn();
-                                        
-                                        if ($is_enabled) {
-                                            $free_setting = $pdo->query("SELECT percentage FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
-                                            $direct_pct = $free_setting ? (float)$free_setting['percentage'] : 0;
-                                            if ($direct_pct > 0) {
-                                                $direct_amt = ($amount * $direct_pct) / 100;
-                                            } else {
-                                                $reason = "Free user income enabled but global % is 0%";
-                                            }
-                                        } else {
-                                            $reason = "Free User, Admin has Disabled income for them.";
-                                        }
+                                        $sponsor_pkg_name = 'Free User';
                                     } else {
-                                        // Paid User - Get Package
                                         $pkg_stmt = $pdo->prepare("
                                             SELECT p.name, p.direct_income_percent 
                                             FROM subscriptions s
@@ -163,60 +148,58 @@ include 'header.php';
                                         $pkg_stmt->execute([$sponsor_id]);
                                         $pkg = $pkg_stmt->fetch();
                                         if ($pkg) {
-                                            $sponsor_pkg = $pkg['name'];
-                                            $direct_pct = (float)$pkg['direct_income_percent'];
-                                            if ($direct_pct > 0) {
-                                                $direct_amt = ($amount * $direct_pct) / 100;
-                                            } else {
-                                                $reason = "Sponsor's package ({$sponsor_pkg}) has Direct Income set to 0% in Admin.";
-                                            }
+                                            $sponsor_pkg_name = $pkg['name'];
                                         } else {
-                                            $reason = "Sponsor has no active package but is not marked as free?";
+                                            $sponsor_pkg_name = 'N/A';
                                         }
                                     }
                                     
-                                    // ==========================================
-                                    // 🔥 Calculate Team Turnover Income (Differential)
-                                    // ==========================================
-                                    // Check if Sponsor's package is eligible for Team Turnover
-                                    $sponsor_pkg_stmt = $pdo->prepare("
-                                        SELECT p.is_team_turnover_eligible
-                                        FROM subscriptions s
-                                        JOIN packages p ON s.package_id = p.id
-                                        WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
-                                        ORDER BY s.id DESC LIMIT 1
-                                    ");
-                                    $sponsor_pkg_stmt->execute([$sponsor_id]);
-                                    $is_team_eligible = $sponsor_pkg_stmt->fetchColumn() ?? false;
+                                    // Calculate Direct Income Diff
+                                    $direct_pct = getUserIncomePercentage($pdo, $sponsor_id);
+                                    $direct_amt = 0;
+                                    $direct_diff = 0;
+                                    if ($direct_pct > $last_direct_pct) {
+                                        $direct_diff = $direct_pct - $last_direct_pct;
+                                        $direct_amt = ($amount * $direct_diff) / 100;
+                                        $last_direct_pct = $direct_pct;
+                                    }
                                     
-                                    if ($is_team_eligible) {
-                                        $total_turnover = getTeamTurnover($pdo, $sponsor_id);
-                                        $slabStmt = $pdo->prepare("SELECT * FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 AND min_turnover <= ? AND (max_turnover IS NULL OR max_turnover >= ?) ORDER BY min_turnover DESC LIMIT 1");
-                                        $slabStmt->execute([$total_turnover, $total_turnover]);
-                                        $slab = $slabStmt->fetch();
-                                        if ($slab) {
-                                            $team_pct = (float)$slab['percentage'];
-                                            $team_amt = ($amount * $team_pct) / 100;
-                                        } else {
-                                            if (empty($reason)) $reason = "No matching Team Turnover slab found.";
-                                        }
+                                    // Calculate Team Turnover Diff
+                                    $team_pct = getTeamTurnoverPercentage($pdo, $sponsor_id);
+                                    $team_amt = 0;
+                                    $team_diff = 0;
+                                    if ($team_pct > $last_team_pct) {
+                                        $team_diff = $team_pct - $last_team_pct;
+                                        $team_amt = ($amount * $team_diff) / 100;
+                                        $last_team_pct = $team_pct;
+                                    }
+                                    
+                                    $level_total = $direct_amt + $team_amt;
+                                    if ($level_total > 0) {
+                                        $has_any_payout = true;
+                                        $total_payout += $level_total;
+                                        
+                                        $chain_html .= "<div class='mb-1 border-bottom pb-1'>";
+                                        $chain_html .= "<strong>Level $level: #$sponsor_id $sponsor_name</strong> ($sponsor_pkg_name)<br>";
+                                        if ($direct_amt > 0) $chain_html .= "<span class='text-success'>Direct: ₹" . number_format($direct_amt, 2) . " ($direct_diff%)</span><br>";
+                                        if ($team_amt > 0) $chain_html .= "<span class='text-primary'>Team: ₹" . number_format($team_amt, 2) . " ($team_diff%)</span><br>";
+                                        $chain_html .= "<strong>Total: ₹" . number_format($level_total, 2) . "</strong>";
+                                        $chain_html .= "</div>";
                                     } else {
-                                        if (empty($reason)) $reason = "Sponsor's package is not eligible for Team Turnover.";
+                                        $chain_html .= "<div class='mb-1 text-muted small'>Level $level: #$sponsor_id $sponsor_name ($sponsor_pkg_name) - No Payout</div>";
                                     }
+                                    
+                                    $current_user_id = $sponsor_id;
+                                    $level++;
                                 }
                                 
-                                $total_amt = $direct_amt + $team_amt;
-                                if ($total_amt > 0) {
-                                    $can_pay = true;
-                                    $reason = "✅ Should be working!";
-                                }
-                                if (empty($reason)) {
-                                    $reason = "No income calculated.";
+                                if (!$has_any_payout) {
+                                    $chain_html = "<span class='text-danger'>No payouts calculated for this chain.</span>";
                                 }
                             ?>
                                 <tr>
                                     <td class="text-center">
-                                        <?php if ($can_pay): ?>
+                                        <?php if ($has_any_payout): ?>
                                             <input type="checkbox" name="selected_subs[]" value="<?= $sub_id ?>" class="sub-checkbox" style="width:1.2rem; height:1.2rem;">
                                         <?php else: ?>
                                             <i class="fas fa-times-circle text-danger" title="Not eligible for payout"></i>
@@ -226,18 +209,11 @@ include 'header.php';
                                     <td>#<?= $buyer_id ?> <?= htmlspecialchars($buyer_name) ?></td>
                                     <td>₹ <?= number_format($amount, 2) ?></td>
                                     <td><span class="badge bg-<?= $status_color ?>"><?= $sub_status ?></span></td>
-                                    <td>#<?= $sponsor_id ?> <?= htmlspecialchars($sponsor_name) ?></td>
-                                    <td><span class="badge bg-info text-dark"><?= htmlspecialchars($sponsor_pkg) ?></span></td>
-                                    <td class="text-success fw-bold">
-                                        <?= $direct_amt > 0 ? '₹ ' . number_format($direct_amt, 2) : '₹ 0.00' ?>
+                                    <td>#<?= $sub['referred_by'] ?> <?= htmlspecialchars($sub['referred_by'] ? 'Sponsor' : 'N/A') ?></td>
+                                    <td style="min-width: 300px;">
+                                        <?= $chain_html ?>
+                                        <div class="mt-1 fw-bold text-dark">Total Chain Payout: ₹ <?= number_format($total_payout, 2) ?></div>
                                     </td>
-                                    <td class="text-primary fw-bold">
-                                        <?= $team_amt > 0 ? '₹ ' . number_format($team_amt, 2) : '₹ 0.00' ?>
-                                    </td>
-                                    <td class="text-dark fw-bold fs-6">
-                                        ₹ <?= number_format($total_amt, 2) ?>
-                                    </td>
-                                    <td class="text-danger small" style="max-width: 200px;"><?= $reason ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
