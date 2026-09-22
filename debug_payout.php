@@ -1,7 +1,6 @@
 <?php
 // ============================================================
-// 🐞 FAST DEBUG & SELECTIVE PAYOUT TOOL
-// Uses In-Memory Processing for Team Turnover (Super Fast)
+// 🐞 FAST DEBUG & SELECTIVE PAYOUT TOOL (With Reason)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -13,9 +12,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 $message = '';
 $message_type = '';
 
-// ============================================================
-// 🔥 HANDLE SELECTIVE PAYOUT GENERATION
-// ============================================================
 if (isset($_POST['generate_selected']) && !empty($_POST['selected_subs'])) {
     $selected_subs = $_POST['selected_subs'];
     $batch_id = 'MANUAL_' . date('Ymd_His');
@@ -47,29 +43,20 @@ if (isset($_POST['generate_selected']) && !empty($_POST['selected_subs'])) {
 }
 
 // ============================================================
-// 🔥 STEP 1: PREFETCH ALL DATA IN SINGLE QUERIES (FAST)
+// 🔥 PREFETCH ALL DATA
 // ============================================================
-
-// 1. Fetch all users (id, name, referred_by, free_user_income_enabled)
 $all_users = [];
 $stmt = $pdo->query("SELECT id, name, referred_by, free_user_income_enabled FROM users");
 while ($row = $stmt->fetch()) {
     $all_users[$row['id']] = $row;
 }
 
-// 2. Fetch ALL active subscriptions grouped by user_id (for team turnover calc)
 $active_subs_by_user = [];
-$stmt = $pdo->query("
-    SELECT user_id, SUM(amount) as total 
-    FROM subscriptions 
-    WHERE status = 'active' AND end_date >= CURRENT_DATE 
-    GROUP BY user_id
-");
+$stmt = $pdo->query("SELECT user_id, SUM(amount) as total FROM subscriptions WHERE status = 'active' AND end_date >= CURRENT_DATE GROUP BY user_id");
 while ($row = $stmt->fetch()) {
     $active_subs_by_user[$row['user_id']] = (float)$row['total'];
 }
 
-// 3. Fetch Active Package details per user (name + direct_income_percent + team_eligible)
 $user_active_pkg = [];
 $stmt = $pdo->query("
     SELECT DISTINCT ON (s.user_id) s.user_id, p.name as pkg_name, p.direct_income_percent, p.is_team_turnover_eligible
@@ -82,18 +69,12 @@ while ($row = $stmt->fetch()) {
     $user_active_pkg[$row['user_id']] = $row;
 }
 
-// 4. Fetch Free User Global Percentage
 $free_user_pct = 0;
 $free_setting = $pdo->query("SELECT percentage FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
 if ($free_setting) $free_user_pct = (float)$free_setting['percentage'];
 
-// 5. Fetch Team Turnover Slabs
 $team_slabs = $pdo->query("SELECT min_turnover, max_turnover, percentage FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 ORDER BY min_turnover ASC")->fetchAll();
 
-// ============================================================
-// 🔥 STEP 2: COMPUTE TEAM TURNOVER FOR ALL USERS (Bottom-Up)
-// ============================================================
-// Build children map (parent_id => [child_ids])
 $children_map = [];
 foreach ($all_users as $uid => $u) {
     $parent = $u['referred_by'];
@@ -102,17 +83,13 @@ foreach ($all_users as $uid => $u) {
     }
 }
 
-// Compute team turnover for each user (memoized recursive)
 $team_turnover_cache = [];
 function computeTeamTurnover($uid, &$children_map, &$active_subs_by_user, &$cache) {
     if (isset($cache[$uid])) return $cache[$uid];
-    
     $total = 0;
     if (isset($children_map[$uid])) {
         foreach ($children_map[$uid] as $child_id) {
-            // Add child's personal volume
             $total += isset($active_subs_by_user[$child_id]) ? $active_subs_by_user[$child_id] : 0;
-            // Add child's team volume
             $total += computeTeamTurnover($child_id, $children_map, $active_subs_by_user, $cache);
         }
     }
@@ -120,35 +97,26 @@ function computeTeamTurnover($uid, &$children_map, &$active_subs_by_user, &$cach
     return $total;
 }
 
-// Precompute for all users
 foreach ($all_users as $uid => $u) {
     computeTeamTurnover($uid, $children_map, $active_subs_by_user, $team_turnover_cache);
 }
 
-// ============================================================
-// 🔥 STEP 3: HELPER FUNCTIONS (In-Memory)
-// ============================================================
-
 function getDirectPctInMemory($user_id, &$all_users, &$user_active_pkg, $free_user_pct) {
-    // Check if user is free
     $is_free = !isset($user_active_pkg[$user_id]);
-    
     if ($is_free) {
         $enabled = isset($all_users[$user_id]['free_user_income_enabled']) && $all_users[$user_id]['free_user_income_enabled'];
-        return $enabled ? $free_user_pct : 0;
+        if ($enabled) return $free_user_pct;
+        return 0;
     } else {
         return (float)($user_active_pkg[$user_id]['direct_income_percent'] ?? 0);
     }
 }
 
 function getTeamTurnoverPctInMemory($user_id, &$team_turnover_cache, &$team_slabs, &$user_active_pkg) {
-    // Check if user has a team-turnover-eligible package
-    if (!isset($user_active_pkg[$user_id])) return 0;
+    if (!isset($user_active_pkg[$user_id])) return 0; // Free user, not eligible for Team Turnover
     if (empty($user_active_pkg[$user_id]['is_team_turnover_eligible'])) return 0;
     
     $turnover = $team_turnover_cache[$user_id] ?? 0;
-    
-    // Find matching slab
     $matched_pct = 0;
     foreach ($team_slabs as $slab) {
         $min = (float)$slab['min_turnover'];
@@ -160,9 +128,6 @@ function getTeamTurnoverPctInMemory($user_id, &$team_turnover_cache, &$team_slab
     return $matched_pct;
 }
 
-// ============================================================
-// 🔥 STEP 4: FETCH ALL SUBSCRIPTIONS FOR DISPLAY
-// ============================================================
 $stmt = $pdo->query("
     SELECT s.id as sub_id, s.user_id, s.amount, s.package_id, s.status, s.end_date, 
            u.name as buyer_name, u.referred_by, u.id as buyer_id
@@ -178,7 +143,7 @@ include 'header.php';
 
 <div class="container mt-4 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold text-danger"><i class="fas fa-bug me-2"></i> Payout Debugger (Fast Mode)</h3>
+        <h3 class="fw-bold text-danger"><i class="fas fa-bug me-2"></i> Payout Debugger (With Reasons)</h3>
         <a href="admin_payout_backfill.php" class="btn btn-outline-primary rounded-pill px-4">Go to Backfill Tool</a>
     </div>
 
@@ -190,7 +155,7 @@ include 'header.php';
     <?php endif; ?>
 
     <div class="alert alert-info py-2 small">
-        <i class="fas fa-bolt me-1 text-warning"></i> <b>Fast Mode:</b> All calculations done in-memory. Page loads in 2-3 seconds.
+        <i class="fas fa-info-circle me-1"></i> Check the "Reason" column below to see exactly why a payout is 0 for a specific user.
     </div>
 
     <form method="POST">
@@ -205,7 +170,7 @@ include 'header.php';
                                 <th>Buyer</th>
                                 <th>Amount</th>
                                 <th>Status</th>
-                                <th style="min-width: 350px;">Payout Chain Breakdown</th>
+                                <th style="min-width: 400px;">Payout Chain & Reason</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -237,24 +202,48 @@ include 'header.php';
                                     $sponsor_name = $all_users[$sponsor_id]['name'] ?? 'Unknown';
                                     $sponsor_pkg_name = $user_active_pkg[$sponsor_id]['pkg_name'] ?? 'Free User';
                                     
-                                    // Direct Income (In-Memory)
+                                    // Direct Income Check
                                     $direct_pct = getDirectPctInMemory($sponsor_id, $all_users, $user_active_pkg, $free_user_pct);
                                     $direct_amt = 0;
                                     $direct_diff = 0;
+                                    $direct_reason = '';
+                                    
                                     if ($direct_pct > $last_direct_pct) {
                                         $direct_diff = $direct_pct - $last_direct_pct;
                                         $direct_amt = ($amount * $direct_diff) / 100;
                                         $last_direct_pct = $direct_pct;
+                                    } else {
+                                        if ($direct_pct == 0) {
+                                            if (!isset($user_active_pkg[$sponsor_id])) {
+                                                $enabled = $all_users[$sponsor_id]['free_user_income_enabled'] ?? false;
+                                                if (!$enabled) $direct_reason = "Free User (Income Disabled)";
+                                                else $direct_reason = "Free User (0% Global)";
+                                            } else {
+                                                $direct_reason = "Package % is 0";
+                                            }
+                                        }
                                     }
                                     
-                                    // Team Turnover (In-Memory)
+                                    // Team Turnover Check
                                     $team_pct = getTeamTurnoverPctInMemory($sponsor_id, $team_turnover_cache, $team_slabs, $user_active_pkg);
                                     $team_amt = 0;
                                     $team_diff = 0;
+                                    $team_reason = '';
+                                    
                                     if ($team_pct > $last_team_pct) {
                                         $team_diff = $team_pct - $last_team_pct;
                                         $team_amt = ($amount * $team_diff) / 100;
                                         $last_team_pct = $team_pct;
+                                    } else {
+                                        if ($team_pct == 0) {
+                                            if (!isset($user_active_pkg[$sponsor_id])) {
+                                                $team_reason = "No Active Package";
+                                            } elseif (empty($user_active_pkg[$sponsor_id]['is_team_turnover_eligible'])) {
+                                                $team_reason = "Package Not Eligible";
+                                            } else {
+                                                $team_reason = "No Slab Matched";
+                                            }
+                                        }
                                     }
                                     
                                     $level_total = $direct_amt + $team_amt;
@@ -262,14 +251,17 @@ include 'header.php';
                                     if ($level_total > 0) {
                                         $has_any_payout = true;
                                         $total_payout += $level_total;
-                                        
                                         $chain_html .= "<div class='mb-1 border-bottom pb-1'>";
                                         $chain_html .= "<strong>L$level: #$sponsor_id $sponsor_name</strong> <span class='badge bg-info text-dark'>$sponsor_pkg_name</span><br>";
                                         if ($direct_amt > 0) $chain_html .= "<span class='text-success small'>Direct: ₹" . number_format($direct_amt, 2) . " ($direct_diff%)</span> ";
                                         if ($team_amt > 0) $chain_html .= "<span class='text-primary small'>Team: ₹" . number_format($team_amt, 2) . " ($team_diff%)</span>";
                                         $chain_html .= "</div>";
                                     } else {
-                                        $chain_html .= "<div class='mb-1 text-muted small'>L$level: #$sponsor_id $sponsor_name ($sponsor_pkg_name) - No Payout</div>";
+                                        $reason_text = '';
+                                        if (!empty($direct_reason)) $reason_text .= "Direct: $direct_reason. ";
+                                        if (!empty($team_reason)) $reason_text .= "Team: $team_reason.";
+                                        if (empty($reason_text)) $reason_text = "No gap difference.";
+                                        $chain_html .= "<div class='mb-1 text-muted small'>L$level: #$sponsor_id $sponsor_name ($sponsor_pkg_name) - <span class='text-danger'>$reason_text</span></div>";
                                     }
                                     
                                     $current_user_id = $sponsor_id;
