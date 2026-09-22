@@ -20,10 +20,9 @@ if (isset($_POST['generate_backfill'])) {
     $batch_id_generated = 'BACKFILL_' . date('Ymd_His');
     
     $stmt = $pdo->query("
-        SELECT s.user_id, s.amount, s.package_id, u.name as user_name 
+        SELECT s.user_id, s.amount, s.package_id 
         FROM subscriptions s 
-        JOIN users u ON s.user_id = u.id 
-        WHERE s.status = 'active' AND s.end_date >= CURRENT_DATE 
+        WHERE s.status = 'active' AND s.end_date >= CURRENT_DATE AND s.amount > 0
         ORDER BY s.id ASC
     ");
     $active_subs = $stmt->fetchAll();
@@ -32,10 +31,8 @@ if (isset($_POST['generate_backfill'])) {
     try {
         $pdo->beginTransaction();
         foreach ($active_subs as $sub) {
-            if ($sub['amount'] > 0) {
-                if (function_exists('distributeIncome')) {
-                    distributeIncome($pdo, $sub['user_id'], $sub['amount'], $sub['package_id'], $batch_id_generated);
-                }
+            if (function_exists('distributeIncome')) {
+                distributeIncome($pdo, $sub['user_id'], $sub['amount'], $sub['package_id'], $batch_id_generated);
                 $count++;
             }
         }
@@ -102,22 +99,18 @@ if (isset($_POST['force_delete_by_date'])) {
     try {
         $pdo->beginTransaction();
         
-        // 1. Get all earnings for this date to adjust wallets
         $earn_stmt = $pdo->prepare("SELECT user_id, SUM(amount) as total_amt FROM user_earnings WHERE created_at >= ? AND created_at <= ? GROUP BY user_id");
         $earn_stmt->execute([$start_time, $end_time]);
         $earnings = $earn_stmt->fetchAll();
         
-        // 2. Subtract from user wallets
         foreach ($earnings as $e) {
             $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance - ? WHERE id = ?")->execute([$e['total_amt'], $e['user_id']]);
         }
         
-        // 3. Delete from user_earnings
         $del1 = $pdo->prepare("DELETE FROM user_earnings WHERE created_at >= ? AND created_at <= ?");
         $del1->execute([$start_time, $end_time]);
         $deleted_earnings = $del1->rowCount();
         
-        // 4. Delete from wallet_transactions
         $del2 = $pdo->prepare("DELETE FROM wallet_transactions WHERE created_at >= ? AND created_at <= ?");
         $del2->execute([$start_time, $end_time]);
         $deleted_wallet = $del2->rowCount();
