@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // 🐞 DEBUG & SELECTIVE PAYOUT TOOL
-// Shows Active + Expired Subscriptions, Calculates Level Diff & Team Turnover
+// Shows Active + Expired Subscriptions, Calculates Differential Direct & Team Turnover
 // Allows Admin to selectively generate payouts via Checkboxes
 // ============================================================
 require_once __DIR__ . '/db.php';
@@ -66,7 +66,7 @@ include 'header.php';
     <?php endif; ?>
 
     <div class="alert alert-info py-2 small">
-        <i class="fas fa-info-circle me-1"></i> This tool now shows <b>Expired Subscriptions</b> as well. Use the checkboxes to selectively generate payouts for those who haven't received them yet.
+        <i class="fas fa-info-circle me-1"></i> This tool shows <b>Active</b> and <b>Expired</b> subscriptions. Use the checkboxes to selectively generate payouts. The Team Turnover is calculated using <b>Differential Logic</b> (bottom-up).
     </div>
 
     <form method="POST">
@@ -117,7 +117,6 @@ include 'header.php';
                                 
                                 $sponsor_name = 'N/A';
                                 $sponsor_pkg = 'N/A';
-                                $direct_pct = 0;
                                 $direct_amt = 0;
                                 $team_amt = 0;
                                 $total_amt = 0;
@@ -144,7 +143,11 @@ include 'header.php';
                                         if ($is_enabled) {
                                             $free_setting = $pdo->query("SELECT percentage FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
                                             $direct_pct = $free_setting ? (float)$free_setting['percentage'] : 0;
-                                            if ($direct_pct == 0) $reason = "Free user income enabled but global % is 0%";
+                                            if ($direct_pct > 0) {
+                                                $direct_amt = ($amount * $direct_pct) / 100;
+                                            } else {
+                                                $reason = "Free user income enabled but global % is 0%";
+                                            }
                                         } else {
                                             $reason = "Free User, Admin has Disabled income for them.";
                                         }
@@ -162,19 +165,18 @@ include 'header.php';
                                         if ($pkg) {
                                             $sponsor_pkg = $pkg['name'];
                                             $direct_pct = (float)$pkg['direct_income_percent'];
-                                            if ($direct_pct == 0) $reason = "Sponsor's package ({$sponsor_pkg}) has Direct Income set to 0% in Admin.";
+                                            if ($direct_pct > 0) {
+                                                $direct_amt = ($amount * $direct_pct) / 100;
+                                            } else {
+                                                $reason = "Sponsor's package ({$sponsor_pkg}) has Direct Income set to 0% in Admin.";
+                                            }
                                         } else {
                                             $reason = "Sponsor has no active package but is not marked as free?";
                                         }
                                     }
                                     
-                                    // Calculate Direct Income Amount
-                                    if ($direct_pct > 0) {
-                                        $direct_amt = ($amount * $direct_pct) / 100;
-                                    }
-                                    
                                     // ==========================================
-                                    // 🔥 Calculate Team Turnover Income
+                                    // 🔥 Calculate Team Turnover Income (Differential)
                                     // ==========================================
                                     // Check if Sponsor's package is eligible for Team Turnover
                                     $sponsor_pkg_stmt = $pdo->prepare("
@@ -193,7 +195,10 @@ include 'header.php';
                                         $slabStmt->execute([$total_turnover, $total_turnover]);
                                         $slab = $slabStmt->fetch();
                                         if ($slab) {
-                                            $team_amt = ($total_turnover * $slab['percentage']) / 100;
+                                            $team_pct = (float)$slab['percentage'];
+                                            $team_amt = ($amount * $team_pct) / 100;
+                                        } else {
+                                            if (empty($reason)) $reason = "No matching Team Turnover slab found.";
                                         }
                                     } else {
                                         if (empty($reason)) $reason = "Sponsor's package is not eligible for Team Turnover.";
@@ -224,7 +229,7 @@ include 'header.php';
                                     <td>#<?= $sponsor_id ?> <?= htmlspecialchars($sponsor_name) ?></td>
                                     <td><span class="badge bg-info text-dark"><?= htmlspecialchars($sponsor_pkg) ?></span></td>
                                     <td class="text-success fw-bold">
-                                        <?= $direct_amt > 0 ? '₹ ' . number_format($direct_amt, 2) . " ($direct_pct%)" : '₹ 0.00' ?>
+                                        <?= $direct_amt > 0 ? '₹ ' . number_format($direct_amt, 2) : '₹ 0.00' ?>
                                     </td>
                                     <td class="text-primary fw-bold">
                                         <?= $team_amt > 0 ? '₹ ' . number_format($team_amt, 2) : '₹ 0.00' ?>
