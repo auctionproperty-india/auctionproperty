@@ -1,6 +1,8 @@
 <?php
 // ============================================================
-// 🐞 DEBUG PAYOUT TOOL (2-Step: Select → View Breakdown & Statement)
+// 🐞 DEBUG PAYOUT TOOL (2-Step: Select → Per-Receiver Statements)
+// - Team Turnover calculated from SELECTED subscriptions only (verification mode)
+// - Statement shown per Income Receiver (not per Buyer)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -9,21 +11,15 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     die("Admin access required.");
 }
 
-$step = $_GET['step'] ?? 'select'; // 'select' or 'view'
+$step = $_GET['step'] ?? 'select';
 
 // ============================================================
-// 🔥 PREFETCH ALL DATA (Fast)
+// PREFETCH BASE DATA
 // ============================================================
 $all_users = [];
 $stmt = $pdo->query("SELECT id, name, referred_by, free_user_income_enabled FROM users");
 while ($row = $stmt->fetch()) {
     $all_users[$row['id']] = $row;
-}
-
-$active_subs_by_user = [];
-$stmt = $pdo->query("SELECT user_id, SUM(amount) as total FROM subscriptions WHERE status = 'active' AND end_date >= CURRENT_DATE GROUP BY user_id");
-while ($row = $stmt->fetch()) {
-    $active_subs_by_user[$row['user_id']] = (float)$row['total'];
 }
 
 $user_active_pkg = [];
@@ -44,34 +40,8 @@ if ($free_setting) $free_user_pct = (float)$free_setting['percentage'];
 
 $team_slabs = $pdo->query("SELECT min_turnover, max_turnover, percentage FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 ORDER BY min_turnover ASC")->fetchAll();
 
-// Build children map & compute team turnover
-$children_map = [];
-foreach ($all_users as $uid => $u) {
-    $parent = $u['referred_by'];
-    if ($parent && isset($all_users[$parent])) {
-        $children_map[$parent][] = $uid;
-    }
-}
-
-$team_turnover_cache = [];
-$computeTurnover = function($uid) use (&$computeTurnover, &$children_map, &$active_subs_by_user, &$team_turnover_cache) {
-    if (isset($team_turnover_cache[$uid])) return $team_turnover_cache[$uid];
-    $total = 0;
-    if (isset($children_map[$uid])) {
-        foreach ($children_map[$uid] as $child_id) {
-            $total += isset($active_subs_by_user[$child_id]) ? $active_subs_by_user[$child_id] : 0;
-            $total += $computeTurnover($child_id);
-        }
-    }
-    $team_turnover_cache[$uid] = $total;
-    return $total;
-};
-foreach ($all_users as $uid => $u) {
-    $computeTurnover($uid);
-}
-
-// Helper closures
-$getDirectPct = function($user_id) use (&$all_users, &$user_active_pkg, $free_user_pct) {
+// Helper functions
+function getDirectPctForUser($user_id, &$all_users, &$user_active_pkg, $free_user_pct) {
     $is_free = !isset($user_active_pkg[$user_id]);
     if ($is_free) {
         $enabled = isset($all_users[$user_id]['free_user_income_enabled']) && $all_users[$user_id]['free_user_income_enabled'];
@@ -79,12 +49,11 @@ $getDirectPct = function($user_id) use (&$all_users, &$user_active_pkg, $free_us
     } else {
         return (float)($user_active_pkg[$user_id]['direct_income_percent'] ?? 0);
     }
-};
+}
 
-$getTeamPct = function($user_id) use (&$team_turnover_cache, &$team_slabs, &$user_active_pkg) {
+function getTeamPctForUser($user_id, $turnover, &$team_slabs, &$user_active_pkg) {
     if (!isset($user_active_pkg[$user_id])) return 0;
     if (empty($user_active_pkg[$user_id]['is_team_turnover_eligible'])) return 0;
-    $turnover = $team_turnover_cache[$user_id] ?? 0;
     $matched_pct = 0;
     foreach ($team_slabs as $slab) {
         $min = (float)$slab['min_turnover'];
@@ -94,41 +63,76 @@ $getTeamPct = function($user_id) use (&$team_turnover_cache, &$team_slabs, &$use
         }
     }
     return $matched_pct;
-};
+}
 
 // ============================================================
-// 🔥 STEP 2: PROCESS SELECTED SUBSCRIPTIONS (Build breakdown)
+// STEP 2: PROCESS SELECTED SUBSCRIPTIONS
 // ============================================================
-$selected_data = [];
+$receiver_statements = []; // Grouped by receiver user_id
 
 if ($step == 'view' && !empty($_POST['selected_subs'])) {
-    $selected_subs = $_POST['selected_subs'];
-    
-    foreach ($selected_subs as $sub_id) {
-        $sub_id = (int)$sub_id;
-        $stmt = $pdo->prepare("
-            SELECT s.id as sub_id, s.user_id, s.amount, s.package_id, s.status, s.end_date,
-                   u.name as buyer_name, u.id as buyer_id
-            FROM subscriptions s 
-            JOIN users u ON s.user_id = u.id 
-            WHERE s.id = ?
-        ");
-        $stmt->execute([$sub_id]);
-        $sub = $stmt->fetch();
-        if (!$sub) continue;
-        
+    $selected_subs = array_map('intval', $_POST['selected_subs']);
+    $placeholders = implode(',', array_fill(0, count($selected_subs), '?'));
+
+    // 🔥 Fetch volumes ONLY from selected subscriptions (for verification)
+    $selected_volumes_by_user = [];
+    $stmt = $pdo->prepare("SELECT user_id, SUM(amount) as total FROM subscriptions WHERE id IN ($placeholders) GROUP BY user_id");
+    $stmt->execute($selected_subs);
+    while ($row = $stmt->fetch()) {
+        $selected_volumes_by_user[$row['user_id']] = (float)$row['total'];
+    }
+
+    // Build children map
+    $children_map = [];
+    foreach ($all_users as $uid => $u) {
+        $parent = $u['referred_by'];
+        if ($parent && isset($all_users[$parent])) {
+            $children_map[$parent][] = $uid;
+        }
+    }
+
+    // Compute team turnover using ONLY selected volumes
+    $team_turnover_cache = [];
+    $computeTurnover = function($uid) use (&$computeTurnover, &$children_map, &$selected_volumes_by_user, &$team_turnover_cache) {
+        if (isset($team_turnover_cache[$uid])) return $team_turnover_cache[$uid];
+        $total = 0;
+        if (isset($children_map[$uid])) {
+            foreach ($children_map[$uid] as $child_id) {
+                $total += isset($selected_volumes_by_user[$child_id]) ? $selected_volumes_by_user[$child_id] : 0;
+                $total += $computeTurnover($child_id);
+            }
+        }
+        $team_turnover_cache[$uid] = $total;
+        return $total;
+    };
+    foreach ($all_users as $uid => $u) {
+        $computeTurnover($uid);
+    }
+
+    // Fetch selected subscriptions details
+    $stmt = $pdo->prepare("
+        SELECT s.id as sub_id, s.user_id, s.amount, s.status, s.end_date,
+               u.name as buyer_name, u.id as buyer_id
+        FROM subscriptions s 
+        JOIN users u ON s.user_id = u.id 
+        WHERE s.id IN ($placeholders)
+        ORDER BY s.id DESC
+    ");
+    $stmt->execute($selected_subs);
+    $selected_sub_details = $stmt->fetchAll();
+
+    // 🔥 Walk up chain for each selected sub, record each receiver's earning
+    foreach ($selected_sub_details as $sub) {
         $buyer_id = $sub['buyer_id'];
         $amount = (float)$sub['amount'];
         $buyer_name = $sub['buyer_name'];
-        $sub_status = ($sub['status'] == 'active' && $sub['end_date'] >= date('Y-m-d')) ? 'Active' : 'Expired';
+        $sub_id = $sub['sub_id'];
         
-        $chain = [];
         $current_user_id = $buyer_id;
         $last_direct_pct = 0;
         $last_team_pct = 0;
         $level = 1;
         $max_levels = 10;
-        $grand_total = 0;
         
         while ($level <= $max_levels) {
             $sponsor_id = $all_users[$current_user_id]['referred_by'] ?? null;
@@ -136,88 +140,71 @@ if ($step == 'view' && !empty($_POST['selected_subs'])) {
             
             $sponsor_name = $all_users[$sponsor_id]['name'] ?? 'Unknown';
             $sponsor_pkg_name = $user_active_pkg[$sponsor_id]['pkg_name'] ?? 'Free User';
-            
-            $direct_pct = $getDirectPct($sponsor_id);
-            $direct_diff = 0;
-            $direct_amt = 0;
-            $direct_reason = '';
-            
-            if ($direct_pct > $last_direct_pct) {
-                $direct_diff = $direct_pct - $last_direct_pct;
-                $direct_amt = ($amount * $direct_diff) / 100;
-                $last_direct_pct = $direct_pct;
-            } else {
-                if ($direct_pct == 0) {
-                    if (!isset($user_active_pkg[$sponsor_id])) {
-                        $enabled = $all_users[$sponsor_id]['free_user_income_enabled'] ?? false;
-                        $direct_reason = $enabled ? "Free User (0% Global)" : "Free User (Income Disabled)";
-                    } else {
-                        $direct_reason = "Package % is 0";
-                    }
-                } else {
-                    $direct_reason = "No higher gap than previous level";
-                }
-            }
-            
-            $team_pct = $getTeamPct($sponsor_id);
-            $team_diff = 0;
-            $team_amt = 0;
-            $team_reason = '';
             $sponsor_turnover = $team_turnover_cache[$sponsor_id] ?? 0;
             
-            if ($team_pct > $last_team_pct) {
-                $team_diff = $team_pct - $last_team_pct;
-                $team_amt = ($amount * $team_diff) / 100;
-                $last_team_pct = $team_pct;
-            } else {
-                if ($team_pct == 0) {
-                    if (!isset($user_active_pkg[$sponsor_id])) {
-                        $team_reason = "No Active Package (Not eligible)";
-                    } elseif (empty($user_active_pkg[$sponsor_id]['is_team_turnover_eligible'])) {
-                        $team_reason = "Package Not Team-Eligible";
-                    } else {
-                        $team_reason = "No Slab Matched (Turnover: ₹" . number_format($sponsor_turnover, 2) . ")";
-                    }
-                } else {
-                    $team_reason = "No higher gap than previous level";
-                }
+            // Initialize receiver record
+            if (!isset($receiver_statements[$sponsor_id])) {
+                $receiver_statements[$sponsor_id] = [
+                    'name' => $sponsor_name,
+                    'pkg' => $sponsor_pkg_name,
+                    'turnover' => $sponsor_turnover,
+                    'entries' => [],
+                    'total' => 0
+                ];
             }
             
-            $level_total = $direct_amt + $team_amt;
-            $grand_total += $level_total;
+            // DIRECT
+            $direct_pct = getDirectPctForUser($sponsor_id, $all_users, $user_active_pkg, $free_user_pct);
+            if ($direct_pct > $last_direct_pct) {
+                $diff = $direct_pct - $last_direct_pct;
+                $amt = ($amount * $diff) / 100;
+                if ($amt > 0) {
+                    $receiver_statements[$sponsor_id]['entries'][] = [
+                        'sub_id' => $sub_id,
+                        'buyer_id' => $buyer_id,
+                        'buyer_name' => $buyer_name,
+                        'buyer_amount' => $amount,
+                        'level' => $level,
+                        'type' => 'direct',
+                        'pct' => $diff,
+                        'amount' => $amt,
+                    ];
+                    $receiver_statements[$sponsor_id]['total'] += $amt;
+                }
+                $last_direct_pct = $direct_pct;
+            }
             
-            $chain[] = [
-                'level' => $level,
-                'sponsor_id' => $sponsor_id,
-                'sponsor_name' => $sponsor_name,
-                'sponsor_pkg' => $sponsor_pkg_name,
-                'sponsor_turnover' => $sponsor_turnover,
-                'direct_pct' => $direct_pct,
-                'direct_diff' => $direct_diff,
-                'direct_amt' => $direct_amt,
-                'direct_reason' => $direct_reason,
-                'team_pct' => $team_pct,
-                'team_diff' => $team_diff,
-                'team_amt' => $team_amt,
-                'team_reason' => $team_reason,
-                'level_total' => $level_total,
-            ];
+            // TEAM TURNOVER
+            $team_pct = getTeamPctForUser($sponsor_id, $sponsor_turnover, $team_slabs, $user_active_pkg);
+            if ($team_pct > $last_team_pct) {
+                $diff = $team_pct - $last_team_pct;
+                $amt = ($amount * $diff) / 100;
+                if ($amt > 0) {
+                    $receiver_statements[$sponsor_id]['entries'][] = [
+                        'sub_id' => $sub_id,
+                        'buyer_id' => $buyer_id,
+                        'buyer_name' => $buyer_name,
+                        'buyer_amount' => $amount,
+                        'level' => $level,
+                        'type' => 'team_turnover',
+                        'pct' => $diff,
+                        'amount' => $amt,
+                    ];
+                    $receiver_statements[$sponsor_id]['total'] += $amt;
+                }
+                $last_team_pct = $team_pct;
+            }
             
             $current_user_id = $sponsor_id;
             $level++;
             if ($last_direct_pct >= 100 && $last_team_pct >= 100) break;
         }
-        
-        $selected_data[] = [
-            'sub_id' => $sub_id,
-            'buyer_id' => $buyer_id,
-            'buyer_name' => $buyer_name,
-            'amount' => $amount,
-            'sub_status' => $sub_status,
-            'chain' => $chain,
-            'grand_total' => $grand_total,
-        ];
     }
+
+    // Sort by total descending
+    uasort($receiver_statements, function($a, $b) {
+        return $b['total'] <=> $a['total'];
+    });
 }
 
 // ============================================================
@@ -240,55 +227,88 @@ include 'header.php';
 ?>
 
 <style>
-    .chain-box {
-        background: #f8fafc;
-        border-radius: 12px;
-        padding: 12px;
-        border: 1px solid #e2e8f0;
-    }
-    .level-item {
-        padding: 8px 10px;
-        border-bottom: 1px solid #e2e8f0;
-        font-size: 0.82rem;
-    }
-    .level-item:last-child { border-bottom: none; }
-    .stmt-slip {
+    .slip-card {
         background: #fff;
-        border: 2px solid #1e3a8a;
         border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
         overflow: hidden;
-        margin-top: 20px;
+        margin-bottom: 25px;
     }
-    .stmt-header {
+    .slip-header {
         background: linear-gradient(135deg, #1e3a8a, #2563eb);
         color: #fff;
-        padding: 18px;
+        padding: 20px 25px;
         text-align: center;
     }
-    .stmt-header h4 { margin: 0; font-weight: 800; letter-spacing: 1px; }
-    .stmt-body { padding: 18px; }
-    .stmt-table { width: 100%; font-size: 0.85rem; }
-    .stmt-table th {
+    .slip-header h3 { margin: 0; font-weight: 800; letter-spacing: 1px; }
+    .slip-header p { margin: 4px 0 0; opacity: 0.85; font-size: 0.85rem; }
+    .slip-body { padding: 20px 25px; }
+    .receiver-info {
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin-bottom: 18px;
+        border-left: 5px solid #2563eb;
+    }
+    .receiver-info table { width: 100%; font-size: 0.88rem; }
+    .receiver-info td { padding: 3px 0; }
+    .summary-pills {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+    }
+    .summary-pill {
+        flex: 1;
+        min-width: 150px;
+        padding: 12px;
+        border-radius: 10px;
+        text-align: center;
+        border: 2px solid #e2e8f0;
+    }
+    .summary-pill .lbl {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        color: #64748b;
+        font-weight: 700;
+    }
+    .summary-pill .val {
+        font-size: 1.3rem;
+        font-weight: 800;
+        margin-top: 4px;
+    }
+    .summary-pill.direct { background: #f0fdf4; border-color: #10b981; }
+    .summary-pill.direct .val { color: #059669; }
+    .summary-pill.team { background: #f5f3ff; border-color: #8b5cf6; }
+    .summary-pill.team .val { color: #7c3aed; }
+    .summary-pill.total { background: #eff6ff; border-color: #2563eb; }
+    .summary-pill.total .val { color: #1d4ed8; }
+
+    .entries-table { width: 100%; font-size: 0.82rem; }
+    .entries-table th {
         background: #1e293b;
         color: #fff;
-        padding: 10px;
-        font-size: 0.75rem;
+        padding: 10px 8px;
+        font-size: 0.7rem;
         text-transform: uppercase;
+        letter-spacing: 0.4px;
     }
-    .stmt-table td { padding: 10px; border-bottom: 1px solid #f1f5f9; }
-    .stmt-summary {
-        background: #f0fdf4;
-        border-radius: 10px;
-        padding: 14px;
-        display: flex;
-        justify-content: space-between;
-        font-weight: 800;
-        font-size: 1.1rem;
-        color: #166534;
+    .entries-table td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
     }
+    .entries-table tr:hover { background: #f8fafc; }
+    .badge-type-direct { background: #dcfce7; color: #166534; padding: 3px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+    .badge-type-team { background: #ede9fe; color: #5b21b6; padding: 3px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+    .badge-pkg { background: #2563eb; color: #fff; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+    .badge-pkg-free { background: #94a3b8; color: #fff; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+
     @media print {
         .no-print { display: none !important; }
         body { background: #fff !important; }
+        .slip-card { box-shadow: none !important; page-break-inside: avoid; }
     }
 </style>
 
@@ -298,11 +318,11 @@ include 'header.php';
         <!-- STEP 1: SELECT SUBSCRIPTIONS               -->
         <!-- ========================================== -->
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3 class="fw-bold text-danger"><i class="fas fa-bug me-2"></i> Step 1: Select Subscriptions to Debug</h3>
+            <h3 class="fw-bold text-danger"><i class="fas fa-bug me-2"></i> Step 1: Select Subscriptions</h3>
         </div>
         
         <div class="alert alert-info py-2 small">
-            <i class="fas fa-info-circle me-1"></i> Select the subscriptions you want to debug. Then click <b>"View Breakdown"</b> to see full details with statement preview.
+            <i class="fas fa-info-circle me-1"></i> Select subscriptions you want to debug. Team Turnover will be calculated <b>ONLY from your selected subscriptions</b> (verification mode), and statements will be grouped by <b>Income Receiver</b>.
         </div>
         
         <form method="POST" action="?step=view">
@@ -345,7 +365,7 @@ include 'header.php';
                 </div>
                 <div class="card-footer bg-white text-end py-3">
                     <button type="submit" class="btn btn-primary btn-lg rounded-pill px-5">
-                        <i class="fas fa-eye me-2"></i> View Breakdown
+                        <i class="fas fa-eye me-2"></i> View Receiver Statements
                     </button>
                 </div>
             </div>
@@ -362,13 +382,13 @@ include 'header.php';
         
     <?php else: ?>
         <!-- ========================================== -->
-        <!-- STEP 2: VIEW BREAKDOWN + STATEMENT PREVIEW -->
+        <!-- STEP 2: PER-RECEIVER STATEMENTS            -->
         <!-- ========================================== -->
         <div class="d-flex justify-content-between align-items-center mb-4 no-print">
-            <h3 class="fw-bold text-success"><i class="fas fa-check-circle me-2"></i> Payout Breakdown & Statement Preview</h3>
+            <h3 class="fw-bold text-success"><i class="fas fa-file-invoice-dollar me-2"></i> Income Statements (Per Receiver)</h3>
             <div>
                 <a href="debug_payout.php" class="btn btn-outline-secondary rounded-pill px-4">
-                    <i class="fas fa-arrow-left me-1"></i> Back to Selection
+                    <i class="fas fa-arrow-left me-1"></i> Back
                 </a>
                 <button onclick="window.print()" class="btn btn-outline-primary rounded-pill px-4 ms-2">
                     <i class="fas fa-print me-1"></i> Print All
@@ -376,163 +396,121 @@ include 'header.php';
             </div>
         </div>
         
-        <?php if (empty($selected_data)): ?>
-            <div class="alert alert-warning">No subscriptions were selected. Please go back and select at least one.</div>
+        <?php if (empty($receiver_statements)): ?>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i> 
+                No payouts were generated from the selected subscriptions. Please check your settings or select different subscriptions.
+            </div>
         <?php endif; ?>
         
-        <?php foreach ($selected_data as $data): ?>
-            
-            <!-- Buyer Info Card -->
-            <div class="card shadow-sm border-0 rounded-4 mb-4">
-                <div class="card-header bg-primary text-white rounded-top-4">
-                    <h5 class="mb-0">
-                        <i class="fas fa-user me-2"></i> 
-                        Subscription #<?= $data['sub_id'] ?> — Buyer: <?= htmlspecialchars($data['buyer_name']) ?> (#<?= $data['buyer_id'] ?>)
-                    </h5>
+        <?php $receiver_counter = 0; ?>
+        <?php foreach ($receiver_statements as $receiver_id => $stmt_data): 
+            $receiver_counter++;
+            $sum_direct = 0;
+            $sum_team = 0;
+            foreach ($stmt_data['entries'] as $e) {
+                if ($e['type'] == 'direct') $sum_direct += $e['amount'];
+                else $sum_team += $e['amount'];
+            }
+        ?>
+            <!-- Receiver Statement -->
+            <div class="slip-card">
+                <div class="slip-header">
+                    <h3>PRIME PROPERTY INDIA</h3>
+                    <p>Income Statement / Salary Slip</p>
+                    <p style="background:rgba(255,255,255,0.2);display:inline-block;padding:3px 12px;border-radius:20px;margin-top:6px;font-size:0.75rem;">
+                        Statement #<?= $receiver_counter ?> — Generated on <?= date('d M Y, h:i A') ?>
+                    </p>
                 </div>
-                <div class="card-body">
+                <div class="slip-body">
                     
-                    <!-- Summary Badges -->
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-3">
-                            <div class="p-2 text-center border rounded">
-                                <small class="text-muted">Amount</small>
-                                <div class="fw-bold fs-5">₹ <?= number_format($data['amount'], 2) ?></div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="p-2 text-center border rounded">
-                                <small class="text-muted">Status</small>
-                                <div class="fw-bold fs-5">
-                                    <span class="badge bg-<?= $data['sub_status'] == 'Active' ? 'success' : 'secondary' ?>"><?= $data['sub_status'] ?></span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="p-2 text-center border rounded">
-                                <small class="text-muted">Chain Levels</small>
-                                <div class="fw-bold fs-5"><?= count($data['chain']) ?></div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="p-2 text-center border rounded bg-success text-white">
-                                <small>Total Chain Payout</small>
-                                <div class="fw-bold fs-5">₹ <?= number_format($data['grand_total'], 2) ?></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Chain Breakdown -->
-                    <h6 class="fw-bold mb-2"><i class="fas fa-sitemap me-1"></i> Upline Chain Breakdown</h6>
-                    <div class="chain-box mb-4">
-                        <?php if (empty($data['chain'])): ?>
-                            <div class="text-muted p-3">No upline chain found.</div>
-                        <?php else: ?>
-                            <?php foreach ($data['chain'] as $item): ?>
-                                <div class="level-item">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <strong>L<?= $item['level'] ?>: #<?= $item['sponsor_id'] ?> <?= htmlspecialchars($item['sponsor_name']) ?></strong>
-                                            <span class="badge bg-info text-dark ms-1"><?= htmlspecialchars($item['sponsor_pkg']) ?></span>
-                                            <?php if ($item['sponsor_turnover'] > 0): ?>
-                                                <small class="text-muted d-block">Team Turnover: ₹ <?= number_format($item['sponsor_turnover'], 2) ?></small>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="text-end">
-                                            <?php if ($item['direct_amt'] > 0): ?>
-                                                <div class="text-success small">Direct: ₹<?= number_format($item['direct_amt'], 2) ?> (<?= $item['direct_diff'] ?>%)</div>
-                                            <?php endif; ?>
-                                            <?php if ($item['team_amt'] > 0): ?>
-                                                <div class="text-primary small">Team: ₹<?= number_format($item['team_amt'], 2) ?> (<?= $item['team_diff'] ?>%)</div>
-                                            <?php endif; ?>
-                                            <div class="fw-bold mt-1">Total: ₹<?= number_format($item['level_total'], 2) ?></div>
-                                        </div>
-                                    </div>
-                                    <?php if (!empty($item['direct_reason']) || !empty($item['team_reason'])): ?>
-                                        <div class="text-danger small mt-1">
-                                            <?php if (!empty($item['direct_reason'])): ?>
-                                                <i class="fas fa-info-circle"></i> Direct: <?= htmlspecialchars($item['direct_reason']) ?>
-                                            <?php endif; ?>
-                                            <?php if (!empty($item['team_reason'])): ?>
-                                                <br><i class="fas fa-info-circle"></i> Team: <?= htmlspecialchars($item['team_reason']) ?>
-                                            <?php endif; ?>
-                                        </div>
+                    <!-- Receiver Info -->
+                    <div class="receiver-info">
+                        <table>
+                            <tr>
+                                <td style="width:50%;"><strong>Beneficiary:</strong> <?= htmlspecialchars($stmt_data['name']) ?></td>
+                                <td style="width:50%;"><strong>User ID:</strong> #<?= $receiver_id ?></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong>Package:</strong> 
+                                    <?php if (!empty($stmt_data['pkg']) && $stmt_data['pkg'] != 'Free User'): ?>
+                                        <span class="badge-pkg"><?= htmlspecialchars($stmt_data['pkg']) ?></span>
+                                    <?php else: ?>
+                                        <span class="badge-pkg-free">Free User</span>
                                     <?php endif; ?>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                                </td>
+                                <td>
+                                    <strong>Team Turnover (Selected):</strong> 
+                                    ₹ <?= number_format($stmt_data['turnover'], 2) ?>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
                     
-                    <!-- Statement Preview (Salary Slip Style) -->
-                    <h6 class="fw-bold mb-2"><i class="fas fa-file-invoice-dollar me-1"></i> Statement Preview (Demo)</h6>
-                    <div class="stmt-slip">
-                        <div class="stmt-header">
-                            <h4>PRIME PROPERTY INDIA</h4>
-                            <p class="mb-0 small">Income Statement / Salary Slip</p>
+                    <!-- Summary Pills -->
+                    <div class="summary-pills">
+                        <div class="summary-pill direct">
+                            <div class="lbl">Direct Income</div>
+                            <div class="val">₹ <?= number_format($sum_direct, 2) ?></div>
                         </div>
-                        <div class="stmt-body">
-                            <table class="table table-sm mb-3">
+                        <div class="summary-pill team">
+                            <div class="lbl">Team Turnover Income</div>
+                            <div class="val">₹ <?= number_format($sum_team, 2) ?></div>
+                        </div>
+                        <div class="summary-pill total">
+                            <div class="lbl">Net Payable</div>
+                            <div class="val">₹ <?= number_format($stmt_data['total'], 2) ?></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Detailed Entries Table -->
+                    <h6 class="fw-bold mb-2"><i class="fas fa-list me-1"></i> Income Breakdown (<?= count($stmt_data['entries']) ?> entries)</h6>
+                    <div class="table-responsive">
+                        <table class="entries-table">
+                            <thead>
                                 <tr>
-                                    <td><strong>Buyer:</strong> <?= htmlspecialchars($data['buyer_name']) ?> (#<?= $data['buyer_id'] ?>)</td>
-                                    <td><strong>Subscription ID:</strong> #<?= $data['sub_id'] ?></td>
+                                    <th>From Buyer</th>
+                                    <th>Sub ID</th>
+                                    <th>Level</th>
+                                    <th>Type</th>
+                                    <th>%</th>
+                                    <th class="text-end">Amount</th>
                                 </tr>
-                                <tr>
-                                    <td><strong>Purchase Amount:</strong> ₹ <?= number_format($data['amount'], 2) ?></td>
-                                    <td><strong>Status:</strong> <?= $data['sub_status'] ?></td>
-                                </tr>
-                            </table>
-                            
-                            <table class="stmt-table">
-                                <thead>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($stmt_data['entries'] as $e): ?>
                                     <tr>
-                                        <th>Level</th>
-                                        <th>Beneficiary</th>
-                                        <th>Package</th>
-                                        <th>Income Type</th>
-                                        <th>%</th>
-                                        <th class="text-end">Amount</th>
+                                        <td>
+                                            <strong>#<?= $e['buyer_id'] ?> <?= htmlspecialchars($e['buyer_name']) ?></strong>
+                                            <div style="font-size:0.7rem;color:#64748b;">Purchased: ₹ <?= number_format($e['buyer_amount'], 2) ?></div>
+                                        </td>
+                                        <td>#<?= $e['sub_id'] ?></td>
+                                        <td><span class="badge bg-warning text-dark">L<?= $e['level'] ?></span></td>
+                                        <td>
+                                            <?php if ($e['type'] == 'direct'): ?>
+                                                <span class="badge-type-direct">Direct Diff</span>
+                                            <?php else: ?>
+                                                <span class="badge-type-team">Team Turnover</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><strong><?= $e['pct'] ?>%</strong></td>
+                                        <td class="text-end fw-bold text-success">₹ <?= number_format($e['amount'], 2) ?></td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (empty($data['chain'])): ?>
-                                        <tr><td colspan="6" class="text-center text-muted py-3">No income generated.</td></tr>
-                                    <?php endif; ?>
-                                    <?php foreach ($data['chain'] as $item): ?>
-                                        <?php if ($item['direct_amt'] > 0): ?>
-                                            <tr>
-                                                <td>L<?= $item['level'] ?></td>
-                                                <td>#<?= $item['sponsor_id'] ?> <?= htmlspecialchars($item['sponsor_name']) ?></td>
-                                                <td><span class="badge bg-info text-dark"><?= htmlspecialchars($item['sponsor_pkg']) ?></span></td>
-                                                <td><span class="text-success">Direct Diff</span></td>
-                                                <td><?= $item['direct_diff'] ?>%</td>
-                                                <td class="text-end fw-bold">₹ <?= number_format($item['direct_amt'], 2) ?></td>
-                                            </tr>
-                                        <?php endif; ?>
-                                        <?php if ($item['team_amt'] > 0): ?>
-                                            <tr>
-                                                <td>L<?= $item['level'] ?></td>
-                                                <td>#<?= $item['sponsor_id'] ?> <?= htmlspecialchars($item['sponsor_name']) ?></td>
-                                                <td><span class="badge bg-info text-dark"><?= htmlspecialchars($item['sponsor_pkg']) ?></span></td>
-                                                <td><span class="text-primary">Team Turnover Diff</span></td>
-                                                <td><?= $item['team_diff'] ?>%</td>
-                                                <td class="text-end fw-bold">₹ <?= number_format($item['team_amt'], 2) ?></td>
-                                            </tr>
-                                        <?php endif; ?>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                            
-                            <div class="stmt-summary mt-3">
-                                <span>NET TOTAL CHAIN PAYOUT:</span>
-                                <span>₹ <?= number_format($data['grand_total'], 2) ?></span>
-                            </div>
-                            
-                            <div class="text-center mt-3 text-muted small">
-                                <em>This is a demo statement preview (not yet credited).</em>
-                            </div>
-                        </div>
+                                <?php endforeach; ?>
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#f0fdf4;">
+                                    <td colspan="5" class="text-end fw-bold">TOTAL:</td>
+                                    <td class="text-end fw-bold text-success" style="font-size:1rem;">₹ <?= number_format($stmt_data['total'], 2) ?></td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                     
+                    <div class="text-center mt-3 text-muted" style="font-size:0.75rem;">
+                        <em>This is a computer-generated statement preview. Not yet credited to wallet.</em>
+                    </div>
                 </div>
             </div>
         <?php endforeach; ?>
