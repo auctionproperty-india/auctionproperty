@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // 🗄️ Database Connection – Supabase Safe (Pooler Friendly)
-// + Session Handler (Custom)
+// + Session Handler (Custom) + Impersonation Support
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
@@ -125,6 +125,16 @@ if (!function_exists('safeExecute')) {
 }
 
 // ============================================================
+// 🔥 IMPERSONATION SUPPORT – Detect "Login as User" Mode
+// ============================================================
+// When admin clicks "Login as User", the popup window uses a 
+// different session name ("IMPERSONATE") so it doesn't affect
+// the main admin session. We detect this via ?imp=1 URL param.
+
+$is_impersonate_mode = (isset($_GET['imp']) && $_GET['imp'] == '1') 
+                    || (isset($_POST['imp']) && $_POST['imp'] == '1');
+
+// ============================================================
 // 🔥 SESSION HANDLER INTEGRATION
 // ============================================================
 
@@ -138,12 +148,19 @@ if (file_exists($sessionHandlerFile)) {
             $handler = new DatabaseSessionHandler($pdo);
             
             if (session_status() == PHP_SESSION_NONE) {
+                // Use different session name for impersonation
+                if ($is_impersonate_mode) {
+                    session_name('IMPERSONATE');
+                } else {
+                    session_name('PHPSESSID');
+                }
+                
                 session_set_save_handler($handler, true);
                 session_set_cookie_params([
                     'lifetime' => 86400 * 30, // 30 Days
                     'path' => '/',
                     'domain' => '',
-                    'secure' => true, // Render पर HTTPS है तो true कर सकते हैं, लेकिन false रखना safe है
+                    'secure' => true,
                     'httponly' => true,
                     'samesite' => 'Lax'
                 ]);
@@ -159,6 +176,9 @@ if (file_exists($sessionHandlerFile)) {
 } else {
     // Fallback agar session_handler.php na ho
     if (session_status() == PHP_SESSION_NONE) {
+        if ($is_impersonate_mode) {
+            session_name('IMPERSONATE');
+        }
         session_start();
     }
 }
