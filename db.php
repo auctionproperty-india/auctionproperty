@@ -1,7 +1,6 @@
 <?php
 // ============================================================
-// 🗄️ Database Connection – Supabase Safe (Pooler Friendly)
-// + Stable Session Handler (Never switches session name)
+// 🗄️ Database Connection – Supabase Safe + Session + Impersonation
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
@@ -14,16 +13,13 @@ date_default_timezone_set('Asia/Kolkata');
 
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
-    
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_PERSISTENT         => false,
         PDO::ATTR_EMULATE_PREPARES   => true,
     ];
-    
     $pdo = new PDO($dsn, $user, $password, $options);
-    
 } catch (PDOException $e) {
     error_log("DB Connection Failed: " . $e->getMessage());
     die("❌ Database Connection Failed: " . htmlspecialchars($e->getMessage()));
@@ -122,10 +118,8 @@ if (!function_exists('safeExecute')) {
 }
 
 // ============================================================
-// 🔥 SESSION HANDLER INTEGRATION (FINAL STABLE VERSION)
+// 🔥 SESSION HANDLER INTEGRATION (Stable + Impersonation Support)
 // ============================================================
-// 🔥 CRITICAL RULE: NEVER change session name dynamically.
-// Always use the SAME session name to avoid logout issues.
 
 $sessionHandlerFile = __DIR__ . '/session_handler.php';
 
@@ -135,13 +129,25 @@ if (file_exists($sessionHandlerFile)) {
     if (class_exists('DatabaseSessionHandler')) {
         try {
             if (session_status() == PHP_SESSION_NONE) {
-                // 🔥 FIXED: Always use the SAME session name
-                session_name('PRIMEPROP_SESS');
+                
+                // 🔥 Detect if this request is for impersonation
+                $is_impersonating = false;
+                
+                if (isset($_GET['imp']) && $_GET['imp'] == '1') {
+                    $is_impersonating = true;
+                } elseif (isset($_POST['imp']) && $_POST['imp'] == '1') {
+                    $is_impersonating = true;
+                } elseif (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'imp=1') !== false) {
+                    $is_impersonating = true;
+                } elseif (isset($_COOKIE['IMPERSONATE']) && !isset($_COOKIE['PRIMEPROP_SESS'])) {
+                    $is_impersonating = true;
+                }
+                
+                session_name($is_impersonating ? 'IMPERSONATE' : 'PRIMEPROP_SESS');
                 
                 $handler = new DatabaseSessionHandler($pdo);
                 session_set_save_handler($handler, true);
                 
-                // Auto-detect HTTPS
                 $is_https = (
                     (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
                     || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
