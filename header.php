@@ -1,8 +1,7 @@
 <?php
 // ============================================================
 // ✅ Header – Top Nav with Hamburger + Sidebar
-// 🔥 Dynamic Sidebar + Manage Pages Link
-// (Impersonation removed for stability)
+// 🔥 Dynamic Sidebar + Manage Pages Link + Impersonation Banner
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -64,6 +63,9 @@ if ($is_logged_in && $role == 'user') {
         $days_left = 0;
     }
 }
+
+// 🔥 Impersonation check
+$is_impersonating = isset($_SESSION['impersonate_admin']);
 ?>
 <!DOCTYPE html>
 <html>
@@ -76,7 +78,11 @@ if ($is_logged_in && $role == 'user') {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
         /* ====== Global ====== */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
         body { 
             font-family: 'Inter', sans-serif; 
             background: #f4f7fc; 
@@ -92,15 +98,78 @@ if ($is_logged_in && $role == 'user') {
             -ms-user-select: text !important;
             user-select: text !important;
         }
-        body { padding-top: 70px; }
-        body.top-nav-hidden { padding-top: 0; }
-        body.role-admin { background: #f8fafc; }
-        body.role-user { background: #f0f5fa; }
-        body.role-guest { background: #f8fafc; }
-        body.role-sales { background: #f0f5fa; }
+        body { 
+            padding-top: 70px; 
+        }
+        body.top-nav-hidden { 
+            padding-top: 0; 
+        }
+        body.role-admin { 
+            background: #f8fafc; 
+        }
+        body.role-user { 
+            background: #f0f5fa; 
+        }
+        body.role-guest { 
+            background: #f8fafc; 
+        }
+        body.role-sales { 
+            background: #f0f5fa; 
+        }
         body.page-login, body.page-register {
             background: url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed;
             background-size: cover;
+        }
+
+        /* ====== Impersonation Banner ====== */
+        .impersonate-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff;
+            padding: 12px 20px;
+            text-align: center;
+            z-index: 99999;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .impersonate-banner b { 
+            color: #fff; 
+        }
+        .impersonate-banner .btn-exit {
+            background: rgba(255,255,255,0.25);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: #fff;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .impersonate-banner .btn-exit:hover { 
+            background: #fff; 
+            color: #d97706; 
+        }
+        body.impersonate-mode { 
+            padding-top: 120px !important; 
+        }
+        body.impersonate-mode .sidebar { 
+            top: 50px !important; 
+        }
+        body.impersonate-mode .top-nav { 
+            top: 50px !important; 
+        }
+        body.impersonate-mode .hamburger-sidebar { 
+            top: 50px !important; 
         }
 
         /* ====== Top Navigation – Dark Blue Gradient ====== */
@@ -195,8 +264,13 @@ if ($is_logged_in && $role == 'user') {
         }
 
         @media (max-width: 768px) {
-            .top-nav .nav-brand .brand-text { font-size: 1.1rem; }
-            .top-nav .nav-right a { font-size: 0.8rem; padding: 4px 10px; }
+            .top-nav .nav-brand .brand-text { 
+                font-size: 1.1rem; 
+            }
+            .top-nav .nav-right a { 
+                font-size: 0.8rem; 
+                padding: 4px 10px; 
+            }
         }
 
         /* ====== Hamburger Sidebar (Off-canvas) ====== */
@@ -210,7 +284,9 @@ if ($is_logged_in && $role == 'user') {
             background: rgba(0,0,0,0.5);
             z-index: 1050;
         }
-        .sidebar-overlay.show { display: block; }
+        .sidebar-overlay.show { 
+            display: block; 
+        }
 
         .hamburger-sidebar {
             position: fixed;
@@ -398,7 +474,9 @@ if ($is_logged_in && $role == 'user') {
             letter-spacing: 1px;
             color: #1e293b;
         }
-        .sidebar .brand i { color: #1e3a8a; }
+        .sidebar .brand i { 
+            color: #1e3a8a; 
+        }
 
         .sidebar a {
             display: flex;
@@ -423,13 +501,17 @@ if ($is_logged_in && $role == 'user') {
             background: #f1f5f9;
             color: #1e3a8a;
         }
-        .sidebar a:hover i { color: #1e3a8a; }
+        .sidebar a:hover i { 
+            color: #1e3a8a; 
+        }
         .sidebar a.active {
             background: #eef2ff;
             color: #1e3a8a;
             border-left-color: #1e3a8a;
         }
-        .sidebar a.active i { color: #1e3a8a; }
+        .sidebar a.active i { 
+            color: #1e3a8a; 
+        }
 
         .sidebar .logout-link {
             margin-top: 30px;
@@ -437,7 +519,9 @@ if ($is_logged_in && $role == 'user') {
             padding-top: 20px;
             color: #dc2626 !important;
         }
-        .sidebar .logout-link i { color: #dc2626 !important; }
+        .sidebar .logout-link i { 
+            color: #dc2626 !important; 
+        }
         .sidebar .logout-link:hover {
             background: #fef2f2 !important;
             color: #b91c1c !important;
@@ -453,7 +537,9 @@ if ($is_logged_in && $role == 'user') {
             background: rgba(0,0,0,0.4);
             z-index: 1040;
         }
-        .sidebar-overlay-main.show { display: block; }
+        .sidebar-overlay-main.show { 
+            display: block; 
+        }
 
         /* ====== Main Content ====== */
         .main-content {
@@ -508,11 +594,24 @@ if ($is_logged_in && $role == 'user') {
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             margin-bottom: 10px;
         }
-        .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
-        .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
-        body.role-admin .top-bar .user-info .name { color: #0f172a; }
-        body.role-user .top-bar .user-info .name { color: #0f172a; }
-        body.role-sales .top-bar .user-info .name { color: #0f172a; }
+        .top-bar .user-info { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+        .top-bar .user-info .name { 
+            font-weight: 700; 
+            font-size: 16px; 
+        }
+        body.role-admin .top-bar .user-info .name { 
+            color: #0f172a; 
+        }
+        body.role-user .top-bar .user-info .name { 
+            color: #0f172a; 
+        }
+        body.role-sales .top-bar .user-info .name { 
+            color: #0f172a; 
+        }
         .top-bar .badge-role {
             padding: 4px 14px;
             border-radius: 30px;
@@ -550,9 +649,15 @@ if ($is_logged_in && $role == 'user') {
             cursor: pointer;
             display: inline-block;
         }
-        body.role-admin .hamburger-btn { color: #1e293b; }
-        body.role-user .hamburger-btn { color: #1e293b; }
-        body.role-sales .hamburger-btn { color: #1e293b; }
+        body.role-admin .hamburger-btn { 
+            color: #1e293b; 
+        }
+        body.role-user .hamburger-btn { 
+            color: #1e293b; 
+        }
+        body.role-sales .hamburger-btn { 
+            color: #1e293b; 
+        }
         @media (min-width: 992px) {
             .hamburger-btn {
                 display: none !important;
@@ -583,7 +688,10 @@ if ($is_logged_in && $role == 'user') {
             color: #0f172a;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
         }
-        .card-premium:hover { transform: translateY(-2px); box-shadow: 0 20px 30px -10px rgba(0,0,0,0.08); }
+        .card-premium:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 20px 30px -10px rgba(0,0,0,0.08); 
+        }
         .stat-icon {
             width: 50px;
             height: 50px;
@@ -594,19 +702,59 @@ if ($is_logged_in && $role == 'user') {
             font-size: 24px;
             flex-shrink: 0;
         }
-        body.role-admin .stat-icon.bg-soft-primary { background: #eef2ff; color: #1e3a8a; }
-        body.role-admin .stat-icon.bg-soft-success { background: #dcfce7; color: #166534; }
-        body.role-admin .stat-icon.bg-soft-warning { background: #fef3c7; color: #92400e; }
-        body.role-user .stat-icon.bg-soft-primary { background: #dbeafe; color: #2563eb; }
-        body.role-user .stat-icon.bg-soft-success { background: #d1fae5; color: #059669; }
-        body.role-user .stat-icon.bg-soft-warning { background: #fef3c7; color: #d97706; }
-        body.role-sales .stat-icon.bg-soft-primary { background: #dbeafe; color: #2563eb; }
-        body.role-sales .stat-icon.bg-soft-success { background: #d1fae5; color: #059669; }
-        body.role-sales .stat-icon.bg-soft-warning { background: #fef3c7; color: #d97706; }
-        .btn { border-radius: 10px; font-weight: 600; padding: 8px 16px; font-size: 14px; }
-        .btn-primary { background: #1e3a8a; border: none; }
-        .btn-primary:hover { background: #1e40af; }
-        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        body.role-admin .stat-icon.bg-soft-primary { 
+            background: #eef2ff; 
+            color: #1e3a8a; 
+        }
+        body.role-admin .stat-icon.bg-soft-success { 
+            background: #dcfce7; 
+            color: #166534; 
+        }
+        body.role-admin .stat-icon.bg-soft-warning { 
+            background: #fef3c7; 
+            color: #92400e; 
+        }
+        body.role-user .stat-icon.bg-soft-primary { 
+            background: #dbeafe; 
+            color: #2563eb; 
+        }
+        body.role-user .stat-icon.bg-soft-success { 
+            background: #d1fae5; 
+            color: #059669; 
+        }
+        body.role-user .stat-icon.bg-soft-warning { 
+            background: #fef3c7; 
+            color: #d97706; 
+        }
+        body.role-sales .stat-icon.bg-soft-primary { 
+            background: #dbeafe; 
+            color: #2563eb; 
+        }
+        body.role-sales .stat-icon.bg-soft-success { 
+            background: #d1fae5; 
+            color: #059669; 
+        }
+        body.role-sales .stat-icon.bg-soft-warning { 
+            background: #fef3c7; 
+            color: #d97706; 
+        }
+        .btn { 
+            border-radius: 10px; 
+            font-weight: 600; 
+            padding: 8px 16px; 
+            font-size: 14px; 
+        }
+        .btn-primary { 
+            background: #1e3a8a; 
+            border: none; 
+        }
+        .btn-primary:hover { 
+            background: #1e40af; 
+        }
+        .btn-sm { 
+            padding: 5px 10px; 
+            font-size: 12px; 
+        }
         .user-welcome-banner {
             background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
             border-radius: 24px;
@@ -615,17 +763,32 @@ if ($is_logged_in && $role == 'user') {
             margin-bottom: 25px;
             box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3);
         }
-        .user-welcome-banner h2 { font-weight: 800; }
-        .user-welcome-banner p { opacity: 0.9; }
-        @media (max-width: 576px) {
-            .top-bar .user-info .name { font-size: 14px; }
-            .card-premium { padding: 15px; }
-            .stat-icon { width: 40px; height: 40px; font-size: 18px; }
+        .user-welcome-banner h2 { 
+            font-weight: 800; 
         }
-        .badge-sales { background: #f59e0b; color: #000; }
+        .user-welcome-banner p { 
+            opacity: 0.9; 
+        }
+        @media (max-width: 576px) {
+            .top-bar .user-info .name { 
+                font-size: 14px; 
+            }
+            .card-premium { 
+                padding: 15px; 
+            }
+            .stat-icon { 
+                width: 40px; 
+                height: 40px; 
+                font-size: 18px; 
+            }
+        }
+        .badge-sales { 
+            background: #f59e0b; 
+            color: #000; 
+        }
     </style>
 </head>
-<body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>"
+<body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= $is_impersonating ? 'impersonate-mode' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>"
       oncontextmenu="var tag = event.target.tagName; if(tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return false;"
       onkeydown="
         var tag = event.target.tagName;
@@ -635,6 +798,21 @@ if ($is_logged_in && $role == 'user') {
         if (event.ctrlKey && (event.key === 'u' || event.key === 's' || event.key === 'p')) return false;
         if (event.ctrlKey && event.shiftKey && (event.key === 'I' || event.key === 'J' || event.key === 'C')) return false;
       ">
+
+<!-- 🔥 IMPERSONATION BANNER -->
+<?php if ($is_impersonating): ?>
+<div class="impersonate-banner">
+    <span>
+        <i class="fas fa-user-secret"></i> 
+        You are logged in as <b><?= htmlspecialchars($_SESSION['name'] ?? 'User') ?></b> 
+        (User #<?= $_SESSION['user_id'] ?>)
+        <span style="opacity:0.85;">(Original Admin: <?= htmlspecialchars($_SESSION['impersonate_admin']['name'] ?? 'Admin') ?>)</span>
+    </span>
+    <a href="admin_exit_impersonation.php" class="btn-exit">
+        <i class="fas fa-sign-out-alt"></i> Return to Admin
+    </a>
+</div>
+<?php endif; ?>
 
 <!-- ====== TOP NAV – on index, login, register ====== -->
 <?php if (!$hide_top_nav): ?>
@@ -648,7 +826,7 @@ if ($is_logged_in && $role == 'user') {
     </div>
     <div class="nav-right">
         <?php if ($is_logged_in): ?>
-            <span class="user-badge"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['user_name'] ?? 'User') ?></span>
+            <span class="user-badge"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['name'] ?? $_SESSION['user_name'] ?? 'User') ?></span>
             <a href="logout.php" style="color:#fca5a5;"><i class="fas fa-sign-out-alt"></i> Logout</a>
         <?php else: ?>
             <a href="login.php" class="btn-login"><i class="fas fa-sign-in-alt"></i> Login</a>
@@ -835,7 +1013,14 @@ if ($is_logged_in && $role == 'user') {
         <a href="user_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
     <?php endif; ?>
 
-    <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+    <?php if ($is_impersonating): ?>
+        <a href="admin_exit_impersonation.php" class="logout-link" style="color:#d97706 !important;">
+            <i class="fas fa-sign-out-alt" style="color:#d97706 !important;"></i> 
+            <span>Exit Impersonation</span>
+        </a>
+    <?php else: ?>
+        <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -851,7 +1036,7 @@ if ($is_logged_in && $role == 'user') {
             <div class="user-info">
                 <i class="fas fa-user-circle" style="font-size:32px; <?= ($role=='admin')?'color:#1e3a8a;':(($role=='sales')?'color:#f59e0b;':'color:#10b981;') ?>"></i>
                 <div>
-                    <div class="name"><?= htmlspecialchars($_SESSION['user_name'] ?? 'User') ?>
+                    <div class="name"><?= htmlspecialchars($_SESSION['name'] ?? $_SESSION['user_name'] ?? 'User') ?>
                         <span class="badge-role badge <?= ($role=='admin')?'bg-primary':(($role=='sales')?'badge-sales':'bg-success') ?>"><?= strtoupper($role) ?></span>
                     </div>
                     <?php if ($role == 'user'): ?>
@@ -965,6 +1150,39 @@ document.addEventListener('DOMContentLoaded', function() {
         setInterval(updateTimer, 60000);
     }
 });
+
+// 🔥 Impersonation: Auto-inject imp=1 into all links and forms
+<?php if ($is_impersonating): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inject into links
+    document.querySelectorAll('a[href]').forEach(function(a) {
+        var href = a.getAttribute('href');
+        if (!href) return;
+        if (href.startsWith('#')) return;
+        if (href.startsWith('javascript:')) return;
+        if (href.startsWith('http://') || href.startsWith('https://')) return;
+        if (href.includes('imp=1')) return;
+        if (href.includes('admin_exit_impersonation.php')) return;
+        if (href.includes('logout.php')) return;
+        
+        var sep = href.includes('?') ? '&' : '?';
+        a.setAttribute('href', href + sep + 'imp=1');
+    });
+    
+    // Inject into forms
+    document.querySelectorAll('form').forEach(function(f) {
+        if (f.querySelector('input[name="imp"]')) return;
+        var method = (f.getAttribute('method') || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'POST') return;
+        
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'imp';
+        input.value = '1';
+        f.appendChild(input);
+    });
+});
+<?php endif; ?>
 </script>
 
 </body>
