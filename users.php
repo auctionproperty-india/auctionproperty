@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (Fixed: Role + Data Clean + Free Income Toggle + Status Toggle)
+// 👥 User Management – Admin Panel (with Login as User button)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -20,9 +20,6 @@ if (!function_exists('safeDateFormat')) {
     }
 }
 
-// ============================================================
-// 🔥 HELPER: Detect Error Text (Data Corruption Fix)
-// ============================================================
 function cleanDisplayValue($value, $fallback = 'N/A') {
     if (empty($value)) return $fallback;
     $value = trim((string)$value);
@@ -41,9 +38,6 @@ function cleanDisplayValue($value, $fallback = 'N/A') {
     return $value;
 }
 
-// ============================================================
-// 🔥 HELPER: Get User Role Label
-// ============================================================
 function getUserRoleLabel($user) {
     $role = strtolower($user['role'] ?? 'user');
     $isSuper = !empty($user['is_super_admin']);
@@ -60,7 +54,6 @@ function getUserRoleLabel($user) {
     return ['label' => 'User', 'class' => 'badge-role-user'];
 }
 
-// ---- Handle Actions ----
 $message = '';
 $message_type = '';
 
@@ -91,14 +84,12 @@ if (isset($_GET['toggle_block']) && is_numeric($_GET['toggle_block'])) {
     }
 }
 
-// 🔥 Handle Free User Income Toggle (FIXED: Using 1/0 instead of true/false)
 if (isset($_GET['toggle_free_income']) && is_numeric($_GET['toggle_free_income'])) {
     $id = (int)$_GET['toggle_free_income'];
     $stmt = $pdo->prepare("SELECT free_user_income_enabled FROM users WHERE id = ?");
     $stmt->execute([$id]);
     $user = $stmt->fetch();
     if ($user) {
-        // PostgreSQL के लिए true/false की जगह 1/0 पास करें
         $new_status = ($user['free_user_income_enabled']) ? 0 : 1; 
         $stmt = $pdo->prepare("UPDATE users SET free_user_income_enabled = ? WHERE id = ?");
         $stmt->execute([$new_status, $id]);
@@ -107,7 +98,6 @@ if (isset($_GET['toggle_free_income']) && is_numeric($_GET['toggle_free_income']
     }
 }
 
-// ---- Search & Filter ----
 $search = trim($_GET['search'] ?? '');
 $referral_filter = trim($_GET['referral_filter'] ?? 'all');
 
@@ -200,7 +190,6 @@ include 'header.php';
         border-radius: 6px;
         margin-right: 2px;
     }
-
     .badge-status {
         padding: 3px 10px;
         border-radius: 30px;
@@ -211,7 +200,6 @@ include 'header.php';
     .badge-status.active { background: #dcfce7; color: #166534; }
     .badge-status.inactive { background: #fee2e2; color: #991b1b; }
     .badge-status.blocked { background: #fef3c7; color: #92400e; }
-
     .badge-referrer {
         font-size: 0.7rem;
         background: #eef2ff;
@@ -225,19 +213,15 @@ include 'header.php';
         white-space: nowrap;
         vertical-align: middle;
     }
-
     .badge-role-super { background: linear-gradient(135deg, #dc2626, #b91c1c); color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; white-space: nowrap; }
     .badge-role-subadmin { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; white-space: nowrap; }
     .badge-role-sales { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; white-space: nowrap; }
     .badge-role-user { background: #64748b; color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; white-space: nowrap; }
-
     .badge-package { background: #2563eb; color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; }
     .badge-package-free { background: #94a3b8; color: #fff; padding: 3px 10px; border-radius: 30px; font-size: 0.68rem; font-weight: 700; display: inline-block; }
     .badge-coins { background: #fbbf24; color: #0f172a; padding: 3px 10px; border-radius: 30px; font-size: 0.7rem; font-weight: 700; display: inline-block; }
-
     .date-stack { font-size: 0.75rem; line-height: 1.4; }
     .date-stack .lbl { color: #94a3b8; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
-
     .search-box {
         background: #fff;
         padding: 14px 18px;
@@ -266,14 +250,11 @@ include 'header.php';
         font-size: 0.85rem;
     }
     .search-box select:focus { outline: none; border-color: #2563eb; }
-
     @media (max-width: 768px) {
         .user-table { font-size: 0.75rem; }
         .user-table th { font-size: 0.62rem; padding: 8px 5px; }
         .user-table td { padding: 8px 5px; }
     }
-    
-    /* 🔥 Custom style for Free Income Toggle */
     .toggle-badge {
         cursor: pointer;
         padding: 4px 12px;
@@ -283,16 +264,8 @@ include 'header.php';
         display: inline-block;
         transition: all 0.2s;
     }
-    .toggle-badge.on {
-        background: #10b981;
-        color: #fff;
-        box-shadow: 0 2px 5px rgba(16,185,129,0.4);
-    }
-    .toggle-badge.off {
-        background: #e2e8f0;
-        color: #475569;
-        border: 1px solid #cbd5e1;
-    }
+    .toggle-badge.on { background: #10b981; color: #fff; box-shadow: 0 2px 5px rgba(16,185,129,0.4); }
+    .toggle-badge.off { background: #e2e8f0; color: #475569; border: 1px solid #cbd5e1; }
 </style>
 
 <div class="container-fluid">
@@ -304,13 +277,11 @@ include 'header.php';
     <div class="search-box">
         <form method="GET" class="d-flex gap-2 flex-wrap align-items-center w-100">
             <input type="text" name="search" placeholder="🔍 Search name, email, phone..." value="<?= htmlspecialchars($search ?? '') ?>">
-
             <select name="referral_filter">
                 <option value="all" <?= ($referral_filter == 'all') ? 'selected' : '' ?>>All Users</option>
                 <option value="with_referrer" <?= ($referral_filter == 'with_referrer') ? 'selected' : '' ?>>With Referrer</option>
                 <option value="without_referrer" <?= ($referral_filter == 'without_referrer') ? 'selected' : '' ?>>⚠️ Without Referrer</option>
             </select>
-
             <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3"><i class="fas fa-search"></i> Search</button>
             <?php if (!empty($search) || $referral_filter != 'all'): ?>
                 <a href="users.php" class="btn btn-secondary btn-sm rounded-pill px-3"><i class="fas fa-times"></i> Clear</a>
@@ -399,7 +370,6 @@ include 'header.php';
                             <?php endif; ?>
                         </td>
 
-                        <!-- 🔥 Free User Income Toggle (ON/OFF) -->
                         <td>
                             <?php if (empty($user['package_name'])): ?>
                                 <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" class="text-decoration-none">
@@ -414,7 +384,6 @@ include 'header.php';
                             <?php endif; ?>
                         </td>
 
-                        <!-- 🔥 Status Toggle Button -->
                         <td>
                             <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" 
                                class="btn btn-sm <?= ($user['status'] == 'blocked') ? 'btn-danger' : 'btn-success' ?>"
@@ -428,17 +397,23 @@ include 'header.php';
                             <span class="<?= $roleInfo['class'] ?>"><?= $roleInfo['label'] ?></span>
                         </td>
 
-                        <!-- 🔥 Actions -->
                         <td class="actions" style="text-align: right;">
+                            <!-- Edit -->
                             <a href="admin_edit_user.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-primary" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
                             
-                            <!-- Give Package Button -->
+                            <!-- Give Package -->
                             <a href="admin_give_package.php?user_id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-success" title="Give Free Package">
                                 <i class="fas fa-gift"></i>
                             </a>
 
+                            <!-- 🔥 NEW: Login as User -->
+                            <a href="javascript:void(0)" onclick="openImpersonatePopup(<?= (int)$user['id'] ?>)" class="btn btn-sm btn-warning" title="Login as User (opens in popup)">
+                                <i class="fas fa-user-secret"></i>
+                            </a>
+
+                            <!-- View Team -->
                             <a href="admin_team.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-info" title="View Team">
                                 <i class="fas fa-sitemap"></i>
                             </a>
@@ -458,5 +433,16 @@ include 'header.php';
         </div>
     </div>
 </div>
+
+<script>
+    function openImpersonatePopup(userId) {
+        if (!userId || userId == 0) return;
+        window.open(
+            'admin_login_as_user.php?user_id=' + userId, 
+            'ImpersonateUser_' + userId, 
+            'width=1280,height=800,scrollbars=yes,resizable=yes'
+        );
+    }
+</script>
 
 <?php include 'footer.php'; ?>
