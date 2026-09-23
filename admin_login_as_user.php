@@ -5,7 +5,7 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// Check if admin is logged in
+// Check if admin is logged in (in the MAIN session)
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     die("Admin access required. Please login as admin first.");
 }
@@ -27,7 +27,7 @@ if (!$user) {
     die("User not found.");
 }
 
-// Close the current admin session (PHPSESSID)
+// Close the current admin session
 session_write_close();
 
 // Start a new session with a different name (IMPERSONATE)
@@ -40,13 +40,12 @@ $_SESSION['role'] = $user['role'];
 $_SESSION['name'] = $user['name'];
 $_SESSION['email'] = $user['email'];
 $_SESSION['phone'] = $user['phone'];
-// Add any other session variables your app uses (e.g., referral_code, etc.)
 
-// Store admin info for the banner
+// Store admin info for the impersonation banner
 $_SESSION['impersonate_admin_id'] = $admin_id;
 $_SESSION['impersonate_admin_name'] = $admin_name;
 
-// Redirect to user dashboard
-header("Location: dashboard.php");
+// Redirect to user dashboard with imp=1 flag
+header("Location: user_dashboard.php?imp=1");
 exit;
 ?>
