@@ -1,39 +1,57 @@
 <?php
 // ============================================================
-// ✅ Logout – Session Destroy + Cookies Clear
+// 🚪 Logout – Properly destroys BOTH admin and impersonate sessions
 // ============================================================
 
-// Session Start करें (अगर पहले से नहीं है)
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
+// 1. First, destroy the IMPERSONATE session if URL has imp_session
+if (isset($_GET['imp_session']) && !empty($_GET['imp_session'])) {
+    $imp_id = preg_replace('/[^a-f0-9]/', '', $_GET['imp_session']);
+    if (strlen($imp_id) >= 32) {
+        ini_set('session.use_cookies', 0);
+        ini_set('session.use_only_cookies', 0);
+        session_name('IMPERSONATE');
+        session_id($imp_id);
+        session_start();
+        
+        // Delete from DB
+        try {
+            global $pdo;
+            if (isset($pdo)) {
+                $pdo->prepare("DELETE FROM sessions WHERE id = ?")->execute([$imp_id]);
+            }
+        } catch (Exception $e) {}
+        
+        $_SESSION = [];
+        session_destroy();
+    }
 }
 
-// सारे Session Variables खाली करें
-$_SESSION = array();
+// 2. Now load db.php to get the CORRECT session (PRIMEPROP_SESS)
+require_once __DIR__ . '/db.php';
 
-// अगर Session Cookie है, तो उसे Delete करें
-if (ini_get("session.use_cookies")) {
-    $params = session_get_cookie_params();
-    setcookie(
-        session_name(),
-        '',
-        time() - 42000,
-        $params["path"],
-        $params["domain"],
-        $params["secure"],
-        $params["httponly"]
-    );
+// 3. Clear all session data
+$_SESSION = [];
+
+// 4. Destroy the PRIMEPROP_SESS session from DB
+$session_id = session_id();
+if ($session_id) {
+    try {
+        $pdo->prepare("DELETE FROM sessions WHERE id = ?")->execute([$session_id]);
+    } catch (Exception $e) {}
 }
 
-// Session Destroy करें
+// 5. Destroy PHP session
 session_destroy();
 
-// Browser Cache Clear करने के लिए Headers
-header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-header("Pragma: no-cache");
-header("Expires: Thu, 01 Jan 1970 00:00:00 GMT");
+// 6. Clear ALL cookies (both admin and impersonate)
+$cookies_to_clear = ['PRIMEPROP_SESS', 'IMPERSONATE', 'PHPSESSID', 'PRIMEPROP'];
+foreach ($cookies_to_clear as $cookie_name) {
+    setcookie($cookie_name, '', time() - 3600, '/');
+    setcookie($cookie_name, '', time() - 3600, '/', '', false, true);
+    unset($_COOKIE[$cookie_name]);
+}
 
-// ✅ Home Page पर Redirect करें (यही एकमात्र बदलाव है)
-header("Location: index.php");
+// 7. Redirect to login
+header("Location: login.php");
 exit;
 ?>
