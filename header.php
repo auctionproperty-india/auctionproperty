@@ -1,22 +1,18 @@
 <?php
 // ============================================================
-// ✅ Header – Top Nav with Hamburger + Sidebar (Index, Login, Register)
-// 🔥 Dynamic Sidebar + Manage Pages Link
+// ✅ Header – Top Nav with Hamburger + Sidebar
+// 🔥 Dynamic Sidebar + Manage Pages Link + Impersonation Banner
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// Current page name
 $current_page = basename($_SERVER['PHP_SELF']);
-
-// 🔥 Show top nav on index, login, register – hide on others
 $hide_top_nav = !in_array($current_page, ['index.php', 'login.php', 'register.php']);
 
 $is_logged_in = isset($_SESSION['user_id']);
 $role = $is_logged_in ? ($_SESSION['role'] ?? 'user') : 'guest';
 
-// Super admin check
 $is_super_admin = false;
 if ($is_logged_in) {
     $stmt = $pdo->prepare("SELECT is_super_admin FROM users WHERE id = ?");
@@ -30,16 +26,10 @@ if ($is_logged_in) {
     }
 }
 
-// ---- Fetch navigation items (Menu Links) ----
 $nav_items = safeFetchAll($pdo, "SELECT * FROM navigation_items WHERE is_active = TRUE ORDER BY display_order");
-
-// ---- Fetch Dynamic Pages (About, FAQ, Contact, etc.) ----
 $dynamic_pages = safeFetchAll($pdo, "SELECT slug, title, icon FROM dynamic_pages WHERE is_active = TRUE ORDER BY display_order ASC, id ASC");
-
-// ---- Fetch social links ----
 $social_links = safeFetchAll($pdo, "SELECT * FROM social_links WHERE is_active = TRUE ORDER BY display_order");
 
-// ---- User info for top bar ----
 $reg_date = '';
 $activation_date = 'Not Active';
 $expiry_date = null;
@@ -63,6 +53,9 @@ if ($is_logged_in && $role == 'user') {
         $days_left = 0;
     }
 }
+
+// 🔥 Impersonation check
+$is_impersonating = isset($_SESSION['impersonate_admin_id']);
 ?>
 <!DOCTYPE html>
 <html>
@@ -74,7 +67,6 @@ if ($is_logged_in && $role == 'user') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* ====== Global ====== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: 'Inter', sans-serif; 
@@ -102,6 +94,48 @@ if ($is_logged_in && $role == 'user') {
             background-size: cover;
         }
 
+        /* 🔥 Impersonation Banner */
+        .impersonate-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff;
+            padding: 12px 20px;
+            text-align: center;
+            z-index: 99999;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .impersonate-banner b { color: #fff; }
+        .impersonate-banner .btn-close-imp {
+            background: rgba(255,255,255,0.25);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: #fff;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .impersonate-banner .btn-close-imp:hover {
+            background: #fff;
+            color: #d97706;
+        }
+        body.impersonate-mode { padding-top: 50px !important; }
+        body.impersonate-mode.top-nav-hidden { padding-top: 50px !important; }
+        body.impersonate-mode .sidebar { top: 50px !important; }
+        body.impersonate-mode .top-nav { top: 50px !important; }
+        body.impersonate-mode .hamburger-sidebar { top: 50px !important; }
+
         /* ====== Top Navigation – Dark Blue Gradient ====== */
         .top-nav {
             position: fixed;
@@ -117,482 +151,156 @@ if ($is_logged_in && $role == 'user') {
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             height: 70px;
         }
-        body.top-nav-hidden .top-nav {
-            display: none !important;
-        }
+        body.top-nav-hidden .top-nav { display: none !important; }
 
-        .top-nav .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .top-nav .nav-brand .brand-icon {
-            color: #fbbf24;
-            font-size: 1.8rem;
-        }
-        .top-nav .nav-brand .brand-text {
-            color: #ffffff;
-            font-weight: 700;
-            font-size: 1.4rem;
-            letter-spacing: -0.5px;
-        }
-        .top-nav .nav-brand .brand-text span {
-            color: #fbbf24;
-        }
-
-        .top-nav .hamburger {
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 2rem;
-            cursor: pointer;
-            padding: 0 8px;
-            transition: transform 0.2s;
-        }
-        .top-nav .hamburger:hover {
-            transform: scale(1.1);
-        }
-
-        .top-nav .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        .top-nav .nav-brand { display: flex; align-items: center; gap: 12px; }
+        .top-nav .nav-brand .brand-icon { color: #fbbf24; font-size: 1.8rem; }
+        .top-nav .nav-brand .brand-text { color: #ffffff; font-weight: 700; font-size: 1.4rem; letter-spacing: -0.5px; }
+        .top-nav .nav-brand .brand-text span { color: #fbbf24; }
+        .top-nav .hamburger { background: none; border: none; color: #fff; font-size: 2rem; cursor: pointer; padding: 0 8px; transition: transform 0.2s; }
+        .top-nav .hamburger:hover { transform: scale(1.1); }
+        .top-nav .nav-right { display: flex; align-items: center; gap: 10px; }
         .top-nav .nav-right a {
-            color: rgba(255,255,255,0.85);
-            text-decoration: none;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-weight: 500;
-            font-size: 0.9rem;
-            transition: all 0.3s;
+            color: rgba(255,255,255,0.85); text-decoration: none; padding: 6px 14px; border-radius: 20px;
+            font-weight: 500; font-size: 0.9rem; transition: all 0.3s;
         }
-        .top-nav .nav-right a:hover {
-            background: rgba(255,255,255,0.12);
-            color: #fff;
-        }
-        .top-nav .nav-right .btn-login {
-            background: #fbbf24;
-            color: #0f172a !important;
-            font-weight: 600;
-        }
-        .top-nav .nav-right .btn-login:hover {
-            background: #fcd34d;
-        }
-        .top-nav .nav-right .btn-register {
-            border: 1px solid rgba(255,255,255,0.3);
-        }
-        .top-nav .nav-right .btn-register:hover {
-            background: rgba(255,255,255,0.1);
-        }
-        .top-nav .nav-right .user-badge {
-            color: rgba(255,255,255,0.9);
-            font-size: 0.9rem;
-        }
-        .top-nav .nav-right .user-badge i {
-            color: #fbbf24;
-        }
-
+        .top-nav .nav-right a:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .top-nav .nav-right .btn-login { background: #fbbf24; color: #0f172a !important; font-weight: 600; }
+        .top-nav .nav-right .btn-login:hover { background: #fcd34d; }
+        .top-nav .nav-right .btn-register { border: 1px solid rgba(255,255,255,0.3); }
+        .top-nav .nav-right .btn-register:hover { background: rgba(255,255,255,0.1); }
+        .top-nav .nav-right .user-badge { color: rgba(255,255,255,0.9); font-size: 0.9rem; }
+        .top-nav .nav-right .user-badge i { color: #fbbf24; }
         @media (max-width: 768px) {
             .top-nav .nav-brand .brand-text { font-size: 1.1rem; }
             .top-nav .nav-right a { font-size: 0.8rem; padding: 4px 10px; }
         }
 
-        /* ====== Hamburger Sidebar (Off-canvas) ====== */
+        /* ====== Hamburger Sidebar ====== */
         .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1050;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1050;
         }
         .sidebar-overlay.show { display: block; }
-
         .hamburger-sidebar {
-            position: fixed;
-            top: 0;
-            left: -320px;
-            width: 320px;
-            height: 100%;
-            background: #ffffff;
-            z-index: 1060;
-            transition: left 0.3s ease-in-out;
-            box-shadow: 2px 0 20px rgba(0,0,0,0.15);
-            padding: 25px 20px;
-            overflow-y: auto;
+            position: fixed; top: 0; left: -320px; width: 320px; height: 100%;
+            background: #ffffff; z-index: 1060; transition: left 0.3s ease-in-out;
+            box-shadow: 2px 0 20px rgba(0,0,0,0.15); padding: 25px 20px; overflow-y: auto;
         }
-        .hamburger-sidebar.open {
-            left: 0;
-        }
+        .hamburger-sidebar.open { left: 0; }
         .hamburger-sidebar .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px;
         }
-        .hamburger-sidebar .sidebar-header .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.8rem;
-            color: #475569;
-            cursor: pointer;
-        }
-        .hamburger-sidebar .sidebar-header .brand-small {
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: #1e293b;
-        }
-        .hamburger-sidebar .sidebar-header .brand-small i {
-            color: #1e3a8a;
-        }
-
-        .hamburger-sidebar .nav-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .hamburger-sidebar .nav-list li {
-            margin: 4px 0;
-        }
+        .hamburger-sidebar .sidebar-header .close-btn { background: none; border: none; font-size: 1.8rem; color: #475569; cursor: pointer; }
+        .hamburger-sidebar .sidebar-header .brand-small { font-weight: 700; font-size: 1.2rem; color: #1e293b; }
+        .hamburger-sidebar .sidebar-header .brand-small i { color: #1e3a8a; }
+        .hamburger-sidebar .nav-list { list-style: none; padding: 0; margin: 0; }
+        .hamburger-sidebar .nav-list li { margin: 4px 0; }
         .hamburger-sidebar .nav-list li a {
-            display: block;
-            padding: 12px 16px;
-            color: #475569;
-            text-decoration: none;
-            border-radius: 10px;
-            font-weight: 500;
-            transition: all 0.2s;
+            display: block; padding: 12px 16px; color: #475569; text-decoration: none;
+            border-radius: 10px; font-weight: 500; transition: all 0.2s;
         }
-        .hamburger-sidebar .nav-list li a:hover {
-            background: #f1f5f9;
-            color: #1e3a8a;
-        }
-        .hamburger-sidebar .nav-list li a i {
-            width: 28px;
-            color: #94a3b8;
-            margin-right: 10px;
-        }
-
-        /* 🔥 Auth links */
-        .hamburger-sidebar .auth-links {
-            margin-top: 20px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 15px;
-        }
+        .hamburger-sidebar .nav-list li a:hover { background: #f1f5f9; color: #1e3a8a; }
+        .hamburger-sidebar .nav-list li a i { width: 28px; color: #94a3b8; margin-right: 10px; }
+        .hamburger-sidebar .auth-links { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
         .hamburger-sidebar .auth-links a {
-            display: block;
-            padding: 10px 16px;
-            color: #1e3a8a;
-            font-weight: 600;
-            text-decoration: none;
-            border-radius: 8px;
-            background: #f1f5f9;
-            margin-bottom: 8px;
-            text-align: center;
+            display: block; padding: 10px 16px; color: #1e3a8a; font-weight: 600;
+            text-decoration: none; border-radius: 8px; background: #f1f5f9; margin-bottom: 8px; text-align: center;
         }
-        .hamburger-sidebar .auth-links a:hover {
-            background: #1e3a8a;
-            color: #fff;
-        }
-        .hamburger-sidebar .auth-links .register-link {
-            background: #eef2ff;
-        }
-
-        .hamburger-sidebar .social-section {
-            margin-top: 30px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 20px;
-        }
-        .hamburger-sidebar .social-section h6 {
-            font-weight: 600;
-            color: #1e293b;
-            margin-bottom: 12px;
-        }
-        .hamburger-sidebar .social-section .social-icons {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
+        .hamburger-sidebar .auth-links a:hover { background: #1e3a8a; color: #fff; }
+        .hamburger-sidebar .auth-links .register-link { background: #eef2ff; }
+        .hamburger-sidebar .social-section { margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+        .hamburger-sidebar .social-section h6 { font-weight: 600; color: #1e293b; margin-bottom: 12px; }
+        .hamburger-sidebar .social-section .social-icons { display: flex; gap: 12px; flex-wrap: wrap; }
         .hamburger-sidebar .social-section .social-icons a {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #f1f5f9;
-            color: #1e293b;
-            text-decoration: none;
-            transition: all 0.2s;
-            font-size: 1.2rem;
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 40px; height: 40px; border-radius: 50%; background: #f1f5f9; color: #1e293b;
+            text-decoration: none; transition: all 0.2s; font-size: 1.2rem;
         }
-        .hamburger-sidebar .social-section .social-icons a:hover {
-            background: #1e3a8a;
-            color: #fff;
-            transform: translateY(-3px);
-        }
+        .hamburger-sidebar .social-section .social-icons a:hover { background: #1e3a8a; color: #fff; transform: translateY(-3px); }
 
-        /* ====== Existing Sidebar (for logged-in users) ====== */
+        /* ====== Existing Sidebar ====== */
         .sidebar {
-            height: 100vh;
-            width: 280px;
-            position: fixed;
-            top: 0;
-            left: 0;
-            padding: 30px 15px;
-            box-shadow: 2px 0 12px rgba(0,0,0,0.06);
-            z-index: 1050;
-            transition: transform 0.3s ease-in-out, background 0.3s;
-            overflow-y: auto;
+            height: 100vh; width: 280px; position: fixed; top: 0; left: 0;
+            padding: 30px 15px; box-shadow: 2px 0 12px rgba(0,0,0,0.06);
+            z-index: 1050; transition: transform 0.3s ease-in-out, background 0.3s; overflow-y: auto;
         }
-        body:not(.top-nav-hidden) .sidebar {
-            top: 70px;
-        }
-        body.top-nav-hidden .sidebar {
-            top: 0;
-        }
-        body.role-admin .sidebar {
-            background: #ffffff;
-            color: #1e293b;
-            border-right: 1px solid #e2e8f0;
-        }
-        body.role-user .sidebar {
-            background: #ffffff;
-            color: #334155;
-            border-right: 1px solid #e2e8f0;
-        }
-        body.role-sales .sidebar {
-            background: #ffffff;
-            color: #334155;
-            border-right: 1px solid #e2e8f0;
-        }
-
+        body:not(.top-nav-hidden) .sidebar { top: 70px; }
+        body.top-nav-hidden .sidebar { top: 0; }
+        body.role-admin .sidebar { background: #ffffff; color: #1e293b; border-right: 1px solid #e2e8f0; }
+        body.role-user .sidebar { background: #ffffff; color: #334155; border-right: 1px solid #e2e8f0; }
+        body.role-sales .sidebar { background: #ffffff; color: #334155; border-right: 1px solid #e2e8f0; }
         @media (max-width: 991px) {
-            .sidebar {
-                transform: translateX(-100%);
-                top: 0 !important;
-            }
-            .sidebar.show {
-                transform: translateX(0);
-            }
+            .sidebar { transform: translateX(-100%); top: 0 !important; }
+            .sidebar.show { transform: translateX(0); }
         }
         @media (min-width: 992px) {
-            .sidebar {
-                transform: translateX(0) !important;
-            }
+            .sidebar { transform: translateX(0) !important; }
         }
-
         .sidebar .brand {
-            font-size: 24px;
-            font-weight: 800;
-            text-align: center;
-            padding-bottom: 25px;
-            border-bottom: 1px solid #e2e8f0;
-            margin-bottom: 25px;
-            letter-spacing: 1px;
-            color: #1e293b;
+            font-size: 24px; font-weight: 800; text-align: center; padding-bottom: 25px;
+            border-bottom: 1px solid #e2e8f0; margin-bottom: 25px; letter-spacing: 1px; color: #1e293b;
         }
         .sidebar .brand i { color: #1e3a8a; }
-
         .sidebar a {
-            display: flex;
-            align-items: center;
-            padding: 12px 20px;
-            margin: 4px 0;
-            text-decoration: none;
-            border-radius: 12px;
-            font-weight: 500;
-            font-size: 15px;
-            transition: all 0.3s ease;
-            border-left: 3px solid transparent;
-            color: #475569;
+            display: flex; align-items: center; padding: 12px 20px; margin: 4px 0;
+            text-decoration: none; border-radius: 12px; font-weight: 500; font-size: 15px;
+            transition: all 0.3s ease; border-left: 3px solid transparent; color: #475569;
         }
-        .sidebar a i {
-            width: 28px;
-            font-size: 18px;
-            transition: all 0.3s;
-            color: #94a3b8;
-        }
-        .sidebar a:hover {
-            background: #f1f5f9;
-            color: #1e3a8a;
-        }
+        .sidebar a i { width: 28px; font-size: 18px; transition: all 0.3s; color: #94a3b8; }
+        .sidebar a:hover { background: #f1f5f9; color: #1e3a8a; }
         .sidebar a:hover i { color: #1e3a8a; }
-        .sidebar a.active {
-            background: #eef2ff;
-            color: #1e3a8a;
-            border-left-color: #1e3a8a;
-        }
+        .sidebar a.active { background: #eef2ff; color: #1e3a8a; border-left-color: #1e3a8a; }
         .sidebar a.active i { color: #1e3a8a; }
-
-        .sidebar .logout-link {
-            margin-top: 30px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 20px;
-            color: #dc2626 !important;
-        }
+        .sidebar .logout-link { margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; color: #dc2626 !important; }
         .sidebar .logout-link i { color: #dc2626 !important; }
-        .sidebar .logout-link:hover {
-            background: #fef2f2 !important;
-            color: #b91c1c !important;
-        }
-
+        .sidebar .logout-link:hover { background: #fef2f2 !important; color: #b91c1c !important; }
         .sidebar-overlay-main {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.4);
-            z-index: 1040;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); z-index: 1040;
         }
         .sidebar-overlay-main.show { display: block; }
 
         /* ====== Main Content ====== */
-        .main-content {
-            padding: 30px 35px;
-            min-height: 100vh;
-            transition: margin-left 0.3s;
-        }
-        body.role-admin .main-content {
-            padding-top: 0 !important;
-        }
-        body.role-admin .main-content,
-        body.role-user .main-content,
-        body.role-sales .main-content {
-            margin-left: 280px;
-        }
-        body.role-guest .main-content {
-            margin-left: 0 !important;
-        }
+        .main-content { padding: 30px 35px; min-height: 100vh; transition: margin-left 0.3s; }
+        body.role-admin .main-content { padding-top: 0 !important; }
+        body.role-admin .main-content, body.role-user .main-content, body.role-sales .main-content { margin-left: 280px; }
+        body.role-guest .main-content { margin-left: 0 !important; }
         @media (max-width: 991px) {
-            .main-content {
-                margin-left: 0 !important;
-                padding: 15px;
-            }
+            .main-content { margin-left: 0 !important; padding: 15px; }
         }
 
-        /* ====== Top Bar (User Info) ====== */
+        /* ====== Top Bar ====== */
         .top-bar {
-            padding: 15px 20px;
-            border-radius: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-            gap: 10px;
-            background: #ffffff;
-            border: 1px solid rgba(0,0,0,0.02);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-            color: #0f172a;
+            padding: 15px 20px; border-radius: 20px; display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 10px;
+            background: #ffffff; border: 1px solid rgba(0,0,0,0.02);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); color: #0f172a;
         }
-        body.role-admin .top-bar {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            color: #1e293b;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            margin-bottom: 10px;
-        }
-        body.role-sales .top-bar {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            color: #1e293b;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            margin-bottom: 10px;
-        }
+        body.role-admin .top-bar { background: #ffffff; border: 1px solid #e2e8f0; color: #1e293b; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 10px; }
+        body.role-sales .top-bar { background: #ffffff; border: 1px solid #e2e8f0; color: #1e293b; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 10px; }
         .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
         .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
-        body.role-admin .top-bar .user-info .name { color: #0f172a; }
-        body.role-user .top-bar .user-info .name { color: #0f172a; }
-        body.role-sales .top-bar .user-info .name { color: #0f172a; }
-        .top-bar .badge-role {
-            padding: 4px 14px;
-            border-radius: 30px;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .top-bar .user-dates {
-            font-size: 0.75rem;
-            opacity: 0.7;
-            margin-top: 2px;
-            color: inherit;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-        }
+        .top-bar .badge-role { padding: 4px 14px; border-radius: 30px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+        .top-bar .user-dates { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; color: inherit; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         .top-bar .countdown-timer {
-            font-weight: 700 !important;
-            color: #dc3545 !important;
-            background: rgba(220, 53, 69, 0.1);
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
+            font-weight: 700 !important; color: #dc3545 !important; background: rgba(220, 53, 69, 0.1);
+            padding: 2px 12px; border-radius: 20px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;
         }
-        .hamburger-btn {
-            background: transparent;
-            border: none;
-            font-size: 28px;
-            padding: 5px 10px;
-            cursor: pointer;
-            display: inline-block;
-        }
+        .hamburger-btn { background: transparent; border: none; font-size: 28px; padding: 5px 10px; cursor: pointer; display: inline-block; }
         body.role-admin .hamburger-btn { color: #1e293b; }
         body.role-user .hamburger-btn { color: #1e293b; }
         body.role-sales .hamburger-btn { color: #1e293b; }
-        @media (min-width: 992px) {
-            .hamburger-btn {
-                display: none !important;
-            }
-        }
+        @media (min-width: 992px) { .hamburger-btn { display: none !important; } }
 
         /* ====== Cards ====== */
-        .card-premium {
-            border-radius: 20px;
-            border: none;
-            padding: 20px 24px;
-            margin-bottom: 20px;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        body.role-admin .card-premium {
-            background: #ffffff;
-            color: #0f172a;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            border: 1px solid #e2e8f0;
-        }
-        body.role-user .card-premium {
-            background: #ffffff;
-            color: #0f172a;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
-        }
-        body.role-sales .card-premium {
-            background: #ffffff;
-            color: #0f172a;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
-        }
+        .card-premium { border-radius: 20px; border: none; padding: 20px 24px; margin-bottom: 20px; transition: transform 0.2s, box-shadow 0.2s; }
+        body.role-admin .card-premium { background: #ffffff; color: #0f172a; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; }
+        body.role-user .card-premium { background: #ffffff; color: #0f172a; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
+        body.role-sales .card-premium { background: #ffffff; color: #0f172a; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
         .card-premium:hover { transform: translateY(-2px); box-shadow: 0 20px 30px -10px rgba(0,0,0,0.08); }
-        .stat-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            flex-shrink: 0;
-        }
+        .stat-icon { width: 50px; height: 50px; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
         body.role-admin .stat-icon.bg-soft-primary { background: #eef2ff; color: #1e3a8a; }
         body.role-admin .stat-icon.bg-soft-success { background: #dcfce7; color: #166534; }
         body.role-admin .stat-icon.bg-soft-warning { background: #fef3c7; color: #92400e; }
@@ -608,10 +316,7 @@ if ($is_logged_in && $role == 'user') {
         .btn-sm { padding: 5px 10px; font-size: 12px; }
         .user-welcome-banner {
             background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
-            border-radius: 24px;
-            padding: 30px;
-            color: white;
-            margin-bottom: 25px;
+            border-radius: 24px; padding: 30px; color: white; margin-bottom: 25px;
             box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3);
         }
         .user-welcome-banner h2 { font-weight: 800; }
@@ -624,7 +329,7 @@ if ($is_logged_in && $role == 'user') {
         .badge-sales { background: #f59e0b; color: #000; }
     </style>
 </head>
-<body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>"
+<body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= $is_impersonating ? 'impersonate-mode' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>"
       oncontextmenu="var tag = event.target.tagName; if(tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return false;"
       onkeydown="
         var tag = event.target.tagName;
@@ -634,6 +339,20 @@ if ($is_logged_in && $role == 'user') {
         if (event.ctrlKey && (event.key === 'u' || event.key === 's' || event.key === 'p')) return false;
         if (event.ctrlKey && event.shiftKey && (event.key === 'I' || event.key === 'J' || event.key === 'C')) return false;
       ">
+
+<!-- 🔥 IMPERSONATION BANNER -->
+<?php if ($is_impersonating): ?>
+<div class="impersonate-banner">
+    <span>
+        <i class="fas fa-user-secret"></i> 
+        You are logged in as <b><?= htmlspecialchars($_SESSION['name'] ?? 'User') ?></b> (User #<?= $_SESSION['user_id'] ?>)
+        <span style="opacity:0.85;">(Original Admin: <?= htmlspecialchars($_SESSION['impersonate_admin_name'] ?? 'Admin') ?>)</span>
+    </span>
+    <button class="btn-close-imp" onclick="window.close()">
+        <i class="fas fa-times"></i> Close & Return to Admin
+    </button>
+</div>
+<?php endif; ?>
 
 <!-- ====== TOP NAV – on index, login, register ====== -->
 <?php if (!$hide_top_nav): ?>
@@ -656,7 +375,6 @@ if ($is_logged_in && $role == 'user') {
     </div>
 </nav>
 
-<!-- ====== HAMBURGER SIDEBAR (🔥 DYNAMIC) ====== -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="hamburger-sidebar" id="hamburgerSidebar">
     <div class="sidebar-header">
@@ -665,27 +383,14 @@ if ($is_logged_in && $role == 'user') {
     </div>
     <ul class="nav-list">
         <?php 
-        // 🔥 Priority 1: Dynamic Pages (Admin से Manage होते हैं)
         if (!empty($dynamic_pages)):
             foreach ($dynamic_pages as $page): ?>
-                <li>
-                    <a href="page.php?slug=<?= urlencode($page['slug']) ?>">
-                        <i class="fas <?= htmlspecialchars($page['icon']) ?>"></i>
-                        <?= htmlspecialchars($page['title']) ?>
-                    </a>
-                </li>
+                <li><a href="page.php?slug=<?= urlencode($page['slug']) ?>"><i class="fas <?= htmlspecialchars($page['icon']) ?>"></i><?= htmlspecialchars($page['title']) ?></a></li>
             <?php endforeach;
-        // 🔥 Priority 2: Navigation Items (अगर Dynamic Pages खाली हैं)
         elseif (!empty($nav_items)):
             foreach ($nav_items as $item): ?>
-                <li>
-                    <a href="<?= htmlspecialchars($item['url']) ?>">
-                        <?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?>
-                        <?= htmlspecialchars($item['label']) ?>
-                    </a>
-                </li>
+                <li><a href="<?= htmlspecialchars($item['url']) ?>"><?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?><?= htmlspecialchars($item['label']) ?></a></li>
             <?php endforeach;
-        // 🔥 Priority 3: Fallback Default Links
         else: ?>
             <li><a href="index.php"><i class="fas fa-home"></i> Home</a></li>
             <li><a href="index.php?tab=auction"><i class="fas fa-gavel"></i> Auctions</a></li>
@@ -695,24 +400,18 @@ if ($is_logged_in && $role == 'user') {
             <li><a href="page.php?slug=contact"><i class="fas fa-envelope"></i> Contact</a></li>
         <?php endif; ?>
     </ul>
-    
-    <!-- Auth links for non-logged users -->
     <?php if (!$is_logged_in): ?>
     <div class="auth-links">
         <a href="login.php"><i class="fas fa-sign-in-alt me-2"></i>Login</a>
         <a href="register.php" class="register-link"><i class="fas fa-user-plus me-2"></i>Create Account</a>
     </div>
     <?php endif; ?>
-    
-    <!-- Social Links -->
     <div class="social-section">
         <h6><i class="fas fa-share-alt me-2"></i>Follow Us</h6>
         <div class="social-icons">
             <?php if (!empty($social_links)): ?>
                 <?php foreach ($social_links as $social): ?>
-                    <a href="<?= htmlspecialchars($social['url']) ?>" target="_blank" title="<?= htmlspecialchars($social['platform']) ?>">
-                        <i class="<?= htmlspecialchars($social['icon_class']) ?>"></i>
-                    </a>
+                    <a href="<?= htmlspecialchars($social['url']) ?>" target="_blank" title="<?= htmlspecialchars($social['platform']) ?>"><i class="<?= htmlspecialchars($social['icon_class']) ?>"></i></a>
                 <?php endforeach; ?>
             <?php else: ?>
                 <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
@@ -724,80 +423,60 @@ if ($is_logged_in && $role == 'user') {
 </div>
 <?php endif; ?>
 
-<!-- ====== EXISTING SIDEBAR (for logged-in users) ====== -->
+<!-- ====== EXISTING SIDEBAR ====== -->
 <?php if ($is_logged_in): ?>
 <div class="sidebar-overlay-main" id="sidebarOverlayMain" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
 
     <?php if ($role == 'admin'): ?>
-        <!-- ADMIN SIDEBAR -->
         <a href="admin_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        
         <?php if (hasViewPermission('properties', $pdo)): ?>
             <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
             <a href="bulk_upload_properties.php"><i class="fas fa-file-upload"></i> <span>Bulk Upload Properties</span></a>
         <?php endif; ?>
-        
         <?php if ($is_super_admin): ?>
             <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
             <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
             <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
         <?php endif; ?>
-        
-        <!-- 🔥 NEW: Manage Pages Link -->
         <a href="admin_pages.php"><i class="fas fa-file-alt"></i> <span>Manage Pages</span></a>
-        
         <?php if (hasViewPermission('packages', $pdo)): ?>
             <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
         <?php endif; ?>
-        
         <?php if (hasViewPermission('subscriptions', $pdo)): ?>
             <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
             <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
         <?php endif; ?>
-        
         <?php if (hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
-        
         <?php if (hasViewPermission('deductions', $pdo)): ?>
             <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
         <?php endif; ?>
-        
         <?php if (hasViewPermission('activity_logs', $pdo)): ?>
             <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
         <?php endif; ?>
-        
         <?php if (hasViewPermission('accounting', $pdo)): ?>
             <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
         <?php endif; ?>
-        
         <?php if (hasViewPermission('settings', $pdo)): ?>
             <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
         <?php endif; ?>
-        
         <a href="admin_spin_settings.php"><i class="fas fa-cog"></i> <span>Spin Settings</span></a>
-        
         <?php if (hasViewPermission('kyc', $pdo)): ?>
             <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
         <?php endif; ?>
-        
         <?php if (hasViewPermission('support', $pdo)): ?>
             <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
         <?php endif; ?>
-        
         <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
         <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
-        
         <?php if ($is_super_admin): ?>
             <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
         <?php endif; ?>
-        
         <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
         <a href="admin_social_links.php"><i class="fas fa-share-alt"></i> <span>Social Links</span></a>
-        
-        <!-- Notification Manager Link -->
         <a href="admin_notification.php">
             <i class="fas fa-bullhorn"></i> 
             <span>Manage Popup Notification</span>
@@ -805,9 +484,7 @@ if ($is_logged_in && $role == 'user') {
                 <span class="badge bg-danger ms-2"><?= $notif_count ?></span>
             <?php endif; ?>
         </a>
-
     <?php elseif ($role == 'sales'): ?>
-        <!-- SALES SIDEBAR -->
         <a href="sales_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
         <a href="sales_lead_upload.php"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
@@ -815,16 +492,11 @@ if ($is_logged_in && $role == 'user') {
         <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
         <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
         <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
-
     <?php else: ?>
-        <!-- USER SIDEBAR -->
         <a href="user_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
-        <a href="my_earnings.php" class="nav-link">
-    <i class="fas fa-file-invoice-dollar"></i>
-    <span>My Earnings</span>
-</a>
+        <a href="my_earnings.php" class="nav-link"><i class="fas fa-file-invoice-dollar"></i><span>My Earnings</span></a>
         <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
         <a href="user_referrals.php"><i class="fas fa-link"></i> <span>Referrals</span></a>
         <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
@@ -834,13 +506,19 @@ if ($is_logged_in && $role == 'user') {
         <a href="user_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
     <?php endif; ?>
 
-    <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+    <?php if ($is_impersonating): ?>
+        <a href="javascript:void(0)" onclick="window.close()" class="logout-link" style="color:#d97706 !important;">
+            <i class="fas fa-sign-out-alt" style="color:#d97706 !important;"></i> 
+            <span>Exit Impersonation</span>
+        </a>
+    <?php else: ?>
+        <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 
 <!-- ====== MAIN CONTENT ====== -->
 <div class="main-content">
-    <!-- Top Bar (User Info) -->
     <?php if ($is_logged_in): ?>
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
@@ -850,7 +528,7 @@ if ($is_logged_in && $role == 'user') {
             <div class="user-info">
                 <i class="fas fa-user-circle" style="font-size:32px; <?= ($role=='admin')?'color:#1e3a8a;':(($role=='sales')?'color:#f59e0b;':'color:#10b981;') ?>"></i>
                 <div>
-                    <div class="name"><?= htmlspecialchars($_SESSION['user_name']) ?>
+                    <div class="name"><?= htmlspecialchars($_SESSION['user_name'] ?? $_SESSION['name'] ?? 'User') ?>
                         <span class="badge-role badge <?= ($role=='admin')?'bg-primary':(($role=='sales')?'badge-sales':'bg-success') ?>"><?= strtoupper($role) ?></span>
                     </div>
                     <?php if ($role == 'user'): ?>
@@ -903,7 +581,6 @@ if ($is_logged_in && $role == 'user') {
 
 <!-- ====== SIDEBAR TOGGLE SCRIPTS ====== -->
 <script>
-// Toggle hamburger sidebar
 document.addEventListener('DOMContentLoaded', function() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const sidebar = document.getElementById('hamburgerSidebar');
@@ -930,7 +607,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (overlay) overlay.addEventListener('click', closeSidebar);
 });
 
-// Toggle main sidebar (for logged-in users)
 function toggleSidebar() {
     const sidebar = document.getElementById('mainSidebar');
     const overlay = document.getElementById('sidebarOverlayMain');
@@ -946,7 +622,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Countdown timer
 document.addEventListener('DOMContentLoaded', function() {
     const countdownEl = document.getElementById('countdownDisplay');
     if (countdownEl && countdownEl.dataset.expiry) {
@@ -964,6 +639,39 @@ document.addEventListener('DOMContentLoaded', function() {
         setInterval(updateTimer, 60000);
     }
 });
+
+// 🔥 Impersonation: Inject imp=1 into all links and forms
+<?php if ($is_impersonating): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inject into links
+    document.querySelectorAll('a[href]').forEach(function(a) {
+        var href = a.getAttribute('href');
+        if (!href) return;
+        if (href.startsWith('#')) return;
+        if (href.startsWith('javascript:')) return;
+        if (href.startsWith('http://') || href.startsWith('https://')) return;
+        if (href.includes('imp=1')) return;
+        if (href.includes('logout.php')) return;
+        if (href.includes('admin_login_as_user.php')) return;
+        
+        var sep = href.includes('?') ? '&' : '?';
+        a.setAttribute('href', href + sep + 'imp=1');
+    });
+    
+    // Inject into forms
+    document.querySelectorAll('form').forEach(function(f) {
+        if (f.querySelector('input[name="imp"]')) return;
+        var method = (f.getAttribute('method') || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'POST') return;
+        
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'imp';
+        input.value = '1';
+        f.appendChild(input);
+    });
+});
+<?php endif; ?>
 </script>
 
 </body>
