@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (with Login as User button)
+// 👥 User Management – Admin Panel (with Login as User)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -322,7 +322,6 @@ include 'header.php';
                     <?php foreach ($users as $user): ?>
                     <tr>
                         <td><strong>#<?= htmlspecialchars($user['id'] ?? '') ?></strong></td>
-
                         <td>
                             <div style="font-weight: 700; color: #0f172a;">
                                 <?= htmlspecialchars(cleanDisplayValue($user['name'] ?? '', 'Unknown')) ?>
@@ -331,17 +330,14 @@ include 'header.php';
                                 <?= htmlspecialchars(cleanDisplayValue($user['email'] ?? '', 'N/A')) ?>
                             </div>
                         </td>
-
                         <td>
                             <div style="font-size: 0.78rem;">
                                 <?= htmlspecialchars(cleanDisplayValue($user['phone'] ?? '', 'N/A')) ?>
                             </div>
                         </td>
-
                         <td>
                             <span class="badge-coins">🪙 <?= number_format($user['user_coins'] ?? 0) ?></span>
                         </td>
-
                         <td>
                             <?php if (!empty($user['referrer_name']) || !empty($user['referrer_email'])): ?>
                                 <span class="badge-referrer" title="<?= htmlspecialchars(cleanDisplayValue($user['referrer_name'] ?? '', $user['referrer_email'] ?? '')) ?>">
@@ -351,14 +347,12 @@ include 'header.php';
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
-
                         <td>
                             <div class="date-stack">
                                 <div><span class="lbl">Reg:</span> <?= safeDateFormat($user['created_at'] ?? '') ?></div>
                                 <div><span class="lbl">Act:</span> <?= safeDateFormat($user['activation_date'] ?? '') ?></div>
                             </div>
                         </td>
-
                         <td>
                             <?php if (!empty($user['package_name'])): ?>
                                 <div><span class="badge-package"><?= htmlspecialchars($user['package_name']) ?></span></div>
@@ -369,7 +363,6 @@ include 'header.php';
                                 <span class="badge-package-free">Free</span>
                             <?php endif; ?>
                         </td>
-
                         <td>
                             <?php if (empty($user['package_name'])): ?>
                                 <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" class="text-decoration-none">
@@ -383,7 +376,6 @@ include 'header.php';
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
-
                         <td>
                             <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" 
                                class="btn btn-sm <?= ($user['status'] == 'blocked') ? 'btn-danger' : 'btn-success' ?>"
@@ -391,33 +383,23 @@ include 'header.php';
                                 <?= ($user['status'] == 'blocked') ? 'Blocked' : 'Active' ?>
                             </a>
                         </td>
-
                         <td>
                             <?php $roleInfo = getUserRoleLabel($user); ?>
                             <span class="<?= $roleInfo['class'] ?>"><?= $roleInfo['label'] ?></span>
                         </td>
-
                         <td class="actions" style="text-align: right;">
-                            <!-- Edit -->
                             <a href="admin_edit_user.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-primary" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            
-                            <!-- Give Package -->
                             <a href="admin_give_package.php?user_id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-success" title="Give Free Package">
                                 <i class="fas fa-gift"></i>
                             </a>
-
-                            <!-- 🔥 NEW: Login as User -->
-                            <a href="javascript:void(0)" onclick="openImpersonatePopup(<?= (int)$user['id'] ?>)" class="btn btn-sm btn-warning" title="Login as User (opens in popup)">
+                            <a href="javascript:void(0)" onclick="loginAsUser(<?= (int)$user['id'] ?>)" class="btn btn-sm btn-warning" title="Login as User">
                                 <i class="fas fa-user-secret"></i>
                             </a>
-
-                            <!-- View Team -->
                             <a href="admin_team.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-info" title="View Team">
                                 <i class="fas fa-sitemap"></i>
                             </a>
-                            
                             <?php if (($user['id'] ?? 0) != $_SESSION['user_id']): ?>
                                 <a href="?delete=<?= htmlspecialchars($user['id'] ?? '') ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>"
                                    class="btn btn-sm btn-danger"
@@ -435,12 +417,12 @@ include 'header.php';
 </div>
 
 <script>
-    function openImpersonatePopup(userId) {
-        if (!userId || userId == 0) return;
+    function loginAsUser(userId) {
+        if (!userId || userId <= 0) return;
         window.open(
-            'admin_login_as_user.php?user_id=' + userId, 
-            'ImpersonateUser_' + userId, 
-            'width=1280,height=800,scrollbars=yes,resizable=yes'
+            'admin_login_as_user.php?user_id=' + userId + '&imp=1',
+            'ImpersonateUser_' + userId,
+            'width=1300,height=850,scrollbars=yes,resizable=yes'
         );
     }
 </script>
