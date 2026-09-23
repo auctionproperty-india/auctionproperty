@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // 🗄️ Database Connection – Supabase Safe (Pooler Friendly)
-// + Session Handler (Custom) + Impersonation Support
+// + Stable Session Handler (No auto-logout on code change)
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
@@ -15,13 +15,10 @@ date_default_timezone_set('Asia/Kolkata');
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
     
-    // 🔥 FIX: Supabase Pooler के लिए ज़रूरी Options
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_PERSISTENT         => false,
-        
-        // 🔥 MOST IMPORTANT: Prepared Statement Error Fix
         PDO::ATTR_EMULATE_PREPARES   => true,
     ];
     
@@ -33,7 +30,7 @@ try {
 }
 
 // ============================================================
-// 🔥 SAFE QUERY HELPERS (Auto-Retry on Statement Errors)
+// 🔥 SAFE QUERY HELPERS
 // ============================================================
 
 if (!function_exists('safeQuery')) {
@@ -125,17 +122,7 @@ if (!function_exists('safeExecute')) {
 }
 
 // ============================================================
-// 🔥 IMPERSONATION SUPPORT – Detect "Login as User" Mode
-// ============================================================
-// When admin clicks "Login as User", the popup window uses a 
-// different session name ("IMPERSONATE") so it doesn't affect
-// the main admin session. We detect this via ?imp=1 URL param.
-
-$is_impersonate_mode = (isset($_GET['imp']) && $_GET['imp'] == '1') 
-                    || (isset($_POST['imp']) && $_POST['imp'] == '1');
-
-// ============================================================
-// 🔥 SESSION HANDLER INTEGRATION
+// 🔥 SESSION HANDLER INTEGRATION (STABLE VERSION)
 // ============================================================
 
 $sessionHandlerFile = __DIR__ . '/session_handler.php';
@@ -145,25 +132,31 @@ if (file_exists($sessionHandlerFile)) {
     
     if (class_exists('DatabaseSessionHandler')) {
         try {
-            $handler = new DatabaseSessionHandler($pdo);
-            
+            // 🔥 IMPORTANT: Always use the SAME session name
+            // Never change it dynamically - that causes logout on code changes
             if (session_status() == PHP_SESSION_NONE) {
-                // Use different session name for impersonation
-                if ($is_impersonate_mode) {
-                    session_name('IMPERSONATE');
-                } else {
-                    session_name('PHPSESSID');
-                }
+                session_name('PRIMEPROP_SESS');
                 
+                $handler = new DatabaseSessionHandler($pdo);
                 session_set_save_handler($handler, true);
+                
+                // 🔥 Cookie params that work on BOTH HTTP and HTTPS
+                // If you are on HTTPS only, set 'secure' => true
+                $is_https = (
+                    (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
+                    || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+                    || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
+                );
+                
                 session_set_cookie_params([
-                    'lifetime' => 86400 * 30, // 30 Days
+                    'lifetime' => 86400 * 90, // 90 days
                     'path' => '/',
                     'domain' => '',
-                    'secure' => true,
+                    'secure' => $is_https, // auto-detect
                     'httponly' => true,
                     'samesite' => 'Lax'
                 ]);
+                
                 session_start();
             }
         } catch (Exception $e) {
@@ -172,13 +165,13 @@ if (file_exists($sessionHandlerFile)) {
                 session_start();
             }
         }
+    } else {
+        if (session_status() == PHP_SESSION_NONE) {
+            session_start();
+        }
     }
 } else {
-    // Fallback agar session_handler.php na ho
     if (session_status() == PHP_SESSION_NONE) {
-        if ($is_impersonate_mode) {
-            session_name('IMPERSONATE');
-        }
         session_start();
     }
 }
