@@ -3,20 +3,19 @@
 // 🚪 Exit Impersonation – Return to Admin
 // ============================================================
 
-// Start the IMPERSONATE session
-session_name('IMPERSONATE');
-session_start();
+$imp_session_id = $_GET['imp_session'] ?? null;
 
-// Destroy it
-$_SESSION = [];
-session_destroy();
-
-// Clear IMPERSONATE cookie
-if (isset($_COOKIE['IMPERSONATE'])) {
-    setcookie('IMPERSONATE', '', time() - 3600, '/');
+if ($imp_session_id) {
+    ini_set('session.use_cookies', 0);
+    ini_set('session.use_only_cookies', 0);
+    session_name('IMPERSONATE');
+    session_id(preg_replace('/[^a-f0-9]/', '', $imp_session_id));
+    session_start();
+    $_SESSION = [];
+    session_destroy();
 }
 
-// Redirect to users.php (admin session is still active in PRIMEPROP_SESS cookie)
+// Redirect back to admin panel (admin cookie is still intact)
 header("Location: users.php");
 exit;
 ?>
