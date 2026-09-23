@@ -1,6 +1,7 @@
 <?php
 // ============================================================
-// 🗄️ Database Connection – Supabase Safe + Session + Impersonation
+// 🗄️ Database Connection – Supabase Safe (Pooler Friendly)
+// + URL-based Impersonation Session Handler
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
@@ -13,13 +14,16 @@ date_default_timezone_set('Asia/Kolkata');
 
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
+    
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_PERSISTENT         => false,
         PDO::ATTR_EMULATE_PREPARES   => true,
     ];
+    
     $pdo = new PDO($dsn, $user, $password, $options);
+    
 } catch (PDOException $e) {
     error_log("DB Connection Failed: " . $e->getMessage());
     die("❌ Database Connection Failed: " . htmlspecialchars($e->getMessage()));
@@ -118,7 +122,7 @@ if (!function_exists('safeExecute')) {
 }
 
 // ============================================================
-// 🔥 SESSION HANDLER INTEGRATION (Stable + Impersonation Support)
+// 🔥 SESSION HANDLER INTEGRATION (URL-based Impersonation Only)
 // ============================================================
 
 $sessionHandlerFile = __DIR__ . '/session_handler.php';
@@ -130,38 +134,49 @@ if (file_exists($sessionHandlerFile)) {
         try {
             if (session_status() == PHP_SESSION_NONE) {
                 
-                // 🔥 Detect if this request is for impersonation
-                $is_impersonating = false;
+                // 🔥 Check ONLY URL and POST for imp_session
+                // NEVER check cookies - that caused the stuck issue
+                $imp_session_id = null;
                 
-                if (isset($_GET['imp']) && $_GET['imp'] == '1') {
-                    $is_impersonating = true;
-                } elseif (isset($_POST['imp']) && $_POST['imp'] == '1') {
-                    $is_impersonating = true;
-                } elseif (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'imp=1') !== false) {
-                    $is_impersonating = true;
-                } elseif (isset($_COOKIE['IMPERSONATE']) && !isset($_COOKIE['PRIMEPROP_SESS'])) {
-                    $is_impersonating = true;
+                if (isset($_GET['imp_session']) && !empty($_GET['imp_session'])) {
+                    $imp_session_id = preg_replace('/[^a-f0-9]/', '', $_GET['imp_session']);
+                } elseif (isset($_POST['imp_session']) && !empty($_POST['imp_session'])) {
+                    $imp_session_id = preg_replace('/[^a-f0-9]/', '', $_POST['imp_session']);
                 }
                 
-                session_name($is_impersonating ? 'IMPERSONATE' : 'PRIMEPROP_SESS');
+                if ($imp_session_id && strlen($imp_session_id) >= 32) {
+                    // 🔥 IMPERSONATION MODE: Use URL session ID, NO cookie set
+                    ini_set('session.use_cookies', 0);
+                    ini_set('session.use_only_cookies', 0);
+                    ini_set('session.use_trans_sid', 0);
+                    session_name('IMPERSONATE');
+                    session_id($imp_session_id);
+                    define('IMPERSONATION_MODE', true);
+                } else {
+                    // 🔥 NORMAL MODE: Always use the same cookie
+                    session_name('PRIMEPROP_SESS');
+                    define('IMPERSONATION_MODE', false);
+                }
                 
                 $handler = new DatabaseSessionHandler($pdo);
                 session_set_save_handler($handler, true);
                 
-                $is_https = (
-                    (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
-                    || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-                    || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
-                );
-                
-                session_set_cookie_params([
-                    'lifetime' => 86400 * 90,
-                    'path' => '/',
-                    'domain' => '',
-                    'secure' => $is_https,
-                    'httponly' => true,
-                    'samesite' => 'Lax'
-                ]);
+                if (!IMPERSONATION_MODE) {
+                    $is_https = (
+                        (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
+                        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+                        || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
+                    );
+                    
+                    session_set_cookie_params([
+                        'lifetime' => 86400 * 90,
+                        'path' => '/',
+                        'domain' => '',
+                        'secure' => $is_https,
+                        'httponly' => true,
+                        'samesite' => 'Lax'
+                    ]);
+                }
                 
                 session_start();
             }
