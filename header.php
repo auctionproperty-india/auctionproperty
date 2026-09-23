@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // ✅ Header – Top Nav with Hamburger + Sidebar
-// 🔥 Dynamic Sidebar + Manage Pages Link + Impersonation Banner
+// 🔥 Dynamic Sidebar + Manage Pages Link + URL-based Impersonation
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -65,7 +65,8 @@ if ($is_logged_in && $role == 'user') {
 }
 
 // 🔥 Impersonation check
-$is_impersonating = isset($_SESSION['impersonate_admin']);
+$is_impersonating = isset($_SESSION['impersonate_admin_id']);
+$current_imp_session = $is_impersonating ? session_id() : '';
 ?>
 <!DOCTYPE html>
 <html>
@@ -78,15 +79,15 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
         /* ====== Global ====== */
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background: #f4f7fc; 
-            overflow-x: hidden; 
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f4f7fc;
+            overflow-x: hidden;
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
@@ -98,23 +99,23 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             -ms-user-select: text !important;
             user-select: text !important;
         }
-        body { 
-            padding-top: 70px; 
+        body {
+            padding-top: 70px;
         }
-        body.top-nav-hidden { 
-            padding-top: 0; 
+        body.top-nav-hidden {
+            padding-top: 0;
         }
-        body.role-admin { 
-            background: #f8fafc; 
+        body.role-admin {
+            background: #f8fafc;
         }
-        body.role-user { 
-            background: #f0f5fa; 
+        body.role-user {
+            background: #f0f5fa;
         }
-        body.role-guest { 
-            background: #f8fafc; 
+        body.role-guest {
+            background: #f8fafc;
         }
-        body.role-sales { 
-            background: #f0f5fa; 
+        body.role-sales {
+            background: #f0f5fa;
         }
         body.page-login, body.page-register {
             background: url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed;
@@ -141,8 +142,8 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             gap: 14px;
             flex-wrap: wrap;
         }
-        .impersonate-banner b { 
-            color: #fff; 
+        .impersonate-banner b {
+            color: #fff;
         }
         .impersonate-banner .btn-exit {
             background: rgba(255,255,255,0.25);
@@ -155,21 +156,21 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             text-decoration: none;
             transition: all 0.2s;
         }
-        .impersonate-banner .btn-exit:hover { 
-            background: #fff; 
-            color: #d97706; 
+        .impersonate-banner .btn-exit:hover {
+            background: #fff;
+            color: #d97706;
         }
-        body.impersonate-mode { 
-            padding-top: 120px !important; 
+        body.impersonate-mode {
+            padding-top: 120px !important;
         }
-        body.impersonate-mode .sidebar { 
-            top: 50px !important; 
+        body.impersonate-mode .sidebar {
+            top: 50px !important;
         }
-        body.impersonate-mode .top-nav { 
-            top: 50px !important; 
+        body.impersonate-mode .top-nav {
+            top: 50px !important;
         }
-        body.impersonate-mode .hamburger-sidebar { 
-            top: 50px !important; 
+        body.impersonate-mode .hamburger-sidebar {
+            top: 50px !important;
         }
 
         /* ====== Top Navigation – Dark Blue Gradient ====== */
@@ -264,12 +265,12 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
         }
 
         @media (max-width: 768px) {
-            .top-nav .nav-brand .brand-text { 
-                font-size: 1.1rem; 
+            .top-nav .nav-brand .brand-text {
+                font-size: 1.1rem;
             }
-            .top-nav .nav-right a { 
-                font-size: 0.8rem; 
-                padding: 4px 10px; 
+            .top-nav .nav-right a {
+                font-size: 0.8rem;
+                padding: 4px 10px;
             }
         }
 
@@ -284,8 +285,8 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             background: rgba(0,0,0,0.5);
             z-index: 1050;
         }
-        .sidebar-overlay.show { 
-            display: block; 
+        .sidebar-overlay.show {
+            display: block;
         }
 
         .hamburger-sidebar {
@@ -474,8 +475,8 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             letter-spacing: 1px;
             color: #1e293b;
         }
-        .sidebar .brand i { 
-            color: #1e3a8a; 
+        .sidebar .brand i {
+            color: #1e3a8a;
         }
 
         .sidebar a {
@@ -501,16 +502,16 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             background: #f1f5f9;
             color: #1e3a8a;
         }
-        .sidebar a:hover i { 
-            color: #1e3a8a; 
+        .sidebar a:hover i {
+            color: #1e3a8a;
         }
         .sidebar a.active {
             background: #eef2ff;
             color: #1e3a8a;
             border-left-color: #1e3a8a;
         }
-        .sidebar a.active i { 
-            color: #1e3a8a; 
+        .sidebar a.active i {
+            color: #1e3a8a;
         }
 
         .sidebar .logout-link {
@@ -519,8 +520,8 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             padding-top: 20px;
             color: #dc2626 !important;
         }
-        .sidebar .logout-link i { 
-            color: #dc2626 !important; 
+        .sidebar .logout-link i {
+            color: #dc2626 !important;
         }
         .sidebar .logout-link:hover {
             background: #fef2f2 !important;
@@ -537,8 +538,8 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             background: rgba(0,0,0,0.4);
             z-index: 1040;
         }
-        .sidebar-overlay-main.show { 
-            display: block; 
+        .sidebar-overlay-main.show {
+            display: block;
         }
 
         /* ====== Main Content ====== */
@@ -594,23 +595,23 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             margin-bottom: 10px;
         }
-        .top-bar .user-info { 
-            display: flex; 
-            align-items: center; 
-            gap: 12px; 
+        .top-bar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
-        .top-bar .user-info .name { 
-            font-weight: 700; 
-            font-size: 16px; 
+        .top-bar .user-info .name {
+            font-weight: 700;
+            font-size: 16px;
         }
-        body.role-admin .top-bar .user-info .name { 
-            color: #0f172a; 
+        body.role-admin .top-bar .user-info .name {
+            color: #0f172a;
         }
-        body.role-user .top-bar .user-info .name { 
-            color: #0f172a; 
+        body.role-user .top-bar .user-info .name {
+            color: #0f172a;
         }
-        body.role-sales .top-bar .user-info .name { 
-            color: #0f172a; 
+        body.role-sales .top-bar .user-info .name {
+            color: #0f172a;
         }
         .top-bar .badge-role {
             padding: 4px 14px;
@@ -649,14 +650,14 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             cursor: pointer;
             display: inline-block;
         }
-        body.role-admin .hamburger-btn { 
-            color: #1e293b; 
+        body.role-admin .hamburger-btn {
+            color: #1e293b;
         }
-        body.role-user .hamburger-btn { 
-            color: #1e293b; 
+        body.role-user .hamburger-btn {
+            color: #1e293b;
         }
-        body.role-sales .hamburger-btn { 
-            color: #1e293b; 
+        body.role-sales .hamburger-btn {
+            color: #1e293b;
         }
         @media (min-width: 992px) {
             .hamburger-btn {
@@ -688,9 +689,9 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             color: #0f172a;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
         }
-        .card-premium:hover { 
-            transform: translateY(-2px); 
-            box-shadow: 0 20px 30px -10px rgba(0,0,0,0.08); 
+        .card-premium:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 30px -10px rgba(0,0,0,0.08);
         }
         .stat-icon {
             width: 50px;
@@ -702,58 +703,58 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             font-size: 24px;
             flex-shrink: 0;
         }
-        body.role-admin .stat-icon.bg-soft-primary { 
-            background: #eef2ff; 
-            color: #1e3a8a; 
+        body.role-admin .stat-icon.bg-soft-primary {
+            background: #eef2ff;
+            color: #1e3a8a;
         }
-        body.role-admin .stat-icon.bg-soft-success { 
-            background: #dcfce7; 
-            color: #166534; 
+        body.role-admin .stat-icon.bg-soft-success {
+            background: #dcfce7;
+            color: #166534;
         }
-        body.role-admin .stat-icon.bg-soft-warning { 
-            background: #fef3c7; 
-            color: #92400e; 
+        body.role-admin .stat-icon.bg-soft-warning {
+            background: #fef3c7;
+            color: #92400e;
         }
-        body.role-user .stat-icon.bg-soft-primary { 
-            background: #dbeafe; 
-            color: #2563eb; 
+        body.role-user .stat-icon.bg-soft-primary {
+            background: #dbeafe;
+            color: #2563eb;
         }
-        body.role-user .stat-icon.bg-soft-success { 
-            background: #d1fae5; 
-            color: #059669; 
+        body.role-user .stat-icon.bg-soft-success {
+            background: #d1fae5;
+            color: #059669;
         }
-        body.role-user .stat-icon.bg-soft-warning { 
-            background: #fef3c7; 
-            color: #d97706; 
+        body.role-user .stat-icon.bg-soft-warning {
+            background: #fef3c7;
+            color: #d97706;
         }
-        body.role-sales .stat-icon.bg-soft-primary { 
-            background: #dbeafe; 
-            color: #2563eb; 
+        body.role-sales .stat-icon.bg-soft-primary {
+            background: #dbeafe;
+            color: #2563eb;
         }
-        body.role-sales .stat-icon.bg-soft-success { 
-            background: #d1fae5; 
-            color: #059669; 
+        body.role-sales .stat-icon.bg-soft-success {
+            background: #d1fae5;
+            color: #059669;
         }
-        body.role-sales .stat-icon.bg-soft-warning { 
-            background: #fef3c7; 
-            color: #d97706; 
+        body.role-sales .stat-icon.bg-soft-warning {
+            background: #fef3c7;
+            color: #d97706;
         }
-        .btn { 
-            border-radius: 10px; 
-            font-weight: 600; 
-            padding: 8px 16px; 
-            font-size: 14px; 
+        .btn {
+            border-radius: 10px;
+            font-weight: 600;
+            padding: 8px 16px;
+            font-size: 14px;
         }
-        .btn-primary { 
-            background: #1e3a8a; 
-            border: none; 
+        .btn-primary {
+            background: #1e3a8a;
+            border: none;
         }
-        .btn-primary:hover { 
-            background: #1e40af; 
+        .btn-primary:hover {
+            background: #1e40af;
         }
-        .btn-sm { 
-            padding: 5px 10px; 
-            font-size: 12px; 
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
         }
         .user-welcome-banner {
             background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
@@ -763,28 +764,28 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
             margin-bottom: 25px;
             box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3);
         }
-        .user-welcome-banner h2 { 
-            font-weight: 800; 
+        .user-welcome-banner h2 {
+            font-weight: 800;
         }
-        .user-welcome-banner p { 
-            opacity: 0.9; 
+        .user-welcome-banner p {
+            opacity: 0.9;
         }
         @media (max-width: 576px) {
-            .top-bar .user-info .name { 
-                font-size: 14px; 
+            .top-bar .user-info .name {
+                font-size: 14px;
             }
-            .card-premium { 
-                padding: 15px; 
+            .card-premium {
+                padding: 15px;
             }
-            .stat-icon { 
-                width: 40px; 
-                height: 40px; 
-                font-size: 18px; 
+            .stat-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
             }
         }
-        .badge-sales { 
-            background: #f59e0b; 
-            color: #000; 
+        .badge-sales {
+            background: #f59e0b;
+            color: #000;
         }
     </style>
 </head>
@@ -806,9 +807,9 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
         <i class="fas fa-user-secret"></i> 
         You are logged in as <b><?= htmlspecialchars($_SESSION['name'] ?? 'User') ?></b> 
         (User #<?= $_SESSION['user_id'] ?>)
-        <span style="opacity:0.85;">(Original Admin: <?= htmlspecialchars($_SESSION['impersonate_admin']['name'] ?? 'Admin') ?>)</span>
+        <span style="opacity:0.85;">(Original Admin: <?= htmlspecialchars($_SESSION['impersonate_admin_name'] ?? 'Admin') ?>)</span>
     </span>
-    <a href="admin_exit_impersonation.php" class="btn-exit">
+    <a href="admin_exit_impersonation.php?imp_session=<?= htmlspecialchars($current_imp_session) ?>" class="btn-exit">
         <i class="fas fa-sign-out-alt"></i> Return to Admin
     </a>
 </div>
@@ -1014,7 +1015,7 @@ $is_impersonating = isset($_SESSION['impersonate_admin']);
     <?php endif; ?>
 
     <?php if ($is_impersonating): ?>
-        <a href="admin_exit_impersonation.php" class="logout-link" style="color:#d97706 !important;">
+        <a href="admin_exit_impersonation.php?imp_session=<?= htmlspecialchars($current_imp_session) ?>" class="logout-link" style="color:#d97706 !important;">
             <i class="fas fa-sign-out-alt" style="color:#d97706 !important;"></i> 
             <span>Exit Impersonation</span>
         </a>
@@ -1151,9 +1152,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// 🔥 Impersonation: Auto-inject imp=1 into all links and forms
+// 🔥 Impersonation: Auto-inject imp_session into all links and forms
 <?php if ($is_impersonating): ?>
 document.addEventListener('DOMContentLoaded', function() {
+    var impSessionId = '<?= htmlspecialchars($current_imp_session) ?>';
+    
     // Inject into links
     document.querySelectorAll('a[href]').forEach(function(a) {
         var href = a.getAttribute('href');
@@ -1161,24 +1164,28 @@ document.addEventListener('DOMContentLoaded', function() {
         if (href.startsWith('#')) return;
         if (href.startsWith('javascript:')) return;
         if (href.startsWith('http://') || href.startsWith('https://')) return;
-        if (href.includes('imp=1')) return;
-        if (href.includes('admin_exit_impersonation.php')) return;
+        if (href.includes('imp_session=')) return;
+        if (href.includes('admin_exit_impersonation.php')) {
+            var sep = href.includes('?') ? '&' : '?';
+            a.setAttribute('href', href + sep + 'imp_session=' + impSessionId);
+            return;
+        }
         if (href.includes('logout.php')) return;
         
         var sep = href.includes('?') ? '&' : '?';
-        a.setAttribute('href', href + sep + 'imp=1');
+        a.setAttribute('href', href + sep + 'imp_session=' + impSessionId);
     });
     
     // Inject into forms
     document.querySelectorAll('form').forEach(function(f) {
-        if (f.querySelector('input[name="imp"]')) return;
+        if (f.querySelector('input[name="imp_session"]')) return;
         var method = (f.getAttribute('method') || 'GET').toUpperCase();
         if (method !== 'GET' && method !== 'POST') return;
         
         var input = document.createElement('input');
         input.type = 'hidden';
-        input.name = 'imp';
-        input.value = '1';
+        input.name = 'imp_session';
+        input.value = impSessionId;
         f.appendChild(input);
     });
 });
