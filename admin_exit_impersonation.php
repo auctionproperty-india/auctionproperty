@@ -1,28 +1,22 @@
 <?php
 // ============================================================
-// 🚪 Emergency Exit – Clear ALL Sessions & Cookies
-// Use this if you are stuck in Impersonation Mode
+// 🚪 Exit Impersonation – Return to Admin
 // ============================================================
 
-// Clear ALL possible session names
-$session_names = ['PHPSESSID', 'IMPERSONATE', 'PRIMEPROP_SESS', 'PRIMEPROP'];
+// Start the IMPERSONATE session
+session_name('IMPERSONATE');
+session_start();
 
-foreach ($session_names as $sname) {
-    // Start and destroy each session
-    session_name($sname);
-    if (session_status() == PHP_SESSION_NONE) {
-        session_start();
-    }
-    $_SESSION = [];
-    session_destroy();
-    
-    // Clear cookie
-    if (isset($_COOKIE[$sname])) {
-        setcookie($sname, '', time() - 3600, '/');
-    }
+// Destroy it
+$_SESSION = [];
+session_destroy();
+
+// Clear IMPERSONATE cookie
+if (isset($_COOKIE['IMPERSONATE'])) {
+    setcookie('IMPERSONATE', '', time() - 3600, '/');
 }
 
-// Redirect to login
-header("Location: login.php?msg=session_cleared");
+// Redirect to users.php (admin session is still active in PRIMEPROP_SESS cookie)
+header("Location: users.php");
 exit;
 ?>
