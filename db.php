@@ -1,7 +1,6 @@
 <?php
 // ============================================================
-// 🗄️ Database Connection – Supabase Safe (Pooler Friendly)
-// + URL-based Impersonation Session Handler
+// 🗄️ Database Connection + URL-based Impersonation Session
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
@@ -14,23 +13,20 @@ date_default_timezone_set('Asia/Kolkata');
 
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
-    
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_PERSISTENT         => false,
         PDO::ATTR_EMULATE_PREPARES   => true,
     ];
-    
     $pdo = new PDO($dsn, $user, $password, $options);
-    
 } catch (PDOException $e) {
     error_log("DB Connection Failed: " . $e->getMessage());
     die("❌ Database Connection Failed: " . htmlspecialchars($e->getMessage()));
 }
 
 // ============================================================
-// 🔥 SAFE QUERY HELPERS
+// SAFE QUERY HELPERS
 // ============================================================
 
 if (!function_exists('safeQuery')) {
@@ -122,7 +118,7 @@ if (!function_exists('safeExecute')) {
 }
 
 // ============================================================
-// 🔥 SESSION HANDLER INTEGRATION (URL-based Impersonation Only)
+// SESSION HANDLER INTEGRATION (URL-based Impersonation)
 // ============================================================
 
 $sessionHandlerFile = __DIR__ . '/session_handler.php';
@@ -134,8 +130,6 @@ if (file_exists($sessionHandlerFile)) {
         try {
             if (session_status() == PHP_SESSION_NONE) {
                 
-                // 🔥 Check ONLY URL and POST for imp_session
-                // NEVER check cookies - that caused the stuck issue
                 $imp_session_id = null;
                 
                 if (isset($_GET['imp_session']) && !empty($_GET['imp_session'])) {
@@ -145,7 +139,6 @@ if (file_exists($sessionHandlerFile)) {
                 }
                 
                 if ($imp_session_id && strlen($imp_session_id) >= 32) {
-                    // 🔥 IMPERSONATION MODE: Use URL session ID, NO cookie set
                     ini_set('session.use_cookies', 0);
                     ini_set('session.use_only_cookies', 0);
                     ini_set('session.use_trans_sid', 0);
@@ -153,7 +146,6 @@ if (file_exists($sessionHandlerFile)) {
                     session_id($imp_session_id);
                     define('IMPERSONATION_MODE', true);
                 } else {
-                    // 🔥 NORMAL MODE: Always use the same cookie
                     session_name('PRIMEPROP_SESS');
                     define('IMPERSONATION_MODE', false);
                 }
