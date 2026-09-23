@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // 🗄️ Database Connection – Supabase Safe (Pooler Friendly)
-// + Stable Session Handler (No auto-logout on code change)
+// + Stable Session Handler (Never switches session name)
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
@@ -122,8 +122,10 @@ if (!function_exists('safeExecute')) {
 }
 
 // ============================================================
-// 🔥 SESSION HANDLER INTEGRATION (STABLE VERSION)
+// 🔥 SESSION HANDLER INTEGRATION (FINAL STABLE VERSION)
 // ============================================================
+// 🔥 CRITICAL RULE: NEVER change session name dynamically.
+// Always use the SAME session name to avoid logout issues.
 
 $sessionHandlerFile = __DIR__ . '/session_handler.php';
 
@@ -132,16 +134,14 @@ if (file_exists($sessionHandlerFile)) {
     
     if (class_exists('DatabaseSessionHandler')) {
         try {
-            // 🔥 IMPORTANT: Always use the SAME session name
-            // Never change it dynamically - that causes logout on code changes
             if (session_status() == PHP_SESSION_NONE) {
+                // 🔥 FIXED: Always use the SAME session name
                 session_name('PRIMEPROP_SESS');
                 
                 $handler = new DatabaseSessionHandler($pdo);
                 session_set_save_handler($handler, true);
                 
-                // 🔥 Cookie params that work on BOTH HTTP and HTTPS
-                // If you are on HTTPS only, set 'secure' => true
+                // Auto-detect HTTPS
                 $is_https = (
                     (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
                     || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
@@ -149,10 +149,10 @@ if (file_exists($sessionHandlerFile)) {
                 );
                 
                 session_set_cookie_params([
-                    'lifetime' => 86400 * 90, // 90 days
+                    'lifetime' => 86400 * 90,
                     'path' => '/',
                     'domain' => '',
-                    'secure' => $is_https, // auto-detect
+                    'secure' => $is_https,
                     'httponly' => true,
                     'samesite' => 'Lax'
                 ]);
