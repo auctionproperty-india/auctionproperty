@@ -936,7 +936,14 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
             <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
         <?php endif; ?>
-        
+
+            <!-- 🔥 Payout Preview & Tools -->
+        <a href="admin_payout_preview.php"><i class="fas fa-file-invoice-dollar"></i> <span>Payout Preview</span></a>
+        <a href="admin_payout_manager.php"><i class="fas fa-wallet"></i> <span>Payout Manager</span></a>
+        <a href="admin_fix_subscription_amounts.php"><i class="fas fa-tools"></i> <span>Fix Amounts</span></a>
+        <a href="admin_give_package.php"><i class="fas fa-gift"></i> <span>Give Free Package</span></a>
+        <a href="admin_extend_subscriptions.php"><i class="fas fa-calendar-plus"></i> <span>Extend Subscriptions</span></a>
+    
         <?php if (hasViewPermission('referrals', $pdo)): ?>
             <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
         <?php endif; ?>
