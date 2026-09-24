@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (with Package Filter + Login as User)
+// 👥 User Management – Admin Panel (Multi-Select Package Filter)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -101,7 +101,24 @@ if (isset($_GET['toggle_free_income']) && is_numeric($_GET['toggle_free_income']
 // ---- Filters ----
 $search = trim($_GET['search'] ?? '');
 $referral_filter = trim($_GET['referral_filter'] ?? 'all');
-$package_filter = trim($_GET['package_filter'] ?? 'all');
+
+// 🔥 Multi-select package filter
+$package_filters = $_GET['package_filter'] ?? [];
+if (!is_array($package_filters)) {
+    $package_filters = empty($package_filters) ? [] : [$package_filters];
+}
+// Sanitize values
+$clean_pkg_filters = [];
+foreach ($package_filters as $pf) {
+    $pf = trim((string)$pf);
+    if ($pf === '') continue;
+    if (is_numeric($pf)) {
+        $clean_pkg_filters[] = (string)(int)$pf;
+    } elseif (in_array($pf, ['free', 'none'])) {
+        $clean_pkg_filters[] = $pf;
+    }
+}
+$package_filters = array_values(array_unique($clean_pkg_filters));
 
 $search_condition = "";
 $search_params = [];
@@ -119,17 +136,29 @@ if ($referral_filter == 'with_referrer') {
     $search_condition .= " AND u.referred_by IS NULL";
 }
 
-// 🔥 Package Filter Logic
-if ($package_filter == 'free') {
-    // Free users – no active package
-    $search_condition .= " AND s.package_id IS NULL";
-} elseif ($package_filter == 'none') {
-    // Users with no subscription record at all
-    $search_condition .= " AND s.user_id IS NULL";
-} elseif (!empty($package_filter) && $package_filter != 'all') {
-    // Specific package
-    $search_condition .= " AND s.package_id = ?";
-    $search_params[] = (int)$package_filter;
+// 🔥 Multi-package filter (OR logic)
+if (!empty($package_filters)) {
+    $pkg_or_conditions = [];
+    $free_selected = in_array('free', $package_filters);
+    $none_selected = in_array('none', $package_filters);
+    $pkg_ids_selected = array_filter($package_filters, 'is_numeric');
+
+    if ($free_selected) {
+        $pkg_or_conditions[] = "s.user_id IS NULL"; // no active subscription => free user
+    }
+    if ($none_selected) {
+        $pkg_or_conditions[] = "s.user_id IS NULL";
+    }
+    if (!empty($pkg_ids_selected)) {
+        $placeholders = implode(',', array_fill(0, count($pkg_ids_selected), '?'));
+        $pkg_or_conditions[] = "s.package_id IN ($placeholders)";
+        foreach ($pkg_ids_selected as $pid) {
+            $search_params[] = (int)$pid;
+        }
+    }
+    if (!empty($pkg_or_conditions)) {
+        $search_condition .= " AND (" . implode(' OR ', $pkg_or_conditions) . ")";
+    }
 }
 
 $sql = "
@@ -160,8 +189,18 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($search_params);
 $users = $stmt->fetchAll();
 
-// 🔥 Fetch all packages for filter dropdown
+// Fetch all packages for filter dropdown
 $all_packages = $pdo->query("SELECT id, name FROM packages ORDER BY name ASC")->fetchAll();
+
+// 🔥 Build preserve QS for toggle/delete links
+$preserve_params = [];
+if (!empty($search)) $preserve_params[] = 'search=' . urlencode($search);
+if ($referral_filter != 'all') $preserve_params[] = 'referral_filter=' . urlencode($referral_filter);
+foreach ($package_filters as $pf) {
+    $preserve_params[] = 'package_filter[]=' . urlencode($pf);
+}
+$preserve_qs = !empty($preserve_params) ? implode('&', $preserve_params) : '';
+$preserve_qs_amp = $preserve_qs ? '&' . $preserve_qs : '';
 
 include 'header.php';
 ?>
@@ -277,13 +316,6 @@ include 'header.php';
         letter-spacing: 0.3px;
         margin-right: 4px;
     }
-    @media (max-width: 768px) {
-        .user-table { font-size: 0.75rem; }
-        .user-table th { font-size: 0.62rem; padding: 8px 5px; }
-        .user-table td { padding: 8px 5px; }
-        .search-box input[type="text"],
-        .search-box select { min-width: 130px; font-size: 0.78rem; }
-    }
     .toggle-badge {
         cursor: pointer;
         padding: 4px 12px;
@@ -295,6 +327,113 @@ include 'header.php';
     }
     .toggle-badge.on { background: #10b981; color: #fff; box-shadow: 0 2px 5px rgba(16,185,129,0.4); }
     .toggle-badge.off { background: #e2e8f0; color: #475569; border: 1px solid #cbd5e1; }
+
+    /* 🔥 Multi-Select Dropdown */
+    .multi-select-wrap { position: relative; display: inline-block; }
+    .multi-select-btn {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 30px;
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #1e293b;
+        cursor: pointer;
+        min-width: 200px;
+        text-align: left;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.2s;
+    }
+    .multi-select-btn:hover { border-color: #2563eb; }
+    .multi-select-btn .ms-label { flex: 1; }
+    .multi-select-btn .ms-badge {
+        background: #2563eb;
+        color: #fff;
+        padding: 2px 9px;
+        border-radius: 20px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        min-width: 20px;
+        text-align: center;
+    }
+    .multi-select-btn i.fa-chevron-down {
+        color: #94a3b8;
+        font-size: 0.7rem;
+        transition: transform 0.2s;
+    }
+    .multi-select-wrap.open .multi-select-btn i.fa-chevron-down { transform: rotate(180deg); }
+
+    .multi-select-panel {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+        min-width: 260px;
+        max-height: 340px;
+        overflow-y: auto;
+        z-index: 500;
+        padding: 6px 0;
+    }
+    .multi-select-wrap.open .multi-select-panel { display: block; }
+
+    .multi-select-panel .ms-actions {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 14px 8px;
+        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 4px;
+    }
+    .multi-select-panel .ms-actions button {
+        background: none;
+        border: none;
+        color: #2563eb;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 2px 4px;
+    }
+    .multi-select-panel .ms-actions button:hover { text-decoration: underline; }
+
+    .multi-select-panel label {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 8px 14px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        color: #334155;
+        margin: 0;
+        transition: background 0.15s;
+    }
+    .multi-select-panel label:hover { background: #f1f5f9; }
+    .multi-select-panel input[type="checkbox"] {
+        width: 1.1rem;
+        height: 1.1rem;
+        accent-color: #2563eb;
+        cursor: pointer;
+        margin: 0;
+    }
+    .multi-select-panel .ms-sep {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 4px 0;
+    }
+
+    @media (max-width: 768px) {
+        .user-table { font-size: 0.75rem; }
+        .user-table th { font-size: 0.62rem; padding: 8px 5px; }
+        .user-table td { padding: 8px 5px; }
+        .search-box input[type="text"],
+        .search-box select { min-width: 130px; font-size: 0.78rem; }
+        .multi-select-btn { min-width: 160px; font-size: 0.78rem; }
+    }
 </style>
 
 <div class="container-fluid">
@@ -305,7 +444,7 @@ include 'header.php';
 
     <!-- 🔥 SEARCH + FILTERS -->
     <div class="search-box">
-        <form method="GET" class="d-flex gap-2 flex-wrap align-items-center w-100">
+        <form method="GET" class="d-flex gap-2 flex-wrap align-items-center w-100" id="filterForm">
             <input type="text" name="search" placeholder="🔍 Search name, email, phone..." value="<?= htmlspecialchars($search ?? '') ?>">
 
             <span class="filter-label"><i class="fas fa-user-tag"></i> Referrer:</span>
@@ -315,20 +454,67 @@ include 'header.php';
                 <option value="without_referrer" <?= ($referral_filter == 'without_referrer') ? 'selected' : '' ?>>⚠️ Without Referrer</option>
             </select>
 
-            <span class="filter-label"><i class="fas fa-box"></i> Package:</span>
-            <select name="package_filter">
-                <option value="all" <?= ($package_filter == 'all') ? 'selected' : '' ?>>All Packages</option>
-                <option value="free" <?= ($package_filter == 'free') ? 'selected' : '' ?>>🆓 Free Users Only</option>
-                <option value="none" <?= ($package_filter == 'none') ? 'selected' : '' ?>>❌ No Subscription</option>
-                <?php foreach ($all_packages as $pkg): ?>
-                    <option value="<?= (int)$pkg['id'] ?>" <?= ($package_filter == $pkg['id']) ? 'selected' : '' ?>>
-                        📦 <?= htmlspecialchars($pkg['name']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
+            <span class="filter-label"><i class="fas fa-box"></i> Packages:</span>
+
+            <!-- 🔥 Multi-Select Package Dropdown -->
+            <div class="multi-select-wrap" id="pkgWrap">
+                <button type="button" class="multi-select-btn" onclick="togglePkgDropdown(event)">
+                    <span class="ms-label" id="pkgBtnLabel">
+                        <?php 
+                        if (empty($package_filters)) {
+                            echo 'All Packages';
+                        } elseif (count($package_filters) == 1) {
+                            $single = $package_filters[0];
+                            if ($single == 'free') echo '🆓 Free Users Only';
+                            elseif ($single == 'none') echo '❌ No Subscription';
+                            else {
+                                foreach ($all_packages as $pkg) {
+                                    if ($pkg['id'] == $single) { echo '📦 ' . htmlspecialchars($pkg['name']); break; }
+                                }
+                            }
+                        } else {
+                            echo 'Packages Selected';
+                        }
+                        ?>
+                    </span>
+                    <span class="ms-badge" id="pkgBtnBadge" style="<?= empty($package_filters) ? 'display:none;' : '' ?>"><?= count($package_filters) ?></span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+
+                <div class="multi-select-panel" id="pkgPanel">
+                    <div class="ms-actions">
+                        <button type="button" onclick="pkgSelectAll()">✓ Select All</button>
+                        <button type="button" onclick="pkgClearAll()">✗ Clear All</button>
+                    </div>
+
+                    <label>
+                        <input type="checkbox" name="package_filter[]" value="free"
+                            <?= in_array('free', $package_filters) ? 'checked' : '' ?>
+                            onchange="updatePkgLabel()">
+                        🆓 Free Users Only
+                    </label>
+                    <label>
+                        <input type="checkbox" name="package_filter[]" value="none"
+                            <?= in_array('none', $package_filters) ? 'checked' : '' ?>
+                            onchange="updatePkgLabel()">
+                        ❌ No Subscription
+                    </label>
+
+                    <div class="ms-sep"></div>
+
+                    <?php foreach ($all_packages as $pkg): ?>
+                        <label>
+                            <input type="checkbox" name="package_filter[]" value="<?= (int)$pkg['id'] ?>"
+                                <?= in_array((string)$pkg['id'], $package_filters, true) ? 'checked' : '' ?>
+                                onchange="updatePkgLabel()">
+                            📦 <?= htmlspecialchars($pkg['name']) ?>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
 
             <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3"><i class="fas fa-search"></i> Apply</button>
-            <?php if (!empty($search) || $referral_filter != 'all' || $package_filter != 'all'): ?>
+            <?php if (!empty($search) || $referral_filter != 'all' || !empty($package_filters)): ?>
                 <a href="users.php" class="btn btn-secondary btn-sm rounded-pill px-3"><i class="fas fa-times"></i> Clear</a>
             <?php endif; ?>
         </form>
@@ -417,7 +603,7 @@ include 'header.php';
 
                         <td>
                             <?php if (empty($user['package_name'])): ?>
-                                <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>&package_filter=<?= urlencode($package_filter) ?>" class="text-decoration-none">
+                                <a href="?toggle_free_income=<?= $user['id'] ?><?= $preserve_qs_amp ?>" class="text-decoration-none">
                                     <?php if (!empty($user['free_user_income_enabled'])): ?>
                                         <span class="toggle-badge on">ON</span>
                                     <?php else: ?>
@@ -430,7 +616,7 @@ include 'header.php';
                         </td>
 
                         <td>
-                            <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>&package_filter=<?= urlencode($package_filter) ?>" 
+                            <a href="?toggle_block=<?= $user['id'] ?><?= $preserve_qs_amp ?>" 
                                class="btn btn-sm <?= ($user['status'] == 'blocked') ? 'btn-danger' : 'btn-success' ?>"
                                title="<?= ($user['status'] == 'blocked') ? 'Click to Unblock' : 'Click to Block' ?>">
                                 <?= ($user['status'] == 'blocked') ? 'Blocked' : 'Active' ?>
@@ -460,7 +646,7 @@ include 'header.php';
                             </a>
                             
                             <?php if (($user['id'] ?? 0) != $_SESSION['user_id']): ?>
-                                <a href="?delete=<?= htmlspecialchars($user['id'] ?? '') ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>&package_filter=<?= urlencode($package_filter) ?>"
+                                <a href="?delete=<?= htmlspecialchars($user['id'] ?? '') ?><?= $preserve_qs_amp ?>"
                                    class="btn btn-sm btn-danger"
                                    onclick="return confirm('Delete this user?')" title="Delete">
                                     <i class="fas fa-trash"></i>
@@ -476,6 +662,56 @@ include 'header.php';
 </div>
 
 <script>
+    // 🔥 Multi-select dropdown toggle
+    function togglePkgDropdown(e) {
+        if (e) e.stopPropagation();
+        document.getElementById('pkgWrap').classList.toggle('open');
+    }
+
+    // Close on outside click
+    document.addEventListener('click', function(e) {
+        var wrap = document.getElementById('pkgWrap');
+        if (wrap && !wrap.contains(e.target)) {
+            wrap.classList.remove('open');
+        }
+    });
+
+    // Update label when checkboxes change
+    function updatePkgLabel() {
+        var checkboxes = document.querySelectorAll('#pkgPanel input[name="package_filter[]"]:checked');
+        var count = checkboxes.length;
+        var labelEl = document.getElementById('pkgBtnLabel');
+        var badgeEl = document.getElementById('pkgBtnBadge');
+
+        if (count === 0) {
+            labelEl.textContent = 'All Packages';
+            badgeEl.style.display = 'none';
+        } else if (count === 1) {
+            var parentLabel = checkboxes[0].parentElement;
+            var text = parentLabel.textContent.trim();
+            labelEl.textContent = text;
+            badgeEl.style.display = 'none';
+        } else {
+            labelEl.textContent = 'Packages Selected';
+            badgeEl.textContent = count;
+            badgeEl.style.display = 'inline-block';
+        }
+    }
+
+    function pkgSelectAll() {
+        document.querySelectorAll('#pkgPanel input[name="package_filter[]"]').forEach(function(cb) {
+            cb.checked = true;
+        });
+        updatePkgLabel();
+    }
+
+    function pkgClearAll() {
+        document.querySelectorAll('#pkgPanel input[name="package_filter[]"]').forEach(function(cb) {
+            cb.checked = false;
+        });
+        updatePkgLabel();
+    }
+
     function loginAsUser(userId) {
         if (!userId || userId <= 0) return;
         window.open(
