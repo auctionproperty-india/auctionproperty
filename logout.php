@@ -13,7 +13,6 @@ if (isset($_GET['imp_session']) && !empty($_GET['imp_session'])) {
         session_id($imp_id);
         session_start();
         
-        // Delete from DB
         try {
             global $pdo;
             if (isset($pdo)) {
