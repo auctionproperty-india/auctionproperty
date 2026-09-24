@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✏️ Edit User – Live Expiry + Custom Duration Override
+// ✏️ Edit User – Preserves original subscription amount
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -17,7 +17,6 @@ if ($user_id <= 0) {
     exit;
 }
 
-// ---- Fetch user data ----
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch();
@@ -40,7 +39,7 @@ if ($user['referred_by']) {
 // ---- Get current active subscription ----
 $sub_stmt = $pdo->prepare("
     SELECT s.package_id, p.name as package_name, p.duration_months, 
-           s.start_date, s.end_date, s.id as sub_id
+           s.start_date, s.end_date, s.id as sub_id, s.amount as sub_amount
     FROM subscriptions s
     LEFT JOIN packages p ON s.package_id = p.id
     WHERE s.user_id = ? AND s.status = 'active'
@@ -51,20 +50,17 @@ $sub_info = $sub_stmt->fetch();
 $current_pkg = $sub_info['package_id'] ?? null;
 $pkg_expiry = $sub_info['end_date'] ?? null;
 $sub_id = $sub_info['sub_id'] ?? null;
+$sub_amount = $sub_info['sub_amount'] ?? 0;
 
-// ---- Get all packages (with duration & price) ----
 $packages = $pdo->query("SELECT id, name, duration_months, price FROM packages ORDER BY id")->fetchAll();
 
-// 🔥 Build JS object: {package_id: duration_months}
 $pkg_durations_js = [];
 foreach ($packages as $pkg) {
     $pkg_durations_js[$pkg['id']] = (int)$pkg['duration_months'];
 }
 
-// ---- Get all users for referrer dropdown ----
 $all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
 
-// ---- Safe Date Format ----
 function safeDateFormat($dateStr) {
     if (empty($dateStr) || strtotime($dateStr) === false) {
         return '';
@@ -72,7 +68,6 @@ function safeDateFormat($dateStr) {
     return date('Y-m-d', strtotime($dateStr));
 }
 
-// ---- Handle Update ----
 $error = '';
 $success = '';
 $new_referrer_name = '';
@@ -80,7 +75,6 @@ $new_referrer_name = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     $admin_password = $_POST['admin_password'] ?? '';
 
-    // ---- Verify admin password ----
     $admin_id = $_SESSION['user_id'];
     $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
     $stmt->execute([$admin_id]);
@@ -88,7 +82,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     if (!$admin || !password_verify($admin_password, $admin['password'])) {
         $error = "❌ Invalid admin password. Changes not saved.";
     } else {
-        // ---- Collect form data ----
         $name = trim($_POST['name']);
         $email = trim($_POST['email']);
         $phone = trim($_POST['phone']);
@@ -100,7 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         $new_password = trim($_POST['new_password']);
         $new_referrer_id = isset($_POST['new_referrer']) && $_POST['new_referrer'] !== '' ? (int)$_POST['new_referrer'] : null;
 
-        // ---- Get new referrer name for success message ----
         if ($new_referrer_id) {
             $ref_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
             $ref_stmt->execute([$new_referrer_id]);
@@ -114,9 +106,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
 
         $pdo->beginTransaction();
         try {
-            // ============================================================
-            // 1. Update user basic info
-            // ============================================================
             $stmt = $pdo->prepare("
                 UPDATE users 
                 SET name = ?, email = ?, phone = ?, 
@@ -128,7 +117,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
             ");
             $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $new_referrer_id, $user_id]);
 
-            // ---- Update password if provided ----
             if (!empty($new_password)) {
                 $hashed = password_hash($new_password, PASSWORD_DEFAULT);
                 $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
@@ -136,25 +124,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
             }
 
             // ============================================================
-            // 2. Update subscription
+            // 🔥 FIX: Update subscription WITHOUT changing amount
             // ============================================================
             if ($package_id) {
                 $duration = 0;
-                $pkg_price = 0;
                 foreach ($packages as $pkg) {
                     if ($pkg['id'] == $package_id) {
                         $duration = (int)$pkg['duration_months'];
-                        $pkg_price = (float)$pkg['price'];
                         break;
                     }
                 }
 
-                // 🔥 Custom duration override (if admin filled it in)
                 if ($custom_duration > 0) {
                     $duration = $custom_duration;
                 }
 
-                // Determine start date
                 if (!empty($activation_date)) {
                     $new_start = $activation_date;
                 } elseif (!empty($sub_info['start_date'])) {
@@ -165,7 +149,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                     $new_start = date('Y-m-d');
                 }
 
-                // 🔥 Calculate expiry
                 $new_end = null;
                 if ($duration > 0) {
                     $new_end = date('Y-m-d', strtotime("$new_start + $duration months"));
@@ -174,15 +157,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                 }
 
                 if ($sub_id) {
-                    // UPDATE existing subscription
+                    // 🔥 UPDATE without touching amount column
                     $stmt = $pdo->prepare("
                         UPDATE subscriptions 
-                        SET package_id = ?, start_date = ?, end_date = ?, amount = ?
+                        SET package_id = ?, start_date = ?, end_date = ?
                         WHERE id = ?
                     ");
-                    $stmt->execute([$package_id, $new_start, $new_end, $pkg_price, $sub_id]);
+                    $stmt->execute([$package_id, $new_start, $new_end, $sub_id]);
                 } else {
-                    // INSERT new subscription
+                    // 🔥 INSERT new subscription - use package price as default (since there is no prior amount)
+                    $pkg_price = 0;
+                    foreach ($packages as $pkg) {
+                        if ($pkg['id'] == $package_id) {
+                            $pkg_price = (float)$pkg['price'];
+                            break;
+                        }
+                    }
                     $stmt = $pdo->prepare("
                         INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at)
                         VALUES (?, ?, ?, 'active', ?, ?, NOW())
@@ -193,7 +183,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
 
             $pdo->commit();
 
-            // Refresh data
             $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
             $stmt->execute([$user_id]);
             $user = $stmt->fetch();
@@ -203,14 +192,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
             $current_pkg = $sub_info['package_id'] ?? null;
             $pkg_expiry = $sub_info['end_date'] ?? null;
             $sub_id = $sub_info['sub_id'] ?? null;
+            $sub_amount = $sub_info['sub_amount'] ?? 0;
 
             $referrer_name = $new_referrer_name;
 
-            $success = "✅ User updated successfully!";
+            $success = "✅ User updated successfully! (Subscription amount preserved: ₹" . number_format($sub_amount, 2) . ")";
             if ($new_referrer_name != 'None') {
                 $success .= " New Referrer: <strong>" . htmlspecialchars($new_referrer_name) . "</strong>";
-            } else {
-                $success .= " Referrer removed.";
             }
 
         } catch (Exception $e) {
@@ -241,6 +229,10 @@ include 'header.php';
     .expiry-preview .val { font-size: 1.2rem; font-weight: 800; color: #059669; margin-top: 2px; }
     .expiry-preview .sub { font-size: 0.72rem; color: #64748b; margin-top: 4px; }
     .warning-box { background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 10px 14px; font-size: 0.82rem; color: #92400e; margin-bottom: 10px; }
+    .amount-display { background: #fef3c7; border: 2px solid #f59e0b; border-radius: 10px; padding: 12px 16px; text-align: center; }
+    .amount-display .lbl { font-size: 0.7rem; text-transform: uppercase; color: #92400e; font-weight: 700; }
+    .amount-display .val { font-size: 1.3rem; font-weight: 800; color: #b45309; margin-top: 2px; }
+    .amount-display .sub { font-size: 0.72rem; color: #92400e; margin-top: 4px; }
 </style>
 
 <div class="container-fluid">
@@ -260,8 +252,8 @@ include 'header.php';
                 <?php endif; ?>
 
                 <div class="help-box">
-                    <i class="fas fa-bolt me-1"></i>
-                    <strong>Live Preview:</strong> जब भी आप <b>Activation Date</b>, <b>Package</b>, या <b>Custom Duration</b> बदलेंगे, <b>Expiry Date</b> अपने आप नीचे update हो जाएगी।
+                    <i class="fas fa-shield-alt me-1"></i>
+                    <strong>Amount Protected:</strong> जब आप पैकेज या date बदलेंगे, तो सब्सक्रिप्शन का <b>original amount</b> (जो approval के समय दर्ज हुआ था) वैसा ही रहेगा — package price से overwrite नहीं होगा।
                 </div>
 
                 <form method="POST">
@@ -313,24 +305,24 @@ include 'header.php';
                             </select>
                         </div>
 
-                        <!-- 🔥 CUSTOM DURATION FIELD -->
                         <div class="col-md-6">
                             <label class="form-label">Custom Duration (months) <span class="text-muted">— optional</span></label>
                             <input type="number" name="custom_duration" id="customDuration" class="form-control" 
                                    min="0" max="120" placeholder="Leave empty to use package duration" value="0">
-                            <small class="text-muted">अगर पैकेज में duration 0 है, तो यहाँ महीने डालें।</small>
                         </div>
 
-                        <!-- 🔥 PACKAGE DURATION WARNING -->
-                        <div class="col-md-12" id="durationWarning" style="display:none;">
-                            <div class="warning-box">
-                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                <strong>ध्यान दें:</strong> इस पैकेज में <b>duration_months = 0</b> है। Expiry calculate करने के लिए ऊपर <b>Custom Duration</b> में महीने भरें या <a href="admin_packages.php" target="_blank">admin_packages.php</a> में जाकर पैकेज का duration सेट करें।
+                        <!-- 🔥 SUBSCRIPTION AMOUNT DISPLAY (read-only) -->
+                        <div class="col-md-6">
+                            <label class="form-label">Subscription Amount (Original)</label>
+                            <div class="amount-display">
+                                <div class="lbl">Amount Paid by User</div>
+                                <div class="val">₹ <?= number_format($sub_amount, 2) ?></div>
+                                <div class="sub">This amount is used for payout calculations</div>
                             </div>
                         </div>
 
                         <!-- 🔥 LIVE EXPIRY PREVIEW -->
-                        <div class="col-md-12">
+                        <div class="col-md-6">
                             <label class="form-label">Expiry Date Preview</label>
                             <div class="expiry-preview">
                                 <div class="lbl">New Expiry Date</div>
@@ -339,10 +331,15 @@ include 'header.php';
                                 </div>
                                 <div class="sub" id="expiryReason">Existing subscription</div>
                             </div>
-                            <input type="hidden" name="calculated_expiry" id="calculatedExpiry" value="<?= $pkg_expiry ? safeDateFormat($pkg_expiry) : '' ?>">
                         </div>
 
-                        <!-- ====== REFERRAL SECTION ====== -->
+                        <div class="col-md-12" id="durationWarning" style="display:none;">
+                            <div class="warning-box">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                <strong>ध्यान दें:</strong> इस पैकेज में <b>duration_months = 0</b> है। Expiry calculate करने के लिए ऊपर <b>Custom Duration</b> में महीने भरें या <a href="admin_packages.php" target="_blank">admin_packages.php</a> में जाकर पैकेज का duration सेट करें।
+                            </div>
+                        </div>
+
                         <div class="col-md-12">
                             <div class="referral-card">
                                 <h6><i class="fas fa-link me-2"></i>Referrer Management</h6>
@@ -369,22 +366,17 @@ include 'header.php';
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
-                                <small class="text-muted">
-                                    Changing the referrer will move this user and their entire downline team to the new referrer.
-                                </small>
                             </div>
                         </div>
 
                         <div class="col-md-12">
                             <label class="form-label">New Password (leave blank to keep current)</label>
                             <input type="text" name="new_password" class="form-control" placeholder="Enter new password">
-                            <small class="text-muted">Minimum 6 characters recommended.</small>
                         </div>
 
                         <div class="col-md-12 password-confirm">
                             <label class="form-label">Admin Password <span class="text-danger">*</span></label>
                             <input type="password" name="admin_password" class="form-control" required placeholder="Enter your admin password to confirm changes">
-                            <small class="text-muted">Admin password is required to save any changes.</small>
                         </div>
                     </div>
 
@@ -399,7 +391,6 @@ include 'header.php';
 </div>
 
 <script>
-// 🔥 Package durations map from PHP
 const PKG_DURATIONS = <?= json_encode($pkg_durations_js) ?>;
 const EXISTING_END = <?= json_encode($pkg_expiry ? safeDateFormat($pkg_expiry) : '') ?>;
 
@@ -409,7 +400,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const customDurationInput = document.getElementById('customDuration');
     const expiryPreview = document.getElementById('expiryPreview');
     const expiryReason = document.getElementById('expiryReason');
-    const calculatedExpiry = document.getElementById('calculatedExpiry');
     const durationWarning = document.getElementById('durationWarning');
 
     function formatDate(dateStr) {
@@ -441,60 +431,47 @@ document.addEventListener('DOMContentLoaded', function() {
         const customDur = parseInt(customDurationInput.value) || 0;
         const pkgDur = PKG_DURATIONS[pkgId] || 0;
 
-        // Use custom duration if set, otherwise package duration
         let duration = customDur > 0 ? customDur : pkgDur;
 
-        // Show warning if package has no duration AND no custom duration
         if (pkgId && pkgDur === 0 && customDur === 0) {
             durationWarning.style.display = 'block';
         } else {
             durationWarning.style.display = 'none';
         }
 
-        // Case 1: No package → Free user
         if (!pkgId) {
             expiryPreview.textContent = '—';
             expiryReason.textContent = 'Free user (no package)';
-            calculatedExpiry.value = '';
             return;
         }
 
-        // Case 2: No activation date
         if (!activationDate) {
             if (EXISTING_END) {
                 expiryPreview.textContent = formatDate(EXISTING_END);
                 expiryReason.textContent = 'Existing expiry (no activation date)';
-                calculatedExpiry.value = EXISTING_END;
             } else {
                 expiryPreview.textContent = '—';
                 expiryReason.textContent = 'Activation date required';
-                calculatedExpiry.value = '';
             }
             return;
         }
 
-        // Case 3: Both activation date + duration present
         if (duration > 0) {
             const newEnd = addMonths(activationDate, duration);
             expiryPreview.textContent = formatDate(newEnd);
             const label = customDur > 0 ? 'Custom duration' : 'Package duration';
             expiryReason.textContent = `${activationDate} + ${duration} months (${label})`;
-            calculatedExpiry.value = newEnd;
         } else {
-            // No duration anywhere → preserve existing
             if (EXISTING_END) {
                 expiryPreview.textContent = formatDate(EXISTING_END);
                 expiryReason.textContent = 'No duration set — existing expiry preserved';
-                calculatedExpiry.value = EXISTING_END;
             } else {
                 expiryPreview.textContent = '—';
                 expiryReason.textContent = 'No duration set in package';
-                calculatedExpiry.value = '';
             }
         }
     }
 
-    // Attach listeners
     if (activationInput) {
         activationInput.addEventListener('change', recalculate);
         activationInput.addEventListener('input', recalculate);
@@ -505,11 +482,9 @@ document.addEventListener('DOMContentLoaded', function() {
         customDurationInput.addEventListener('change', recalculate);
     }
 
-    // Initial run
     recalculate();
 });
 
-// Referrer search
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('referrerSearch');
     const select = document.getElementById('referrerSelect');
