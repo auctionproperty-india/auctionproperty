@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✏️ Edit User – With Referrer Search + Admin Password Confirmation
+// ✏️ Edit User – Live Expiry Calculator (JS) + Fixed Backend
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -52,8 +52,14 @@ $current_pkg = $sub_info['package_id'] ?? null;
 $pkg_expiry = $sub_info['end_date'] ?? null;
 $sub_id = $sub_info['sub_id'] ?? null;
 
-// ---- Get all packages ----
-$packages = $pdo->query("SELECT id, name, duration_months FROM packages ORDER BY id")->fetchAll();
+// ---- Get all packages (with duration & price) ----
+$packages = $pdo->query("SELECT id, name, duration_months, price FROM packages ORDER BY id")->fetchAll();
+
+// 🔥 Build JS object: {package_id: duration_months}
+$pkg_durations_js = [];
+foreach ($packages as $pkg) {
+    $pkg_durations_js[$pkg['id']] = (int)$pkg['duration_months'];
+}
 
 // ---- Get all users for referrer dropdown ----
 $all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
@@ -70,6 +76,7 @@ function safeDateFormat($dateStr) {
 $error = '';
 $success = '';
 $new_referrer_name = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     $admin_password = $_POST['admin_password'] ?? '';
 
@@ -90,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         $package_id = $_POST['package_id'] ? (int)$_POST['package_id'] : null;
         $status = $_POST['status'];
         $new_password = trim($_POST['new_password']);
-        $new_referrer_id = isset($_POST['new_referrer']) ? (int)$_POST['new_referrer'] : null;
+        $new_referrer_id = isset($_POST['new_referrer']) && $_POST['new_referrer'] !== '' ? (int)$_POST['new_referrer'] : null;
 
         // ---- Get new referrer name for success message ----
         if ($new_referrer_id) {
@@ -106,7 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
 
         $pdo->beginTransaction();
         try {
-            // ---- Update user ----
+            // ============================================================
+            // 1. Update user basic info
+            // ============================================================
             $stmt = $pdo->prepare("
                 UPDATE users 
                 SET name = ?, email = ?, phone = ?, 
@@ -126,84 +135,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
             }
 
             // ============================================================
-            // 🔥 FIX: Update subscription with new activation_date & package
+            // 2. Update subscription – with CORRECT expiry calculation
             // ============================================================
             if ($package_id) {
-                // Get package duration
                 $duration = 0;
+                $pkg_price = 0;
                 foreach ($packages as $pkg) {
                     if ($pkg['id'] == $package_id) {
                         $duration = (int)$pkg['duration_months'];
+                        $pkg_price = (float)$pkg['price'];
                         break;
                     }
                 }
 
+                // Determine start date (priority: form > existing > user activation > today)
+                if (!empty($activation_date)) {
+                    $new_start = $activation_date;
+                } elseif (!empty($sub_info['start_date'])) {
+                    $new_start = $sub_info['start_date'];
+                } elseif (!empty($user['activation_date'])) {
+                    $new_start = $user['activation_date'];
+                } else {
+                    $new_start = date('Y-m-d');
+                }
+
+                // 🔥 Calculate expiry = start + duration
+                $new_end = null;
+                if ($duration > 0) {
+                    $new_end = date('Y-m-d', strtotime("$new_start + $duration months"));
+                } elseif (!empty($sub_info['end_date'])) {
+                    $new_end = $sub_info['end_date'];
+                }
+
                 if ($sub_id) {
-                    // Existing active subscription – update package, start_date, end_date
-                    $new_start = $activation_date ?: $sub_info['start_date'] ?? date('Y-m-d');
-                    if ($duration > 0) {
-                        $new_end = date('Y-m-d', strtotime("$new_start + $duration months"));
-                    } else {
-                        $new_end = null; // if no duration, keep null
-                    }
+                    // UPDATE existing subscription
                     $stmt = $pdo->prepare("
                         UPDATE subscriptions 
-                        SET package_id = ?, start_date = ?, end_date = ?,
-                            amount = (SELECT price FROM packages WHERE id = ?)
+                        SET package_id = ?, start_date = ?, end_date = ?, amount = ?
                         WHERE id = ?
                     ");
-                    $stmt->execute([$package_id, $new_start, $new_end, $package_id, $sub_id]);
+                    $stmt->execute([$package_id, $new_start, $new_end, $pkg_price, $sub_id]);
                 } else {
-                    // No active subscription – create a new one
-                    if (!empty($activation_date) && $duration > 0) {
-                        $new_end = date('Y-m-d', strtotime("$activation_date + $duration months"));
-                        $stmt = $pdo->prepare("
-                            INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at)
-                            VALUES (?, ?, (SELECT price FROM packages WHERE id = ?), 'active', ?, ?, NOW())
-                        ");
-                        $stmt->execute([$user_id, $package_id, $package_id, $activation_date, $new_end]);
-                        // Fetch the new sub_id for expiry display
-                        $sub_id = $pdo->lastInsertId();
-                        $sub_info = $pdo->prepare("SELECT start_date, end_date FROM subscriptions WHERE id = ?")
-                            ->execute([$sub_id]) ? $sub_info = $pdo->fetch() : null;
-                    } else {
-                        // No activation date or no duration – create a pending subscription or just skip
-                        // We'll create a pending one with no dates.
-                        $stmt = $pdo->prepare("
-                            INSERT INTO subscriptions (user_id, package_id, amount, status, created_at)
-                            VALUES (?, ?, (SELECT price FROM packages WHERE id = ?), 'pending', NOW())
-                        ");
-                        $stmt->execute([$user_id, $package_id, $package_id]);
-                    }
+                    // INSERT new subscription
+                    $stmt = $pdo->prepare("
+                        INSERT INTO subscriptions (user_id, package_id, amount, status, start_date, end_date, created_at)
+                        VALUES (?, ?, ?, 'active', ?, ?, NOW())
+                    ");
+                    $stmt->execute([$user_id, $package_id, $pkg_price, $new_start, $new_end]);
                 }
-            } else {
-                // If package_id is empty (Free), we might want to deactivate or remove subscription?
-                // Usually we would set subscription status to 'cancelled' or leave as is.
-                // For simplicity, we'll keep existing subscription but update package to null? 
-                // But we'll just leave it.
             }
 
             $pdo->commit();
 
-            // ---- Update referrer name for display ----
-            $referrer_name = $new_referrer_name;
-
-            // ---- Refresh user data ----
+            // Refresh data
             $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
             $stmt->execute([$user_id]);
             $user = $stmt->fetch();
 
-            // Refresh subscription info
             $sub_stmt->execute([$user_id]);
             $sub_info = $sub_stmt->fetch();
+            $current_pkg = $sub_info['package_id'] ?? null;
             $pkg_expiry = $sub_info['end_date'] ?? null;
+            $sub_id = $sub_info['sub_id'] ?? null;
+
+            $referrer_name = $new_referrer_name;
 
             $success = "✅ User updated successfully!";
-            if (!empty($new_referrer_name) && $new_referrer_name != 'None') {
+            if ($new_referrer_name != 'None') {
                 $success .= " New Referrer: <strong>" . htmlspecialchars($new_referrer_name) . "</strong>";
             } else {
                 $success .= " Referrer removed.";
             }
+
         } catch (Exception $e) {
             $pdo->rollBack();
             $error = "❌ Error updating user: " . $e->getMessage();
@@ -226,6 +229,11 @@ include 'header.php';
     #referrerSearch { margin-bottom: 8px; }
     #referrerSelect { max-height: 200px; overflow-y: auto; }
     .password-confirm { border-left: 4px solid #ef4444; background: #fef2f2; padding-left: 12px; border-radius: 4px; }
+    .help-box { background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px; padding: 10px 14px; font-size: 0.82rem; color: #1e40af; margin-bottom: 10px; }
+    .expiry-preview { background: #ecfdf5; border: 2px dashed #10b981; border-radius: 10px; padding: 12px 16px; text-align: center; }
+    .expiry-preview .lbl { font-size: 0.7rem; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px; }
+    .expiry-preview .val { font-size: 1.2rem; font-weight: 800; color: #059669; margin-top: 2px; }
+    .expiry-preview .sub { font-size: 0.72rem; color: #64748b; margin-top: 4px; }
 </style>
 
 <div class="container-fluid">
@@ -243,6 +251,11 @@ include 'header.php';
                 <?php if ($error): ?>
                     <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
+
+                <div class="help-box">
+                    <i class="fas fa-bolt me-1"></i>
+                    <strong>Live Preview:</strong> जब भी आप <b>Activation Date</b> या <b>Package</b> बदलेंगे, <b>Expiry Date</b> अपने आप नीचे update हो जाएगी।
+                </div>
 
                 <form method="POST">
                     <div class="row g-3">
@@ -270,26 +283,41 @@ include 'header.php';
                             <label class="form-label">Registration Date</label>
                             <input type="date" name="registration_date" class="form-control" value="<?= safeDateFormat($user['created_at']) ?>">
                         </div>
+
+                        <!-- 🔥 ACTIVATION DATE with live change -->
                         <div class="col-md-6">
                             <label class="form-label">Activation Date</label>
-                            <input type="date" name="activation_date" class="form-control" value="<?= safeDateFormat($user['activation_date']) ?>">
-                            <small class="text-muted">If set, subscription start date will be updated.</small>
+                            <input type="date" name="activation_date" id="activationDate" class="form-control" value="<?= safeDateFormat($user['activation_date']) ?>">
+                            <small class="text-muted">इसे बदलने पर Expiry auto-update होगी।</small>
                         </div>
+
+                        <!-- 🔥 PACKAGE with live change -->
                         <div class="col-md-6">
                             <label class="form-label">Package</label>
-                            <select name="package_id" class="form-control">
+                            <select name="package_id" id="packageSelect" class="form-control">
                                 <option value="">Free</option>
                                 <?php foreach ($packages as $pkg): ?>
                                     <option value="<?= $pkg['id'] ?>" <?= ($current_pkg == $pkg['id']) ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($pkg['name']) ?>
+                                        <?php if (!empty($pkg['duration_months'])): ?>
+                                            (<?= $pkg['duration_months'] ?> months)
+                                        <?php endif; ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
+
+                        <!-- 🔥 LIVE EXPIRY PREVIEW -->
                         <div class="col-md-6">
-                            <label class="form-label">Package Expiry Date</label>
-                            <input type="text" class="form-control" value="<?= $pkg_expiry ? date('d M Y', strtotime($pkg_expiry)) : 'No active subscription' ?>" readonly>
-                            <small class="text-muted">Auto-calculated from activation date + package duration</small>
+                            <label class="form-label">Expiry Date Preview</label>
+                            <div class="expiry-preview">
+                                <div class="lbl">New Expiry Date</div>
+                                <div class="val" id="expiryPreview">
+                                    <?= $pkg_expiry ? date('d M Y', strtotime($pkg_expiry)) : 'No expiry' ?>
+                                </div>
+                                <div class="sub" id="expiryReason">Existing subscription</div>
+                            </div>
+                            <input type="hidden" name="calculated_expiry" id="calculatedExpiry" value="<?= $pkg_expiry ? safeDateFormat($pkg_expiry) : '' ?>">
                         </div>
 
                         <!-- ====== REFERRAL SECTION ====== -->
@@ -297,7 +325,6 @@ include 'header.php';
                             <div class="referral-card">
                                 <h6><i class="fas fa-link me-2"></i>Referrer Management</h6>
 
-                                <!-- Current Referrer Display -->
                                 <div class="mb-3">
                                     <label class="form-label">Current Referrer</label>
                                     <div class="current-referrer">
@@ -305,13 +332,11 @@ include 'header.php';
                                     </div>
                                 </div>
 
-                                <!-- Search Box -->
                                 <div class="mb-2">
                                     <label class="form-label">Search Referrer</label>
                                     <input type="text" id="referrerSearch" class="form-control" placeholder="Type name or email to filter...">
                                 </div>
 
-                                <!-- Dropdown to Change Referrer -->
                                 <label class="form-label">Change Referrer (Team Shift)</label>
                                 <select name="new_referrer" id="referrerSelect" class="form-control" size="5">
                                     <option value="">— Remove Referrer (None) —</option>
@@ -334,7 +359,6 @@ include 'header.php';
                             <small class="text-muted">Minimum 6 characters recommended.</small>
                         </div>
 
-                        <!-- ====== ADMIN PASSWORD CONFIRMATION ====== -->
                         <div class="col-md-12 password-confirm">
                             <label class="form-label">Admin Password <span class="text-danger">*</span></label>
                             <input type="password" name="admin_password" class="form-control" required placeholder="Enter your admin password to confirm changes">
@@ -353,7 +377,106 @@ include 'header.php';
 </div>
 
 <script>
-// JavaScript to filter the dropdown options based on search input
+// 🔥 Package durations map (from PHP)
+const PKG_DURATIONS = <?= json_encode($pkg_durations_js) ?>;
+
+// Get existing end_date as fallback (for packages without duration)
+const EXISTING_END = <?= json_encode($pkg_expiry ? safeDateFormat($pkg_expiry) : '') ?>;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const activationInput = document.getElementById('activationDate');
+    const packageSelect = document.getElementById('packageSelect');
+    const expiryPreview = document.getElementById('expiryPreview');
+    const expiryReason = document.getElementById('expiryReason');
+    const calculatedExpiry = document.getElementById('calculatedExpiry');
+
+    // Formats YYYY-MM-DD to "DD MMM YYYY"
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return dateStr;
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return parts[2] + ' ' + months[parseInt(parts[1]) - 1] + ' ' + parts[0];
+    }
+
+    // Adds months to a date (YYYY-MM-DD) and returns YYYY-MM-DD
+    function addMonths(dateStr, months) {
+        if (!dateStr || months <= 0) return '';
+        const d = new Date(dateStr + 'T00:00:00');
+        if (isNaN(d.getTime())) return '';
+        
+        // Save the original day
+        const origDay = d.getDate();
+        d.setMonth(d.getMonth() + months);
+        
+        // If month rolled over (e.g., Jan 31 + 1 month = Mar 3), set to last day of target month
+        if (d.getDate() !== origDay) {
+            d.setDate(0);
+        }
+        
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return yyyy + '-' + mm + '-' + dd;
+    }
+
+    function recalculate() {
+        const activationDate = activationInput.value;
+        const pkgId = packageSelect.value;
+        const duration = PKG_DURATIONS[pkgId] || 0;
+
+        // Case 1: No package selected → Free user
+        if (!pkgId) {
+            expiryPreview.textContent = '—';
+            expiryReason.textContent = 'Free user (no package)';
+            calculatedExpiry.value = '';
+            return;
+        }
+
+        // Case 2: No activation date
+        if (!activationDate) {
+            if (EXISTING_END) {
+                expiryPreview.textContent = formatDate(EXISTING_END);
+                expiryReason.textContent = 'Existing expiry (no activation date)';
+                calculatedExpiry.value = EXISTING_END;
+            } else {
+                expiryPreview.textContent = '—';
+                expiryReason.textContent = 'Activation date required';
+                calculatedExpiry.value = '';
+            }
+            return;
+        }
+
+        // Case 3: Both activation date + duration present
+        if (duration > 0) {
+            const newEnd = addMonths(activationDate, duration);
+            expiryPreview.textContent = formatDate(newEnd);
+            expiryReason.textContent = `${activationDate} + ${duration} months`;
+            calculatedExpiry.value = newEnd;
+        } else {
+            // Package has no duration → preserve existing expiry
+            if (EXISTING_END) {
+                expiryPreview.textContent = formatDate(EXISTING_END);
+                expiryReason.textContent = 'Package has no duration — existing expiry preserved';
+                calculatedExpiry.value = EXISTING_END;
+            } else {
+                expiryPreview.textContent = '—';
+                expiryReason.textContent = 'Package has no duration set in admin';
+                calculatedExpiry.value = '';
+            }
+        }
+    }
+
+    // Trigger on change
+    if (activationInput) activationInput.addEventListener('change', recalculate);
+    if (activationInput) activationInput.addEventListener('input', recalculate);
+    if (packageSelect) packageSelect.addEventListener('change', recalculate);
+
+    // Initial run
+    recalculate();
+});
+
+// Referrer search filter
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('referrerSearch');
     const select = document.getElementById('referrerSelect');
