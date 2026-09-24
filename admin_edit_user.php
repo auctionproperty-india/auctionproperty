@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✏️ Edit User – Live Expiry Calculator (JS) + Fixed Backend
+// ✏️ Edit User – Live Expiry + Custom Duration Override
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -95,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         $registration_date = $_POST['registration_date'] ?: null;
         $activation_date = $_POST['activation_date'] ?: null;
         $package_id = $_POST['package_id'] ? (int)$_POST['package_id'] : null;
+        $custom_duration = !empty($_POST['custom_duration']) ? (int)$_POST['custom_duration'] : 0;
         $status = $_POST['status'];
         $new_password = trim($_POST['new_password']);
         $new_referrer_id = isset($_POST['new_referrer']) && $_POST['new_referrer'] !== '' ? (int)$_POST['new_referrer'] : null;
@@ -135,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
             }
 
             // ============================================================
-            // 2. Update subscription – with CORRECT expiry calculation
+            // 2. Update subscription
             // ============================================================
             if ($package_id) {
                 $duration = 0;
@@ -148,7 +149,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                     }
                 }
 
-                // Determine start date (priority: form > existing > user activation > today)
+                // 🔥 Custom duration override (if admin filled it in)
+                if ($custom_duration > 0) {
+                    $duration = $custom_duration;
+                }
+
+                // Determine start date
                 if (!empty($activation_date)) {
                     $new_start = $activation_date;
                 } elseif (!empty($sub_info['start_date'])) {
@@ -159,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                     $new_start = date('Y-m-d');
                 }
 
-                // 🔥 Calculate expiry = start + duration
+                // 🔥 Calculate expiry
                 $new_end = null;
                 if ($duration > 0) {
                     $new_end = date('Y-m-d', strtotime("$new_start + $duration months"));
@@ -234,6 +240,7 @@ include 'header.php';
     .expiry-preview .lbl { font-size: 0.7rem; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px; }
     .expiry-preview .val { font-size: 1.2rem; font-weight: 800; color: #059669; margin-top: 2px; }
     .expiry-preview .sub { font-size: 0.72rem; color: #64748b; margin-top: 4px; }
+    .warning-box { background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 10px 14px; font-size: 0.82rem; color: #92400e; margin-bottom: 10px; }
 </style>
 
 <div class="container-fluid">
@@ -254,7 +261,7 @@ include 'header.php';
 
                 <div class="help-box">
                     <i class="fas fa-bolt me-1"></i>
-                    <strong>Live Preview:</strong> जब भी आप <b>Activation Date</b> या <b>Package</b> बदलेंगे, <b>Expiry Date</b> अपने आप नीचे update हो जाएगी।
+                    <strong>Live Preview:</strong> जब भी आप <b>Activation Date</b>, <b>Package</b>, या <b>Custom Duration</b> बदलेंगे, <b>Expiry Date</b> अपने आप नीचे update हो जाएगी।
                 </div>
 
                 <form method="POST">
@@ -283,15 +290,12 @@ include 'header.php';
                             <label class="form-label">Registration Date</label>
                             <input type="date" name="registration_date" class="form-control" value="<?= safeDateFormat($user['created_at']) ?>">
                         </div>
-
-                        <!-- 🔥 ACTIVATION DATE with live change -->
                         <div class="col-md-6">
                             <label class="form-label">Activation Date</label>
                             <input type="date" name="activation_date" id="activationDate" class="form-control" value="<?= safeDateFormat($user['activation_date']) ?>">
                             <small class="text-muted">इसे बदलने पर Expiry auto-update होगी।</small>
                         </div>
 
-                        <!-- 🔥 PACKAGE with live change -->
                         <div class="col-md-6">
                             <label class="form-label">Package</label>
                             <select name="package_id" id="packageSelect" class="form-control">
@@ -301,14 +305,32 @@ include 'header.php';
                                         <?= htmlspecialchars($pkg['name']) ?>
                                         <?php if (!empty($pkg['duration_months'])): ?>
                                             (<?= $pkg['duration_months'] ?> months)
+                                        <?php else: ?>
+                                            (⚠️ No Duration)
                                         <?php endif; ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
 
-                        <!-- 🔥 LIVE EXPIRY PREVIEW -->
+                        <!-- 🔥 CUSTOM DURATION FIELD -->
                         <div class="col-md-6">
+                            <label class="form-label">Custom Duration (months) <span class="text-muted">— optional</span></label>
+                            <input type="number" name="custom_duration" id="customDuration" class="form-control" 
+                                   min="0" max="120" placeholder="Leave empty to use package duration" value="0">
+                            <small class="text-muted">अगर पैकेज में duration 0 है, तो यहाँ महीने डालें।</small>
+                        </div>
+
+                        <!-- 🔥 PACKAGE DURATION WARNING -->
+                        <div class="col-md-12" id="durationWarning" style="display:none;">
+                            <div class="warning-box">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                <strong>ध्यान दें:</strong> इस पैकेज में <b>duration_months = 0</b> है। Expiry calculate करने के लिए ऊपर <b>Custom Duration</b> में महीने भरें या <a href="admin_packages.php" target="_blank">admin_packages.php</a> में जाकर पैकेज का duration सेट करें।
+                            </div>
+                        </div>
+
+                        <!-- 🔥 LIVE EXPIRY PREVIEW -->
+                        <div class="col-md-12">
                             <label class="form-label">Expiry Date Preview</label>
                             <div class="expiry-preview">
                                 <div class="lbl">New Expiry Date</div>
@@ -377,20 +399,19 @@ include 'header.php';
 </div>
 
 <script>
-// 🔥 Package durations map (from PHP)
+// 🔥 Package durations map from PHP
 const PKG_DURATIONS = <?= json_encode($pkg_durations_js) ?>;
-
-// Get existing end_date as fallback (for packages without duration)
 const EXISTING_END = <?= json_encode($pkg_expiry ? safeDateFormat($pkg_expiry) : '') ?>;
 
 document.addEventListener('DOMContentLoaded', function() {
     const activationInput = document.getElementById('activationDate');
     const packageSelect = document.getElementById('packageSelect');
+    const customDurationInput = document.getElementById('customDuration');
     const expiryPreview = document.getElementById('expiryPreview');
     const expiryReason = document.getElementById('expiryReason');
     const calculatedExpiry = document.getElementById('calculatedExpiry');
+    const durationWarning = document.getElementById('durationWarning');
 
-    // Formats YYYY-MM-DD to "DD MMM YYYY"
     function formatDate(dateStr) {
         if (!dateStr) return '—';
         const parts = dateStr.split('-');
@@ -399,21 +420,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return parts[2] + ' ' + months[parseInt(parts[1]) - 1] + ' ' + parts[0];
     }
 
-    // Adds months to a date (YYYY-MM-DD) and returns YYYY-MM-DD
     function addMonths(dateStr, months) {
         if (!dateStr || months <= 0) return '';
         const d = new Date(dateStr + 'T00:00:00');
         if (isNaN(d.getTime())) return '';
-        
-        // Save the original day
         const origDay = d.getDate();
         d.setMonth(d.getMonth() + months);
-        
-        // If month rolled over (e.g., Jan 31 + 1 month = Mar 3), set to last day of target month
         if (d.getDate() !== origDay) {
             d.setDate(0);
         }
-        
         const yyyy = d.getFullYear();
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
@@ -423,9 +438,20 @@ document.addEventListener('DOMContentLoaded', function() {
     function recalculate() {
         const activationDate = activationInput.value;
         const pkgId = packageSelect.value;
-        const duration = PKG_DURATIONS[pkgId] || 0;
+        const customDur = parseInt(customDurationInput.value) || 0;
+        const pkgDur = PKG_DURATIONS[pkgId] || 0;
 
-        // Case 1: No package selected → Free user
+        // Use custom duration if set, otherwise package duration
+        let duration = customDur > 0 ? customDur : pkgDur;
+
+        // Show warning if package has no duration AND no custom duration
+        if (pkgId && pkgDur === 0 && customDur === 0) {
+            durationWarning.style.display = 'block';
+        } else {
+            durationWarning.style.display = 'none';
+        }
+
+        // Case 1: No package → Free user
         if (!pkgId) {
             expiryPreview.textContent = '—';
             expiryReason.textContent = 'Free user (no package)';
@@ -451,46 +477,50 @@ document.addEventListener('DOMContentLoaded', function() {
         if (duration > 0) {
             const newEnd = addMonths(activationDate, duration);
             expiryPreview.textContent = formatDate(newEnd);
-            expiryReason.textContent = `${activationDate} + ${duration} months`;
+            const label = customDur > 0 ? 'Custom duration' : 'Package duration';
+            expiryReason.textContent = `${activationDate} + ${duration} months (${label})`;
             calculatedExpiry.value = newEnd;
         } else {
-            // Package has no duration → preserve existing expiry
+            // No duration anywhere → preserve existing
             if (EXISTING_END) {
                 expiryPreview.textContent = formatDate(EXISTING_END);
-                expiryReason.textContent = 'Package has no duration — existing expiry preserved';
+                expiryReason.textContent = 'No duration set — existing expiry preserved';
                 calculatedExpiry.value = EXISTING_END;
             } else {
                 expiryPreview.textContent = '—';
-                expiryReason.textContent = 'Package has no duration set in admin';
+                expiryReason.textContent = 'No duration set in package';
                 calculatedExpiry.value = '';
             }
         }
     }
 
-    // Trigger on change
-    if (activationInput) activationInput.addEventListener('change', recalculate);
-    if (activationInput) activationInput.addEventListener('input', recalculate);
+    // Attach listeners
+    if (activationInput) {
+        activationInput.addEventListener('change', recalculate);
+        activationInput.addEventListener('input', recalculate);
+    }
     if (packageSelect) packageSelect.addEventListener('change', recalculate);
+    if (customDurationInput) {
+        customDurationInput.addEventListener('input', recalculate);
+        customDurationInput.addEventListener('change', recalculate);
+    }
 
     // Initial run
     recalculate();
 });
 
-// Referrer search filter
+// Referrer search
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('referrerSearch');
     const select = document.getElementById('referrerSelect');
+    if (!searchInput || !select) return;
+    
     const options = select.querySelectorAll('option');
-
     searchInput.addEventListener('input', function() {
         const filter = this.value.toLowerCase().trim();
         options.forEach(opt => {
             const text = opt.textContent.toLowerCase();
-            if (text.includes(filter) || filter === '') {
-                opt.style.display = '';
-            } else {
-                opt.style.display = 'none';
-            }
+            opt.style.display = (text.includes(filter) || filter === '') ? '' : 'none';
         });
     });
 });
