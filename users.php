@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (with Login as User)
+// 👥 User Management – Admin Panel (with Package Filter + Login as User)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -98,8 +98,10 @@ if (isset($_GET['toggle_free_income']) && is_numeric($_GET['toggle_free_income']
     }
 }
 
+// ---- Filters ----
 $search = trim($_GET['search'] ?? '');
 $referral_filter = trim($_GET['referral_filter'] ?? 'all');
+$package_filter = trim($_GET['package_filter'] ?? 'all');
 
 $search_condition = "";
 $search_params = [];
@@ -115,6 +117,19 @@ if ($referral_filter == 'with_referrer') {
     $search_condition .= " AND u.referred_by IS NOT NULL";
 } elseif ($referral_filter == 'without_referrer') {
     $search_condition .= " AND u.referred_by IS NULL";
+}
+
+// 🔥 Package Filter Logic
+if ($package_filter == 'free') {
+    // Free users – no active package
+    $search_condition .= " AND s.package_id IS NULL";
+} elseif ($package_filter == 'none') {
+    // Users with no subscription record at all
+    $search_condition .= " AND s.user_id IS NULL";
+} elseif (!empty($package_filter) && $package_filter != 'all') {
+    // Specific package
+    $search_condition .= " AND s.package_id = ?";
+    $search_params[] = (int)$package_filter;
 }
 
 $sql = "
@@ -144,6 +159,9 @@ $sql = "
 $stmt = $pdo->prepare($sql);
 $stmt->execute($search_params);
 $users = $stmt->fetchAll();
+
+// 🔥 Fetch all packages for filter dropdown
+$all_packages = $pdo->query("SELECT id, name FROM packages ORDER BY name ASC")->fetchAll();
 
 include 'header.php';
 ?>
@@ -238,7 +256,7 @@ include 'header.php';
         border-radius: 30px;
         padding: 8px 18px;
         border: 1px solid #e2e8f0;
-        min-width: 220px;
+        min-width: 200px;
         font-size: 0.85rem;
     }
     .search-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
@@ -248,12 +266,23 @@ include 'header.php';
         border: 1px solid #e2e8f0;
         background: #fff;
         font-size: 0.85rem;
+        min-width: 160px;
     }
     .search-box select:focus { outline: none; border-color: #2563eb; }
+    .filter-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        margin-right: 4px;
+    }
     @media (max-width: 768px) {
         .user-table { font-size: 0.75rem; }
         .user-table th { font-size: 0.62rem; padding: 8px 5px; }
         .user-table td { padding: 8px 5px; }
+        .search-box input[type="text"],
+        .search-box select { min-width: 130px; font-size: 0.78rem; }
     }
     .toggle-badge {
         cursor: pointer;
@@ -274,16 +303,32 @@ include 'header.php';
         <span class="badge bg-primary" style="font-size: 0.85rem; padding: 8px 16px;">Total: <?= count($users) ?> users</span>
     </div>
 
+    <!-- 🔥 SEARCH + FILTERS -->
     <div class="search-box">
         <form method="GET" class="d-flex gap-2 flex-wrap align-items-center w-100">
             <input type="text" name="search" placeholder="🔍 Search name, email, phone..." value="<?= htmlspecialchars($search ?? '') ?>">
+
+            <span class="filter-label"><i class="fas fa-user-tag"></i> Referrer:</span>
             <select name="referral_filter">
                 <option value="all" <?= ($referral_filter == 'all') ? 'selected' : '' ?>>All Users</option>
                 <option value="with_referrer" <?= ($referral_filter == 'with_referrer') ? 'selected' : '' ?>>With Referrer</option>
                 <option value="without_referrer" <?= ($referral_filter == 'without_referrer') ? 'selected' : '' ?>>⚠️ Without Referrer</option>
             </select>
-            <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3"><i class="fas fa-search"></i> Search</button>
-            <?php if (!empty($search) || $referral_filter != 'all'): ?>
+
+            <span class="filter-label"><i class="fas fa-box"></i> Package:</span>
+            <select name="package_filter">
+                <option value="all" <?= ($package_filter == 'all') ? 'selected' : '' ?>>All Packages</option>
+                <option value="free" <?= ($package_filter == 'free') ? 'selected' : '' ?>>🆓 Free Users Only</option>
+                <option value="none" <?= ($package_filter == 'none') ? 'selected' : '' ?>>❌ No Subscription</option>
+                <?php foreach ($all_packages as $pkg): ?>
+                    <option value="<?= (int)$pkg['id'] ?>" <?= ($package_filter == $pkg['id']) ? 'selected' : '' ?>>
+                        📦 <?= htmlspecialchars($pkg['name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+
+            <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3"><i class="fas fa-search"></i> Apply</button>
+            <?php if (!empty($search) || $referral_filter != 'all' || $package_filter != 'all'): ?>
                 <a href="users.php" class="btn btn-secondary btn-sm rounded-pill px-3"><i class="fas fa-times"></i> Clear</a>
             <?php endif; ?>
         </form>
@@ -322,6 +367,7 @@ include 'header.php';
                     <?php foreach ($users as $user): ?>
                     <tr>
                         <td><strong>#<?= htmlspecialchars($user['id'] ?? '') ?></strong></td>
+
                         <td>
                             <div style="font-weight: 700; color: #0f172a;">
                                 <?= htmlspecialchars(cleanDisplayValue($user['name'] ?? '', 'Unknown')) ?>
@@ -330,14 +376,17 @@ include 'header.php';
                                 <?= htmlspecialchars(cleanDisplayValue($user['email'] ?? '', 'N/A')) ?>
                             </div>
                         </td>
+
                         <td>
                             <div style="font-size: 0.78rem;">
                                 <?= htmlspecialchars(cleanDisplayValue($user['phone'] ?? '', 'N/A')) ?>
                             </div>
                         </td>
+
                         <td>
                             <span class="badge-coins">🪙 <?= number_format($user['user_coins'] ?? 0) ?></span>
                         </td>
+
                         <td>
                             <?php if (!empty($user['referrer_name']) || !empty($user['referrer_email'])): ?>
                                 <span class="badge-referrer" title="<?= htmlspecialchars(cleanDisplayValue($user['referrer_name'] ?? '', $user['referrer_email'] ?? '')) ?>">
@@ -347,12 +396,14 @@ include 'header.php';
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
+
                         <td>
                             <div class="date-stack">
                                 <div><span class="lbl">Reg:</span> <?= safeDateFormat($user['created_at'] ?? '') ?></div>
                                 <div><span class="lbl">Act:</span> <?= safeDateFormat($user['activation_date'] ?? '') ?></div>
                             </div>
                         </td>
+
                         <td>
                             <?php if (!empty($user['package_name'])): ?>
                                 <div><span class="badge-package"><?= htmlspecialchars($user['package_name']) ?></span></div>
@@ -363,9 +414,10 @@ include 'header.php';
                                 <span class="badge-package-free">Free</span>
                             <?php endif; ?>
                         </td>
+
                         <td>
                             <?php if (empty($user['package_name'])): ?>
-                                <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" class="text-decoration-none">
+                                <a href="?toggle_free_income=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>&package_filter=<?= urlencode($package_filter) ?>" class="text-decoration-none">
                                     <?php if (!empty($user['free_user_income_enabled'])): ?>
                                         <span class="toggle-badge on">ON</span>
                                     <?php else: ?>
@@ -376,32 +428,39 @@ include 'header.php';
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
+
                         <td>
-                            <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>" 
+                            <a href="?toggle_block=<?= $user['id'] ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>&package_filter=<?= urlencode($package_filter) ?>" 
                                class="btn btn-sm <?= ($user['status'] == 'blocked') ? 'btn-danger' : 'btn-success' ?>"
                                title="<?= ($user['status'] == 'blocked') ? 'Click to Unblock' : 'Click to Block' ?>">
                                 <?= ($user['status'] == 'blocked') ? 'Blocked' : 'Active' ?>
                             </a>
                         </td>
+
                         <td>
                             <?php $roleInfo = getUserRoleLabel($user); ?>
                             <span class="<?= $roleInfo['class'] ?>"><?= $roleInfo['label'] ?></span>
                         </td>
+
                         <td class="actions" style="text-align: right;">
                             <a href="admin_edit_user.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-primary" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
+
                             <a href="admin_give_package.php?user_id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-success" title="Give Free Package">
                                 <i class="fas fa-gift"></i>
                             </a>
+
                             <a href="javascript:void(0)" onclick="loginAsUser(<?= (int)$user['id'] ?>)" class="btn btn-sm btn-warning" title="Login as User">
                                 <i class="fas fa-user-secret"></i>
                             </a>
+
                             <a href="admin_team.php?id=<?= htmlspecialchars($user['id'] ?? '') ?>" class="btn btn-sm btn-info" title="View Team">
                                 <i class="fas fa-sitemap"></i>
                             </a>
+                            
                             <?php if (($user['id'] ?? 0) != $_SESSION['user_id']): ?>
-                                <a href="?delete=<?= htmlspecialchars($user['id'] ?? '') ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>"
+                                <a href="?delete=<?= htmlspecialchars($user['id'] ?? '') ?>&search=<?= urlencode($search) ?>&referral_filter=<?= urlencode($referral_filter) ?>&package_filter=<?= urlencode($package_filter) ?>"
                                    class="btn btn-sm btn-danger"
                                    onclick="return confirm('Delete this user?')" title="Delete">
                                     <i class="fas fa-trash"></i>
@@ -420,7 +479,7 @@ include 'header.php';
     function loginAsUser(userId) {
         if (!userId || userId <= 0) return;
         window.open(
-            'admin_login_as_user.php?user_id=' + userId + '&imp=1',
+            'admin_login_as_user.php?user_id=' + userId,
             'ImpersonateUser_' + userId,
             'width=1300,height=850,scrollbars=yes,resizable=yes'
         );
