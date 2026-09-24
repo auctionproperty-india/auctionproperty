@@ -1,15 +1,15 @@
 <?php
 // ============================================================
-// 🗄️ Database Session Handler – Auto-Detect Column (access/last_activity)
-// Works with both MySQL-style TIMESTAMP and INT based columns
+// 🗄️ Database Session Handler – Auto-Detect + 90-Day Minimum GC
 // ============================================================
 
 class DatabaseSessionHandler implements SessionHandlerInterface
 {
     private $pdo;
     private $table = 'sessions';
-    private $time_column = 'last_activity'; // default
+    private $time_column = 'last_activity';
     private $use_timestamp = false;
+    private $min_lifetime = 7776000; // 90 days in seconds
 
     public function __construct($pdo)
     {
@@ -17,13 +17,9 @@ class DatabaseSessionHandler implements SessionHandlerInterface
         $this->detectSchema();
     }
 
-    /**
-     * Auto-detect the schema of the sessions table
-     */
     private function detectSchema()
     {
         try {
-            // Check if 'last_activity' column exists
             $stmt = $this->pdo->query("
                 SELECT column_name, data_type 
                 FROM information_schema.columns 
@@ -36,15 +32,14 @@ class DatabaseSessionHandler implements SessionHandlerInterface
 
             if (isset($columns['last_activity'])) {
                 $this->time_column = 'last_activity';
-                $this->use_timestamp = false; // INT
+                $this->use_timestamp = false;
             } elseif (isset($columns['access'])) {
                 $this->time_column = 'access';
-                $this->use_timestamp = true; // TIMESTAMP
+                $this->use_timestamp = true;
             } elseif (isset($columns['timestamp'])) {
                 $this->time_column = 'timestamp';
                 $this->use_timestamp = true;
             } else {
-                // Fallback: Create the column if missing
                 $this->pdo->exec("ALTER TABLE {$this->table} ADD COLUMN IF NOT EXISTS last_activity INT");
                 $this->time_column = 'last_activity';
                 $this->use_timestamp = false;
@@ -109,13 +104,19 @@ class DatabaseSessionHandler implements SessionHandlerInterface
     public function gc($maxLifetime)
     {
         try {
+            // 🔥 FIX: Enforce minimum 90 days – never delete earlier
+            if ($maxLifetime < $this->min_lifetime) {
+                $maxLifetime = $this->min_lifetime;
+            }
+            
             if ($this->use_timestamp) {
                 $stmt = $this->pdo->prepare("DELETE FROM {$this->table} WHERE {$this->time_column} < NOW() - INTERVAL '{$maxLifetime} seconds'");
+                $stmt->execute();
             } else {
                 $stmt = $this->pdo->prepare("DELETE FROM {$this->table} WHERE {$this->time_column} < ?");
                 $stmt->execute([time() - $maxLifetime]);
             }
-            return $stmt->execute() !== false;
+            return true;
         } catch (Exception $e) {
             error_log("Session GC Error: " . $e->getMessage());
             return false;
