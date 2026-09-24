@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🗄️ Database Connection + URL-based Impersonation Session
+// 🗄️ Database Connection + Session Handler + 90-Day Lifetime Fix
 // ============================================================
 
 $host = getenv('DB_HOST') ?: 'aws-0-ap-northeast-2.pooler.supabase.com';
@@ -10,6 +10,19 @@ $user = getenv('DB_USER') ?: 'postgres.bqspzgwpqimjyhispwtp';
 $password = getenv('DB_PASSWORD') ?: 'Primeaug2026';
 
 date_default_timezone_set('Asia/Kolkata');
+
+// ============================================================
+// 🔥 SESSION LIFETIME FIX – 90 Days (BEFORE session_start)
+// ============================================================
+$lifetime = 86400 * 90; // 90 days in seconds
+
+ini_set('session.gc_maxlifetime', $lifetime);
+ini_set('session.cookie_lifetime', $lifetime);
+ini_set('session.gc_probability', 1);
+ini_set('session.gc_divisor', 1000);  // Run GC only 0.1% of requests
+ini_set('session.use_strict_mode', 0);
+ini_set('session.use_cookies', 1);
+ini_set('session.use_only_cookies', 1);
 
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
@@ -161,7 +174,7 @@ if (file_exists($sessionHandlerFile)) {
                     );
                     
                     session_set_cookie_params([
-                        'lifetime' => 86400 * 90,
+                        'lifetime' => $lifetime,
                         'path' => '/',
                         'domain' => '',
                         'secure' => $is_https,
