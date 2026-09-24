@@ -1,6 +1,7 @@
 <?php
 // ============================================================
 // 🕵️ Admin – Login as User (URL-based Session)
+// Sets BOTH name and user_name to match all pages
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -24,7 +25,7 @@ if (!$user) {
 }
 
 $admin_id = $_SESSION['user_id'];
-$admin_name = $_SESSION['name'] ?? 'Admin';
+$admin_name = $_SESSION['name'] ?? $_SESSION['user_name'] ?? 'Admin';
 
 // Close the admin session (don't destroy it)
 session_write_close();
@@ -39,12 +40,17 @@ $new_session_id = bin2hex(random_bytes(24)); // 48 hex chars
 session_id($new_session_id);
 session_start();
 
-$_SESSION['user_id']  = $user['id'];
-$_SESSION['role']     = $user['role'];
-$_SESSION['name']     = $user['name'];
-$_SESSION['email']    = $user['email'];
-$_SESSION['phone']    = $user['phone'] ?? '';
-$_SESSION['impersonate_admin_id'] = $admin_id;
+// 🔥 Set ALL possible session keys that pages might use
+$_SESSION['user_id']      = $user['id'];
+$_SESSION['role']         = $user['role'];
+$_SESSION['name']         = $user['name'];
+$_SESSION['user_name']    = $user['name'];  // for pages that use user_name
+$_SESSION['email']        = $user['email'];
+$_SESSION['user_email']   = $user['email']; // for pages that use user_email
+$_SESSION['phone']        = $user['phone'] ?? '';
+
+// Store admin info for the impersonation banner
+$_SESSION['impersonate_admin_id']   = $admin_id;
 $_SESSION['impersonate_admin_name'] = $admin_name;
 
 session_write_close();
