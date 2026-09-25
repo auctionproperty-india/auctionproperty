@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 💰 My Earnings – Clean Readable Typography
+// 💰 My Earnings – PDF-Optimized Statement (A4 single-page fit)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -167,18 +167,23 @@ include 'header.php';
         --brand-purple: #7c3aed;
     }
 
-    body { background: #f0f4f8; font-family: 'Inter', sans-serif; }
+    body { 
+        background: #f0f4f8; 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
 
     @page {
         size: A4;
-        margin: 12mm 10mm;
+        margin: 8mm 8mm;
     }
 
     .statement-wrapper {
         max-width: 210mm;
         margin: 0 auto;
         background: #fff;
-        border-radius: 14px;
+        border-radius: 12px;
         box-shadow: 0 12px 45px rgba(15, 23, 42, 0.10);
         overflow: hidden;
         margin-bottom: 30px;
@@ -188,124 +193,124 @@ include 'header.php';
     .statement-brand-header {
         background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #2563eb 100%);
         color: #fff;
-        padding: 24px 32px 20px;
+        padding: 18px 26px 16px;
     }
     .brand-logo-row {
         display: flex; align-items: center; justify-content: space-between;
-        flex-wrap: wrap; gap: 15px; margin-bottom: 18px;
+        flex-wrap: wrap; gap: 12px; margin-bottom: 14px;
     }
-    .brand-logo { display: flex; align-items: center; gap: 14px; }
+    .brand-logo { display: flex; align-items: center; gap: 12px; }
     .brand-logo .logo-icon {
-        width: 48px; height: 48px;
+        width: 42px; height: 42px;
         background: linear-gradient(135deg, #fbbf24, #f59e0b);
-        border-radius: 12px; display: flex; align-items: center; justify-content: center;
-        font-size: 22px; color: #0f172a;
-        box-shadow: 0 6px 18px rgba(251, 191, 36, 0.35);
+        border-radius: 10px; display: flex; align-items: center; justify-content: center;
+        font-size: 20px; color: #0f172a;
+        box-shadow: 0 4px 12px rgba(251, 191, 36, 0.35);
     }
     .brand-logo .brand-name {
-        font-size: 1.15rem; font-weight: 700;
-        letter-spacing: 0.5px; line-height: 1.2;
+        font-size: 1.05rem; font-weight: 700;
+        letter-spacing: 0.3px; line-height: 1.2;
     }
     .brand-logo .brand-tagline {
-        font-size: 0.7rem; opacity: 0.7; letter-spacing: 2px;
-        text-transform: uppercase; font-weight: 500; margin-top: 3px;
+        font-size: 0.65rem; opacity: 0.75; letter-spacing: 1.8px;
+        text-transform: uppercase; font-weight: 500; margin-top: 2px;
     }
     .statement-period-badge {
-        background: rgba(255, 255, 255, 0.12);
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        padding: 9px 20px; border-radius: 10px; text-align: right;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        padding: 8px 18px; border-radius: 8px; text-align: right;
     }
     .statement-period-badge .label {
-        font-size: 0.6rem; text-transform: uppercase; opacity: 0.7;
+        font-size: 0.58rem; text-transform: uppercase; opacity: 0.75;
         letter-spacing: 1.2px; font-weight: 600;
     }
     .statement-period-badge .value {
-        font-size: 0.92rem; font-weight: 700; margin-top: 3px;
+        font-size: 0.88rem; font-weight: 700; margin-top: 2px;
     }
 
     .statement-meta {
-        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px;
-        padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.12);
+        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+        padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.15);
     }
-    .statement-meta .meta-item { flex: 1; min-width: 140px; }
+    .statement-meta .meta-item { flex: 1; min-width: 130px; }
     .statement-meta .meta-label {
-        font-size: 0.6rem; text-transform: uppercase; opacity: 0.6;
-        letter-spacing: 1.2px; font-weight: 600; margin-bottom: 4px;
+        font-size: 0.58rem; text-transform: uppercase; opacity: 0.65;
+        letter-spacing: 1px; font-weight: 600; margin-bottom: 3px;
     }
     .statement-meta .meta-value {
-        font-size: 0.9rem; font-weight: 600;
+        font-size: 0.85rem; font-weight: 600;
+        word-break: break-all;
     }
     .statement-meta .meta-value small {
-        font-weight: 400; opacity: 0.75;
-        font-size: 0.8rem;
+        font-weight: 400; opacity: 0.8;
+        font-size: 0.78rem;
     }
 
     /* ============ GROSS SUMMARY ============ */
     .gross-summary {
         display: flex;
-        padding: 20px 32px;
-        background: linear-gradient(135deg, #fffbeb, #fef3c7);
+        padding: 16px 26px;
+        background: #fef3c7;
         border-bottom: 1px solid #fde68a;
         align-items: center;
-        gap: 20px;
+        gap: 16px;
         flex-wrap: wrap;
     }
     .gross-summary .gs-icon {
-        width: 56px; height: 56px;
-        background: linear-gradient(135deg, #fbbf24, #f59e0b);
-        border-radius: 15px;
+        width: 48px; height: 48px;
+        background: #f59e0b;
+        border-radius: 12px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 26px; color: #fff;
-        box-shadow: 0 8px 20px rgba(251, 191, 36, 0.4);
+        font-size: 22px; color: #fff;
         flex-shrink: 0;
     }
     .gross-summary .gs-info { flex: 1; }
     .gross-summary .gs-info .label {
-        font-size: 0.7rem; text-transform: uppercase;
+        font-size: 0.68rem; text-transform: uppercase;
         color: #92400e; font-weight: 600; letter-spacing: 1px;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
     }
     .gross-summary .gs-info .value {
-        font-size: 1.8rem; font-weight: 700;
+        font-size: 1.6rem; font-weight: 700;
         color: #b45309; line-height: 1.1;
     }
     .gross-summary .gs-info .sub {
-        font-size: 0.75rem; color: #78350f;
-        margin-top: 5px; font-weight: 500;
+        font-size: 0.72rem; color: #78350f;
+        margin-top: 3px; font-weight: 500;
     }
     .gross-summary .gs-right { text-align: right; }
     .gross-summary .gs-right .lbl {
-        font-size: 0.65rem; text-transform: uppercase;
+        font-size: 0.62rem; text-transform: uppercase;
         color: #92400e; font-weight: 600; letter-spacing: 0.8px;
     }
     .gross-summary .gs-right .val {
-        font-size: 1.1rem; font-weight: 700;
-        color: #78350f; margin-top: 3px;
+        font-size: 1rem; font-weight: 700;
+        color: #78350f; margin-top: 2px;
     }
 
     /* ============ BODY ============ */
-    .statement-body { padding: 22px 32px 26px; }
+    .statement-body { padding: 18px 26px 22px; }
 
     .section-heading {
-        display: flex; align-items: center; gap: 12px;
-        margin-bottom: 16px; padding-bottom: 12px;
+        display: flex; align-items: center; gap: 10px;
+        margin-bottom: 14px; padding-bottom: 10px;
         border-bottom: 2px solid #f1f5f9;
         flex-wrap: wrap;
     }
     .section-heading .sh-icon {
-        width: 34px; height: 34px;
-        background: linear-gradient(135deg, #1e3a8a, #2563eb);
-        color: #fff; border-radius: 9px;
-        display: flex; align-items: center; justify-content: center; font-size: 15px;
+        width: 30px; height: 30px;
+        background: #1e3a8a;
+        color: #fff; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center; font-size: 13px;
     }
     .section-heading h5 {
         margin: 0; font-weight: 700; color: #0f172a;
-        font-size: 1rem;
+        font-size: 0.95rem;
     }
     .section-heading .sh-count {
         background: #eff6ff; color: #1d4ed8;
-        padding: 3px 11px; border-radius: 20px;
-        font-size: 0.7rem; font-weight: 600;
+        padding: 3px 10px; border-radius: 20px;
+        font-size: 0.68rem; font-weight: 600;
     }
 
     /* Toggle */
@@ -313,124 +318,123 @@ include 'header.php';
         margin-left: auto;
         display: inline-flex;
         background: #f1f5f9;
-        border-radius: 24px;
+        border-radius: 22px;
         padding: 3px;
         gap: 3px;
     }
     .view-toggle button {
         background: transparent;
         border: none;
-        padding: 6px 16px;
-        border-radius: 20px;
-        font-size: 0.75rem;
+        padding: 5px 14px;
+        border-radius: 18px;
+        font-size: 0.72rem;
         font-weight: 600;
         color: #64748b;
         cursor: pointer;
         transition: all 0.2s;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
     }
     .view-toggle button.active {
-        background: linear-gradient(135deg, #1e3a8a, #2563eb);
+        background: #1e3a8a;
         color: #fff;
-        box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3);
     }
 
     /* ============ BATCH SLIP ============ */
     .batch-slip {
         background: #fff;
         border: 1.5px solid #e2e8f0;
-        border-radius: 14px;
+        border-radius: 12px;
         overflow: hidden;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
         page-break-inside: avoid;
+        break-inside: avoid;
     }
 
     .batch-slip-header {
-        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-        padding: 14px 22px;
+        background: #f8fafc;
+        padding: 12px 18px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 10px;
         border-bottom: 1.5px solid #e2e8f0;
     }
-    .batch-info { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+    .batch-info { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
     .batch-info .info-item { display: flex; flex-direction: column; }
     .batch-info .info-item .lbl {
-        font-size: 0.6rem; text-transform: uppercase; color: #94a3b8;
-        font-weight: 600; letter-spacing: 1px; margin-bottom: 3px;
+        font-size: 0.58rem; text-transform: uppercase; color: #94a3b8;
+        font-weight: 600; letter-spacing: 0.8px; margin-bottom: 2px;
     }
     .batch-info .info-item .val {
-        font-size: 0.82rem; font-weight: 600; color: #0f172a;
+        font-size: 0.78rem; font-weight: 600; color: #0f172a;
     }
     .batch-info .info-item .utr-code {
         font-family: 'Courier New', monospace;
-        background: #eff6ff; padding: 3px 9px;
-        border-radius: 5px; font-size: 0.72rem;
+        background: #eff6ff; padding: 2px 8px;
+        border-radius: 4px; font-size: 0.7rem;
         border: 1px solid #bfdbfe;
         color: #1e40af; font-weight: 600;
     }
     .batch-gross-badge {
-        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        background: #f59e0b;
         color: #fff;
-        padding: 9px 18px;
-        border-radius: 10px;
+        padding: 7px 16px;
+        border-radius: 8px;
         text-align: right;
-        box-shadow: 0 5px 14px rgba(245, 158, 11, 0.3);
     }
     .batch-gross-badge .lbl {
-        font-size: 0.6rem; text-transform: uppercase; opacity: 0.95;
-        font-weight: 600; letter-spacing: 1px;
+        font-size: 0.58rem; text-transform: uppercase;
+        font-weight: 600; letter-spacing: 0.8px;
+        opacity: 0.95;
     }
     .batch-gross-badge .val {
-        font-size: 1.05rem; font-weight: 700;
-        line-height: 1.1; margin-top: 3px;
+        font-size: 1rem; font-weight: 700;
+        line-height: 1.1; margin-top: 2px;
     }
 
     /* ============ TABLE ============ */
-    .earnings-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .earnings-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
     .earnings-table thead th {
         background: #1e293b; color: #fff;
-        font-size: 0.65rem; text-transform: uppercase;
-        letter-spacing: 0.8px; padding: 11px 12px;
+        font-size: 0.62rem; text-transform: uppercase;
+        letter-spacing: 0.7px; padding: 9px 10px;
         text-align: left; font-weight: 600; white-space: nowrap;
     }
     .earnings-table tbody td {
-        padding: 11px 12px;
+        padding: 9px 10px;
         border-bottom: 1px solid #f1f5f9;
         vertical-align: middle;
         color: #1e293b;
         font-weight: 400;
-        font-size: 0.82rem;
+        font-size: 0.78rem;
     }
-    .earnings-table tbody tr:hover { background: #f8fafc; }
     .earnings-table tbody tr:last-child td { border-bottom: none; }
     .earnings-table tfoot td {
         background: #fef3c7;
-        padding: 12px;
+        padding: 10px;
         font-weight: 700;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         color: #78350f;
         border-top: 1.5px solid #fcd34d;
     }
 
     .user-cell strong {
         font-weight: 600; color: #0f172a;
-        display: block; font-size: 0.82rem;
+        display: block; font-size: 0.78rem;
     }
     .user-cell small {
-        font-size: 0.7rem; color: #64748b;
+        font-size: 0.68rem; color: #64748b;
         font-weight: 400;
     }
 
     .badge-type {
         display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.68rem;
+        padding: 3px 10px;
+        border-radius: 16px;
+        font-size: 0.65rem;
         font-weight: 600;
         white-space: nowrap;
     }
@@ -439,31 +443,31 @@ include 'header.php';
 
     .group-label {
         display: inline-block;
-        background: linear-gradient(135deg, #1e3a8a, #2563eb);
+        background: #1e3a8a;
         color: #fff;
-        padding: 4px 12px;
-        border-radius: 20px;
+        padding: 3px 10px;
+        border-radius: 16px;
         font-weight: 600;
-        font-size: 0.72rem;
-        min-width: 42px;
+        font-size: 0.68rem;
+        min-width: 40px;
         text-align: center;
     }
 
     .level-text {
         font-weight: 500;
         color: #475569;
-        font-size: 0.82rem;
+        font-size: 0.78rem;
     }
 
     .sales-text {
         font-weight: 600;
         color: #0f172a;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
     }
     .sales-text small {
         color: #94a3b8;
         font-weight: 400;
-        font-size: 0.72rem;
+        font-size: 0.68rem;
         margin-left: 3px;
     }
 
@@ -471,20 +475,22 @@ include 'header.php';
         font-weight: 700;
         color: #b45309;
         white-space: nowrap;
-        font-size: 0.88rem;
+        font-size: 0.85rem;
     }
 
     /* ============ DEDUCTION BREAKDOWN ============ */
     .deduction-breakdown {
-        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        background: #f8fafc;
         border-top: 1.5px solid #e2e8f0;
-        padding: 18px 26px;
+        padding: 14px 22px;
+        page-break-inside: avoid;
+        break-inside: avoid;
     }
     .deduction-row {
         display: flex;
         justify-content: space-between;
-        padding: 8px 0;
-        font-size: 0.88rem;
+        padding: 6px 0;
+        font-size: 0.85rem;
         border-bottom: 1px dashed #cbd5e1;
     }
     .deduction-row:last-child { border-bottom: none; }
@@ -493,13 +499,13 @@ include 'header.php';
         font-weight: 500;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
     }
     .deduction-row .label i {
-        width: 20px;
+        width: 18px;
         text-align: center;
         color: #94a3b8;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
     }
     .deduction-row .value {
         font-weight: 600;
@@ -510,78 +516,81 @@ include 'header.php';
     .deduction-row.net-row {
         border-top: 2px solid #1e293b;
         border-bottom: none;
-        margin-top: 6px;
-        padding-top: 14px;
+        margin-top: 5px;
+        padding-top: 10px;
     }
     .deduction-row.net-row .label {
         color: #0f172a;
         font-weight: 700;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         letter-spacing: 0.5px;
         text-transform: uppercase;
     }
     .deduction-row.net-row .label i {
         color: #059669;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
     }
     .deduction-row.net-row .value {
         color: #059669;
         font-weight: 700;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
     }
 
     /* ============ GRAND TOTAL ============ */
     .grand-total-box {
-        margin-top: 24px;
-        background: linear-gradient(135deg, #0f172a, #1e3a8a);
-        border-radius: 14px;
-        padding: 20px 26px;
+        margin-top: 18px;
+        background: #1e3a8a;
+        border-radius: 12px;
+        padding: 16px 22px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
-        gap: 18px;
+        gap: 14px;
         color: #fff;
         page-break-inside: avoid;
+        break-inside: avoid;
     }
     .grand-total-box .gt-left h4 {
-        margin: 0; font-size: 0.9rem; font-weight: 600;
+        margin: 0; font-size: 0.85rem; font-weight: 600;
         letter-spacing: 1px; opacity: 0.9; text-transform: uppercase;
     }
     .grand-total-box .gt-left p {
-        margin: 4px 0 0; font-size: 0.75rem;
-        opacity: 0.7; font-weight: 400;
+        margin: 3px 0 0; font-size: 0.72rem;
+        opacity: 0.75; font-weight: 400;
     }
-    .grand-total-box .gt-right { display: flex; gap: 24px; flex-wrap: wrap; }
+    .grand-total-box .gt-right { display: flex; gap: 20px; flex-wrap: wrap; }
     .gt-item { text-align: right; }
     .gt-item .lbl {
-        font-size: 0.62rem; text-transform: uppercase;
-        opacity: 0.7; font-weight: 600; letter-spacing: 1px;
+        font-size: 0.6rem; text-transform: uppercase;
+        opacity: 0.75; font-weight: 600; letter-spacing: 0.8px;
     }
     .gt-item .val {
-        font-size: 0.95rem; font-weight: 600;
-        margin-top: 3px;
+        font-size: 0.9rem; font-weight: 600;
+        margin-top: 2px;
     }
     .gt-item.net .val {
-        font-size: 1.35rem;
+        font-size: 1.25rem;
         color: #6ee7b7;
         font-weight: 700;
     }
 
     /* ============ EMPTY ============ */
-    .empty-state { text-align: center; padding: 50px 20px; color: #94a3b8; }
-    .empty-state i { font-size: 3rem; opacity: 0.3; margin-bottom: 12px; }
-    .empty-state h5 { font-weight: 600; color: #64748b; font-size: 1rem; }
+    .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+    .empty-state i { font-size: 2.5rem; opacity: 0.3; margin-bottom: 10px; }
+    .empty-state h5 { font-weight: 600; color: #64748b; font-size: 0.95rem; }
 
     /* ============ FOOTER ============ */
     .statement-footer {
         background: #f8fafc;
-        padding: 16px 32px;
+        padding: 12px 26px;
         text-align: center;
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         color: #94a3b8;
         border-top: 1px solid #e2e8f0;
         font-weight: 400;
+        page-break-inside: avoid;
+        break-inside: avoid;
     }
 
     /* ============ FILTER BAR ============ */
@@ -605,27 +614,37 @@ include 'header.php';
         padding: 7px 14px; font-size: 0.82rem;
         font-weight: 500; color: #1e293b; background: #fff;
     }
-    .filter-bar select:focus, .filter-bar input[type="date"]:focus {
-        outline: none; border-color: #2563eb;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    }
     .btn-print {
-        background: linear-gradient(135deg, #1e3a8a, #2563eb);
+        background: #1e3a8a;
         color: #fff; border: none;
         padding: 9px 22px; border-radius: 9px;
         font-weight: 600; font-size: 0.82rem;
         cursor: pointer; transition: all 0.25s;
         display: inline-flex; align-items: center; gap: 7px;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
     }
-    .btn-print:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
+    .btn-print:hover { background: #1e40af; }
 
-    /* ============ PRINT ============ */
+    /* ============ PRINT: PDF FIX ============ */
     @media print {
-        body { background: #fff !important; font-size: 10pt; }
+        html, body { 
+            background: #fff !important; 
+            font-size: 9.5pt;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
         .sidebar, .top-nav, .top-bar, .sidebar-overlay-main, .filter-bar, .btn-print,
-        .impersonate-banner, footer, .no-print, .view-toggle { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; }
+        .impersonate-banner, footer, .no-print, .view-toggle { 
+            display: none !important; 
+        }
+        .main-content { 
+            margin-left: 0 !important; 
+            padding: 0 !important; 
+            width: 100% !important;
+        }
+        .container-fluid { padding: 0 !important; }
+        
         .statement-wrapper {
             box-shadow: none !important;
             border-radius: 0 !important;
@@ -633,14 +652,134 @@ include 'header.php';
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
+            page-break-after: avoid;
         }
-        .statement-brand-header { padding: 15px 20px !important; border-radius: 0 !important; }
-        .gross-summary { padding: 12px 20px !important; }
-        .statement-body { padding: 15px 20px !important; }
-        .batch-slip { page-break-inside: avoid; margin-bottom: 12px !important; }
-        .deduction-breakdown { page-break-inside: avoid; }
-        .grand-total-box { page-break-inside: avoid; margin-top: 15px !important; }
-        .statement-footer { page-break-inside: avoid; }
+        
+        /* Compact for A4 */
+        .statement-brand-header { 
+            padding: 12px 18px !important; 
+            border-radius: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .brand-logo .logo-icon { 
+            width: 34px; height: 34px; font-size: 16px;
+        }
+        .brand-logo .brand-name { font-size: 0.95rem; }
+        .brand-logo .brand-tagline { font-size: 0.6rem; }
+        .statement-period-badge { padding: 6px 14px; }
+        .statement-meta { padding-top: 10px; }
+        .statement-meta .meta-label { font-size: 0.55rem; }
+        .statement-meta .meta-value { font-size: 0.78rem; }
+        .statement-meta .meta-value small { font-size: 0.72rem; }
+        
+        .gross-summary { 
+            padding: 12px 18px !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .gross-summary .gs-icon { width: 40px; height: 40px; font-size: 18px; }
+        .gross-summary .gs-info .value { font-size: 1.35rem; }
+        .gross-summary .gs-info .label { font-size: 0.62rem; }
+        .gross-summary .gs-info .sub { font-size: 0.68rem; }
+        
+        .statement-body { padding: 12px 18px !important; }
+        .section-heading { margin-bottom: 10px; padding-bottom: 8px; }
+        .section-heading h5 { font-size: 0.88rem; }
+        
+        .batch-slip { 
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            margin-bottom: 10px !important; 
+        }
+        .batch-slip-header { 
+            padding: 8px 14px !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .batch-info .info-item .val { font-size: 0.72rem; }
+        .batch-gross-badge { padding: 5px 12px; }
+        .batch-gross-badge .val { font-size: 0.88rem; }
+        
+        .earnings-table { font-size: 0.72rem; }
+        .earnings-table thead th { padding: 7px 8px; font-size: 0.58rem; }
+        .earnings-table tbody td { padding: 7px 8px; font-size: 0.72rem; }
+        .earnings-table tfoot td { padding: 8px; font-size: 0.78rem; }
+        .user-cell strong { font-size: 0.72rem; }
+        .user-cell small { font-size: 0.62rem; }
+        .badge-type { padding: 2px 8px; font-size: 0.6rem; }
+        .group-label { padding: 2px 8px; font-size: 0.62rem; }
+        
+        .deduction-breakdown { 
+            padding: 10px 16px !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .deduction-row { padding: 5px 0; font-size: 0.78rem; }
+        .deduction-row.net-row { padding-top: 8px; margin-top: 4px; }
+        .deduction-row.net-row .value { font-size: 1.05rem; }
+        
+        .grand-total-box { 
+            padding: 12px 16px !important;
+            margin-top: 12px !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .grand-total-box .gt-left h4 { font-size: 0.78rem; }
+        .grand-total-box .gt-left p { font-size: 0.68rem; }
+        .gt-item .val { font-size: 0.82rem; }
+        .gt-item.net .val { font-size: 1.1rem; }
+        
+        .statement-footer { 
+            padding: 10px 18px !important;
+            font-size: 0.65rem;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        
+        /* Hide FA icons in print if they don't render - use text instead */
+        .deduction-row .label i,
+        .gross-summary .gs-icon i,
+        .batch-slip-header i,
+        .section-heading i,
+        .statement-footer i,
+        .grand-total-box i {
+            display: none !important;
+        }
+        
+        /* Replace FA icons with simple text markers in print */
+        .gross-summary .gs-icon::before {
+            content: '₹';
+            font-size: 22px;
+            font-weight: 700;
+            color: #fff;
+            display: block;
+        }
+        
+        .section-heading .sh-icon::before {
+            content: '≡';
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            display: block;
+        }
+        
+        /* Show simple text markers for deduction rows */
+        .deduction-row .label::before {
+            content: '•';
+            color: #94a3b8;
+            font-size: 14px;
+            margin-right: 4px;
+        }
+        .deduction-row.net-row .label::before {
+            color: #059669;
+        }
     }
 
     /* Hide/Show Views */
@@ -649,17 +788,16 @@ include 'header.php';
     body.show-detailed .view-detailed { display: block; }
     body.show-detailed .view-summary  { display: none; }
 
-    /* Summary view: hide batch header */
     .batch-slip-header { display: none; }
     body.show-detailed .batch-slip-header { display: flex; }
 
     @media (max-width: 768px) {
-        .statement-brand-header { padding: 18px 20px; }
-        .gross-summary { padding: 15px 20px; }
-        .gross-summary .gs-info .value { font-size: 1.5rem; }
-        .statement-body { padding: 15px 20px; }
-        .earnings-table { font-size: 0.75rem; }
-        .earnings-table thead th, .earnings-table tbody td { padding: 8px 8px; }
+        .statement-brand-header { padding: 15px 18px; }
+        .gross-summary { padding: 14px 18px; }
+        .gross-summary .gs-info .value { font-size: 1.4rem; }
+        .statement-body { padding: 14px 18px; }
+        .earnings-table { font-size: 0.72rem; }
+        .earnings-table thead th, .earnings-table tbody td { padding: 7px 6px; }
         .view-toggle { margin-left: 0; }
     }
 </style>
@@ -804,11 +942,11 @@ include 'header.php';
                             <table class="earnings-table">
                                 <thead>
                                     <tr>
-                                        <th style="width:110px;">Group</th>
+                                        <th style="width:100px;">Group</th>
                                         <th>Income Type</th>
-                                        <th class="text-center" style="width:110px;">Level</th>
-                                        <th class="text-center" style="width:120px;">Sales</th>
-                                        <th class="text-end" style="width:150px;">Gross Amount</th>
+                                        <th class="text-center" style="width:100px;">Level</th>
+                                        <th class="text-center" style="width:110px;">Sales</th>
+                                        <th class="text-end" style="width:140px;">Gross Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -865,7 +1003,7 @@ include 'header.php';
                                 <tbody>
                                     <?php foreach ($g['entries'] as $e): ?>
                                         <tr>
-                                            <td style="font-size:0.75rem; white-space:nowrap; color:#64748b;">
+                                            <td style="font-size:0.72rem; white-space:nowrap; color:#64748b;">
                                                 <?= date('d M Y', strtotime($e['date'])) ?>
                                             </td>
                                             <td class="user-cell">
@@ -879,7 +1017,7 @@ include 'header.php';
                                                     <span class="badge-type team">Team</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td style="font-size:0.75rem; color:#475569; min-width:180px;">
+                                            <td style="font-size:0.72rem; color:#475569; min-width:160px;">
                                                 <?= htmlspecialchars($e['description'] ?? '') ?>
                                             </td>
                                             <td class="text-end amt-gross-cell">₹ <?= indianCurrencyFormat($e['gross']) ?></td>
@@ -950,7 +1088,6 @@ include 'header.php';
 
         <!-- FOOTER -->
         <div class="statement-footer">
-            <i class="fas fa-shield-alt me-1"></i>
             This is a computer-generated statement and does not require a signature.
             <br>Generated on <?= date('d M Y, h:i A') ?> · Prime Property India
         </div>
