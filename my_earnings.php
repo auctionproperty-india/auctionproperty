@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 💰 My Earnings – PDF-Optimized Statement (A4 single-page fit)
+// 💰 My Earnings – Clean PDF Statement (NO FontAwesome in statement)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -160,23 +160,21 @@ include 'header.php';
     :root {
         --brand-dark: #0f172a;
         --brand-blue: #1e3a8a;
-        --brand-blue-light: #2563eb;
         --brand-green: #059669;
         --brand-gold: #f59e0b;
         --brand-red: #dc2626;
-        --brand-purple: #7c3aed;
     }
 
     body { 
         background: #f0f4f8; 
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        font-family: Arial, Helvetica, sans-serif;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
 
     @page {
         size: A4;
-        margin: 8mm 8mm;
+        margin: 10mm 8mm;
     }
 
     .statement-wrapper {
@@ -193,27 +191,32 @@ include 'header.php';
     .statement-brand-header {
         background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #2563eb 100%);
         color: #fff;
-        padding: 18px 26px 16px;
+        padding: 20px 28px;
     }
     .brand-logo-row {
         display: flex; align-items: center; justify-content: space-between;
-        flex-wrap: wrap; gap: 12px; margin-bottom: 14px;
+        flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
     }
     .brand-logo { display: flex; align-items: center; gap: 12px; }
-    .brand-logo .logo-icon {
+    .brand-logo .logo-box {
         width: 42px; height: 42px;
-        background: linear-gradient(135deg, #fbbf24, #f59e0b);
-        border-radius: 10px; display: flex; align-items: center; justify-content: center;
+        background: #f59e0b;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
         font-size: 20px; color: #0f172a;
-        box-shadow: 0 4px 12px rgba(251, 191, 36, 0.35);
+        font-weight: 700;
+        letter-spacing: -1px;
+        flex-shrink: 0;
     }
     .brand-logo .brand-name {
         font-size: 1.05rem; font-weight: 700;
-        letter-spacing: 0.3px; line-height: 1.2;
+        letter-spacing: 0.5px; line-height: 1.2;
+        font-family: Arial, Helvetica, sans-serif;
     }
     .brand-logo .brand-tagline {
-        font-size: 0.65rem; opacity: 0.75; letter-spacing: 1.8px;
-        text-transform: uppercase; font-weight: 500; margin-top: 2px;
+        font-size: 0.65rem; opacity: 0.75;
+        letter-spacing: 2px; text-transform: uppercase;
+        font-weight: 500; margin-top: 2px;
     }
     .statement-period-badge {
         background: rgba(255, 255, 255, 0.15);
@@ -242,33 +245,34 @@ include 'header.php';
         word-break: break-all;
     }
     .statement-meta .meta-value small {
-        font-weight: 400; opacity: 0.8;
+        font-weight: 400; opacity: 0.85;
         font-size: 0.78rem;
     }
 
     /* ============ GROSS SUMMARY ============ */
     .gross-summary {
         display: flex;
-        padding: 16px 26px;
+        padding: 18px 28px;
         background: #fef3c7;
         border-bottom: 1px solid #fde68a;
         align-items: center;
         gap: 16px;
         flex-wrap: wrap;
     }
-    .gross-summary .gs-icon {
+    .gross-summary .gs-icon-box {
         width: 48px; height: 48px;
         background: #f59e0b;
         border-radius: 12px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 22px; color: #fff;
+        font-size: 24px; color: #fff;
+        font-weight: 700;
         flex-shrink: 0;
     }
     .gross-summary .gs-info { flex: 1; }
     .gross-summary .gs-info .label {
         font-size: 0.68rem; text-transform: uppercase;
         color: #92400e; font-weight: 600; letter-spacing: 1px;
-        margin-bottom: 3px;
+        margin-bottom: 4px;
     }
     .gross-summary .gs-info .value {
         font-size: 1.6rem; font-weight: 700;
@@ -276,7 +280,7 @@ include 'header.php';
     }
     .gross-summary .gs-info .sub {
         font-size: 0.72rem; color: #78350f;
-        margin-top: 3px; font-weight: 500;
+        margin-top: 4px; font-weight: 500;
     }
     .gross-summary .gs-right { text-align: right; }
     .gross-summary .gs-right .lbl {
@@ -289,7 +293,7 @@ include 'header.php';
     }
 
     /* ============ BODY ============ */
-    .statement-body { padding: 18px 26px 22px; }
+    .statement-body { padding: 20px 28px 24px; }
 
     .section-heading {
         display: flex; align-items: center; gap: 10px;
@@ -297,11 +301,12 @@ include 'header.php';
         border-bottom: 2px solid #f1f5f9;
         flex-wrap: wrap;
     }
-    .section-heading .sh-icon {
+    .section-heading .sh-icon-box {
         width: 30px; height: 30px;
         background: #1e3a8a;
         color: #fff; border-radius: 8px;
-        display: flex; align-items: center; justify-content: center; font-size: 13px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; font-weight: 700;
     }
     .section-heading h5 {
         margin: 0; font-weight: 700; color: #0f172a;
@@ -325,9 +330,9 @@ include 'header.php';
     .view-toggle button {
         background: transparent;
         border: none;
-        padding: 5px 14px;
+        padding: 6px 16px;
         border-radius: 18px;
-        font-size: 0.72rem;
+        font-size: 0.74rem;
         font-weight: 600;
         color: #64748b;
         cursor: pointer;
@@ -335,6 +340,7 @@ include 'header.php';
         display: inline-flex;
         align-items: center;
         gap: 5px;
+        font-family: Arial, sans-serif;
     }
     .view-toggle button.active {
         background: #1e3a8a;
@@ -381,7 +387,7 @@ include 'header.php';
     .batch-gross-badge {
         background: #f59e0b;
         color: #fff;
-        padding: 7px 16px;
+        padding: 8px 16px;
         border-radius: 8px;
         text-align: right;
     }
@@ -501,18 +507,20 @@ include 'header.php';
         align-items: center;
         gap: 8px;
     }
-    .deduction-row .label i {
-        width: 18px;
-        text-align: center;
-        color: #94a3b8;
-        font-size: 0.82rem;
+    .deduction-row .label .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #94a3b8;
+        display: inline-block;
     }
+    .deduction-row.deduct .label .dot { background: #dc2626; }
+    .deduction-row.net-row .label .dot { background: #059669; width: 10px; height: 10px; }
     .deduction-row .value {
         font-weight: 600;
         color: #0f172a;
     }
     .deduction-row.deduct .value { color: #dc2626; }
-    .deduction-row.deduct .label i { color: #dc2626; }
     .deduction-row.net-row {
         border-top: 2px solid #1e293b;
         border-bottom: none;
@@ -525,10 +533,6 @@ include 'header.php';
         font-size: 0.85rem;
         letter-spacing: 0.5px;
         text-transform: uppercase;
-    }
-    .deduction-row.net-row .label i {
-        color: #059669;
-        font-size: 0.9rem;
     }
     .deduction-row.net-row .value {
         color: #059669;
@@ -577,13 +581,12 @@ include 'header.php';
 
     /* ============ EMPTY ============ */
     .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
-    .empty-state i { font-size: 2.5rem; opacity: 0.3; margin-bottom: 10px; }
     .empty-state h5 { font-weight: 600; color: #64748b; font-size: 0.95rem; }
 
     /* ============ FOOTER ============ */
     .statement-footer {
         background: #f8fafc;
-        padding: 12px 26px;
+        padding: 12px 28px;
         text-align: center;
         font-size: 0.7rem;
         color: #94a3b8;
@@ -619,7 +622,7 @@ include 'header.php';
         color: #fff; border: none;
         padding: 9px 22px; border-radius: 9px;
         font-weight: 600; font-size: 0.82rem;
-        cursor: pointer; transition: all 0.25s;
+        cursor: pointer;
         display: inline-flex; align-items: center; gap: 7px;
     }
     .btn-print:hover { background: #1e40af; }
@@ -628,20 +631,30 @@ include 'header.php';
     @media print {
         html, body { 
             background: #fff !important; 
-            font-size: 9.5pt;
+            font-size: 10pt;
             margin: 0 !important;
             padding: 0 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
+        
+        /* Hide everything that is not statement */
         .sidebar, .top-nav, .top-bar, .sidebar-overlay-main, .filter-bar, .btn-print,
-        .impersonate-banner, footer, .no-print, .view-toggle { 
+        .impersonate-banner, footer, .no-print, .view-toggle, 
+        .hamburger-sidebar, .sidebar-overlay { 
             display: none !important; 
         }
+        
+        /* Hide ALL font-awesome icons globally in print */
+        i.fas, i.far, i.fab, i.fa, [class*="fa-"] { 
+            display: none !important; 
+        }
+        
         .main-content { 
             margin-left: 0 !important; 
             padding: 0 !important; 
             width: 100% !important;
+            min-height: auto !important;
         }
         .container-fluid { padding: 0 !important; }
         
@@ -657,14 +670,12 @@ include 'header.php';
         
         /* Compact for A4 */
         .statement-brand-header { 
-            padding: 12px 18px !important; 
+            padding: 14px 20px !important; 
             border-radius: 0 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
-        .brand-logo .logo-icon { 
-            width: 34px; height: 34px; font-size: 16px;
-        }
+        .brand-logo .logo-box { width: 34px; height: 34px; font-size: 16px; }
         .brand-logo .brand-name { font-size: 0.95rem; }
         .brand-logo .brand-tagline { font-size: 0.6rem; }
         .statement-period-badge { padding: 6px 14px; }
@@ -674,32 +685,33 @@ include 'header.php';
         .statement-meta .meta-value small { font-size: 0.72rem; }
         
         .gross-summary { 
-            padding: 12px 18px !important;
+            padding: 12px 20px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
-        .gross-summary .gs-icon { width: 40px; height: 40px; font-size: 18px; }
+        .gross-summary .gs-icon-box { width: 40px; height: 40px; font-size: 20px; }
         .gross-summary .gs-info .value { font-size: 1.35rem; }
         .gross-summary .gs-info .label { font-size: 0.62rem; }
         .gross-summary .gs-info .sub { font-size: 0.68rem; }
         
-        .statement-body { padding: 12px 18px !important; }
+        .statement-body { padding: 14px 20px !important; }
         .section-heading { margin-bottom: 10px; padding-bottom: 8px; }
         .section-heading h5 { font-size: 0.88rem; }
+        .section-heading .sh-icon-box { width: 26px; height: 26px; font-size: 12px; }
         
         .batch-slip { 
             page-break-inside: avoid !important;
             break-inside: avoid !important;
-            margin-bottom: 10px !important; 
+            margin-bottom: 12px !important; 
         }
         .batch-slip-header { 
-            padding: 8px 14px !important;
+            padding: 10px 14px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
         .batch-info .info-item .val { font-size: 0.72rem; }
-        .batch-gross-badge { padding: 5px 12px; }
-        .batch-gross-badge .val { font-size: 0.88rem; }
+        .batch-gross-badge { padding: 6px 14px; }
+        .batch-gross-badge .val { font-size: 0.9rem; }
         
         .earnings-table { font-size: 0.72rem; }
         .earnings-table thead th { padding: 7px 8px; font-size: 0.58rem; }
@@ -735,50 +747,12 @@ include 'header.php';
         .gt-item.net .val { font-size: 1.1rem; }
         
         .statement-footer { 
-            padding: 10px 18px !important;
+            padding: 10px 20px !important;
             font-size: 0.65rem;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             page-break-inside: avoid;
             break-inside: avoid;
-        }
-        
-        /* Hide FA icons in print if they don't render - use text instead */
-        .deduction-row .label i,
-        .gross-summary .gs-icon i,
-        .batch-slip-header i,
-        .section-heading i,
-        .statement-footer i,
-        .grand-total-box i {
-            display: none !important;
-        }
-        
-        /* Replace FA icons with simple text markers in print */
-        .gross-summary .gs-icon::before {
-            content: '₹';
-            font-size: 22px;
-            font-weight: 700;
-            color: #fff;
-            display: block;
-        }
-        
-        .section-heading .sh-icon::before {
-            content: '≡';
-            font-size: 18px;
-            font-weight: 700;
-            color: #fff;
-            display: block;
-        }
-        
-        /* Show simple text markers for deduction rows */
-        .deduction-row .label::before {
-            content: '•';
-            color: #94a3b8;
-            font-size: 14px;
-            margin-right: 4px;
-        }
-        .deduction-row.net-row .label::before {
-            color: #059669;
         }
     }
 
@@ -806,7 +780,7 @@ include 'header.php';
     <!-- FILTER BAR -->
     <div class="filter-bar no-print">
         <form method="GET" class="filter-left" id="filterForm">
-            <label><i class="fas fa-calendar-alt me-1"></i> Period</label>
+            <label>Period</label>
             <select name="range" id="rangeSelect">
                 <option value="this_week" <?= $range == 'this_week' ? 'selected' : '' ?>>This Week</option>
                 <option value="last_week" <?= $range == 'last_week' ? 'selected' : '' ?>>Last Week</option>
@@ -824,7 +798,7 @@ include 'header.php';
             <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3 <?= $range == 'custom' ? '' : 'd-none' ?>" id="applyBtn">Apply</button>
         </form>
         <button onclick="window.print()" class="btn-print">
-            <i class="fas fa-file-download"></i> Print / Download A4
+            Print / Download A4
         </button>
     </div>
 
@@ -835,7 +809,7 @@ include 'header.php';
         <div class="statement-brand-header">
             <div class="brand-logo-row">
                 <div class="brand-logo">
-                    <div class="logo-icon"><i class="fas fa-building"></i></div>
+                    <div class="logo-box">PP</div>
                     <div>
                         <div class="brand-name">PRIME PROPERTY INDIA</div>
                         <div class="brand-tagline">Income Statement</div>
@@ -869,7 +843,7 @@ include 'header.php';
 
         <!-- GROSS SUMMARY -->
         <div class="gross-summary">
-            <div class="gs-icon"><i class="fas fa-coins"></i></div>
+            <div class="gs-icon-box">₹</div>
             <div class="gs-info">
                 <div class="label">Total Gross Income</div>
                 <div class="value">₹ <?= indianCurrencyFormat($grand_gross) ?></div>
@@ -887,17 +861,17 @@ include 'header.php';
         <div class="statement-body">
 
             <div class="section-heading">
-                <div class="sh-icon"><i class="fas fa-receipt"></i></div>
+                <div class="sh-icon-box">≡</div>
                 <h5>Earnings Breakdown</h5>
                 <span class="sh-count"><?= count($groups) ?> Payout<?= count($groups) != 1 ? 's' : '' ?></span>
 
                 <?php if (!empty($groups)): ?>
                 <div class="view-toggle no-print">
                     <button type="button" id="btnSummary" class="active" onclick="setView('summary')">
-                        <i class="fas fa-layer-group"></i> Summary
+                        Summary
                     </button>
                     <button type="button" id="btnDetailed" onclick="setView('detailed')">
-                        <i class="fas fa-list"></i> Detailed
+                        Detailed
                     </button>
                 </div>
                 <?php endif; ?>
@@ -905,7 +879,6 @@ include 'header.php';
 
             <?php if (empty($groups)): ?>
                 <div class="empty-state">
-                    <i class="fas fa-inbox"></i>
                     <h5>No Paid Earnings</h5>
                     <p>There are no paid earnings in this period.</p>
                 </div>
@@ -1037,19 +1010,19 @@ include 'header.php';
                     <!-- DEDUCTION BREAKDOWN -->
                     <div class="deduction-breakdown">
                         <div class="deduction-row">
-                            <span class="label"><i class="fas fa-coins"></i> Gross Amount</span>
+                            <span class="label"><span class="dot"></span> Gross Amount</span>
                             <span class="value">₹ <?= indianCurrencyFormat($g['total_gross']) ?></span>
                         </div>
                         <div class="deduction-row deduct">
-                            <span class="label"><i class="fas fa-percent"></i> TDS Deducted</span>
+                            <span class="label"><span class="dot"></span> TDS Deducted</span>
                             <span class="value">- ₹ <?= indianCurrencyFormat($g['total_tds']) ?></span>
                         </div>
                         <div class="deduction-row deduct">
-                            <span class="label"><i class="fas fa-hand-holding-usd"></i> Admin Charge</span>
+                            <span class="label"><span class="dot"></span> Admin Charge</span>
                             <span class="value">- ₹ <?= indianCurrencyFormat($g['total_admin']) ?></span>
                         </div>
                         <div class="deduction-row net-row">
-                            <span class="label"><i class="fas fa-wallet"></i> Net Payable</span>
+                            <span class="label"><span class="dot"></span> Net Payable</span>
                             <span class="value">₹ <?= indianCurrencyFormat($g['total_net']) ?></span>
                         </div>
                     </div>
@@ -1060,7 +1033,7 @@ include 'header.php';
             <?php if (!empty($groups)): ?>
                 <div class="grand-total-box">
                     <div class="gt-left">
-                        <h4><i class="fas fa-chart-line me-2"></i>Period Summary</h4>
+                        <h4>Period Summary</h4>
                         <p><?= $period_label ?> &nbsp;·&nbsp; <?= count($groups) ?> Payout<?= count($groups) != 1 ? 's' : '' ?></p>
                     </div>
                     <div class="gt-right">
