@@ -1,7 +1,7 @@
 <?php
 // ============================================================
-// 🤝 Admin – MLM Payout Management (Unified Paid History)
-// v4: Merged Old + New Paid History in same format
+// 🤝 Admin – MLM Payout Management (Bulk Release with Checkboxes)
+// v5: Checkbox Selection + Release Selected
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -34,22 +34,89 @@ function calculateNet($amount, $tds_percent, $admin_charge_percent) {
 }
 
 // ============================================================
-// INDIVIDUAL DELETE – Delete all pending entries for a user
+// 🔥 BULK RELEASE – Release multiple users at once
 // ============================================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user_pending'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_selected'])) {
     if (!hasEditPermission('referrals', $pdo)) die("<div class='alert alert-danger m-5'>❌ No permission.</div>");
-    $delete_user_id = (int)$_POST['delete_user_id'];
-    try {
-        $uname_stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
-        $uname_stmt->execute([$delete_user_id]);
-        $uname = $uname_stmt->fetchColumn();
-        $stmt = $pdo->prepare("DELETE FROM user_earnings WHERE user_id = ? AND status = 'pending'");
-        $stmt->execute([$delete_user_id]);
-        $deleted = $stmt->rowCount();
-        $_SESSION['msg'] = "🗑️ Deleted <b>$deleted</b> pending entries for <b>" . htmlspecialchars($uname) . "</b> (#$delete_user_id).";
+
+    $selected_users = $_POST['selected_users'] ?? [];
+    if (empty($selected_users)) {
+        $_SESSION['msg'] = "⚠️ No users selected.";
         header("Location: admin_referrals.php");
         exit;
+    }
+
+    $tds_percent = (float)$_POST['tds_percent'];
+    $admin_charge_percent = (float)$_POST['admin_charge_percent'];
+    $utr_prefix = 'BULK-' . date('YmdHis');
+
+    $total_released_users = 0;
+    $total_gross_all = 0;
+    $total_net_all = 0;
+
+    try {
+        $pdo->beginTransaction();
+
+        foreach ($selected_users as $receiver_id) {
+            $receiver_id = (int)$receiver_id;
+
+            $stmt = $pdo->prepare("SELECT id, amount FROM user_earnings WHERE user_id = ? AND status = 'pending'");
+            $stmt->execute([$receiver_id]);
+            $earnings = $stmt->fetchAll();
+
+            if (empty($earnings)) continue;
+
+            $utr_no = $utr_prefix . '-' . $receiver_id;
+
+            // Get bank details
+            $bank = getUserBankDetails($pdo, $receiver_id);
+            $bank_name = $bank['bank_name'] ?? '';
+            $account_number = $bank['account_number'] ?? '';
+            $ifsc = $bank['ifsc'] ?? '';
+
+            $user_gross = 0;
+            $user_net = 0;
+
+            foreach ($earnings as $e) {
+                $calc = calculateNet($e['amount'], $tds_percent, $admin_charge_percent);
+                $user_gross += $e['amount'];
+                $user_net += $calc['net'];
+
+                $upd = $pdo->prepare("
+                    UPDATE user_earnings 
+                    SET status = 'paid', 
+                        tds_deducted = ?, 
+                        admin_charge_deducted = ?, 
+                        net_amount = ?, 
+                        paid_at = CURRENT_TIMESTAMP, 
+                        utr_no = ?
+                    WHERE id = ?
+                ");
+                $upd->execute([$calc['tds'], $calc['admin_charge'], $calc['net'], $utr_no, $e['id']]);
+            }
+
+            // Credit wallet
+            if ($user_net > 0) {
+                creditWallet($pdo, $receiver_id, $user_net, "MLM Payout Released (Bulk, Gross ₹" . number_format($user_gross, 2) . ")", null, null);
+            }
+
+            // Accounting
+            $uname_stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+            $uname_stmt->execute([$receiver_id]);
+            $uname = $uname_stmt->fetchColumn();
+            addAccountEntry($pdo, 'expense', $user_net, "MLM Payout (Bulk) to $uname (ID: $receiver_id) - Gross ₹" . indianCurrencyFormat($user_gross) . " | UTR: $utr_no", 'MLM Payout');
+
+            $total_released_users++;
+            $total_gross_all += $user_gross;
+            $total_net_all += $user_net;
+        }
+
+        $pdo->commit();
+        $_SESSION['msg'] = "✅ <b>Bulk Release Successful!</b><br>Released to <b>$total_released_users</b> users.<br>Total Gross: ₹" . number_format($total_gross_all, 2) . " | <b>Total Net Credited: ₹" . number_format($total_net_all, 2) . "</b>";
+        header("Location: admin_referrals.php?mlm_paid=1");
+        exit;
     } catch (Exception $e) {
+        $pdo->rollBack();
         $_SESSION['msg'] = "❌ Error: " . $e->getMessage();
         header("Location: admin_referrals.php");
         exit;
@@ -57,25 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user_pending']
 }
 
 // ============================================================
-// DELETE ALL PENDING
-// ============================================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_all_pending'])) {
-    if (!hasEditPermission('referrals', $pdo)) die("<div class='alert alert-danger m-5'>❌ No permission.</div>");
-    try {
-        $stmt = $pdo->query("DELETE FROM user_earnings WHERE status = 'pending'");
-        $deleted = $stmt->rowCount();
-        $_SESSION['msg'] = "🗑️ Deleted <b>$deleted</b> pending MLM entries (all users).";
-        header("Location: admin_referrals.php");
-        exit;
-    } catch (Exception $e) {
-        $_SESSION['msg'] = "❌ Error: " . $e->getMessage();
-        header("Location: admin_referrals.php");
-        exit;
-    }
-}
-
-// ============================================================
-// RELEASE MLM PAYOUT
+// INDIVIDUAL RELEASE
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_mlm'])) {
     if (!hasEditPermission('referrals', $pdo)) die("<div class='alert alert-danger m-5'>❌ No permission.</div>");
@@ -93,32 +142,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_mlm'])) {
         $stmt = $pdo->prepare("SELECT id, amount FROM user_earnings WHERE user_id = ? AND status = 'pending'");
         $stmt->execute([$receiver_id]);
         $earnings = $stmt->fetchAll();
-
-        if (empty($earnings)) throw new Exception("No pending MLM earnings for this user.");
+        if (empty($earnings)) throw new Exception("No pending MLM earnings.");
 
         $total_gross = 0; $total_tds = 0; $total_admin = 0; $total_net = 0;
-
         foreach ($earnings as $e) {
             $calc = calculateNet($e['amount'], $tds_percent, $admin_charge_percent);
-            $total_gross += $e['amount'];
-            $total_tds += $calc['tds'];
-            $total_admin += $calc['admin_charge'];
-            $total_net += $calc['net'];
+            $total_gross += $e['amount']; $total_tds += $calc['tds']; $total_admin += $calc['admin_charge']; $total_net += $calc['net'];
             $upd = $pdo->prepare("UPDATE user_earnings SET status = 'paid', tds_deducted = ?, admin_charge_deducted = ?, net_amount = ?, paid_at = CURRENT_TIMESTAMP, utr_no = ? WHERE id = ?");
             $upd->execute([$calc['tds'], $calc['admin_charge'], $calc['net'], $utr_no, $e['id']]);
         }
-
-        if ($total_net > 0) {
-            creditWallet($pdo, $receiver_id, $total_net, "MLM Payout Released (Gross ₹" . number_format($total_gross, 2) . ", Net ₹" . number_format($total_net, 2) . ")", null, null);
-        }
-
+        if ($total_net > 0) creditWallet($pdo, $receiver_id, $total_net, "MLM Payout Released (Gross ₹" . number_format($total_gross, 2) . ")", null, null);
         $uname_stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
         $uname_stmt->execute([$receiver_id]);
         $uname = $uname_stmt->fetchColumn();
         addAccountEntry($pdo, 'expense', $total_net, "MLM Payout to $uname (ID: $receiver_id) - Gross ₹" . indianCurrencyFormat($total_gross) . " | UTR: $utr_no", 'MLM Payout');
-
         $pdo->commit();
-        $_SESSION['msg'] = "✅ Released! Gross: ₹" . number_format($total_gross, 2) . " | TDS: ₹" . number_format($total_tds, 2) . " | Admin: ₹" . number_format($total_admin, 2) . " | <b>Net: ₹" . number_format($total_net, 2) . "</b>";
+        $_SESSION['msg'] = "✅ Released! Net: ₹" . number_format($total_net, 2);
         header("Location: admin_referrals.php?mlm_paid=1");
         exit;
     } catch (Exception $e) {
@@ -129,18 +168,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_mlm'])) {
     }
 }
 
+// ============================================================
+// INDIVIDUAL DELETE
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user_pending'])) {
+    if (!hasEditPermission('referrals', $pdo)) die("No permission.");
+    $delete_user_id = (int)$_POST['delete_user_id'];
+    try {
+        $uname_stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+        $uname_stmt->execute([$delete_user_id]);
+        $uname = $uname_stmt->fetchColumn();
+        $stmt = $pdo->prepare("DELETE FROM user_earnings WHERE user_id = ? AND status = 'pending'");
+        $stmt->execute([$delete_user_id]);
+        $deleted = $stmt->rowCount();
+        $_SESSION['msg'] = "🗑️ Deleted <b>$deleted</b> pending entries for <b>" . htmlspecialchars($uname) . "</b>.";
+        header("Location: admin_referrals.php");
+        exit;
+    } catch (Exception $e) {
+        $_SESSION['msg'] = "❌ Error: " . $e->getMessage();
+        header("Location: admin_referrals.php");
+        exit;
+    }
+}
+
+// ============================================================
+// DELETE ALL PENDING
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_all_pending'])) {
+    if (!hasEditPermission('referrals', $pdo)) die("No permission.");
+    try {
+        $stmt = $pdo->query("DELETE FROM user_earnings WHERE status = 'pending'");
+        $deleted = $stmt->rowCount();
+        $_SESSION['msg'] = "🗑️ Deleted <b>$deleted</b> pending entries (all users).";
+        header("Location: admin_referrals.php");
+        exit;
+    } catch (Exception $e) {
+        $_SESSION['msg'] = "❌ Error: " . $e->getMessage();
+        header("Location: admin_referrals.php");
+        exit;
+    }
+}
+
 include 'header.php';
 
 $defaults = getGlobalDeductions($pdo);
 
-// ---- Summary Stats (both tables) ----
+// Summary
 $sum1 = $pdo->query("SELECT COALESCE(SUM(tds_deducted), 0) as tds, COALESCE(SUM(admin_charge_deducted), 0) as admin, COALESCE(SUM(net_amount), 0) as net FROM user_earnings WHERE status = 'paid'")->fetch();
 $sum2 = $pdo->query("SELECT COALESCE(SUM(tds_deducted), 0) as tds, COALESCE(SUM(admin_charge_deducted), 0) as admin, COALESCE(SUM(net_amount), 0) as net FROM user_referral_earnings WHERE status = 'paid'")->fetch();
 $total_tds = $sum1['tds'] + $sum2['tds'];
 $total_admin = $sum1['admin'] + $sum2['admin'];
 $total_net_paid = $sum1['net'] + $sum2['net'];
 
-// ---- Pending MLM Payouts ----
+// Pending MLM
 $mlmPending = $pdo->query("
     SELECT e.user_id as receiver_id, u.name as receiver_name, u.email as receiver_email, 
            SUM(e.amount) as total_amount, COUNT(e.id) as total_count
@@ -154,33 +234,21 @@ $mlmEntries = [];
 if (!empty($mlmPending)) {
     $receiver_ids = array_column($mlmPending, 'receiver_id');
     $placeholders = implode(',', array_fill(0, count($receiver_ids), '?'));
-    $stmt = $pdo->prepare("
-        SELECT e.*, f.name as from_user_name 
-        FROM user_earnings e LEFT JOIN users f ON e.from_user_id = f.id 
-        WHERE e.user_id IN ($placeholders) AND e.status = 'pending'
-        ORDER BY e.id ASC
-    ");
+    $stmt = $pdo->prepare("SELECT e.*, f.name as from_user_name FROM user_earnings e LEFT JOIN users f ON e.from_user_id = f.id WHERE e.user_id IN ($placeholders) AND e.status = 'pending' ORDER BY e.id ASC");
     $stmt->execute($receiver_ids);
     while ($row = $stmt->fetch()) {
         $mlmEntries[$row['user_id']][] = $row;
     }
 }
 
-// ============================================================
-// 🔥 UNIFIED PAID HISTORY (Merge Old + New)
-// ============================================================
+// Unified Paid History
 $unifiedPaidGroups = [];
 
-// A) New MLM paid entries
 $stmt = $pdo->query("
-    SELECT e.user_id as receiver_id, u.name as receiver_name,
-           COALESCE(e.utr_no, 'N/A') as utr_no,
-           DATE(e.paid_at) as paid_date,
-           MIN(e.paid_at) as paid_at,
-           SUM(e.amount) as total_gross,
-           SUM(COALESCE(e.tds_deducted, 0)) as total_tds,
-           SUM(COALESCE(e.admin_charge_deducted, 0)) as total_admin,
-           SUM(COALESCE(e.net_amount, 0)) as total_net,
+    SELECT e.user_id as receiver_id, u.name as receiver_name, COALESCE(e.utr_no, 'N/A') as utr_no,
+           DATE(e.paid_at) as paid_date, MIN(e.paid_at) as paid_at,
+           SUM(e.amount) as total_gross, SUM(COALESCE(e.tds_deducted, 0)) as total_tds,
+           SUM(COALESCE(e.admin_charge_deducted, 0)) as total_admin, SUM(COALESCE(e.net_amount, 0)) as total_net,
            COUNT(*) as entry_count
     FROM user_earnings e JOIN users u ON e.user_id = u.id
     WHERE e.status = 'paid'
@@ -194,16 +262,11 @@ while ($row = $stmt->fetch()) {
     $unifiedPaidGroups[$key] = $row;
 }
 
-// B) Old referral paid entries
 $stmt = $pdo->query("
-    SELECT e.user_id as receiver_id, u.name as receiver_name,
-           COALESCE(e.utr_no, 'N/A') as utr_no,
-           DATE(e.paid_at) as paid_date,
-           MIN(e.paid_at) as paid_at,
-           SUM(e.amount) as total_gross,
-           SUM(COALESCE(e.tds_deducted, 0)) as total_tds,
-           SUM(COALESCE(e.admin_charge_deducted, 0)) as total_admin,
-           SUM(COALESCE(e.net_amount, 0)) as total_net,
+    SELECT e.user_id as receiver_id, u.name as receiver_name, COALESCE(e.utr_no, 'N/A') as utr_no,
+           DATE(e.paid_at) as paid_date, MIN(e.paid_at) as paid_at,
+           SUM(e.amount) as total_gross, SUM(COALESCE(e.tds_deducted, 0)) as total_tds,
+           SUM(COALESCE(e.admin_charge_deducted, 0)) as total_admin, SUM(COALESCE(e.net_amount, 0)) as total_net,
            COUNT(*) as entry_count
     FROM user_referral_earnings e JOIN users u ON e.user_id = u.id
     WHERE e.status = 'paid'
@@ -217,48 +280,26 @@ while ($row = $stmt->fetch()) {
     $unifiedPaidGroups[$key] = $row;
 }
 
-// Sort unified groups by paid_at desc
 uasort($unifiedPaidGroups, function($a, $b) {
     return strtotime($b['paid_at']) <=> strtotime($a['paid_at']);
 });
 
-// Pre-fetch entries for each paid group (for modal)
 $paidEntries = [];
 foreach ($unifiedPaidGroups as $key => $g) {
     if ($g['source'] === 'new') {
-        $stmt = $pdo->prepare("
-            SELECT e.*, f.name as from_user_name 
-            FROM user_earnings e LEFT JOIN users f ON e.from_user_id = f.id 
-            WHERE e.user_id = ? AND e.status = 'paid'
-              AND COALESCE(e.utr_no, 'N/A') = ?
-              AND DATE(e.paid_at) = ?
-            ORDER BY e.id ASC
-        ");
+        $stmt = $pdo->prepare("SELECT e.*, f.name as from_user_name FROM user_earnings e LEFT JOIN users f ON e.from_user_id = f.id WHERE e.user_id = ? AND e.status = 'paid' AND COALESCE(e.utr_no, 'N/A') = ? AND DATE(e.paid_at) = ? ORDER BY e.id ASC");
         $stmt->execute([$g['receiver_id'], $g['utr_no'], $g['paid_date']]);
         $paidEntries[$key] = $stmt->fetchAll();
     } else {
-        $stmt = $pdo->prepare("
-            SELECT e.*, f.name as from_user_name, p.name as package_name,
-                   r.name as referred_name
-            FROM user_referral_earnings e 
-            LEFT JOIN users f ON e.user_id = f.id 
-            LEFT JOIN users r ON e.referred_user_id = r.id
-            LEFT JOIN packages p ON e.package_id = p.id
-            WHERE e.user_id = ? AND e.status = 'paid'
-              AND COALESCE(e.utr_no, 'N/A') = ?
-              AND DATE(e.paid_at) = ?
-            ORDER BY e.id ASC
-        ");
+        $stmt = $pdo->prepare("SELECT e.*, f.name as from_user_name, p.name as package_name, r.name as referred_name FROM user_referral_earnings e LEFT JOIN users f ON e.user_id = f.id LEFT JOIN users r ON e.referred_user_id = r.id LEFT JOIN packages p ON e.package_id = p.id WHERE e.user_id = ? AND e.status = 'paid' AND COALESCE(e.utr_no, 'N/A') = ? AND DATE(e.paid_at) = ? ORDER BY e.id ASC");
         $stmt->execute([$g['receiver_id'], $g['utr_no'], $g['paid_date']]);
         $paidEntries[$key] = $stmt->fetchAll();
     }
 }
 
-// ---- Dropdown data ----
 $all_users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
 $packages = $pdo->query("SELECT id, name, referral_bonus, duration_months FROM packages ORDER BY name")->fetchAll();
 
-// Messages
 if(isset($_SESSION['msg'])) { echo "<div class='alert alert-info'>" . $_SESSION['msg'] . "</div>"; unset($_SESSION['msg']); }
 if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payout released!</div>";
 ?>
@@ -266,47 +307,24 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
 <div class="card-premium">
     <h4><i class="fas fa-hand-holding-usd me-2"></i>MLM Payout Management</h4>
 
-    <!-- Summary Cards -->
     <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="card bg-success text-white p-3 rounded-4">
-                <h6>Total Net Paid</h6>
-                <h3>₹ <?= indianCurrencyFormat($total_net_paid) ?></h3>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-dark p-3 rounded-4">
-                <h6>Total TDS</h6>
-                <h3>₹ <?= indianCurrencyFormat($total_tds) ?></h3>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-info text-dark p-3 rounded-4">
-                <h6>Total Admin Charge</h6>
-                <h3>₹ <?= indianCurrencyFormat($total_admin) ?></h3>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-secondary text-white p-3 rounded-4">
-                <h6>Total Gross</h6>
-                <h3>₹ <?= indianCurrencyFormat($total_net_paid + $total_tds + $total_admin) ?></h3>
-            </div>
-        </div>
+        <div class="col-md-3"><div class="card bg-success text-white p-3 rounded-4"><h6>Total Net Paid</h6><h3>₹ <?= indianCurrencyFormat($total_net_paid) ?></h3></div></div>
+        <div class="col-md-3"><div class="card bg-warning text-dark p-3 rounded-4"><h6>Total TDS</h6><h3>₹ <?= indianCurrencyFormat($total_tds) ?></h3></div></div>
+        <div class="col-md-3"><div class="card bg-info text-dark p-3 rounded-4"><h6>Total Admin Charge</h6><h3>₹ <?= indianCurrencyFormat($total_admin) ?></h3></div></div>
+        <div class="col-md-3"><div class="card bg-secondary text-white p-3 rounded-4"><h6>Total Gross</h6><h3>₹ <?= indianCurrencyFormat($total_net_paid + $total_tds + $total_admin) ?></h3></div></div>
     </div>
 
-    <p class="text-muted">Global TDS: <strong><?= $defaults['tds'] ?>%</strong> | Admin Charge: <strong><?= $defaults['admin'] ?>%</strong> (Edit in Settings)</p>
+    <p class="text-muted">Global TDS: <strong><?= $defaults['tds'] ?>%</strong> | Admin Charge: <strong><?= $defaults['admin'] ?>%</strong></p>
 
     <!-- ============================================================ -->
-    <!-- SECTION A: PENDING RELEASE -->
+    <!-- SECTION A: PENDING RELEASE (With Checkboxes) -->
     <!-- ============================================================ -->
     <div class="card border-0 shadow-sm p-3 mb-4" style="background: #eef2ff; border-radius: 16px; border-left: 5px solid #2563eb !important;">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-            <h5 class="mb-0" style="color: #1e3a8a;">
-                <i class="fas fa-layer-group me-2"></i>Pending Release (<?= count($mlmPending) ?> receivers)
-            </h5>
+            <h5 class="mb-0" style="color: #1e3a8a;"><i class="fas fa-layer-group me-2"></i>Pending Release (<?= count($mlmPending) ?> receivers)</h5>
             <div>
                 <?php if (count($mlmPending) > 0): ?>
-                    <form method="POST" style="display:inline;" onsubmit="return confirm('⚠️ यह सभी PENDING MLM entries DELETE कर देगा (all users)।\n\nSure?');">
+                    <form method="POST" style="display:inline;" onsubmit="return confirm('⚠️ सभी PENDING entries DELETE कर देगा। Sure?');">
                         <input type="hidden" name="delete_all_pending" value="1">
                         <button type="submit" class="btn btn-sm btn-danger rounded-pill">
                             <i class="fas fa-trash me-1"></i> Delete All Pending
@@ -319,82 +337,96 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
             </div>
         </div>
         <p class="text-muted small mb-3">
-            <b>View Details</b> (entries देखें), <b>Release</b> (wallet credit), <b>🗑️</b> (इस user की पूरी pending entries delete).
+            जिन-जिन receivers को <b>release</b> करना है, उनके <b>checkbox</b> टिक करें। फिर नीचे <b>"Release Selected"</b> दबाएं — एक साथ सबको पेआउट मिलेगा।
         </p>
 
-        <?php if (count($mlmPending) > 0): ?>
-            <div class="table-responsive">
-                <table class="table table-bordered align-middle" style="font-size: 0.85rem; background: #fff;">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Receiver</th>
-                            <th class="text-end">Gross</th>
-                            <th class="text-end">TDS (<?= $defaults['tds'] ?>%)</th>
-                            <th class="text-end">Admin (<?= $defaults['admin'] ?>%)</th>
-                            <th class="text-end">Net Payable</th>
-                            <th class="text-center">Entries</th>
-                            <th class="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach($mlmPending as $g): 
-                        $gross = $g['total_amount'];
-                        $calc = calculateNet($gross, $defaults['tds'], $defaults['admin']);
-                        $bank = getUserBankDetails($pdo, $g['receiver_id']);
-                    ?>
-                        <tr>
-                            <td>
-                                <strong><?= htmlspecialchars($g['receiver_name']) ?></strong>
-                                <div style="font-size:0.72rem;color:#64748b;">#<?= $g['receiver_id'] ?> — <?= htmlspecialchars($g['receiver_email']) ?></div>
-                            </td>
-                            <td class="text-end fw-bold">₹ <?= number_format($gross, 2) ?></td>
-                            <td class="text-end text-danger">- ₹ <?= number_format($calc['tds'], 2) ?></td>
-                            <td class="text-end text-danger">- ₹ <?= number_format($calc['admin_charge'], 2) ?></td>
-                            <td class="text-end fw-bold text-success">₹ <?= number_format($calc['net'], 2) ?></td>
-                            <td class="text-center"><span class="badge bg-primary"><?= $g['total_count'] ?></span></td>
-                            <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-outline-info"
-                                        onclick="openPendingModal(<?= $g['receiver_id'] ?>, '<?= htmlspecialchars(addslashes($g['receiver_name'])) ?>', <?= $gross ?>, <?= $calc['tds'] ?>, <?= $calc['admin_charge'] ?>, <?= $calc['net'] ?>, '<?= htmlspecialchars(addslashes($bank['bank_name'] ?? '')) ?>', '<?= htmlspecialchars(addslashes($bank['account_number'] ?? '')) ?>', '<?= htmlspecialchars(addslashes($bank['ifsc'] ?? '')) ?>')">
-                                    <i class="fas fa-eye me-1"></i> View Details
-                                </button>
-                                <form method="POST" style="display:inline;" onsubmit="return confirm('Release ₹<?= number_format($calc['net'], 2) ?> to <?= htmlspecialchars($g['receiver_name']) ?>?');">
-                                    <input type="hidden" name="release_mlm" value="1">
-                                    <input type="hidden" name="receiver_id" value="<?= $g['receiver_id'] ?>">
-                                    <input type="hidden" name="tds_percent" value="<?= $defaults['tds'] ?>">
-                                    <input type="hidden" name="admin_charge_percent" value="<?= $defaults['admin'] ?>">
-                                    <input type="hidden" name="utr" value="AUTO-<?= date('YmdHis') . '-' . $g['receiver_id'] ?>">
-                                    <input type="hidden" name="bank_name" value="<?= htmlspecialchars($bank['bank_name'] ?? '') ?>">
-                                    <input type="hidden" name="account_number" value="<?= htmlspecialchars($bank['account_number'] ?? '') ?>">
-                                    <input type="hidden" name="ifsc" value="<?= htmlspecialchars($bank['ifsc'] ?? '') ?>">
-                                    <button type="submit" class="btn btn-sm btn-success">
-                                        <i class="fas fa-bolt me-1"></i> Release
+        <form method="POST" id="bulkReleaseForm" onsubmit="return confirmBulkRelease();">
+            <input type="hidden" name="release_selected" value="1">
+            <input type="hidden" name="tds_percent" value="<?= $defaults['tds'] ?>">
+            <input type="hidden" name="admin_charge_percent" value="<?= $defaults['admin'] ?>">
+
+            <?php if (count($mlmPending) > 0): ?>
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle" style="font-size: 0.85rem; background: #fff;">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 50px; text-align: center;">
+                                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleAllRelease(this)" style="width:1.3rem;height:1.3rem; cursor:pointer;">
+                                </th>
+                                <th>Receiver</th>
+                                <th class="text-end">Gross</th>
+                                <th class="text-end">TDS (<?= $defaults['tds'] ?>%)</th>
+                                <th class="text-end">Admin (<?= $defaults['admin'] ?>%)</th>
+                                <th class="text-end">Net Payable</th>
+                                <th class="text-center">Entries</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach($mlmPending as $g): 
+                            $gross = $g['total_amount'];
+                            $calc = calculateNet($gross, $defaults['tds'], $defaults['admin']);
+                            $bank = getUserBankDetails($pdo, $g['receiver_id']);
+                        ?>
+                            <tr>
+                                <td class="text-center">
+                                    <input type="checkbox" name="selected_users[]" value="<?= $g['receiver_id'] ?>" class="release-checkbox" 
+                                           data-name="<?= htmlspecialchars($g['receiver_name']) ?>"
+                                           data-net="<?= $calc['net'] ?>"
+                                           style="width:1.3rem;height:1.3rem; cursor:pointer;">
+                                </td>
+                                <td>
+                                    <strong><?= htmlspecialchars($g['receiver_name']) ?></strong>
+                                    <div style="font-size:0.72rem;color:#64748b;">#<?= $g['receiver_id'] ?> — <?= htmlspecialchars($g['receiver_email']) ?></div>
+                                </td>
+                                <td class="text-end fw-bold">₹ <?= number_format($gross, 2) ?></td>
+                                <td class="text-end text-danger">- ₹ <?= number_format($calc['tds'], 2) ?></td>
+                                <td class="text-end text-danger">- ₹ <?= number_format($calc['admin_charge'], 2) ?></td>
+                                <td class="text-end fw-bold text-success">₹ <?= number_format($calc['net'], 2) ?></td>
+                                <td class="text-center"><span class="badge bg-primary"><?= $g['total_count'] ?></span></td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-info"
+                                            onclick="openPendingModal(<?= $g['receiver_id'] ?>, '<?= htmlspecialchars(addslashes($g['receiver_name'])) ?>', <?= $gross ?>, <?= $calc['tds'] ?>, <?= $calc['admin_charge'] ?>, <?= $calc['net'] ?>, '<?= htmlspecialchars(addslashes($bank['bank_name'] ?? '')) ?>', '<?= htmlspecialchars(addslashes($bank['account_number'] ?? '')) ?>', '<?= htmlspecialchars(addslashes($bank['ifsc'] ?? '')) ?>')">
+                                        <i class="fas fa-eye me-1"></i> View
                                     </button>
-                                </form>
-                                <form method="POST" style="display:inline;" onsubmit="return confirm('⚠️ DELETE all <?= $g['total_count'] ?> pending entries for <?= htmlspecialchars($g['receiver_name']) ?>?');">
-                                    <input type="hidden" name="delete_user_pending" value="1">
-                                    <input type="hidden" name="delete_user_id" value="<?= $g['receiver_id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-danger" title="Delete user's pending entries">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php else: ?>
-            <div class="alert alert-light mb-0 text-center">✨ No pending MLM payouts. <a href="admin_payout_preview.php" class="fw-bold">Generate new →</a></div>
-        <?php endif; ?>
+                                    <form method="POST" style="display:inline;" onsubmit="return confirm('⚠️ DELETE <?= $g['total_count'] ?> pending entries for <?= htmlspecialchars($g['receiver_name']) ?>?');">
+                                        <input type="hidden" name="delete_user_pending" value="1">
+                                        <input type="hidden" name="delete_user_id" value="<?= $g['receiver_id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete pending">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Sticky Bulk Release Bar -->
+                <div class="card border-0 shadow-sm mt-3" style="background: linear-gradient(135deg, #065f46, #10b981); border-radius: 16px;">
+                    <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div class="text-white">
+                            <h5 class="mb-0 fw-bold"><span id="selectedCount">0</span> Users Selected</h5>
+                            <small style="opacity:0.9;">Total Net Payable: <b id="selectedNetTotal">₹ 0.00</b></small>
+                        </div>
+                        <button type="submit" class="btn btn-light btn-lg rounded-pill px-5 fw-bold text-success">
+                            <i class="fas fa-bolt me-2"></i> Release Selected
+                        </button>
+                    </div>
+                </div>
+
+            <?php else: ?>
+                <div class="alert alert-light mb-0 text-center">✨ No pending MLM payouts. <a href="admin_payout_preview.php" class="fw-bold">Generate new →</a></div>
+            <?php endif; ?>
+        </form>
     </div>
 
     <!-- ============================================================ -->
     <!-- SECTION B: UNIFIED PAID HISTORY -->
     <!-- ============================================================ -->
     <h5 class="mt-4"><i class="fas fa-history me-2"></i>Paid History (<?= count($unifiedPaidGroups) ?> batches)</h5>
-    <p class="text-muted small mb-3">
-        यहाँ <b>सभी paid payouts</b> दिख रहे हैं — Old (Referral) और New (MLM)। हर batch के आगे <b>View Details</b> दबाकर पूरी entries देखें।
-    </p>
+    <p class="text-muted small mb-3">सभी paid payouts — Old + New. हर batch के आगे <b>View Details</b> दबाएं।</p>
 
     <?php if(count($unifiedPaidGroups) > 0): ?>
         <div class="table-responsive">
@@ -420,10 +452,7 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
                         : '<span class="badge bg-primary">New</span>';
                 ?>
                     <tr>
-                        <td>
-                            <strong><?= htmlspecialchars($p['receiver_name']) ?></strong>
-                            <div style="font-size:0.72rem;color:#64748b;">#<?= $p['receiver_id'] ?></div>
-                        </td>
+                        <td><strong><?= htmlspecialchars($p['receiver_name']) ?></strong><div style="font-size:0.72rem;color:#64748b;">#<?= $p['receiver_id'] ?></div></td>
                         <td><?= $source_badge ?></td>
                         <td><code style="font-size:0.75rem;"><?= htmlspecialchars($p['utr_no']) ?></code></td>
                         <td class="text-end">₹ <?= number_format($p['total_gross'], 2) ?></td>
@@ -433,8 +462,7 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
                         <td class="text-center"><span class="badge bg-secondary"><?= $p['entry_count'] ?></span></td>
                         <td><?= $p['paid_at'] ? date('d M Y, h:i A', strtotime($p['paid_at'])) : '—' ?></td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-sm btn-outline-info"
-                                    onclick="openPaidModal('<?= $key ?>')">
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="openPaidModal('<?= $key ?>')">
                                 <i class="fas fa-eye me-1"></i> View Details
                             </button>
                         </td>
@@ -449,17 +477,12 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
 
 </div>
 
-<!-- ============================================================ -->
-<!-- MODAL 1: PENDING DETAILS -->
-<!-- ============================================================ -->
+<!-- Pending Details Modal -->
 <div class="modal fade" id="pendingDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header" style="background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff;">
-                <h5 class="modal-title">
-                    <i class="fas fa-file-invoice-dollar me-2"></i>
-                    Pending Payout: <span id="pModalReceiverName"></span>
-                </h5>
+                <h5 class="modal-title"><i class="fas fa-file-invoice-dollar me-2"></i>Pending Payout: <span id="pModalReceiverName"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -469,7 +492,6 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
                     <div class="col-md-3"><div class="p-2 border rounded text-center"><small class="text-muted">Admin (<?= $defaults['admin'] ?>%)</small><div class="fw-bold fs-6 text-danger" id="pModalAdmin">- ₹ 0</div></div></div>
                     <div class="col-md-3"><div class="p-2 border rounded text-center bg-success text-white"><small>NET PAYABLE</small><div class="fw-bold fs-6" id="pModalNet">₹ 0</div></div></div>
                 </div>
-
                 <h6 class="fw-bold mb-2">Pending Entries (<span id="pModalEntryCount">0</span>)</h6>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered" style="font-size: 0.82rem;">
@@ -478,7 +500,6 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
                         <tfoot><tr style="background:#fef3c7;"><td colspan="3" class="text-end fw-bold">GROSS TOTAL:</td><td class="text-end fw-bold" id="pModalGrossFoot">₹ 0</td></tr></tfoot>
                     </table>
                 </div>
-
                 <div class="border rounded p-3" style="background: #f8fafc;">
                     <div class="d-flex justify-content-between py-1 border-bottom"><span>Gross</span><span class="fw-bold" id="pModalSumGross">₹ 0</span></div>
                     <div class="d-flex justify-content-between py-1 border-bottom"><span>TDS (<?= $defaults['tds'] ?>%)</span><span class="text-danger fw-bold" id="pModalSumTds">- ₹ 0</span></div>
@@ -487,42 +508,23 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
                         <span class="fw-bold">NET PAYABLE</span><span class="fw-bold text-success" id="pModalSumNet">₹ 0</span>
                     </div>
                 </div>
-
                 <div class="mt-3 small text-muted">
                     <strong>Bank:</strong> <span id="pModalBank">N/A</span> | <strong>A/c:</strong> <span id="pModalAcc">N/A</span> | <strong>IFSC:</strong> <span id="pModalIfsc">N/A</span>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <form method="POST" id="pModalReleaseForm" onsubmit="return confirm('Release this amount?');" style="display:inline;">
-                    <input type="hidden" name="release_mlm" value="1">
-                    <input type="hidden" name="receiver_id" id="pModalReceiverId">
-                    <input type="hidden" name="tds_percent" value="<?= $defaults['tds'] ?>">
-                    <input type="hidden" name="admin_charge_percent" value="<?= $defaults['admin'] ?>">
-                    <input type="hidden" name="utr" id="pModalUtr">
-                    <input type="hidden" name="bank_name" id="pModalBankHidden">
-                    <input type="hidden" name="account_number" id="pModalAccHidden">
-                    <input type="hidden" name="ifsc" id="pModalIfscHidden">
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-bolt me-1"></i> Release <span id="pModalReleaseBtnAmount">₹ 0</span>
-                    </button>
-                </form>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ============================================================ -->
-<!-- MODAL 2: PAID DETAILS (Unified for Old + New) -->
-<!-- ============================================================ -->
+<!-- Paid Details Modal -->
 <div class="modal fade" id="paidDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header" style="background: linear-gradient(135deg, #065f46, #10b981); color: #fff;">
-                <h5 class="modal-title">
-                    <i class="fas fa-check-circle me-2"></i>
-                    Paid Statement: <span id="paidModalReceiverName"></span>
-                </h5>
+                <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>Paid Statement: <span id="paidModalReceiverName"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -531,46 +533,24 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
                     <strong>UTR:</strong> <code id="paidModalUtr"></code> | 
                     <strong>Paid On:</strong> <span id="paidModalPaidOn"></span>
                 </div>
-
                 <div class="row g-2 mb-3">
                     <div class="col-md-3"><div class="p-2 border rounded text-center"><small class="text-muted">Gross</small><div class="fw-bold fs-6" id="paidModalGross">₹ 0</div></div></div>
                     <div class="col-md-3"><div class="p-2 border rounded text-center"><small class="text-muted">TDS</small><div class="fw-bold fs-6 text-danger" id="paidModalTds">- ₹ 0</div></div></div>
                     <div class="col-md-3"><div class="p-2 border rounded text-center"><small class="text-muted">Admin</small><div class="fw-bold fs-6 text-danger" id="paidModalAdmin">- ₹ 0</div></div></div>
                     <div class="col-md-3"><div class="p-2 border rounded text-center bg-success text-white"><small>NET PAID</small><div class="fw-bold fs-6" id="paidModalNet">₹ 0</div></div></div>
                 </div>
-
                 <h6 class="fw-bold mb-2">Paid Entries (<span id="paidModalEntryCount">0</span>)</h6>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered" style="font-size: 0.82rem;">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>From / Referred User</th>
-                                <th>Type</th>
-                                <th>Description</th>
-                                <th class="text-end">Gross</th>
-                                <th class="text-end">TDS</th>
-                                <th class="text-end">Admin</th>
-                                <th class="text-end">Net</th>
-                            </tr>
-                        </thead>
+                        <thead class="table-dark"><tr><th>From User</th><th>Type</th><th>Description</th><th class="text-end">Gross</th><th class="text-end">TDS</th><th class="text-end">Admin</th><th class="text-end">Net</th></tr></thead>
                         <tbody id="paidModalEntriesBody"></tbody>
-                        <tfoot>
-                            <tr style="background:#f0fdf4;">
-                                <td colspan="3" class="text-end fw-bold">TOTALS:</td>
-                                <td class="text-end fw-bold" id="paidModalGrossFoot">₹ 0</td>
-                                <td class="text-end fw-bold text-danger" id="paidModalTdsFoot">₹ 0</td>
-                                <td class="text-end fw-bold text-danger" id="paidModalAdminFoot">₹ 0</td>
-                                <td class="text-end fw-bold text-success" id="paidModalNetFoot">₹ 0</td>
-                            </tr>
-                        </tfoot>
+                        <tfoot><tr style="background:#f0fdf4;"><td colspan="3" class="text-end fw-bold">TOTALS:</td><td class="text-end fw-bold" id="paidModalGrossFoot">₹ 0</td><td class="text-end fw-bold text-danger" id="paidModalTdsFoot">₹ 0</td><td class="text-end fw-bold text-danger" id="paidModalAdminFoot">₹ 0</td><td class="text-end fw-bold text-success" id="paidModalNetFoot">₹ 0</td></tr></tfoot>
                     </table>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-outline-primary" onclick="window.print()">
-                    <i class="fas fa-print me-1"></i> Print
-                </button>
+                <button type="button" class="btn btn-outline-primary" onclick="window.print()"><i class="fas fa-print me-1"></i> Print</button>
             </div>
         </div>
     </div>
@@ -580,16 +560,9 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
     const MLM_ENTRIES = <?= json_encode($mlmEntries) ?>;
     const PAID_DATA = <?= json_encode(array_map(function($g, $key) use ($paidEntries) {
         return [
-            'key' => $key,
-            'source' => $g['source'],
-            'receiver_id' => $g['receiver_id'],
-            'receiver_name' => $g['receiver_name'],
-            'utr_no' => $g['utr_no'],
-            'paid_at' => $g['paid_at'],
-            'total_gross' => $g['total_gross'],
-            'total_tds' => $g['total_tds'],
-            'total_admin' => $g['total_admin'],
-            'total_net' => $g['total_net'],
+            'key' => $key, 'source' => $g['source'], 'receiver_id' => $g['receiver_id'], 'receiver_name' => $g['receiver_name'],
+            'utr_no' => $g['utr_no'], 'paid_at' => $g['paid_at'], 'total_gross' => $g['total_gross'],
+            'total_tds' => $g['total_tds'], 'total_admin' => $g['total_admin'], 'total_net' => $g['total_net'],
             'entries' => $paidEntries[$key] ?? []
         ];
     }, $unifiedPaidGroups, array_keys($unifiedPaidGroups))) ?>;
@@ -597,10 +570,54 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
     function formatCurrency(n) {
         return '₹ ' + parseFloat(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
-
     function escapeHtml(str) {
         if (!str) return '';
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ========== CHECKBOX SELECTION ==========
+    function toggleAllRelease(masterCheckbox) {
+        document.querySelectorAll('.release-checkbox').forEach(function(cb) {
+            cb.checked = masterCheckbox.checked;
+        });
+        updateSelectedTotal();
+    }
+
+    function updateSelectedTotal() {
+        let count = 0;
+        let total = 0;
+        document.querySelectorAll('.release-checkbox:checked').forEach(function(cb) {
+            count++;
+            total += parseFloat(cb.dataset.net || 0);
+        });
+        document.getElementById('selectedCount').textContent = count;
+        document.getElementById('selectedNetTotal').textContent = formatCurrency(total);
+
+        // Update "Select All" checkbox state
+        const all = document.querySelectorAll('.release-checkbox');
+        const master = document.getElementById('selectAllCheckbox');
+        if (master) {
+            master.checked = (all.length > 0 && count === all.length);
+            master.indeterminate = (count > 0 && count < all.length);
+        }
+    }
+
+    // Attach listener to all checkboxes
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.release-checkbox').forEach(function(cb) {
+            cb.addEventListener('change', updateSelectedTotal);
+        });
+        updateSelectedTotal();
+    });
+
+    function confirmBulkRelease() {
+        const selected = document.querySelectorAll('.release-checkbox:checked');
+        if (selected.length === 0) {
+            alert('⚠️ कृपया कम से कम एक receiver का checkbox टिक करें।');
+            return false;
+        }
+        const total = document.getElementById('selectedNetTotal').textContent;
+        return confirm('⚠️ ' + selected.length + ' receivers को release करना है?\n\nTotal Net Payable: ' + total + '\n\nOK दबाएं तो wallets में credit हो जाएगा।');
     }
 
     // ========== PENDING MODAL ==========
@@ -615,7 +632,6 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
         document.getElementById('pModalSumAdmin').textContent = '- ' + formatCurrency(admin);
         document.getElementById('pModalSumNet').textContent = formatCurrency(net);
         document.getElementById('pModalGrossFoot').textContent = formatCurrency(gross);
-        document.getElementById('pModalReleaseBtnAmount').textContent = formatCurrency(net);
 
         const entries = MLM_ENTRIES[receiverId] || [];
         const tbody = document.getElementById('pModalEntriesBody');
@@ -627,36 +643,24 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
         } else {
             entries.forEach(function(e) {
                 const typeBadge = e.income_type === 'direct' ? '<span class="badge bg-success">Direct</span>' : '<span class="badge bg-primary">Team</span>';
-                tbody.innerHTML += '<tr>' +
-                    '<td><strong>#' + e.from_user_id + ' ' + escapeHtml(e.from_user_name || 'N/A') + '</strong></td>' +
-                    '<td>' + typeBadge + '</td>' +
-                    '<td style="font-size:0.75rem;">' + escapeHtml(e.description || '') + '</td>' +
-                    '<td class="text-end fw-bold text-success">' + formatCurrency(e.amount) + '</td>' +
-                '</tr>';
+                tbody.innerHTML += '<tr><td><strong>#' + e.from_user_id + ' ' + escapeHtml(e.from_user_name || 'N/A') + '</strong></td><td>' + typeBadge + '</td><td style="font-size:0.75rem;">' + escapeHtml(e.description || '') + '</td><td class="text-end fw-bold text-success">' + formatCurrency(e.amount) + '</td></tr>';
             });
         }
 
         document.getElementById('pModalBank').textContent = bank || 'N/A';
         document.getElementById('pModalAcc').textContent = acc || 'N/A';
         document.getElementById('pModalIfsc').textContent = ifsc || 'N/A';
-        document.getElementById('pModalReceiverId').value = receiverId;
-        document.getElementById('pModalBankHidden').value = bank || '';
-        document.getElementById('pModalAccHidden').value = acc || '';
-        document.getElementById('pModalIfscHidden').value = ifsc || '';
-        document.getElementById('pModalUtr').value = 'AUTO-' + new Date().toISOString().slice(0,19).replace(/[^0-9]/g,'') + '-' + receiverId;
 
         new bootstrap.Modal(document.getElementById('pendingDetailsModal')).show();
     }
 
-    // ========== PAID MODAL (Unified) ==========
+    // ========== PAID MODAL ==========
     function openPaidModal(key) {
         const data = PAID_DATA.find(function(g) { return g.key === key; });
         if (!data) return;
 
         document.getElementById('paidModalReceiverName').textContent = data.receiver_name + ' (#' + data.receiver_id + ')';
-        document.getElementById('paidModalSource').innerHTML = data.source === 'old' 
-            ? '<span class="badge bg-secondary">Old Referral</span>' 
-            : '<span class="badge bg-primary">New MLM</span>';
+        document.getElementById('paidModalSource').innerHTML = data.source === 'old' ? '<span class="badge bg-secondary">Old Referral</span>' : '<span class="badge bg-primary">New MLM</span>';
         document.getElementById('paidModalUtr').textContent = data.utr_no;
         document.getElementById('paidModalPaidOn').textContent = data.paid_at ? new Date(data.paid_at).toLocaleString() : '—';
         document.getElementById('paidModalGross').textContent = formatCurrency(data.total_gross);
@@ -675,34 +679,21 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
         } else {
             data.entries.forEach(function(e) {
                 let fromUser = '', type = '', desc = '';
-
                 if (data.source === 'new') {
                     fromUser = '#' + e.from_user_id + ' ' + (e.from_user_name || 'N/A');
-                    type = e.income_type === 'direct' 
-                        ? '<span class="badge bg-success">Direct</span>' 
-                        : '<span class="badge bg-primary">Team</span>';
+                    type = e.income_type === 'direct' ? '<span class="badge bg-success">Direct</span>' : '<span class="badge bg-primary">Team</span>';
                     desc = e.description || '';
                 } else {
-                    // Old referral
                     fromUser = '#' + e.referred_user_id + ' ' + (e.referred_name || 'N/A');
                     type = '<span class="badge bg-warning text-dark">Referral</span>';
                     desc = 'Referral Bonus for ' + (e.package_name || 'package');
                 }
-
                 totalGross += parseFloat(e.amount || 0);
                 totalTds += parseFloat(e.tds_deducted || 0);
                 totalAdmin += parseFloat(e.admin_charge_deducted || 0);
                 totalNet += parseFloat(e.net_amount || 0);
 
-                tbody.innerHTML += '<tr>' +
-                    '<td><strong>' + escapeHtml(fromUser) + '</strong></td>' +
-                    '<td>' + type + '</td>' +
-                    '<td style="font-size:0.75rem;">' + escapeHtml(desc) + '</td>' +
-                    '<td class="text-end">' + formatCurrency(e.amount || 0) + '</td>' +
-                    '<td class="text-end text-danger">- ' + formatCurrency(e.tds_deducted || 0) + '</td>' +
-                    '<td class="text-end text-danger">- ' + formatCurrency(e.admin_charge_deducted || 0) + '</td>' +
-                    '<td class="text-end fw-bold text-success">' + formatCurrency(e.net_amount || 0) + '</td>' +
-                '</tr>';
+                tbody.innerHTML += '<tr><td><strong>' + escapeHtml(fromUser) + '</strong></td><td>' + type + '</td><td style="font-size:0.75rem;">' + escapeHtml(desc) + '</td><td class="text-end">' + formatCurrency(e.amount || 0) + '</td><td class="text-end text-danger">- ' + formatCurrency(e.tds_deducted || 0) + '</td><td class="text-end text-danger">- ' + formatCurrency(e.admin_charge_deducted || 0) + '</td><td class="text-end fw-bold text-success">' + formatCurrency(e.net_amount || 0) + '</td></tr>';
             });
         }
 
