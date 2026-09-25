@@ -1,7 +1,6 @@
 <?php
 // ============================================================
-// 💰 Admin – Payout Preview (Per-Receiver Format like My Earnings)
-// Step 1: Select buyers → Step 2: Preview per-receiver → Confirm
+// 💰 Admin – Payout Preview (Gross + Deductions) → Confirm & Generate
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -14,6 +13,10 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 $message = '';
 $message_type = '';
 $step = $_GET['step'] ?? 'select';
+
+// Get default TDS and Admin from settings
+$default_tds = (float)($pdo->query("SELECT setting_value FROM settings WHERE setting_key='tds_percent'")->fetchColumn() ?: 2);
+$default_admin = (float)($pdo->query("SELECT setting_value FROM settings WHERE setting_key='admin_charge_percent'")->fetchColumn() ?: 5);
 
 // ============================================================
 // 🔥 ACTION: CONFIRM & GENERATE PAYOUTS
@@ -35,7 +38,7 @@ if (isset($_POST['confirm_generate']) && !empty($_POST['selected_subs'])) {
             }
         }
         $pdo->commit();
-        $message = "✅ Successfully generated payouts for <b>$count</b> subscriptions!<br>Batch ID: <b>$batch_id</b>";
+        $message = "✅ Successfully generated <b>$count</b> pending payouts!<br>Batch ID: <b>$batch_id</b><br><b>Now go to <a href='admin_referrals.php'>Admin Referrals</a> to release them (apply TDS + Admin deductions).</b>";
         $message_type = "success";
         $step = 'select';
     } catch (Exception $e) {
@@ -50,52 +53,32 @@ if (isset($_POST['confirm_generate']) && !empty($_POST['selected_subs'])) {
 // ============================================================
 $all_users = [];
 $stmt = $pdo->query("SELECT id, name, referred_by, free_user_income_enabled FROM users");
-while ($row = $stmt->fetch()) {
-    $all_users[$row['id']] = $row;
-}
+while ($row = $stmt->fetch()) { $all_users[$row['id']] = $row; }
 
 $active_subs_by_user = [];
-$stmt = $pdo->query("
-    SELECT user_id, SUM(amount) as total 
-    FROM subscriptions 
-    WHERE status = 'active' AND end_date >= CURRENT_DATE 
-    GROUP BY user_id
-");
-while ($row = $stmt->fetch()) {
-    $active_subs_by_user[$row['user_id']] = (float)$row['total'];
-}
+$stmt = $pdo->query("SELECT user_id, SUM(amount) as total FROM subscriptions WHERE status = 'active' AND end_date >= CURRENT_DATE GROUP BY user_id");
+while ($row = $stmt->fetch()) { $active_subs_by_user[$row['user_id']] = (float)$row['total']; }
 
 $user_active_pkg = [];
 $stmt = $pdo->query("
-    SELECT DISTINCT ON (s.user_id) s.user_id, p.name as pkg_name, 
-           p.direct_income_percent, p.is_team_turnover_eligible
-    FROM subscriptions s
-    JOIN packages p ON s.package_id = p.id
+    SELECT DISTINCT ON (s.user_id) s.user_id, p.name as pkg_name, p.direct_income_percent, p.is_team_turnover_eligible
+    FROM subscriptions s JOIN packages p ON s.package_id = p.id
     WHERE s.status = 'active' AND s.end_date >= CURRENT_DATE
     ORDER BY s.user_id, s.id DESC
 ");
-while ($row = $stmt->fetch()) {
-    $user_active_pkg[$row['user_id']] = $row;
-}
+while ($row = $stmt->fetch()) { $user_active_pkg[$row['user_id']] = $row; }
 
 $free_user_pct = 0;
 $free_setting = $pdo->query("SELECT percentage FROM income_settings WHERE income_type = 'free_user_direct' AND status = 1 LIMIT 1")->fetch();
 if ($free_setting) $free_user_pct = (float)$free_setting['percentage'];
 
-$team_slabs = $pdo->query("
-    SELECT min_turnover, max_turnover, percentage 
-    FROM income_settings 
-    WHERE income_type = 'team_turnover' AND status = 1 
-    ORDER BY min_turnover ASC
-")->fetchAll();
+$team_slabs = $pdo->query("SELECT min_turnover, max_turnover, percentage FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 ORDER BY min_turnover ASC")->fetchAll();
 
 // Children map
 $children_map = [];
 foreach ($all_users as $uid => $u) {
     $parent = $u['referred_by'];
-    if ($parent && isset($all_users[$parent])) {
-        $children_map[$parent][] = $uid;
-    }
+    if ($parent && isset($all_users[$parent])) { $children_map[$parent][] = $uid; }
 }
 
 // Team turnover cache
@@ -112,11 +95,8 @@ $computeTurnover = function($uid) use (&$computeTurnover, &$children_map, &$acti
     $team_turnover_cache[$uid] = $total;
     return $total;
 };
-foreach ($all_users as $uid => $u) {
-    $computeTurnover($uid);
-}
+foreach ($all_users as $uid => $u) { $computeTurnover($uid); }
 
-// Direct %
 $getDirectPct = function($user_id) use (&$all_users, &$user_active_pkg, $free_user_pct) {
     if (isset($user_active_pkg[$user_id])) {
         return (float)($user_active_pkg[$user_id]['direct_income_percent'] ?? 0);
@@ -126,7 +106,6 @@ $getDirectPct = function($user_id) use (&$all_users, &$user_active_pkg, $free_us
     }
 };
 
-// Team %
 $getTeamPct = function($user_id) use (&$team_turnover_cache, &$team_slabs, &$user_active_pkg) {
     if (!isset($user_active_pkg[$user_id])) return 0;
     if (empty($user_active_pkg[$user_id]['is_team_turnover_eligible'])) return 0;
@@ -135,19 +114,20 @@ $getTeamPct = function($user_id) use (&$team_turnover_cache, &$team_slabs, &$use
     foreach ($team_slabs as $slab) {
         $min = (float)$slab['min_turnover'];
         $max = $slab['max_turnover'] !== null ? (float)$slab['max_turnover'] : PHP_FLOAT_MAX;
-        if ($turnover >= $min && $turnover <= $max) {
-            $matched_pct = (float)$slab['percentage'];
-        }
+        if ($turnover >= $min && $turnover <= $max) { $matched_pct = (float)$slab['percentage']; }
     }
     return $matched_pct;
 };
 
 // ============================================================
-// STEP 2: BUILD PREVIEW – GROUPED BY RECEIVER
+// STEP 2: BUILD PREVIEW (Per Receiver, with GROSS)
 // ============================================================
-$receiver_data = [];   // [user_id => [entries, total_direct, total_team, total]]
+$receiver_data = [];
 $processed_sub_ids = [];
-$grand_total = 0;
+$grand_gross = 0;
+$grand_tds = 0;
+$grand_admin = 0;
+$grand_net = 0;
 
 if ($step == 'preview' && !empty($_POST['selected_subs'])) {
     $selected_subs = array_map('intval', $_POST['selected_subs']);
@@ -156,8 +136,7 @@ if ($step == 'preview' && !empty($_POST['selected_subs'])) {
 
     $stmt = $pdo->prepare("
         SELECT s.id as sub_id, s.user_id, s.amount, s.status, s.end_date, s.package_id,
-               u.name as buyer_name, u.id as buyer_id,
-               p.name as pkg_name
+               u.name as buyer_name, u.id as buyer_id, p.name as pkg_name
         FROM subscriptions s 
         JOIN users u ON s.user_id = u.id 
         LEFT JOIN packages p ON s.package_id = p.id
@@ -186,20 +165,16 @@ if ($step == 'preview' && !empty($_POST['selected_subs'])) {
             $sponsor_pkg = $user_active_pkg[$sponsor_id]['pkg_name'] ?? 'Free User';
             $sponsor_turnover = $team_turnover_cache[$sponsor_id] ?? 0;
 
-            // Direct diff
             $direct_pct = $getDirectPct($sponsor_id);
-            $direct_diff = 0;
-            $direct_amt = 0;
+            $direct_diff = 0; $direct_amt = 0;
             if ($direct_pct > $last_direct_pct) {
                 $direct_diff = $direct_pct - $last_direct_pct;
                 $direct_amt = ($amount * $direct_diff) / 100;
                 $last_direct_pct = $direct_pct;
             }
 
-            // Team diff
             $team_pct = $getTeamPct($sponsor_id);
-            $team_diff = 0;
-            $team_amt = 0;
+            $team_diff = 0; $team_amt = 0;
             if ($team_pct > $last_team_pct) {
                 $team_diff = $team_pct - $last_team_pct;
                 $team_amt = ($amount * $team_diff) / 100;
@@ -208,7 +183,6 @@ if ($step == 'preview' && !empty($_POST['selected_subs'])) {
 
             $level_total = $direct_amt + $team_amt;
 
-            // Initialize receiver
             if (!isset($receiver_data[$sponsor_id])) {
                 $receiver_data[$sponsor_id] = [
                     'user_id' => $sponsor_id,
@@ -222,32 +196,23 @@ if ($step == 'preview' && !empty($_POST['selected_subs'])) {
                 ];
             }
 
-            // Add entry only if something was earned
             if ($level_total > 0) {
                 if ($direct_amt > 0) {
                     $receiver_data[$sponsor_id]['entries'][] = [
-                        'buyer_id' => $buyer_id,
-                        'buyer_name' => $buyer_name,
-                        'buyer_amount' => $amount,
-                        'sub_id' => $sub['sub_id'],
-                        'level' => $level,
-                        'type' => 'Direct',
-                        'pct' => $direct_diff,
-                        'amount' => $direct_amt,
+                        'buyer_id' => $buyer_id, 'buyer_name' => $buyer_name,
+                        'buyer_amount' => $amount, 'sub_id' => $sub['sub_id'],
+                        'level' => $level, 'type' => 'Direct',
+                        'pct' => $direct_diff, 'amount' => $direct_amt,
                     ];
                     $receiver_data[$sponsor_id]['total_direct'] += $direct_amt;
                     $receiver_data[$sponsor_id]['total'] += $direct_amt;
                 }
                 if ($team_amt > 0) {
                     $receiver_data[$sponsor_id]['entries'][] = [
-                        'buyer_id' => $buyer_id,
-                        'buyer_name' => $buyer_name,
-                        'buyer_amount' => $amount,
-                        'sub_id' => $sub['sub_id'],
-                        'level' => $level,
-                        'type' => 'Team Turnover',
-                        'pct' => $team_diff,
-                        'amount' => $team_amt,
+                        'buyer_id' => $buyer_id, 'buyer_name' => $buyer_name,
+                        'buyer_amount' => $amount, 'sub_id' => $sub['sub_id'],
+                        'level' => $level, 'type' => 'Team Turnover',
+                        'pct' => $team_diff, 'amount' => $team_amt,
                     ];
                     $receiver_data[$sponsor_id]['total_team'] += $team_amt;
                     $receiver_data[$sponsor_id]['total'] += $team_amt;
@@ -260,14 +225,19 @@ if ($step == 'preview' && !empty($_POST['selected_subs'])) {
         }
     }
 
-    // Sort by total descending
-    uasort($receiver_data, function($a, $b) {
-        return $b['total'] <=> $a['total'];
-    });
+    uasort($receiver_data, function($a, $b) { return $b['total'] <=> $a['total']; });
 
-    // Grand total
+    // Calculate grand totals with deductions
     foreach ($receiver_data as $rd) {
-        $grand_total += $rd['total'];
+        $gross = $rd['total'];
+        $tds = ($gross * $default_tds) / 100;
+        $admin = ($gross * $default_admin) / 100;
+        $net = $gross - $tds - $admin;
+        
+        $grand_gross += $gross;
+        $grand_tds += $tds;
+        $grand_admin += $admin;
+        $grand_net += $net;
     }
 }
 
@@ -278,8 +248,7 @@ $all_subs = [];
 if ($step == 'select') {
     $stmt = $pdo->query("
         SELECT s.id as sub_id, s.user_id, s.amount, s.status, s.end_date,
-               u.name as buyer_name, u.id as buyer_id,
-               p.name as pkg_name
+               u.name as buyer_name, u.id as buyer_id, p.name as pkg_name
         FROM subscriptions s 
         JOIN users u ON s.user_id = u.id 
         LEFT JOIN packages p ON s.package_id = p.id
@@ -311,11 +280,7 @@ include 'header.php';
         flex-wrap: wrap;
         gap: 10px;
     }
-    .stmt-slip-header h5 {
-        margin: 0;
-        font-weight: 800;
-        font-size: 1.05rem;
-    }
+    .stmt-slip-header h5 { margin: 0; font-weight: 800; font-size: 1.05rem; }
     .stmt-slip-header .pkg-badge {
         background: rgba(255,255,255,0.25);
         padding: 4px 14px;
@@ -323,92 +288,83 @@ include 'header.php';
         font-size: 0.75rem;
         font-weight: 700;
     }
-    .stmt-slip-body {
-        padding: 18px 22px;
-    }
+    .stmt-slip-body { padding: 18px 22px; }
 
-    /* Summary pills */
-    .summary-pills {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 18px;
-        flex-wrap: wrap;
-    }
+    .summary-pills { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
     .summary-pill {
-        flex: 1;
-        min-width: 130px;
-        padding: 12px;
-        border-radius: 12px;
-        text-align: center;
-        border: 2px solid #e2e8f0;
+        flex: 1; min-width: 130px; padding: 12px;
+        border-radius: 12px; text-align: center; border: 2px solid #e2e8f0;
     }
     .summary-pill .lbl {
-        font-size: 0.68rem;
-        text-transform: uppercase;
-        color: #64748b;
-        font-weight: 700;
-        letter-spacing: 0.4px;
+        font-size: 0.68rem; text-transform: uppercase;
+        color: #64748b; font-weight: 700; letter-spacing: 0.4px;
     }
-    .summary-pill .val {
-        font-size: 1.15rem;
-        font-weight: 800;
-        margin-top: 3px;
-    }
+    .summary-pill .val { font-size: 1.15rem; font-weight: 800; margin-top: 3px; }
     .summary-pill.direct { background: #f0fdf4; border-color: #10b981; }
     .summary-pill.direct .val { color: #059669; }
     .summary-pill.team { background: #f5f3ff; border-color: #8b5cf6; }
     .summary-pill.team .val { color: #7c3aed; }
-    .summary-pill.total { background: #eff6ff; border-color: #2563eb; }
-    .summary-pill.total .val { color: #1d4ed8; }
+    .summary-pill.gross { background: #fef3c7; border-color: #f59e0b; }
+    .summary-pill.gross .val { color: #b45309; }
 
-    /* Entries table */
-    .entries-table {
-        width: 100%;
-        font-size: 0.82rem;
-        border-collapse: collapse;
-    }
+    .entries-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
     .entries-table th {
-        background: #1e293b;
-        color: #fff;
-        padding: 10px 8px;
-        font-size: 0.7rem;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        text-align: left;
+        background: #1e293b; color: #fff; padding: 10px 8px;
+        font-size: 0.7rem; text-transform: uppercase; text-align: left;
     }
-    .entries-table td {
-        padding: 10px 8px;
-        border-bottom: 1px solid #f1f5f9;
-        vertical-align: middle;
-    }
+    .entries-table td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
     .entries-table tr:hover { background: #f8fafc; }
-    .entries-table tfoot td {
-        background: #f0fdf4;
-        font-weight: 800;
-        font-size: 0.9rem;
-        color: #166534;
-    }
-
     .badge-level { background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; }
     .badge-direct { background: #dcfce7; color: #166534; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
     .badge-team { background: #ede9fe; color: #5b21b6; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
 
-    /* Confirm bar */
+    /* Deduction breakdown at bottom */
+    .deduction-box {
+        background: #f8fafc;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-top: 16px;
+    }
+    .deduction-row {
+        display: flex; justify-content: space-between;
+        padding: 6px 0; font-size: 0.95rem;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+    .deduction-row:last-child { border-bottom: none; }
+    .deduction-row.total {
+        border-top: 2px solid #1e293b;
+        border-bottom: none;
+        margin-top: 8px; padding-top: 12px;
+        font-size: 1.15rem; font-weight: 800;
+    }
+    .deduction-row .label { color: #64748b; font-weight: 600; }
+    .deduction-row .value { font-weight: 700; color: #0f172a; }
+    .deduction-row.total .label { color: #0f172a; }
+    .deduction-row.total .value { color: #059669; }
+
     .confirm-bar {
         background: linear-gradient(135deg, #065f46, #10b981);
-        padding: 18px 22px;
-        border-radius: 16px;
-        color: #fff;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 12px;
+        padding: 18px 22px; border-radius: 16px; color: #fff;
+        display: flex; justify-content: space-between; align-items: center;
+        flex-wrap: wrap; gap: 12px;
         box-shadow: 0 6px 25px rgba(16,185,129,0.3);
         margin-top: 20px;
     }
     .confirm-bar h4 { margin: 0; font-weight: 800; font-size: 1.3rem; }
     .confirm-bar p { margin: 4px 0 0; font-size: 0.85rem; opacity: 0.9; }
+
+    .grand-summary {
+        background: linear-gradient(135deg, #1e3a8a, #2563eb);
+        border-radius: 16px; padding: 20px 24px; color: #fff;
+        margin-bottom: 24px;
+    }
+    .grand-summary .row { margin: 0; }
+    .grand-summary h5 { font-weight: 800; margin-bottom: 16px; }
+    .grand-summary .info { display: flex; gap: 20px; flex-wrap: wrap; }
+    .grand-summary .info-item { flex: 1; min-width: 130px; }
+    .grand-summary .info-item .lbl { font-size: 0.7rem; text-transform: uppercase; opacity: 0.8; font-weight: 700; }
+    .grand-summary .info-item .val { font-size: 1.3rem; font-weight: 800; margin-top: 2px; }
 </style>
 
 <div class="container mt-4 mb-5">
@@ -429,15 +385,15 @@ include 'header.php';
                 <a href="admin_fix_subscription_amounts.php" class="btn btn-outline-warning rounded-pill px-3">
                     <i class="fas fa-tools me-1"></i> Fix Amounts
                 </a>
-                <a href="admin_payout_manager.php" class="btn btn-outline-primary rounded-pill px-3">
-                    <i class="fas fa-wallet me-1"></i> Payout Manager
+                <a href="admin_referrals.php" class="btn btn-outline-primary rounded-pill px-3">
+                    <i class="fas fa-hand-holding-usd me-1"></i> Release Payouts
                 </a>
             </div>
         </div>
 
         <div class="alert alert-info py-2 small">
             <i class="fas fa-info-circle me-1"></i>
-            Select subscriptions to preview payouts. Preview will be shown <b>per-receiver</b> (just like the user sees in My Earnings).
+            Select subscriptions to preview payouts. Preview will show <b>GROSS income</b> and <b>deductions (TDS + Admin)</b> with NET.
         </div>
 
         <form method="POST" action="?step=preview">
@@ -507,7 +463,7 @@ include 'header.php';
 
     <?php else: ?>
         <!-- ========================================== -->
-        <!-- STEP 2: PREVIEW (PER-RECEIVER)             -->
+        <!-- STEP 2: PREVIEW (Per-Receiver, with GROSS) -->
         <!-- ========================================== -->
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <h3 class="fw-bold text-success"><i class="fas fa-file-invoice-dollar me-2"></i> Payout Preview – Per Receiver</h3>
@@ -520,27 +476,41 @@ include 'header.php';
             <div class="alert alert-warning">No payouts calculated from selected subscriptions.</div>
         <?php else: ?>
 
-        <!-- Overall Summary -->
-        <div class="alert alert-success py-3">
-            <h5 class="fw-bold mb-2"><i class="fas fa-info-circle me-1"></i> Overall Summary</h5>
-            <div class="row">
-                <div class="col-md-4">
-                    <small>Total Receivers:</small>
-                    <div class="fw-bold fs-5"><?= count($receiver_data) ?></div>
+        <!-- Grand Summary -->
+        <div class="grand-summary">
+            <h5><i class="fas fa-chart-line me-2"></i>Overall Totals</h5>
+            <div class="info">
+                <div class="info-item">
+                    <div class="lbl">Total Receivers</div>
+                    <div class="val"><?= count($receiver_data) ?></div>
                 </div>
-                <div class="col-md-4">
-                    <small>Buyers Selected:</small>
-                    <div class="fw-bold fs-5"><?= count($processed_sub_ids) ?></div>
+                <div class="info-item">
+                    <div class="lbl">Gross Amount</div>
+                    <div class="val">₹ <?= number_format($grand_gross, 2) ?></div>
                 </div>
-                <div class="col-md-4">
-                    <small>Grand Total Payout:</small>
-                    <div class="fw-bold fs-5 text-success">₹ <?= number_format($grand_total, 2) ?></div>
+                <div class="info-item">
+                    <div class="lbl">TDS (<?= $default_tds ?>%)</div>
+                    <div class="val">- ₹ <?= number_format($grand_tds, 2) ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="lbl">Admin (<?= $default_admin ?>%)</div>
+                    <div class="val">- ₹ <?= number_format($grand_admin, 2) ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="lbl">NET Total</div>
+                    <div class="val" style="color:#a7f3d0;">₹ <?= number_format($grand_net, 2) ?></div>
                 </div>
             </div>
         </div>
 
         <!-- Per-Receiver Cards -->
-        <?php $rc = 0; foreach ($receiver_data as $rid => $rd): $rc++; ?>
+        <?php $rc = 0; foreach ($receiver_data as $rid => $rd): 
+            $rc++;
+            $gross = $rd['total'];
+            $tds_amt = ($gross * $default_tds) / 100;
+            $admin_amt = ($gross * $default_admin) / 100;
+            $net_amt = $gross - $tds_amt - $admin_amt;
+        ?>
             <div class="stmt-slip">
                 <div class="stmt-slip-header">
                     <h5>
@@ -551,19 +521,19 @@ include 'header.php';
                 </div>
                 <div class="stmt-slip-body">
 
-                    <!-- Summary -->
+                    <!-- Top Summary Pills (GROSS) -->
                     <div class="summary-pills">
                         <div class="summary-pill direct">
-                            <div class="lbl">Direct Income</div>
+                            <div class="lbl">Direct Income (Gross)</div>
                             <div class="val">₹ <?= number_format($rd['total_direct'], 2) ?></div>
                         </div>
                         <div class="summary-pill team">
-                            <div class="lbl">Team Turnover</div>
+                            <div class="lbl">Team Turnover (Gross)</div>
                             <div class="val">₹ <?= number_format($rd['total_team'], 2) ?></div>
                         </div>
-                        <div class="summary-pill total">
-                            <div class="lbl">Net Payable</div>
-                            <div class="val">₹ <?= number_format($rd['total'], 2) ?></div>
+                        <div class="summary-pill gross">
+                            <div class="lbl">GROSS TOTAL</div>
+                            <div class="val">₹ <?= number_format($gross, 2) ?></div>
                         </div>
                     </div>
 
@@ -602,32 +572,46 @@ include 'header.php';
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td colspan="5" class="text-end">TOTAL PAYABLE:</td>
-                                    <td class="text-end">₹ <?= number_format($rd['total'], 2) ?></td>
-                                </tr>
-                            </tfoot>
                         </table>
+                    </div>
+
+                    <!-- Deduction Breakdown -->
+                    <div class="deduction-box">
+                        <div class="deduction-row">
+                            <span class="label">Gross Total</span>
+                            <span class="value">₹ <?= number_format($gross, 2) ?></span>
+                        </div>
+                        <div class="deduction-row">
+                            <span class="label">TDS Deduction (<?= $default_tds ?>%)</span>
+                            <span class="value text-danger">- ₹ <?= number_format($tds_amt, 2) ?></span>
+                        </div>
+                        <div class="deduction-row">
+                            <span class="label">Admin/Service Charge (<?= $default_admin ?>%)</span>
+                            <span class="value text-danger">- ₹ <?= number_format($admin_amt, 2) ?></span>
+                        </div>
+                        <div class="deduction-row total">
+                            <span class="label">NET PAYABLE</span>
+                            <span class="value">₹ <?= number_format($net_amt, 2) ?></span>
+                        </div>
                     </div>
                 </div>
             </div>
         <?php endforeach; ?>
 
         <!-- Confirm Bar -->
-        <form method="POST" action="?step=preview" onsubmit="return confirm('⚠️ Are you sure? This will PERMANENTLY credit ₹<?= number_format($grand_total, 2) ?> to selected receivers\' wallets.\n\nClick OK to confirm.');">
+        <form method="POST" action="?step=preview" onsubmit="return confirm('⚠️ यह पूरी entries PENDING में जाएंगी। Admin Referrals में release करने पर wallet में net amount credit होगा।\n\nOK to continue.');">
             <?php foreach ($processed_sub_ids as $sid): ?>
                 <input type="hidden" name="selected_subs[]" value="<?= $sid ?>">
             <?php endforeach; ?>
             
             <div class="confirm-bar">
                 <div>
-                    <h4>₹ <?= number_format($grand_total, 2) ?> — Total Payout</h4>
-                    <p>यह राशि <?= count($receiver_data) ?> receivers के wallets में जाएगी।</p>
+                    <h4>₹ <?= number_format($grand_gross, 2) ?> — Gross Total</h4>
+                    <p>Release के बाद NET ₹ <?= number_format($grand_net, 2) ?> wallets में जाएगा (<?= count($receiver_data) ?> receivers)</p>
                 </div>
                 <div>
                     <button type="submit" name="confirm_generate" class="btn btn-light btn-lg rounded-pill px-5 fw-bold text-success">
-                        <i class="fas fa-check-circle me-2"></i> Yes, Confirm & Generate Payouts
+                        <i class="fas fa-check-circle me-2"></i> Confirm & Save as Pending
                     </button>
                 </div>
             </div>
@@ -639,9 +623,7 @@ include 'header.php';
 
 <script>
     function toggleAll(state) {
-        document.querySelectorAll('.sub-checkbox').forEach(function(cb) {
-            cb.checked = state;
-        });
+        document.querySelectorAll('.sub-checkbox').forEach(function(cb) { cb.checked = state; });
     }
 </script>
 
