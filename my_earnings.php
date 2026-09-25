@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 💰 My Earnings – A4 Print + Group Summary + Detailed Toggle
+// 💰 My Earnings – Clean Readable Typography
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -33,11 +33,11 @@ if ($range == 'this_week') {
 } elseif ($range == 'this_month') {
     $start_date = date('Y-m-01');
     $end_date = date('Y-m-t');
-    $period_label = "This Month (" . date('M Y') . ")";
+    $period_label = "This Month";
 } elseif ($range == 'last_month') {
     $start_date = date('Y-m-01', strtotime('first day of last month'));
     $end_date = date('Y-m-t', strtotime('last day of last month'));
-    $period_label = "Last Month (" . date('M Y', strtotime('first day of last month')) . ")";
+    $period_label = "Last Month";
 } elseif ($range == 'all_time') {
     $start_date = '2000-01-01';
     $end_date = date('Y-m-d');
@@ -45,7 +45,7 @@ if ($range == 'this_week') {
 } elseif ($range == 'custom') {
     $start_date = $_GET['start_date'];
     $end_date = $_GET['end_date'];
-    $period_label = "Custom Period";
+    $period_label = "Custom";
 }
 
 $start_dt = $start_date . ' 00:00:00';
@@ -89,7 +89,6 @@ foreach ($earnings as $e) {
     $admin = (float)($e['admin_charge_deducted'] ?? 0);
     $net = (float)($e['net_amount'] ?? ($gross - $tds - $admin));
     
-    // Extract level from description
     preg_match('/Level\s*(\d+)/i', $e['description'] ?? '', $m);
     $level = isset($m[1]) ? (int)$m[1] : 0;
     
@@ -112,18 +111,15 @@ foreach ($earnings as $e) {
     $groups[$key]['total_net'] += $net;
 }
 
-// For each group, build grouped summary (by type + level)
+// Build grouped summary
 foreach ($groups as $key => &$g) {
     $summary_groups = [];
     foreach ($g['entries'] as $e) {
-        $type_key = $e['income_type']; // 'direct' or 'team_turnover'
-        $level = $e['level'];
-        $combo_key = $type_key . '_' . $level;
-        
+        $combo_key = $e['income_type'] . '_' . $e['level'];
         if (!isset($summary_groups[$combo_key])) {
             $summary_groups[$combo_key] = [
-                'type' => $type_key,
-                'level' => $level,
+                'type' => $e['income_type'],
+                'level' => $e['level'],
                 'count' => 0,
                 'total' => 0,
             ];
@@ -132,17 +128,15 @@ foreach ($groups as $key => &$g) {
         $summary_groups[$combo_key]['total'] += $e['gross'];
     }
     
-    // Sort by type, then level
     usort($summary_groups, function($a, $b) {
         if ($a['type'] !== $b['type']) return strcmp($a['type'], $b['type']);
         return $a['level'] - $b['level'];
     });
     
-    // Assign Group A/B/C labels
     $labels = range('A', 'Z');
     $idx = 0;
     foreach ($summary_groups as &$sg) {
-        $sg['label'] = 'Group ' . $labels[$idx];
+        $sg['label'] = $labels[$idx];
         $idx++;
     }
     unset($sg);
@@ -151,7 +145,6 @@ foreach ($groups as $key => &$g) {
 }
 unset($g);
 
-// Grand totals
 $grand_gross = 0; $grand_tds = 0; $grand_admin = 0; $grand_net = 0;
 foreach ($groups as $g) {
     $grand_gross += $g['total_gross'];
@@ -159,9 +152,6 @@ foreach ($groups as $g) {
     $grand_admin += $g['total_admin'];
     $grand_net += $g['total_net'];
 }
-
-$tds_pct = $grand_gross > 0 ? round(($grand_tds / $grand_gross) * 100, 2) : 0;
-$admin_pct = $grand_gross > 0 ? round(($grand_admin / $grand_gross) * 100, 2) : 0;
 
 include 'header.php';
 ?>
@@ -179,7 +169,6 @@ include 'header.php';
 
     body { background: #f0f4f8; font-family: 'Inter', sans-serif; }
 
-    /* ============ A4 PAGE SETUP ============ */
     @page {
         size: A4;
         margin: 12mm 10mm;
@@ -189,7 +178,7 @@ include 'header.php';
         max-width: 210mm;
         margin: 0 auto;
         background: #fff;
-        border-radius: 12px;
+        border-radius: 14px;
         box-shadow: 0 12px 45px rgba(15, 23, 42, 0.10);
         overflow: hidden;
         margin-bottom: 30px;
@@ -199,113 +188,127 @@ include 'header.php';
     .statement-brand-header {
         background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #2563eb 100%);
         color: #fff;
-        padding: 22px 30px 18px;
+        padding: 24px 32px 20px;
     }
     .brand-logo-row {
         display: flex; align-items: center; justify-content: space-between;
-        flex-wrap: wrap; gap: 15px; margin-bottom: 15px;
+        flex-wrap: wrap; gap: 15px; margin-bottom: 18px;
     }
-    .brand-logo { display: flex; align-items: center; gap: 12px; }
+    .brand-logo { display: flex; align-items: center; gap: 14px; }
     .brand-logo .logo-icon {
-        width: 44px; height: 44px;
+        width: 48px; height: 48px;
         background: linear-gradient(135deg, #fbbf24, #f59e0b);
-        border-radius: 11px; display: flex; align-items: center; justify-content: center;
-        font-size: 20px; color: #0f172a;
+        border-radius: 12px; display: flex; align-items: center; justify-content: center;
+        font-size: 22px; color: #0f172a;
         box-shadow: 0 6px 18px rgba(251, 191, 36, 0.35);
     }
-    .brand-logo .brand-name { font-size: 1.2rem; font-weight: 900; letter-spacing: -0.4px; line-height: 1.1; }
+    .brand-logo .brand-name {
+        font-size: 1.15rem; font-weight: 700;
+        letter-spacing: 0.5px; line-height: 1.2;
+    }
     .brand-logo .brand-tagline {
-        font-size: 0.65rem; opacity: 0.75; letter-spacing: 1.6px;
-        text-transform: uppercase; font-weight: 600; margin-top: 1px;
+        font-size: 0.7rem; opacity: 0.7; letter-spacing: 2px;
+        text-transform: uppercase; font-weight: 500; margin-top: 3px;
     }
     .statement-period-badge {
-        background: rgba(255, 255, 255, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        padding: 8px 18px; border-radius: 10px; text-align: right;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        padding: 9px 20px; border-radius: 10px; text-align: right;
     }
     .statement-period-badge .label {
-        font-size: 0.58rem; text-transform: uppercase; opacity: 0.75;
-        letter-spacing: 1.2px; font-weight: 700;
+        font-size: 0.6rem; text-transform: uppercase; opacity: 0.7;
+        letter-spacing: 1.2px; font-weight: 600;
     }
-    .statement-period-badge .value { font-size: 0.9rem; font-weight: 800; margin-top: 1px; }
+    .statement-period-badge .value {
+        font-size: 0.92rem; font-weight: 700; margin-top: 3px;
+    }
 
     .statement-meta {
         display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px;
-        padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.15);
+        padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.12);
     }
     .statement-meta .meta-item { flex: 1; min-width: 140px; }
     .statement-meta .meta-label {
-        font-size: 0.58rem; text-transform: uppercase; opacity: 0.65;
-        letter-spacing: 1.2px; font-weight: 700; margin-bottom: 3px;
+        font-size: 0.6rem; text-transform: uppercase; opacity: 0.6;
+        letter-spacing: 1.2px; font-weight: 600; margin-bottom: 4px;
     }
-    .statement-meta .meta-value { font-size: 0.88rem; font-weight: 700; }
-    .statement-meta .meta-value small { font-weight: 500; opacity: 0.8; font-size: 0.78rem; }
+    .statement-meta .meta-value {
+        font-size: 0.9rem; font-weight: 600;
+    }
+    .statement-meta .meta-value small {
+        font-weight: 400; opacity: 0.75;
+        font-size: 0.8rem;
+    }
 
     /* ============ GROSS SUMMARY ============ */
     .gross-summary {
         display: flex;
-        padding: 18px 30px;
+        padding: 20px 32px;
         background: linear-gradient(135deg, #fffbeb, #fef3c7);
         border-bottom: 1px solid #fde68a;
         align-items: center;
-        gap: 18px;
+        gap: 20px;
         flex-wrap: wrap;
     }
     .gross-summary .gs-icon {
-        width: 52px; height: 52px;
+        width: 56px; height: 56px;
         background: linear-gradient(135deg, #fbbf24, #f59e0b);
-        border-radius: 14px;
+        border-radius: 15px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 24px; color: #fff;
+        font-size: 26px; color: #fff;
         box-shadow: 0 8px 20px rgba(251, 191, 36, 0.4);
         flex-shrink: 0;
     }
     .gross-summary .gs-info { flex: 1; }
     .gross-summary .gs-info .label {
-        font-size: 0.68rem; text-transform: uppercase;
-        color: #92400e; font-weight: 800; letter-spacing: 1.2px;
-        margin-bottom: 2px;
+        font-size: 0.7rem; text-transform: uppercase;
+        color: #92400e; font-weight: 600; letter-spacing: 1px;
+        margin-bottom: 4px;
     }
     .gross-summary .gs-info .value {
-        font-size: 1.8rem; font-weight: 900;
-        color: #b45309; line-height: 1;
+        font-size: 1.8rem; font-weight: 700;
+        color: #b45309; line-height: 1.1;
     }
     .gross-summary .gs-info .sub {
-        font-size: 0.72rem; color: #78350f;
-        margin-top: 4px; font-weight: 600;
+        font-size: 0.75rem; color: #78350f;
+        margin-top: 5px; font-weight: 500;
     }
     .gross-summary .gs-right { text-align: right; }
     .gross-summary .gs-right .lbl {
-        font-size: 0.62rem; text-transform: uppercase;
-        color: #92400e; font-weight: 800; letter-spacing: 1px;
+        font-size: 0.65rem; text-transform: uppercase;
+        color: #92400e; font-weight: 600; letter-spacing: 0.8px;
     }
     .gross-summary .gs-right .val {
-        font-size: 1rem; font-weight: 800;
+        font-size: 1.1rem; font-weight: 700;
         color: #78350f; margin-top: 3px;
     }
 
     /* ============ BODY ============ */
-    .statement-body { padding: 20px 30px 25px; }
+    .statement-body { padding: 22px 32px 26px; }
 
     .section-heading {
-        display: flex; align-items: center; gap: 10px;
-        margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #f1f5f9;
+        display: flex; align-items: center; gap: 12px;
+        margin-bottom: 16px; padding-bottom: 12px;
+        border-bottom: 2px solid #f1f5f9;
         flex-wrap: wrap;
     }
     .section-heading .sh-icon {
-        width: 32px; height: 32px;
+        width: 34px; height: 34px;
         background: linear-gradient(135deg, #1e3a8a, #2563eb);
-        color: #fff; border-radius: 8px;
-        display: flex; align-items: center; justify-content: center; font-size: 14px;
+        color: #fff; border-radius: 9px;
+        display: flex; align-items: center; justify-content: center; font-size: 15px;
     }
-    .section-heading h5 { margin: 0; font-weight: 800; color: #0f172a; font-size: 0.98rem; }
+    .section-heading h5 {
+        margin: 0; font-weight: 700; color: #0f172a;
+        font-size: 1rem;
+    }
     .section-heading .sh-count {
         background: #eff6ff; color: #1d4ed8;
-        padding: 3px 10px; border-radius: 20px;
-        font-size: 0.68rem; font-weight: 800;
+        padding: 3px 11px; border-radius: 20px;
+        font-size: 0.7rem; font-weight: 600;
     }
 
-    /* Toggle Button */
+    /* Toggle */
     .view-toggle {
         margin-left: auto;
         display: inline-flex;
@@ -317,16 +320,16 @@ include 'header.php';
     .view-toggle button {
         background: transparent;
         border: none;
-        padding: 5px 14px;
+        padding: 6px 16px;
         border-radius: 20px;
-        font-size: 0.72rem;
-        font-weight: 800;
+        font-size: 0.75rem;
+        font-weight: 600;
         color: #64748b;
         cursor: pointer;
         transition: all 0.2s;
         display: inline-flex;
         align-items: center;
-        gap: 5px;
+        gap: 6px;
     }
     .view-toggle button.active {
         background: linear-gradient(135deg, #1e3a8a, #2563eb);
@@ -338,14 +341,15 @@ include 'header.php';
     .batch-slip {
         background: #fff;
         border: 1.5px solid #e2e8f0;
-        border-radius: 12px;
+        border-radius: 14px;
         overflow: hidden;
-        margin-bottom: 18px;
+        margin-bottom: 20px;
         page-break-inside: avoid;
     }
+
     .batch-slip-header {
         background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-        padding: 12px 20px;
+        padding: 14px 22px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -353,64 +357,82 @@ include 'header.php';
         gap: 12px;
         border-bottom: 1.5px solid #e2e8f0;
     }
-    .batch-info { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
+    .batch-info { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
     .batch-info .info-item { display: flex; flex-direction: column; }
     .batch-info .info-item .lbl {
-        font-size: 0.56rem; text-transform: uppercase; color: #64748b;
-        font-weight: 800; letter-spacing: 0.7px; margin-bottom: 1px;
+        font-size: 0.6rem; text-transform: uppercase; color: #94a3b8;
+        font-weight: 600; letter-spacing: 1px; margin-bottom: 3px;
     }
-    .batch-info .info-item .val { font-size: 0.78rem; font-weight: 700; color: #0f172a; }
+    .batch-info .info-item .val {
+        font-size: 0.82rem; font-weight: 600; color: #0f172a;
+    }
     .batch-info .info-item .utr-code {
         font-family: 'Courier New', monospace;
-        background: #eff6ff; padding: 2px 8px;
-        border-radius: 5px; font-size: 0.68rem;
+        background: #eff6ff; padding: 3px 9px;
+        border-radius: 5px; font-size: 0.72rem;
         border: 1px solid #bfdbfe;
-        color: #1e40af; font-weight: 700;
+        color: #1e40af; font-weight: 600;
     }
     .batch-gross-badge {
         background: linear-gradient(135deg, #f59e0b, #fbbf24);
         color: #fff;
-        padding: 7px 16px;
-        border-radius: 9px;
+        padding: 9px 18px;
+        border-radius: 10px;
         text-align: right;
-        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        box-shadow: 0 5px 14px rgba(245, 158, 11, 0.3);
     }
     .batch-gross-badge .lbl {
-        font-size: 0.55rem; text-transform: uppercase; opacity: 0.95;
-        font-weight: 800; letter-spacing: 0.8px;
+        font-size: 0.6rem; text-transform: uppercase; opacity: 0.95;
+        font-weight: 600; letter-spacing: 1px;
     }
-    .batch-gross-badge .val { font-size: 1rem; font-weight: 900; line-height: 1; margin-top: 1px; }
+    .batch-gross-badge .val {
+        font-size: 1.05rem; font-weight: 700;
+        line-height: 1.1; margin-top: 3px;
+    }
 
     /* ============ TABLE ============ */
-    .earnings-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .earnings-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     .earnings-table thead th {
         background: #1e293b; color: #fff;
-        font-size: 0.6rem; text-transform: uppercase;
-        letter-spacing: 0.5px; padding: 9px 8px;
-        text-align: left; font-weight: 800; white-space: nowrap;
+        font-size: 0.65rem; text-transform: uppercase;
+        letter-spacing: 0.8px; padding: 11px 12px;
+        text-align: left; font-weight: 600; white-space: nowrap;
     }
     .earnings-table tbody td {
-        padding: 8px 8px;
+        padding: 11px 12px;
         border-bottom: 1px solid #f1f5f9;
         vertical-align: middle;
         color: #1e293b;
+        font-weight: 400;
+        font-size: 0.82rem;
     }
     .earnings-table tbody tr:hover { background: #f8fafc; }
     .earnings-table tbody tr:last-child td { border-bottom: none; }
     .earnings-table tfoot td {
         background: #fef3c7;
-        padding: 10px 8px; font-weight: 900;
-        font-size: 0.82rem; color: #78350f;
+        padding: 12px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #78350f;
         border-top: 1.5px solid #fcd34d;
     }
 
-    .user-cell strong { font-weight: 800; color: #0f172a; display: block; font-size: 0.78rem; }
-    .user-cell small { font-size: 0.65rem; color: #64748b; }
+    .user-cell strong {
+        font-weight: 600; color: #0f172a;
+        display: block; font-size: 0.82rem;
+    }
+    .user-cell small {
+        font-size: 0.7rem; color: #64748b;
+        font-weight: 400;
+    }
 
     .badge-type {
-        display: inline-block; padding: 2px 8px;
-        border-radius: 20px; font-size: 0.58rem;
-        font-weight: 800; letter-spacing: 0.3px; white-space: nowrap;
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        white-space: nowrap;
     }
     .badge-type.direct { background: #dcfce7; color: #166534; }
     .badge-type.team { background: #ede9fe; color: #5b21b6; }
@@ -419,15 +441,34 @@ include 'header.php';
         display: inline-block;
         background: linear-gradient(135deg, #1e3a8a, #2563eb);
         color: #fff;
-        padding: 3px 10px;
+        padding: 4px 12px;
         border-radius: 20px;
-        font-weight: 800;
-        font-size: 0.65rem;
-        letter-spacing: 0.5px;
+        font-weight: 600;
+        font-size: 0.72rem;
+        min-width: 42px;
+        text-align: center;
+    }
+
+    .level-text {
+        font-weight: 500;
+        color: #475569;
+        font-size: 0.82rem;
+    }
+
+    .sales-text {
+        font-weight: 600;
+        color: #0f172a;
+        font-size: 0.85rem;
+    }
+    .sales-text small {
+        color: #94a3b8;
+        font-weight: 400;
+        font-size: 0.72rem;
+        margin-left: 3px;
     }
 
     .amt-gross-cell {
-        font-weight: 900;
+        font-weight: 700;
         color: #b45309;
         white-space: nowrap;
         font-size: 0.88rem;
@@ -437,96 +478,117 @@ include 'header.php';
     .deduction-breakdown {
         background: linear-gradient(135deg, #f8fafc, #f1f5f9);
         border-top: 1.5px solid #e2e8f0;
-        padding: 16px 24px;
+        padding: 18px 26px;
     }
     .deduction-row {
         display: flex;
         justify-content: space-between;
-        padding: 7px 0;
-        font-size: 0.85rem;
+        padding: 8px 0;
+        font-size: 0.88rem;
         border-bottom: 1px dashed #cbd5e1;
     }
     .deduction-row:last-child { border-bottom: none; }
     .deduction-row .label {
         color: #475569;
-        font-weight: 600;
+        font-weight: 500;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 10px;
     }
     .deduction-row .label i {
-        width: 18px;
+        width: 20px;
         text-align: center;
         color: #94a3b8;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
     }
-    .deduction-row .value { font-weight: 800; color: #0f172a; }
+    .deduction-row .value {
+        font-weight: 600;
+        color: #0f172a;
+    }
     .deduction-row.deduct .value { color: #dc2626; }
     .deduction-row.deduct .label i { color: #dc2626; }
     .deduction-row.net-row {
         border-top: 2px solid #1e293b;
         border-bottom: none;
-        margin-top: 5px;
-        padding-top: 12px;
-        font-size: 1.15rem;
+        margin-top: 6px;
+        padding-top: 14px;
     }
     .deduction-row.net-row .label {
         color: #0f172a;
-        font-weight: 800;
+        font-weight: 700;
         font-size: 0.9rem;
         letter-spacing: 0.5px;
+        text-transform: uppercase;
     }
-    .deduction-row.net-row .label i { color: #059669; font-size: 0.95rem; }
-    .deduction-row.net-row .value { color: #059669; font-weight: 900; font-size: 1.25rem; }
+    .deduction-row.net-row .label i {
+        color: #059669;
+        font-size: 0.95rem;
+    }
+    .deduction-row.net-row .value {
+        color: #059669;
+        font-weight: 700;
+        font-size: 1.3rem;
+    }
 
     /* ============ GRAND TOTAL ============ */
     .grand-total-box {
-        margin-top: 22px;
+        margin-top: 24px;
         background: linear-gradient(135deg, #0f172a, #1e3a8a);
-        border-radius: 12px;
-        padding: 18px 24px;
+        border-radius: 14px;
+        padding: 20px 26px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
-        gap: 15px;
+        gap: 18px;
         color: #fff;
         page-break-inside: avoid;
     }
     .grand-total-box .gt-left h4 {
-        margin: 0; font-size: 0.88rem; font-weight: 800;
-        letter-spacing: 0.5px; opacity: 0.85; text-transform: uppercase;
+        margin: 0; font-size: 0.9rem; font-weight: 600;
+        letter-spacing: 1px; opacity: 0.9; text-transform: uppercase;
     }
-    .grand-total-box .gt-left p { margin: 3px 0 0; font-size: 0.7rem; opacity: 0.7; }
-    .grand-total-box .gt-right { display: flex; gap: 20px; flex-wrap: wrap; }
+    .grand-total-box .gt-left p {
+        margin: 4px 0 0; font-size: 0.75rem;
+        opacity: 0.7; font-weight: 400;
+    }
+    .grand-total-box .gt-right { display: flex; gap: 24px; flex-wrap: wrap; }
     .gt-item { text-align: right; }
     .gt-item .lbl {
-        font-size: 0.58rem; text-transform: uppercase;
-        opacity: 0.75; font-weight: 800; letter-spacing: 0.9px;
+        font-size: 0.62rem; text-transform: uppercase;
+        opacity: 0.7; font-weight: 600; letter-spacing: 1px;
     }
-    .gt-item .val { font-size: 0.92rem; font-weight: 800; margin-top: 1px; }
-    .gt-item.net .val { font-size: 1.3rem; color: #6ee7b7; font-weight: 900; }
+    .gt-item .val {
+        font-size: 0.95rem; font-weight: 600;
+        margin-top: 3px;
+    }
+    .gt-item.net .val {
+        font-size: 1.35rem;
+        color: #6ee7b7;
+        font-weight: 700;
+    }
 
     /* ============ EMPTY ============ */
-    .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
-    .empty-state i { font-size: 3rem; opacity: 0.3; margin-bottom: 10px; }
-    .empty-state h5 { font-weight: 700; color: #64748b; font-size: 1rem; }
+    .empty-state { text-align: center; padding: 50px 20px; color: #94a3b8; }
+    .empty-state i { font-size: 3rem; opacity: 0.3; margin-bottom: 12px; }
+    .empty-state h5 { font-weight: 600; color: #64748b; font-size: 1rem; }
 
     /* ============ FOOTER ============ */
     .statement-footer {
         background: #f8fafc;
-        padding: 14px 30px;
+        padding: 16px 32px;
         text-align: center;
-        font-size: 0.68rem;
+        font-size: 0.72rem;
         color: #94a3b8;
         border-top: 1px solid #e2e8f0;
+        font-weight: 400;
     }
 
     /* ============ FILTER BAR ============ */
     .filter-bar {
-        max-width: 210mm; margin: 0 auto 15px;
+        max-width: 210mm; margin: 0 auto 16px;
         background: #fff; border-radius: 12px;
-        padding: 12px 18px;
+        padding: 14px 20px;
         box-shadow: 0 4px 15px rgba(15, 23, 42, 0.05);
         display: flex; justify-content: space-between;
         align-items: center; gap: 12px; flex-wrap: wrap;
@@ -534,13 +596,14 @@ include 'header.php';
     }
     .filter-bar .filter-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .filter-bar .filter-left label {
-        font-size: 0.68rem; font-weight: 800;
-        text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;
+        font-size: 0.72rem; font-weight: 600;
+        text-transform: uppercase; color: #64748b;
+        letter-spacing: 0.8px;
     }
     .filter-bar select, .filter-bar input[type="date"] {
         border: 2px solid #e2e8f0; border-radius: 8px;
-        padding: 6px 12px; font-size: 0.8rem;
-        font-weight: 600; color: #1e293b; background: #fff;
+        padding: 7px 14px; font-size: 0.82rem;
+        font-weight: 500; color: #1e293b; background: #fff;
     }
     .filter-bar select:focus, .filter-bar input[type="date"]:focus {
         outline: none; border-color: #2563eb;
@@ -549,10 +612,10 @@ include 'header.php';
     .btn-print {
         background: linear-gradient(135deg, #1e3a8a, #2563eb);
         color: #fff; border: none;
-        padding: 8px 20px; border-radius: 8px;
-        font-weight: 800; font-size: 0.78rem;
+        padding: 9px 22px; border-radius: 9px;
+        font-weight: 600; font-size: 0.82rem;
         cursor: pointer; transition: all 0.25s;
-        display: inline-flex; align-items: center; gap: 6px;
+        display: inline-flex; align-items: center; gap: 7px;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
     }
     .btn-print:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
@@ -571,20 +634,13 @@ include 'header.php';
             margin: 0 !important;
             padding: 0 !important;
         }
-        .statement-brand-header {
-            padding: 15px 20px !important;
-            border-radius: 0 !important;
-        }
+        .statement-brand-header { padding: 15px 20px !important; border-radius: 0 !important; }
         .gross-summary { padding: 12px 20px !important; }
         .statement-body { padding: 15px 20px !important; }
-        .batch-slip {
-            page-break-inside: avoid;
-            margin-bottom: 12px !important;
-        }
+        .batch-slip { page-break-inside: avoid; margin-bottom: 12px !important; }
         .deduction-breakdown { page-break-inside: avoid; }
         .grand-total-box { page-break-inside: avoid; margin-top: 15px !important; }
         .statement-footer { page-break-inside: avoid; }
-        .gross-summary .gs-info .value { font-size: 1.5rem; }
     }
 
     /* Hide/Show Views */
@@ -593,13 +649,17 @@ include 'header.php';
     body.show-detailed .view-detailed { display: block; }
     body.show-detailed .view-summary  { display: none; }
 
+    /* Summary view: hide batch header */
+    .batch-slip-header { display: none; }
+    body.show-detailed .batch-slip-header { display: flex; }
+
     @media (max-width: 768px) {
-        .statement-brand-header { padding: 15px 18px; }
-        .gross-summary { padding: 15px 18px; }
-        .gross-summary .gs-info .value { font-size: 1.4rem; }
-        .statement-body { padding: 15px 18px; }
-        .earnings-table { font-size: 0.7rem; }
-        .earnings-table thead th, .earnings-table tbody td { padding: 6px 5px; }
+        .statement-brand-header { padding: 18px 20px; }
+        .gross-summary { padding: 15px 20px; }
+        .gross-summary .gs-info .value { font-size: 1.5rem; }
+        .statement-body { padding: 15px 20px; }
+        .earnings-table { font-size: 0.75rem; }
+        .earnings-table thead th, .earnings-table tbody td { padding: 8px 8px; }
         .view-toggle { margin-left: 0; }
     }
 </style>
@@ -608,7 +668,7 @@ include 'header.php';
     <!-- FILTER BAR -->
     <div class="filter-bar no-print">
         <form method="GET" class="filter-left" id="filterForm">
-            <label><i class="fas fa-calendar-alt me-1"></i> Period:</label>
+            <label><i class="fas fa-calendar-alt me-1"></i> Period</label>
             <select name="range" id="rangeSelect">
                 <option value="this_week" <?= $range == 'this_week' ? 'selected' : '' ?>>This Week</option>
                 <option value="last_week" <?= $range == 'last_week' ? 'selected' : '' ?>>Last Week</option>
@@ -676,7 +736,7 @@ include 'header.php';
                 <div class="label">Total Gross Income</div>
                 <div class="value">₹ <?= indianCurrencyFormat($grand_gross) ?></div>
                 <div class="sub">
-                    <?= count($groups) ?> payout<?= count($groups) != 1 ? 's' : '' ?>, <?= count($earnings) ?> total entr<?= count($earnings) != 1 ? 'ies' : 'y' ?>
+                    <?= count($groups) ?> Payout<?= count($groups) != 1 ? 's' : '' ?> &nbsp;·&nbsp; <?= count($earnings) ?> Total Entr<?= count($earnings) != 1 ? 'ies' : 'y' ?>
                 </div>
             </div>
             <div class="gs-right">
@@ -693,7 +753,6 @@ include 'header.php';
                 <h5>Earnings Breakdown</h5>
                 <span class="sh-count"><?= count($groups) ?> Payout<?= count($groups) != 1 ? 's' : '' ?></span>
 
-                <!-- View Toggle -->
                 <?php if (!empty($groups)): ?>
                 <div class="view-toggle no-print">
                     <button type="button" id="btnSummary" class="active" onclick="setView('summary')">
@@ -714,20 +773,22 @@ include 'header.php';
                 </div>
             <?php endif; ?>
 
-            <?php $batch_num = 1; foreach ($groups as $key => $g): ?>
+            <?php foreach ($groups as $key => $g): ?>
                 <div class="batch-slip">
+
+                    <!-- Batch Header (only in Detailed view) -->
                     <div class="batch-slip-header">
                         <div class="batch-info">
                             <div class="info-item">
-                                <span class="lbl"><i class="fas fa-check-circle me-1"></i> Paid On</span>
+                                <span class="lbl">Paid On</span>
                                 <span class="val"><?= $g['paid_at'] ? date('d M Y, h:i A', strtotime($g['paid_at'])) : '—' ?></span>
                             </div>
                             <div class="info-item">
-                                <span class="lbl"><i class="fas fa-hashtag me-1"></i> UTR</span>
+                                <span class="lbl">Reference</span>
                                 <span class="val utr-code"><?= htmlspecialchars($g['utr']) ?></span>
                             </div>
                             <div class="info-item">
-                                <span class="lbl"><i class="fas fa-list me-1"></i> Entries</span>
+                                <span class="lbl">Entries</span>
                                 <span class="val"><?= count($g['entries']) ?></span>
                             </div>
                         </div>
@@ -743,11 +804,11 @@ include 'header.php';
                             <table class="earnings-table">
                                 <thead>
                                     <tr>
-                                        <th style="width:100px;">Group</th>
+                                        <th style="width:110px;">Group</th>
                                         <th>Income Type</th>
-                                        <th class="text-center">Level</th>
-                                        <th class="text-center">Members</th>
-                                        <th class="text-end">Gross Amount</th>
+                                        <th class="text-center" style="width:110px;">Level</th>
+                                        <th class="text-center" style="width:120px;">Sales</th>
+                                        <th class="text-end" style="width:150px;">Gross Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -755,7 +816,7 @@ include 'header.php';
                                         <tr><td colspan="5" class="text-center text-muted">No entries</td></tr>
                                     <?php else: foreach ($g['summary_groups'] as $sg): ?>
                                         <tr>
-                                            <td><span class="group-label"><?= $sg['label'] ?></span></td>
+                                            <td><span class="group-label">Group <?= $sg['label'] ?></span></td>
                                             <td>
                                                 <?php if ($sg['type'] == 'direct'): ?>
                                                     <span class="badge-type direct">Direct Income</span>
@@ -765,19 +826,22 @@ include 'header.php';
                                             </td>
                                             <td class="text-center">
                                                 <?php if ($sg['level'] > 0): ?>
-                                                    Level <?= $sg['level'] ?>
+                                                    <span class="level-text">Level <?= $sg['level'] ?></span>
                                                 <?php else: ?>
-                                                    —
+                                                    <span class="text-muted">—</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td class="text-center"><strong><?= $sg['count'] ?></strong> member<?= $sg['count'] != 1 ? 's' : '' ?></td>
+                                            <td class="text-center">
+                                                <span class="sales-text"><?= $sg['count'] ?></span>
+                                                <small>Sales</small>
+                                            </td>
                                             <td class="text-end amt-gross-cell">₹ <?= indianCurrencyFormat($sg['total']) ?></td>
                                         </tr>
                                     <?php endforeach; endif; ?>
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="4" class="text-end">GROSS TOTAL:</td>
+                                        <td colspan="4" class="text-end">GROSS TOTAL</td>
                                         <td class="text-end">₹ <?= indianCurrencyFormat($g['total_gross']) ?></td>
                                     </tr>
                                 </tfoot>
@@ -801,7 +865,7 @@ include 'header.php';
                                 <tbody>
                                     <?php foreach ($g['entries'] as $e): ?>
                                         <tr>
-                                            <td style="font-size:0.7rem; white-space:nowrap; color:#64748b;">
+                                            <td style="font-size:0.75rem; white-space:nowrap; color:#64748b;">
                                                 <?= date('d M Y', strtotime($e['date'])) ?>
                                             </td>
                                             <td class="user-cell">
@@ -815,7 +879,7 @@ include 'header.php';
                                                     <span class="badge-type team">Team</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td style="font-size:0.7rem; color:#475569; min-width:160px;">
+                                            <td style="font-size:0.75rem; color:#475569; min-width:180px;">
                                                 <?= htmlspecialchars($e['description'] ?? '') ?>
                                             </td>
                                             <td class="text-end amt-gross-cell">₹ <?= indianCurrencyFormat($e['gross']) ?></td>
@@ -824,7 +888,7 @@ include 'header.php';
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="4" class="text-end">GROSS TOTAL:</td>
+                                        <td colspan="4" class="text-end">GROSS TOTAL</td>
                                         <td class="text-end">₹ <?= indianCurrencyFormat($g['total_gross']) ?></td>
                                     </tr>
                                 </tfoot>
@@ -832,7 +896,7 @@ include 'header.php';
                         </div>
                     </div>
 
-                    <!-- DEDUCTION BREAKDOWN (always shown) -->
+                    <!-- DEDUCTION BREAKDOWN -->
                     <div class="deduction-breakdown">
                         <div class="deduction-row">
                             <span class="label"><i class="fas fa-coins"></i> Gross Amount</span>
@@ -847,19 +911,19 @@ include 'header.php';
                             <span class="value">- ₹ <?= indianCurrencyFormat($g['total_admin']) ?></span>
                         </div>
                         <div class="deduction-row net-row">
-                            <span class="label"><i class="fas fa-wallet"></i> NET PAYABLE</span>
+                            <span class="label"><i class="fas fa-wallet"></i> Net Payable</span>
                             <span class="value">₹ <?= indianCurrencyFormat($g['total_net']) ?></span>
                         </div>
                     </div>
                 </div>
-            <?php $batch_num++; endforeach; ?>
+            <?php endforeach; ?>
 
             <!-- GRAND TOTAL -->
             <?php if (!empty($groups)): ?>
                 <div class="grand-total-box">
                     <div class="gt-left">
                         <h4><i class="fas fa-chart-line me-2"></i>Period Summary</h4>
-                        <p><?= $period_label ?> — <?= count($groups) ?> payout<?= count($groups) != 1 ? 's' : '' ?></p>
+                        <p><?= $period_label ?> &nbsp;·&nbsp; <?= count($groups) ?> Payout<?= count($groups) != 1 ? 's' : '' ?></p>
                     </div>
                     <div class="gt-right">
                         <div class="gt-item">
@@ -888,13 +952,12 @@ include 'header.php';
         <div class="statement-footer">
             <i class="fas fa-shield-alt me-1"></i>
             This is a computer-generated statement and does not require a signature.
-            <br>Generated on <?= date('d M Y, h:i A') ?> | Prime Property India
+            <br>Generated on <?= date('d M Y, h:i A') ?> · Prime Property India
         </div>
     </div>
 </div>
 
 <script>
-    // View toggle (Summary / Detailed)
     function setView(mode) {
         if (mode === 'detailed') {
             document.body.classList.add('show-detailed');
@@ -909,7 +972,6 @@ include 'header.php';
         }
     }
 
-    // Restore last selected view
     document.addEventListener('DOMContentLoaded', function() {
         try {
             var savedView = localStorage.getItem('earnings_view') || 'summary';
@@ -917,7 +979,6 @@ include 'header.php';
         } catch(e) {}
     });
 
-    // Filter handling
     document.getElementById('rangeSelect').addEventListener('change', function() {
         var customFields = document.querySelectorAll('.custom-date-field');
         var applyBtn = document.getElementById('applyBtn');
