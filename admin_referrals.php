@@ -69,7 +69,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_mlm'])) {
     try {
         $pdo->beginTransaction();
 
-        // Fetch all pending MLM earnings for this user
         $stmt = $pdo->prepare("SELECT id, amount FROM user_earnings WHERE user_id = ? AND status = 'pending'");
         $stmt->execute([$receiver_id]);
         $earnings = $stmt->fetchAll();
@@ -90,7 +89,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_mlm'])) {
             $total_admin += $calc['admin_charge'];
             $total_net += $calc['net'];
 
-            // Update earning to 'paid'
             $upd = $pdo->prepare("
                 UPDATE user_earnings 
                 SET status = 'paid', 
@@ -104,12 +102,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_mlm'])) {
             $upd->execute([$calc['tds'], $calc['admin_charge'], $calc['net'], $utr_no, $e['id']]);
         }
 
-        // Credit net amount to wallet
         if ($total_net > 0) {
             creditWallet($pdo, $receiver_id, $total_net, "MLM Payout Released (Gross ₹" . number_format($total_gross, 2) . ", Net ₹" . number_format($total_net, 2) . ")", null, null);
         }
 
-        // Accounting expense entry
         $uname_stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
         $uname_stmt->execute([$receiver_id]);
         $uname = $uname_stmt->fetchColumn();
@@ -118,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_mlm'])) {
 
         $pdo->commit();
 
-        $_SESSION['msg'] = "✅ MLM Payout released!<br>Gross: ₹" . number_format($total_gross, 2) . " | TDS: ₹" . number_format($total_tds, 2) . " | Admin: ₹" . number_format($total_admin, 2) . " | <b>Net Credited to Wallet: ₹" . number_format($total_net, 2) . "</b>";
+        $_SESSION['msg'] = "✅ MLM Payout released!<br>Gross: ₹" . number_format($total_gross, 2) . " | TDS: ₹" . number_format($total_tds, 2) . " | Admin: ₹" . number_format($total_admin, 2) . " | <b>Net Credited: ₹" . number_format($total_net, 2) . "</b>";
         header("Location: admin_referrals.php?mlm_paid=1");
         exit;
     } catch (Exception $e) {
@@ -256,7 +252,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pay_all'])) {
         activateSubscriptionForUser($pdo, $referrer_id, $package_id_all, $duration_all);
     }
 
-    $_SESSION['msg'] = "✅ Total Gross: ₹" . indianCurrencyFormat($total_gross) . ", Deductions: TDS ₹" . indianCurrencyFormat($total_tds) . ", Admin ₹" . indianCurrencyFormat($total_admin) . ", Net ₹" . indianCurrencyFormat($total_net) . " credited. Wallet balance set to 0. UTR: $utr_no";
+    $_SESSION['msg'] = "✅ Total Gross: ₹" . indianCurrencyFormat($total_gross) . ", Deductions: TDS ₹" . indianCurrencyFormat($total_tds) . ", Admin ₹" . indianCurrencyFormat($total_admin) . ", Net ₹" . indianCurrencyFormat($total_net) . " credited. UTR: $utr_no";
     if ($give_subscription_all) $_SESSION['msg'] .= " Subscription activated.";
     header("Location: admin_referrals.php?paid=1");
     exit;
@@ -294,7 +290,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_manual_payout'])) {
                            VALUES (?, ?, ?, ?, 'pending', ?)");
     $stmt->execute([$referrer_id, $referred_id, $package_id, $amount, $activation_date]);
 
-    $_SESSION['msg'] = "✅ Manual payout added successfully! It will appear in pending list.";
+    $_SESSION['msg'] = "✅ Manual payout added successfully!";
     header("Location: admin_referrals.php");
     exit;
 }
@@ -303,7 +299,7 @@ include 'header.php';
 
 $defaults = getGlobalDeductions($pdo);
 
-// ---- Summary Statistics (old referral) ----
+// ---- Summary Statistics ----
 $summary = $pdo->query("SELECT 
                            COALESCE(SUM(tds_deducted), 0) as total_tds,
                            COALESCE(SUM(admin_charge_deducted), 0) as total_admin,
@@ -416,11 +412,11 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h5 class="mb-0" style="color: #1e3a8a;"><i class="fas fa-layer-group me-2"></i>MLM Payouts (Pending Release)</h5>
             <a href="admin_payout_preview.php" class="btn btn-sm btn-outline-primary rounded-pill">
-                <i class="fas fa-plus me-1"></i> Generate New Payouts
+                <i class="fas fa-plus me-1"></i> Generate New
             </a>
         </div>
         <p class="text-muted small mb-3">
-            ये payouts <b>Payout Preview</b> से generate हुए हैं। TDS और Admin Charge लगाकर <b>Pay Now</b> दबाएं — तभी user के wallet में net amount जाएगा।
+            हर receiver के आगे <b>View Details</b> से पूरी entries देखें, और <b>Release</b> दबाकर एक click में wallet credit करें।
         </p>
 
         <?php if (count($mlmPending) > 0): ?>
@@ -429,12 +425,12 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
                     <thead class="table-dark">
                         <tr>
                             <th>Receiver</th>
-                            <th class="text-end">Total Gross</th>
+                            <th class="text-end">Gross</th>
                             <th class="text-end">TDS (<?= $defaults['tds'] ?>%)</th>
                             <th class="text-end">Admin (<?= $defaults['admin'] ?>%)</th>
                             <th class="text-end">Net Payable</th>
                             <th class="text-center">Entries</th>
-                            <th>Action</th>
+                            <th class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -442,6 +438,16 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
                         $gross = $g['total_amount'];
                         $calc = calculateNet($gross, $defaults['tds'], $defaults['admin']);
                         $bank = getUserBankDetails($pdo, $g['receiver_id']);
+                        
+                        $entries_stmt = $pdo->prepare("
+                            SELECT e.*, f.name as from_user_name 
+                            FROM user_earnings e 
+                            LEFT JOIN users f ON e.from_user_id = f.id 
+                            WHERE e.user_id = ? AND e.status = 'pending'
+                            ORDER BY e.id ASC
+                        ");
+                        $entries_stmt->execute([$g['receiver_id']]);
+                        $entries = $entries_stmt->fetchAll();
                     ?>
                         <tr>
                             <td>
@@ -453,49 +459,143 @@ if(isset($_GET['mlm_paid'])) echo "<div class='alert alert-success'>✅ MLM Payo
                             <td class="text-end text-danger">- ₹ <?= number_format($calc['admin_charge'], 2) ?></td>
                             <td class="text-end fw-bold text-success">₹ <?= number_format($calc['net'], 2) ?></td>
                             <td class="text-center"><span class="badge bg-primary"><?= $g['total_count'] ?></span></td>
-                            <td>
-                                <button class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#mlmPay<?= $g['receiver_id'] ?>">
-                                    <i class="fas fa-credit-card me-1"></i> Pay Now
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#detailsModal<?= $g['receiver_id'] ?>">
+                                    <i class="fas fa-eye me-1"></i> View Details
                                 </button>
-                                <div class="collapse mt-2" id="mlmPay<?= $g['receiver_id'] ?>">
-                                    <form method="POST" class="p-2 border rounded bg-white" onsubmit="return confirm('Release ₹<?= number_format($calc['net'], 2) ?> to <?= htmlspecialchars($g['receiver_name']) ?>?');">
-                                        <input type="hidden" name="release_mlm" value="1">
-                                        <input type="hidden" name="receiver_id" value="<?= $g['receiver_id'] ?>">
-                                        <div class="row g-1">
-                                            <div class="col-md-2">
-                                                <label class="form-label small">TDS %</label>
-                                                <input type="number" step="0.01" name="tds_percent" class="form-control form-control-sm" value="<?= $defaults['tds'] ?>" required>
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label small">Admin %</label>
-                                                <input type="number" step="0.01" name="admin_charge_percent" class="form-control form-control-sm" value="<?= $defaults['admin'] ?>" required>
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label small">Bank</label>
-                                                <input type="text" name="bank_name" class="form-control form-control-sm" value="<?= htmlspecialchars($bank['bank_name'] ?? '') ?>">
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label small">A/c No.</label>
-                                                <input type="text" name="account_number" class="form-control form-control-sm" value="<?= htmlspecialchars($bank['account_number'] ?? '') ?>">
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label small">IFSC</label>
-                                                <input type="text" name="ifsc" class="form-control form-control-sm" value="<?= htmlspecialchars($bank['ifsc'] ?? '') ?>">
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label small">UTR</label>
-                                                <input type="text" name="utr" class="form-control form-control-sm" placeholder="UTR" required>
-                                            </div>
-                                        </div>
-                                        <div class="mt-2">
-                                            <button type="submit" class="btn btn-success btn-sm w-100">
-                                                ✅ Confirm & Release ₹<?= number_format($calc['net'], 2) ?> to Wallet
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
+                                <form method="POST" style="display:inline;" onsubmit="return confirm('Release ₹<?= number_format($calc['net'], 2) ?> to <?= htmlspecialchars($g['receiver_name']) ?>?');">
+                                    <input type="hidden" name="release_mlm" value="1">
+                                    <input type="hidden" name="receiver_id" value="<?= $g['receiver_id'] ?>">
+                                    <input type="hidden" name="tds_percent" value="<?= $defaults['tds'] ?>">
+                                    <input type="hidden" name="admin_charge_percent" value="<?= $defaults['admin'] ?>">
+                                    <input type="hidden" name="utr" value="AUTO-<?= date('YmdHis') . '-' . $g['receiver_id'] ?>">
+                                    <input type="hidden" name="bank_name" value="<?= htmlspecialchars($bank['bank_name'] ?? '') ?>">
+                                    <input type="hidden" name="account_number" value="<?= htmlspecialchars($bank['account_number'] ?? '') ?>">
+                                    <input type="hidden" name="ifsc" value="<?= htmlspecialchars($bank['ifsc'] ?? '') ?>">
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        <i class="fas fa-bolt me-1"></i> Release
+                                    </button>
+                                </form>
                             </td>
                         </tr>
+
+                        <!-- Details Modal -->
+                        <div class="modal fade" id="detailsModal<?= $g['receiver_id'] ?>" tabindex="-1">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header" style="background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff;">
+                                        <h5 class="modal-title">
+                                            <i class="fas fa-file-invoice-dollar me-2"></i>
+                                            Payout Details: <?= htmlspecialchars($g['receiver_name']) ?> (#<?= $g['receiver_id'] ?>)
+                                        </h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-3">
+                                                <div class="p-2 border rounded text-center">
+                                                    <small class="text-muted">Gross</small>
+                                                    <div class="fw-bold fs-6">₹ <?= number_format($gross, 2) ?></div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="p-2 border rounded text-center">
+                                                    <small class="text-muted">TDS (<?= $defaults['tds'] ?>%)</small>
+                                                    <div class="fw-bold fs-6 text-danger">- ₹ <?= number_format($calc['tds'], 2) ?></div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="p-2 border rounded text-center">
+                                                    <small class="text-muted">Admin (<?= $defaults['admin'] ?>%)</small>
+                                                    <div class="fw-bold fs-6 text-danger">- ₹ <?= number_format($calc['admin_charge'], 2) ?></div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="p-2 border rounded text-center bg-success text-white">
+                                                    <small>NET PAYABLE</small>
+                                                    <div class="fw-bold fs-6">₹ <?= number_format($calc['net'], 2) ?></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <h6 class="fw-bold mb-2">Income Breakdown (<?= count($entries) ?> entries)</h6>
+                                        <table class="table table-sm table-bordered" style="font-size: 0.82rem;">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>From User</th>
+                                                    <th>Type</th>
+                                                    <th>Description</th>
+                                                    <th class="text-end">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($entries as $e): ?>
+                                                    <tr>
+                                                        <td><strong>#<?= $e['from_user_id'] ?> <?= htmlspecialchars($e['from_user_name'] ?? 'N/A') ?></strong></td>
+                                                        <td>
+                                                            <?php if ($e['income_type'] == 'direct'): ?>
+                                                                <span class="badge bg-success">Direct</span>
+                                                            <?php else: ?>
+                                                                <span class="badge bg-primary">Team Turnover</span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td style="font-size: 0.75rem;"><?= htmlspecialchars($e['description']) ?></td>
+                                                        <td class="text-end fw-bold text-success">₹ <?= number_format($e['amount'], 2) ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                            <tfoot>
+                                                <tr style="background:#fef3c7;">
+                                                    <td colspan="3" class="text-end fw-bold">GROSS TOTAL:</td>
+                                                    <td class="text-end fw-bold">₹ <?= number_format($gross, 2) ?></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+
+                                        <div class="border rounded p-3" style="background: #f8fafc;">
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span>Gross</span>
+                                                <span class="fw-bold">₹ <?= number_format($gross, 2) ?></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span>TDS (<?= $defaults['tds'] ?>%)</span>
+                                                <span class="text-danger fw-bold">- ₹ <?= number_format($calc['tds'], 2) ?></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span>Admin Charge (<?= $defaults['admin'] ?>%)</span>
+                                                <span class="text-danger fw-bold">- ₹ <?= number_format($calc['admin_charge'], 2) ?></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between pt-2 mt-2" style="border-top: 2px solid #1e293b; font-size: 1.15rem;">
+                                                <span class="fw-bold">NET PAYABLE</span>
+                                                <span class="fw-bold text-success">₹ <?= number_format($calc['net'], 2) ?></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-3 small text-muted">
+                                            <strong>Bank:</strong> <?= htmlspecialchars($bank['bank_name'] ?? 'N/A') ?> | 
+                                            <strong>A/c:</strong> <?= htmlspecialchars($bank['account_number'] ?? 'N/A') ?> | 
+                                            <strong>IFSC:</strong> <?= htmlspecialchars($bank['ifsc'] ?? 'N/A') ?>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        <form method="POST" onsubmit="return confirm('Release ₹<?= number_format($calc['net'], 2) ?>?');" style="display:inline;">
+                                            <input type="hidden" name="release_mlm" value="1">
+                                            <input type="hidden" name="receiver_id" value="<?= $g['receiver_id'] ?>">
+                                            <input type="hidden" name="tds_percent" value="<?= $defaults['tds'] ?>">
+                                            <input type="hidden" name="admin_charge_percent" value="<?= $defaults['admin'] ?>">
+                                            <input type="hidden" name="utr" value="AUTO-<?= date('YmdHis') . '-' . $g['receiver_id'] ?>">
+                                            <input type="hidden" name="bank_name" value="<?= htmlspecialchars($bank['bank_name'] ?? '') ?>">
+                                            <input type="hidden" name="account_number" value="<?= htmlspecialchars($bank['account_number'] ?? '') ?>">
+                                            <input type="hidden" name="ifsc" value="<?= htmlspecialchars($bank['ifsc'] ?? '') ?>">
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="fas fa-bolt me-1"></i> Release ₹<?= number_format($calc['net'], 2) ?>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     <?php endforeach; ?>
                     </tbody>
                 </table>
