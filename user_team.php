@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 My Team – City Dashboard + City-wise Full List
+// 👥 My Team – Smart City Normalization + City Dashboard
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -13,6 +13,76 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 
 $user_id = $_SESSION['user_id'];
 include 'header.php'; 
+
+// ============================================================
+// 🏙️ SMART CITY NORMALIZATION
+// ============================================================
+$known_cities = [
+    'indore', 'bhopal', 'agra', 'jaipur', 'gwalior', 'lucknow', 
+    'uttar pradesh', 'nagpur', 'jodhpur', 'patiala', 'delhi',
+    'new delhi', 'surat', 'hisar', 'karnal', 'bharatpur', 
+    'varanasi', 'yamuna nagar', 'jalna', 'katni', 'pune', 
+    'jabalpur', 'alirajpur', 'haridwar', 'vadodara', 'raigarh', 
+    'gaya', 'raipur', 'mandsaur', 'rajasamand', 'kanpur', 
+    'palanpur', 'barwaha', 'nashik', 'yavatmal', 'dhile', 
+    'ballia', 'ghaziabad', 'ayodhya', 'anuppur', 'ujjain', 
+    'dewas', 'mhow', 'barwani', 'khandwa', 'tejaji nagar',
+    'shakurpur', 'malwa county', 'bhopal madhya pardesh',
+    'jaipur rajasthan', 'varanasi uttar pradesh', 'moshi pune'
+];
+
+/**
+ * Normalize city name to a canonical form.
+ * Handles case, extra spaces, extra text like "Tejaji nagar indore" → "indore"
+ */
+function normalizeCityName($city, $known_cities) {
+    if (empty($city)) return '';
+    
+    // Clean up: lowercase, trim, remove extra spaces
+    $city = trim(preg_replace('/\s+/', ' ', strtolower($city)));
+    
+    if ($city === '') return '';
+    
+    // Try to match against known cities (longest match first for better accuracy)
+    $sorted_known = $known_cities;
+    usort($sorted_known, function($a, $b) { return strlen($b) - strlen($a); });
+    
+    foreach ($sorted_known as $known) {
+        if (strpos($city, $known) !== false) {
+            return $known;
+        }
+    }
+    
+    // If no match in known list, try common typo fixes
+    $typo_map = [
+        'indor'   => 'indore',
+        'indoor'  => 'indore',
+        'indor '  => 'indore',
+        'indea'   => 'indore',
+        'bhopl'   => 'bhopal',
+        'jiapur'  => 'jaipur',
+        'jaipr'   => 'jaipur',
+        'lucknw'  => 'lucknow',
+        'nagpure' => 'nagpur',
+    ];
+    
+    foreach ($typo_map as $typo => $correct) {
+        if (strpos($city, $typo) !== false) {
+            return $correct;
+        }
+    }
+    
+    // Return cleaned original if no match
+    return $city;
+}
+
+/**
+ * Display name — Title Case of normalized name
+ */
+function displayCityName($city) {
+    if (empty($city)) return 'Unknown';
+    return ucwords($city);
+}
 
 // ---- Fetch the entire referral tree with city ----
 $sql = "
@@ -72,6 +142,12 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([':user_id' => $user_id]);
 $team_members = $stmt->fetchAll();
 
+// ---- Normalize city for every member ----
+foreach ($team_members as &$m) {
+    $m['city_normalized'] = normalizeCityName($m['city'] ?? '', $known_cities);
+}
+unset($m);
+
 // ---- Build nested array for tree rendering ----
 function buildTree($members, $parentId = null) {
     $branch = [];
@@ -96,10 +172,10 @@ function buildTree($members, $parentId = null) {
 $tree = buildTree($team_members, $user_id);
 $total_members = count($team_members);
 
-// ---- Compute city counts ----
+// ---- Compute city counts (using NORMALIZED city) ----
 $city_counts = [];
 foreach ($team_members as $m) {
-    $city = trim($m['city'] ?? '');
+    $city = trim($m['city_normalized'] ?? '');
     if (!empty($city)) {
         $city_counts[$city] = ($city_counts[$city] ?? 0) + 1;
     }
@@ -137,7 +213,9 @@ function renderTree($nodes, $level = 0) {
                 'Silver' => 'bg-secondary',
                 'Gold' => 'bg-warning text-dark',
                 'Platinum' => 'bg-primary',
-                'Diamond' => 'bg-info'
+                'Diamond' => 'bg-info',
+                'Diamond Combo' => 'bg-info',
+                'Silver Combo' => 'bg-secondary',
             ];
             $colorClass = $pkgColors[$node['package_name']] ?? 'bg-success';
             $packageBadge = ' <span class="badge ' . $colorClass . '">' . htmlspecialchars($node['package_name']) . '</span>';
@@ -147,11 +225,13 @@ function renderTree($nodes, $level = 0) {
         
         $activeIcon = $node['is_active_sub'] ? ' <i class="fas fa-check-circle" style="color:#10b981;" title="Active Subscriber"></i>' : '';
         $icon = $hasChildren ? '📂' : '👤';
-        $cityDisplay = !empty($node['city']) ? htmlspecialchars($node['city']) : '—';
+        $cityDisplay = !empty($node['city_normalized']) 
+            ? htmlspecialchars(displayCityName($node['city_normalized'])) 
+            : '—';
         
         $searchData = 'data-name="' . strtolower(htmlspecialchars($node['name'])) . '" 
                         data-email="' . strtolower(htmlspecialchars($node['email'])) . '" 
-                        data-city="' . strtolower(htmlspecialchars($node['city'] ?? '')) . '"';
+                        data-city="' . strtolower(htmlspecialchars($node['city_normalized'] ?? '')) . '"';
         
         $html .= '<li style="margin-bottom:8px; border-left:2px solid #e2e8f0; padding-left:12px;" ' . $searchData . '>';
         $html .= '<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:'.($level==0?'#f1f5f9':'transparent').'; border-radius:8px; flex-wrap:wrap;">';
@@ -179,15 +259,21 @@ function renderTree($nodes, $level = 0) {
 // ============================================================
 $selected_city = isset($_GET['city']) ? trim($_GET['city']) : '';
 if (!empty($selected_city)) {
-    // Filter members from this city
-    $city_members = array_filter($team_members, function($m) use ($selected_city) {
-        return trim($m['city'] ?? '') == $selected_city;
+    // Normalize the requested city
+    $selected_city_normalized = normalizeCityName($selected_city, $known_cities);
+    
+    // Filter members from this city (using normalized city)
+    $city_members = array_filter($team_members, function($m) use ($selected_city_normalized) {
+        return trim($m['city_normalized'] ?? '') == $selected_city_normalized;
     });
+    
     // Sort by name
     usort($city_members, function($a, $b) {
         return strcmp($a['name'], $b['name']);
     });
+    
     $city_count = count($city_members);
+    $city_display = displayCityName($selected_city_normalized);
     ?>
     <style>
         .city-detail-container {
@@ -204,6 +290,7 @@ if (!empty($selected_city)) {
             padding-bottom: 15px;
             margin-bottom: 20px;
             flex-wrap: wrap;
+            gap: 10px;
         }
         .city-detail-header h4 {
             font-weight: 700;
@@ -211,10 +298,6 @@ if (!empty($selected_city)) {
         }
         .city-detail-header h4 i {
             color: #2563eb;
-        }
-        .city-detail-header .badge {
-            font-size: 1rem;
-            padding: 6px 16px;
         }
         .back-btn {
             background: #e2e8f0;
@@ -260,24 +343,15 @@ if (!empty($selected_city)) {
             color: #94a3b8;
         }
         @media (max-width: 768px) {
-            .city-member-table {
-                font-size: 0.75rem;
-            }
-            .city-member-table th,
-            .city-member-table td {
-                padding: 6px 8px;
-            }
-            .city-detail-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
+            .city-member-table { font-size: 0.75rem; }
+            .city-member-table th, .city-member-table td { padding: 6px 8px; }
+            .city-detail-header { flex-direction: column; align-items: flex-start; }
         }
     </style>
     <div class="container-fluid">
         <div class="city-detail-container">
             <div class="city-detail-header">
-                <h4><i class="fas fa-map-pin"></i> <?= htmlspecialchars($selected_city) ?> (<?= $city_count ?> members)</h4>
+                <h4><i class="fas fa-map-pin"></i> <?= htmlspecialchars($city_display) ?> (<?= $city_count ?> members)</h4>
                 <div>
                     <a href="user_team.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to My Team</a>
                 </div>
@@ -302,7 +376,7 @@ if (!empty($selected_city)) {
                                 <td><strong><?= htmlspecialchars($m['name']) ?></strong></td>
                                 <td><?= htmlspecialchars($m['email']) ?></td>
                                 <td><?= htmlspecialchars($m['phone'] ?? '—') ?></td>
-                                <td><?= htmlspecialchars($m['city'] ?? '—') ?></td>
+                                <td><?= htmlspecialchars(displayCityName($m['city_normalized'] ?? '')) ?></td>
                                 <td>
                                     <?php if (!empty($m['package_name']) && $m['sub_status'] == 'active'): ?>
                                         <span class="badge bg-primary"><?= htmlspecialchars($m['package_name']) ?></span>
@@ -354,16 +428,8 @@ if (!empty($selected_city)) {
         flex-wrap: wrap;
         gap: 10px;
     }
-    .team-header h4 {
-        font-weight: 700;
-        margin: 0;
-    }
-    .team-search {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
-    }
+    .team-header h4 { font-weight: 700; margin: 0; }
+    .team-search { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .team-search input {
         border-radius: 30px;
         padding: 6px 16px;
@@ -376,22 +442,11 @@ if (!empty($selected_city)) {
         border-color: #2563eb;
         box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
     }
-    .team-tree {
-        padding: 10px 0;
-    }
-    .team-tree ul {
-        margin: 0;
-    }
-    .team-tree li {
-        transition: all 0.2s;
-        cursor: default;
-    }
-    .team-tree li:hover > div {
-        background: #f8fafc;
-    }
-    .team-tree li.hidden-item {
-        display: none !important;
-    }
+    .team-tree { padding: 10px 0; }
+    .team-tree ul { margin: 0; }
+    .team-tree li { transition: all 0.2s; cursor: default; }
+    .team-tree li:hover > div { background: #f8fafc; }
+    .team-tree li.hidden-item { display: none !important; }
 
     .city-dashboard {
         display: flex;
@@ -412,14 +467,8 @@ if (!empty($selected_city)) {
         transition: 0.2s;
         cursor: default;
     }
-    .city-card:hover {
-        background: #eef2ff;
-        border-color: #2563eb;
-    }
-    .city-card .city-name {
-        font-weight: 600;
-        color: #0f172a;
-    }
+    .city-card:hover { background: #eef2ff; border-color: #2563eb; }
+    .city-card .city-name { font-weight: 600; color: #0f172a; }
     .city-card .city-count {
         background: #2563eb;
         color: white;
@@ -456,12 +505,8 @@ if (!empty($selected_city)) {
         font-weight: 600;
         display: none;
     }
-    .clear-filter-btn:hover {
-        background: #cbd5e1;
-    }
-    .clear-filter-btn.show {
-        display: inline-block;
-    }
+    .clear-filter-btn:hover { background: #cbd5e1; }
+    .clear-filter-btn.show { display: inline-block; }
 </style>
 
 <div class="container-fluid">
@@ -475,12 +520,15 @@ if (!empty($selected_city)) {
             </div>
         </div>
 
-        <!-- City Dashboard -->
+        <!-- City Dashboard (now normalized) -->
         <?php if (!empty($city_counts)): ?>
         <div class="city-dashboard">
             <?php foreach ($city_counts as $city => $count): ?>
                 <div class="city-card">
-                    <span class="city-name"><i class="fas fa-map-pin" style="color:#2563eb;"></i> <?= htmlspecialchars($city) ?></span>
+                    <span class="city-name">
+                        <i class="fas fa-map-pin" style="color:#2563eb;"></i> 
+                        <?= htmlspecialchars(displayCityName($city)) ?>
+                    </span>
                     <span class="city-count"><?= $count ?></span>
                     <a href="?city=<?= urlencode($city) ?>" class="view-all-btn">View All</a>
                 </div>
