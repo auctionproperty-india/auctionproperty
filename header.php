@@ -1,6 +1,7 @@
 <?php
 // ============================================================
 // ✅ Header – Top Nav + Sidebar + Collapsible Admin Sections
+// + Sales CRM Section
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -104,18 +105,10 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         body.top-nav-hidden {
             padding-top: 0;
         }
-        body.role-admin {
-            background: #f8fafc;
-        }
-        body.role-user {
-            background: #f0f5fa;
-        }
-        body.role-guest {
-            background: #f8fafc;
-        }
-        body.role-sales {
-            background: #f0f5fa;
-        }
+        body.role-admin { background: #f8fafc; }
+        body.role-user { background: #f0f5fa; }
+        body.role-guest { background: #f8fafc; }
+        body.role-sales { background: #f0f5fa; }
         body.page-login, body.page-register {
             background: url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed;
             background-size: cover;
@@ -124,9 +117,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         /* ====== Impersonation Banner ====== */
         .impersonate-banner {
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
+            top: 0; left: 0; right: 0;
             background: linear-gradient(135deg, #f59e0b, #d97706);
             color: #fff;
             padding: 12px 20px;
@@ -141,9 +132,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             gap: 14px;
             flex-wrap: wrap;
         }
-        .impersonate-banner b {
-            color: #fff;
-        }
+        .impersonate-banner b { color: #fff; }
         .impersonate-banner .btn-exit {
             background: rgba(255,255,255,0.25);
             border: 1px solid rgba(255,255,255,0.4);
@@ -155,29 +144,16 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             text-decoration: none;
             transition: all 0.2s;
         }
-        .impersonate-banner .btn-exit:hover {
-            background: #fff;
-            color: #d97706;
-        }
-        body.impersonate-mode {
-            padding-top: 120px !important;
-        }
-        body.impersonate-mode .sidebar {
-            top: 50px !important;
-        }
-        body.impersonate-mode .top-nav {
-            top: 50px !important;
-        }
-        body.impersonate-mode .hamburger-sidebar {
-            top: 50px !important;
-        }
+        .impersonate-banner .btn-exit:hover { background: #fff; color: #d97706; }
+        body.impersonate-mode { padding-top: 120px !important; }
+        body.impersonate-mode .sidebar { top: 50px !important; }
+        body.impersonate-mode .top-nav { top: 50px !important; }
+        body.impersonate-mode .hamburger-sidebar { top: 50px !important; }
 
         /* ====== Top Navigation – Dark Blue Gradient ====== */
         .top-nav {
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
+            top: 0; left: 0; right: 0;
             z-index: 1030;
             background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
             padding: 10px 20px;
@@ -187,47 +163,24 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             height: 70px;
         }
-        body.top-nav-hidden .top-nav {
-            display: none !important;
-        }
+        body.top-nav-hidden .top-nav { display: none !important; }
 
-        .top-nav .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .top-nav .nav-brand .brand-icon {
-            color: #fbbf24;
-            font-size: 1.8rem;
-        }
+        .top-nav .nav-brand { display: flex; align-items: center; gap: 12px; }
+        .top-nav .nav-brand .brand-icon { color: #fbbf24; font-size: 1.8rem; }
         .top-nav .nav-brand .brand-text {
             color: #ffffff;
             font-weight: 700;
             font-size: 1.4rem;
             letter-spacing: -0.5px;
         }
-        .top-nav .nav-brand .brand-text span {
-            color: #fbbf24;
-        }
-
+        .top-nav .nav-brand .brand-text span { color: #fbbf24; }
         .top-nav .hamburger {
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 2rem;
-            cursor: pointer;
-            padding: 0 8px;
+            background: none; border: none; color: #fff;
+            font-size: 2rem; cursor: pointer; padding: 0 8px;
             transition: transform 0.2s;
         }
-        .top-nav .hamburger:hover {
-            transform: scale(1.1);
-        }
-
-        .top-nav .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        .top-nav .hamburger:hover { transform: scale(1.1); }
+        .top-nav .nav-right { display: flex; align-items: center; gap: 10px; }
         .top-nav .nav-right a {
             color: rgba(255,255,255,0.85);
             text-decoration: none;
@@ -237,63 +190,37 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             font-size: 0.9rem;
             transition: all 0.3s;
         }
-        .top-nav .nav-right a:hover {
-            background: rgba(255,255,255,0.12);
-            color: #fff;
-        }
+        .top-nav .nav-right a:hover { background: rgba(255,255,255,0.12); color: #fff; }
         .top-nav .nav-right .btn-login {
             background: #fbbf24;
             color: #0f172a !important;
             font-weight: 600;
         }
-        .top-nav .nav-right .btn-login:hover {
-            background: #fcd34d;
-        }
-        .top-nav .nav-right .btn-register {
-            border: 1px solid rgba(255,255,255,0.3);
-        }
-        .top-nav .nav-right .btn-register:hover {
-            background: rgba(255,255,255,0.1);
-        }
-        .top-nav .nav-right .user-badge {
-            color: rgba(255,255,255,0.9);
-            font-size: 0.9rem;
-        }
-        .top-nav .nav-right .user-badge i {
-            color: #fbbf24;
-        }
+        .top-nav .nav-right .btn-login:hover { background: #fcd34d; }
+        .top-nav .nav-right .btn-register { border: 1px solid rgba(255,255,255,0.3); }
+        .top-nav .nav-right .btn-register:hover { background: rgba(255,255,255,0.1); }
+        .top-nav .nav-right .user-badge { color: rgba(255,255,255,0.9); font-size: 0.9rem; }
+        .top-nav .nav-right .user-badge i { color: #fbbf24; }
 
         @media (max-width: 768px) {
-            .top-nav .nav-brand .brand-text {
-                font-size: 1.1rem;
-            }
-            .top-nav .nav-right a {
-                font-size: 0.8rem;
-                padding: 4px 10px;
-            }
+            .top-nav .nav-brand .brand-text { font-size: 1.1rem; }
+            .top-nav .nav-right a { font-size: 0.8rem; padding: 4px 10px; }
         }
 
         /* ====== Hamburger Sidebar (Off-canvas) ====== */
         .sidebar-overlay {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0,0,0,0.5);
             z-index: 1050;
         }
-        .sidebar-overlay.show {
-            display: block;
-        }
-
+        .sidebar-overlay.show { display: block; }
         .hamburger-sidebar {
             position: fixed;
-            top: 0;
-            left: -320px;
-            width: 320px;
-            height: 100%;
+            top: 0; left: -320px;
+            width: 320px; height: 100%;
             background: #ffffff;
             z-index: 1060;
             transition: left 0.3s ease-in-out;
@@ -301,9 +228,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             padding: 25px 20px;
             overflow-y: auto;
         }
-        .hamburger-sidebar.open {
-            left: 0;
-        }
+        .hamburger-sidebar.open { left: 0; }
         .hamburger-sidebar .sidebar-header {
             display: flex;
             justify-content: space-between;
@@ -313,29 +238,16 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             margin-bottom: 20px;
         }
         .hamburger-sidebar .sidebar-header .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.8rem;
-            color: #475569;
-            cursor: pointer;
+            background: none; border: none;
+            font-size: 1.8rem; color: #475569; cursor: pointer;
         }
         .hamburger-sidebar .sidebar-header .brand-small {
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: #1e293b;
+            font-weight: 700; font-size: 1.2rem; color: #1e293b;
         }
-        .hamburger-sidebar .sidebar-header .brand-small i {
-            color: #1e3a8a;
-        }
+        .hamburger-sidebar .sidebar-header .brand-small i { color: #1e3a8a; }
 
-        .hamburger-sidebar .nav-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .hamburger-sidebar .nav-list li {
-            margin: 4px 0;
-        }
+        .hamburger-sidebar .nav-list { list-style: none; padding: 0; margin: 0; }
+        .hamburger-sidebar .nav-list li { margin: 4px 0; }
         .hamburger-sidebar .nav-list li a {
             display: block;
             padding: 12px 16px;
@@ -345,17 +257,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             font-weight: 500;
             transition: all 0.2s;
         }
-        .hamburger-sidebar .nav-list li a:hover {
-            background: #f1f5f9;
-            color: #1e3a8a;
-        }
+        .hamburger-sidebar .nav-list li a:hover { background: #f1f5f9; color: #1e3a8a; }
         .hamburger-sidebar .nav-list li a i {
-            width: 28px;
-            color: #94a3b8;
-            margin-right: 10px;
+            width: 28px; color: #94a3b8; margin-right: 10px;
         }
 
-        /* 🔥 Auth links */
         .hamburger-sidebar .auth-links {
             margin-top: 20px;
             border-top: 1px solid #e2e8f0;
@@ -372,13 +278,8 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             margin-bottom: 8px;
             text-align: center;
         }
-        .hamburger-sidebar .auth-links a:hover {
-            background: #1e3a8a;
-            color: #fff;
-        }
-        .hamburger-sidebar .auth-links .register-link {
-            background: #eef2ff;
-        }
+        .hamburger-sidebar .auth-links a:hover { background: #1e3a8a; color: #fff; }
+        .hamburger-sidebar .auth-links .register-link { background: #eef2ff; }
 
         .hamburger-sidebar .social-section {
             margin-top: 30px;
@@ -386,21 +287,16 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             padding-top: 20px;
         }
         .hamburger-sidebar .social-section h6 {
-            font-weight: 600;
-            color: #1e293b;
-            margin-bottom: 12px;
+            font-weight: 600; color: #1e293b; margin-bottom: 12px;
         }
         .hamburger-sidebar .social-section .social-icons {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
+            display: flex; gap: 12px; flex-wrap: wrap;
         }
         .hamburger-sidebar .social-section .social-icons a {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 40px;
-            height: 40px;
+            width: 40px; height: 40px;
             border-radius: 50%;
             background: #f1f5f9;
             color: #1e293b;
@@ -419,33 +315,25 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             height: 100vh;
             width: 280px;
             position: fixed;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             padding: 30px 15px;
             box-shadow: 2px 0 12px rgba(0,0,0,0.06);
             z-index: 1050;
             transition: transform 0.3s ease-in-out, background 0.3s;
             overflow-y: auto;
         }
-        body:not(.top-nav-hidden) .sidebar {
-            top: 70px;
-        }
-        body.top-nav-hidden .sidebar {
-            top: 0;
-        }
+        body:not(.top-nav-hidden) .sidebar { top: 70px; }
+        body.top-nav-hidden .sidebar { top: 0; }
         body.role-admin .sidebar {
-            background: #ffffff;
-            color: #1e293b;
+            background: #ffffff; color: #1e293b;
             border-right: 1px solid #e2e8f0;
         }
         body.role-user .sidebar {
-            background: #ffffff;
-            color: #334155;
+            background: #ffffff; color: #334155;
             border-right: 1px solid #e2e8f0;
         }
         body.role-sales .sidebar {
-            background: #ffffff;
-            color: #334155;
+            background: #ffffff; color: #334155;
             border-right: 1px solid #e2e8f0;
         }
 
@@ -454,14 +342,10 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 transform: translateX(-100%);
                 top: 0 !important;
             }
-            .sidebar.show {
-                transform: translateX(0);
-            }
+            .sidebar.show { transform: translateX(0); }
         }
         @media (min-width: 992px) {
-            .sidebar {
-                transform: translateX(0) !important;
-            }
+            .sidebar { transform: translateX(0) !important; }
         }
 
         .sidebar .brand {
@@ -474,9 +358,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             letter-spacing: 1px;
             color: #1e293b;
         }
-        .sidebar .brand i {
-            color: #1e3a8a;
-        }
+        .sidebar .brand i { color: #1e3a8a; }
 
         .sidebar a {
             display: flex;
@@ -497,21 +379,14 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             transition: all 0.3s;
             color: #94a3b8;
         }
-        .sidebar a:hover {
-            background: #f1f5f9;
-            color: #1e3a8a;
-        }
-        .sidebar a:hover i {
-            color: #1e3a8a;
-        }
+        .sidebar a:hover { background: #f1f5f9; color: #1e3a8a; }
+        .sidebar a:hover i { color: #1e3a8a; }
         .sidebar a.active {
             background: #eef2ff;
             color: #1e3a8a;
             border-left-color: #1e3a8a;
         }
-        .sidebar a.active i {
-            color: #1e3a8a;
-        }
+        .sidebar a.active i { color: #1e3a8a; }
 
         .sidebar .logout-link {
             margin-top: 30px;
@@ -519,9 +394,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             padding-top: 20px;
             color: #dc2626 !important;
         }
-        .sidebar .logout-link i {
-            color: #dc2626 !important;
-        }
+        .sidebar .logout-link i { color: #dc2626 !important; }
         .sidebar .logout-link:hover {
             background: #fef2f2 !important;
             color: #b91c1c !important;
@@ -530,21 +403,15 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .sidebar-overlay-main {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0,0,0,0.4);
             z-index: 1040;
         }
-        .sidebar-overlay-main.show {
-            display: block;
-        }
+        .sidebar-overlay-main.show { display: block; }
 
         /* ============ Admin Collapsible Sidebar ============ */
-        .sidebar .nav-section {
-            margin: 6px 0;
-        }
+        .sidebar .nav-section { margin: 6px 0; }
         .sidebar .nav-section-title {
             display: flex;
             align-items: center;
@@ -624,22 +491,15 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             min-height: 100vh;
             transition: margin-left 0.3s;
         }
-        body.role-admin .main-content {
-            padding-top: 0 !important;
-        }
+        body.role-admin .main-content { padding-top: 0 !important; }
         body.role-admin .main-content,
         body.role-user .main-content,
         body.role-sales .main-content {
             margin-left: 280px;
         }
-        body.role-guest .main-content {
-            margin-left: 0 !important;
-        }
+        body.role-guest .main-content { margin-left: 0 !important; }
         @media (max-width: 991px) {
-            .main-content {
-                margin-left: 0 !important;
-                padding: 15px;
-            }
+            .main-content { margin-left: 0 !important; padding: 15px; }
         }
 
         /* ====== Top Bar (User Info) ====== */
@@ -671,24 +531,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             margin-bottom: 10px;
         }
-        .top-bar .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .top-bar .user-info .name {
-            font-weight: 700;
-            font-size: 16px;
-        }
-        body.role-admin .top-bar .user-info .name {
-            color: #0f172a;
-        }
-        body.role-user .top-bar .user-info .name {
-            color: #0f172a;
-        }
-        body.role-sales .top-bar .user-info .name {
-            color: #0f172a;
-        }
+        .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
+        .top-bar .user-info .name { font-weight: 700; font-size: 16px; }
+        body.role-admin .top-bar .user-info .name { color: #0f172a; }
+        body.role-user .top-bar .user-info .name { color: #0f172a; }
+        body.role-sales .top-bar .user-info .name { color: #0f172a; }
         .top-bar .badge-role {
             padding: 4px 14px;
             border-radius: 30px;
@@ -726,19 +573,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             cursor: pointer;
             display: inline-block;
         }
-        body.role-admin .hamburger-btn {
-            color: #1e293b;
-        }
-        body.role-user .hamburger-btn {
-            color: #1e293b;
-        }
-        body.role-sales .hamburger-btn {
-            color: #1e293b;
-        }
+        body.role-admin .hamburger-btn { color: #1e293b; }
+        body.role-user .hamburger-btn { color: #1e293b; }
+        body.role-sales .hamburger-btn { color: #1e293b; }
         @media (min-width: 992px) {
-            .hamburger-btn {
-                display: none !important;
-            }
+            .hamburger-btn { display: none !important; }
         }
 
         /* ====== Cards ====== */
@@ -779,59 +618,19 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             font-size: 24px;
             flex-shrink: 0;
         }
-        body.role-admin .stat-icon.bg-soft-primary {
-            background: #eef2ff;
-            color: #1e3a8a;
-        }
-        body.role-admin .stat-icon.bg-soft-success {
-            background: #dcfce7;
-            color: #166534;
-        }
-        body.role-admin .stat-icon.bg-soft-warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        body.role-user .stat-icon.bg-soft-primary {
-            background: #dbeafe;
-            color: #2563eb;
-        }
-        body.role-user .stat-icon.bg-soft-success {
-            background: #d1fae5;
-            color: #059669;
-        }
-        body.role-user .stat-icon.bg-soft-warning {
-            background: #fef3c7;
-            color: #d97706;
-        }
-        body.role-sales .stat-icon.bg-soft-primary {
-            background: #dbeafe;
-            color: #2563eb;
-        }
-        body.role-sales .stat-icon.bg-soft-success {
-            background: #d1fae5;
-            color: #059669;
-        }
-        body.role-sales .stat-icon.bg-soft-warning {
-            background: #fef3c7;
-            color: #d97706;
-        }
-        .btn {
-            border-radius: 10px;
-            font-weight: 600;
-            padding: 8px 16px;
-            font-size: 14px;
-        }
-        .btn-primary {
-            background: #1e3a8a;
-            border: none;
-        }
-        .btn-primary:hover {
-            background: #1e40af;
-        }
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 12px;
-        }
+        body.role-admin .stat-icon.bg-soft-primary { background: #eef2ff; color: #1e3a8a; }
+        body.role-admin .stat-icon.bg-soft-success { background: #dcfce7; color: #166534; }
+        body.role-admin .stat-icon.bg-soft-warning { background: #fef3c7; color: #92400e; }
+        body.role-user .stat-icon.bg-soft-primary { background: #dbeafe; color: #2563eb; }
+        body.role-user .stat-icon.bg-soft-success { background: #d1fae5; color: #059669; }
+        body.role-user .stat-icon.bg-soft-warning { background: #fef3c7; color: #d97706; }
+        body.role-sales .stat-icon.bg-soft-primary { background: #dbeafe; color: #2563eb; }
+        body.role-sales .stat-icon.bg-soft-success { background: #d1fae5; color: #059669; }
+        body.role-sales .stat-icon.bg-soft-warning { background: #fef3c7; color: #d97706; }
+        .btn { border-radius: 10px; font-weight: 600; padding: 8px 16px; font-size: 14px; }
+        .btn-primary { background: #1e3a8a; border: none; }
+        .btn-primary:hover { background: #1e40af; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
         .user-welcome-banner {
             background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
             border-radius: 24px;
@@ -840,29 +639,14 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             margin-bottom: 25px;
             box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3);
         }
-        .user-welcome-banner h2 {
-            font-weight: 800;
-        }
-        .user-welcome-banner p {
-            opacity: 0.9;
-        }
+        .user-welcome-banner h2 { font-weight: 800; }
+        .user-welcome-banner p { opacity: 0.9; }
         @media (max-width: 576px) {
-            .top-bar .user-info .name {
-                font-size: 14px;
-            }
-            .card-premium {
-                padding: 15px;
-            }
-            .stat-icon {
-                width: 40px;
-                height: 40px;
-                font-size: 18px;
-            }
+            .top-bar .user-info .name { font-size: 14px; }
+            .card-premium { padding: 15px; }
+            .stat-icon { width: 40px; height: 40px; font-size: 18px; }
         }
-        .badge-sales {
-            background: #f59e0b;
-            color: #000;
-        }
+        .badge-sales { background: #f59e0b; color: #000; }
     </style>
 </head>
 <body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= $is_impersonating ? 'impersonate-mode' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>"
@@ -891,7 +675,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 </div>
 <?php endif; ?>
 
-<!-- ====== TOP NAV – on index, login, register ====== -->
+<!-- ====== TOP NAV ====== -->
 <?php if (!$hide_top_nav): ?>
 <nav class="top-nav">
     <div class="nav-brand">
@@ -912,7 +696,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     </div>
 </nav>
 
-<!-- ====== HAMBURGER SIDEBAR (🔥 DYNAMIC) ====== -->
+<!-- ====== HAMBURGER SIDEBAR ====== -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="hamburger-sidebar" id="hamburgerSidebar">
     <div class="sidebar-header">
@@ -921,7 +705,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     </div>
     <ul class="nav-list">
         <?php 
-        // 🔥 Priority 1: Dynamic Pages (Admin से Manage होते हैं)
         if (!empty($dynamic_pages)):
             foreach ($dynamic_pages as $page): ?>
                 <li>
@@ -931,7 +714,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                     </a>
                 </li>
             <?php endforeach;
-        // 🔥 Priority 2: Navigation Items (अगर Dynamic Pages खाली हैं)
         elseif (!empty($nav_items)):
             foreach ($nav_items as $item): ?>
                 <li>
@@ -941,7 +723,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                     </a>
                 </li>
             <?php endforeach;
-        // 🔥 Priority 3: Fallback Default Links
         else: ?>
             <li><a href="index.php"><i class="fas fa-home"></i> Home</a></li>
             <li><a href="index.php?tab=auction"><i class="fas fa-gavel"></i> Auctions</a></li>
@@ -952,7 +733,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <?php endif; ?>
     </ul>
     
-    <!-- Auth links for non-logged users -->
     <?php if (!$is_logged_in): ?>
     <div class="auth-links">
         <a href="login.php"><i class="fas fa-sign-in-alt me-2"></i>Login</a>
@@ -960,7 +740,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     </div>
     <?php endif; ?>
     
-    <!-- Social Links -->
     <div class="social-section">
         <h6><i class="fas fa-share-alt me-2"></i>Follow Us</h6>
         <div class="social-icons">
@@ -980,7 +759,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 </div>
 <?php endif; ?>
 
-<!-- ====== EXISTING SIDEBAR (for logged-in users) ====== -->
+<!-- ====== EXISTING SIDEBAR ====== -->
 <?php if ($is_logged_in): ?>
 <div class="sidebar-overlay-main" id="sidebarOverlayMain" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
@@ -1077,8 +856,8 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
         <!-- 🔷 4. INCOME & PAYOUTS -->
         <?php if (hasViewPermission('referrals', $pdo) || hasViewPermission('accounting', $pdo)): ?>
-        <div class="nav-section <?= in_array($current_page, ['admin_referrals.php','admin_payout_preview.php','admin_payout_manager.php','admin_fix_subscription_amounts.php','admin_accounting.php','admin_deductions.php']) ? 'open' : '' ?>">
-            <div class="nav-section-title <?= in_array($current_page, ['admin_referrals.php','admin_payout_preview.php','admin_payout_manager.php','admin_fix_subscription_amounts.php','admin_accounting.php','admin_deductions.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+        <div class="nav-section <?= in_array($current_page, ['admin_referrals.php','admin_payout_preview.php','admin_payout_manager.php','admin_fix_subscription_amounts.php','admin_accounting.php','admin_deductions.php','admin_wallet_payout.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['admin_referrals.php','admin_payout_preview.php','admin_payout_manager.php','admin_fix_subscription_amounts.php','admin_accounting.php','admin_deductions.php','admin_wallet_payout.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
                 <i class="fas fa-hand-holding-usd section-icon"></i>
                 <span>Income & Payouts</span>
                 <i class="fas fa-chevron-right section-arrow"></i>
@@ -1090,11 +869,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 <a href="admin_referrals.php" class="<?= $current_page == 'admin_referrals.php' ? 'active' : '' ?>">
                     <i class="fas fa-hand-holding-usd"></i> <span>Release Payouts</span>
                 </a>
-               <a href="admin_wallet_payout.php" class="<?= $current_page == 'admin_wallet_payout.php' ? 'active' : '' ?>">
-    <i class="fas fa-money-bill-wave"></i> <span>Wallet Payout</span>
-</a>
                 <a href="admin_payout_manager.php" class="<?= $current_page == 'admin_payout_manager.php' ? 'active' : '' ?>">
                     <i class="fas fa-wallet"></i> <span>Payout Manager</span>
+                </a>
+                <a href="admin_wallet_payout.php" class="<?= $current_page == 'admin_wallet_payout.php' ? 'active' : '' ?>">
+                    <i class="fas fa-money-bill-wave"></i> <span>Wallet Payout</span>
                 </a>
                 <a href="admin_fix_subscription_amounts.php" class="<?= $current_page == 'admin_fix_subscription_amounts.php' ? 'active' : '' ?>">
                     <i class="fas fa-tools"></i> <span>Fix Amounts</span>
@@ -1113,7 +892,27 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         </div>
         <?php endif; ?>
 
-        <!-- 🔷 5. CONTENT & PAGES -->
+        <!-- 🔷 5. SALES CRM (NEW) -->
+        <div class="nav-section <?= in_array($current_page, ['admin_sales_crm.php','admin_sales_leads.php','admin_sales_users.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['admin_sales_crm.php','admin_sales_leads.php','admin_sales_users.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-chart-line section-icon"></i>
+                <span>Sales CRM</span>
+                <i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="admin_sales_crm.php" class="<?= $current_page == 'admin_sales_crm.php' ? 'active' : '' ?>">
+                    <i class="fas fa-chart-pie"></i> <span>CRM Dashboard</span>
+                </a>
+                <a href="admin_sales_leads.php" class="<?= $current_page == 'admin_sales_leads.php' ? 'active' : '' ?>">
+                    <i class="fas fa-list"></i> <span>All Leads</span>
+                </a>
+                <a href="admin_sales_users.php" class="<?= $current_page == 'admin_sales_users.php' ? 'active' : '' ?>">
+                    <i class="fas fa-user-tie"></i> <span>Sales Users</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 🔷 6. CONTENT & PAGES -->
         <div class="nav-section <?= in_array($current_page, ['admin_pages.php','admin_navigation.php','admin_jobs.php','admin_social_links.php','admin_notification.php','admin_activity_logs.php','admin_kyc.php','support_admin.php']) ? 'open' : '' ?>">
             <div class="nav-section-title <?= in_array($current_page, ['admin_pages.php','admin_navigation.php','admin_jobs.php','admin_social_links.php','admin_notification.php','admin_activity_logs.php','admin_kyc.php','support_admin.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
                 <i class="fas fa-file-alt section-icon"></i>
@@ -1159,7 +958,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             </div>
         </div>
 
-        <!-- 🔷 6. SETTINGS -->
+        <!-- 🔷 7. SETTINGS -->
         <?php if (hasViewPermission('settings', $pdo)): ?>
         <div class="nav-section <?= in_array($current_page, ['settings.php','admin_spin_settings.php']) ? 'open' : '' ?>">
             <div class="nav-section-title <?= in_array($current_page, ['settings.php','admin_spin_settings.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
@@ -1180,33 +979,67 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
     <?php elseif ($role == 'sales'): ?>
         <!-- SALES SIDEBAR -->
-        <a href="sales_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        <a href="sales_leads.php"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
-        <a href="sales_lead_upload.php"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
-        <a href="sales_lead_add.php"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
-        <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
-        <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
-        <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
+        <a href="sales_dashboard.php" class="<?= $current_page == 'sales_dashboard.php' ? 'active' : '' ?>">
+            <i class="fas fa-th-large"></i> <span>Dashboard</span>
+        </a>
+        <a href="sales_leads.php" class="<?= $current_page == 'sales_leads.php' ? 'active' : '' ?>">
+            <i class="fas fa-tasks"></i> <span>My Leads</span>
+        </a>
+        <a href="sales_lead_upload.php" class="<?= $current_page == 'sales_lead_upload.php' ? 'active' : '' ?>">
+            <i class="fas fa-upload"></i> <span>Upload Leads</span>
+        </a>
+        <a href="sales_lead_add.php" class="<?= $current_page == 'sales_lead_add.php' ? 'active' : '' ?>">
+            <i class="fas fa-plus"></i> <span>Add Lead</span>
+        </a>
+        <a href="profile.php" class="<?= $current_page == 'profile.php' ? 'active' : '' ?>">
+            <i class="fas fa-user-circle"></i> <span>Profile</span>
+        </a>
+        <a href="change_password.php" class="<?= $current_page == 'change_password.php' ? 'active' : '' ?>">
+            <i class="fas fa-key"></i> <span>Change Password</span>
+        </a>
+        <a href="support.php" class="<?= $current_page == 'support.php' ? 'active' : '' ?>">
+            <i class="fas fa-headset"></i> <span>Support</span>
+        </a>
 
     <?php else: ?>
         <!-- USER SIDEBAR -->
-        <a href="user_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        <a href="user_packages.php"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
-        <a href="user_team.php"><i class="fas fa-users"></i> <span>My Team</span></a>
-        <a href="my_earnings.php" class="nav-link">
+        <a href="user_dashboard.php" class="<?= $current_page == 'user_dashboard.php' ? 'active' : '' ?>">
+            <i class="fas fa-th-large"></i> <span>Dashboard</span>
+        </a>
+        <a href="user_packages.php" class="<?= $current_page == 'user_packages.php' ? 'active' : '' ?>">
+            <i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span>
+        </a>
+        <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>">
+            <i class="fas fa-users"></i> <span>My Team</span>
+        </a>
+        <a href="my_earnings.php" class="nav-link <?= $current_page == 'my_earnings.php' ? 'active' : '' ?>">
             <i class="fas fa-file-invoice-dollar"></i>
             <span>My Earnings</span>
         </a>
-        <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
         <a href="user_wallet_history.php" class="<?= $current_page == 'user_wallet_history.php' ? 'active' : '' ?>">
-    <i class="fas fa-receipt"></i> <span>Payment History</span>
-</a>
-        <a href="user_referrals.php"><i class="fas fa-link"></i> <span>Referrals</span></a>
-        <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
-        <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
-        <a href="user_properties.php"><i class="fas fa-home"></i> <span>My Properties</span></a>
-        <a href="change_password.php"><i class="fas fa-key"></i> <span>Change Password</span></a>
-        <a href="user_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
+            <i class="fas fa-receipt"></i> <span>Payment History</span>
+        </a>
+        <a href="user_subscription_history.php" class="<?= $current_page == 'user_subscription_history.php' ? 'active' : '' ?>">
+            <i class="fas fa-history"></i> <span>Subscription History</span>
+        </a>
+        <a href="user_referrals.php" class="<?= $current_page == 'user_referrals.php' ? 'active' : '' ?>">
+            <i class="fas fa-link"></i> <span>Referrals</span>
+        </a>
+        <a href="profile.php" class="<?= $current_page == 'profile.php' ? 'active' : '' ?>">
+            <i class="fas fa-user-circle"></i> <span>Profile</span>
+        </a>
+        <a href="support.php" class="<?= $current_page == 'support.php' ? 'active' : '' ?>">
+            <i class="fas fa-headset"></i> <span>Support</span>
+        </a>
+        <a href="user_properties.php" class="<?= $current_page == 'user_properties.php' ? 'active' : '' ?>">
+            <i class="fas fa-home"></i> <span>My Properties</span>
+        </a>
+        <a href="change_password.php" class="<?= $current_page == 'change_password.php' ? 'active' : '' ?>">
+            <i class="fas fa-key"></i> <span>Change Password</span>
+        </a>
+        <a href="user_jobs.php" class="<?= $current_page == 'user_jobs.php' ? 'active' : '' ?>">
+            <i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span>
+        </a>
     <?php endif; ?>
 
     <?php if ($is_impersonating): ?>
@@ -1222,7 +1055,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
 <!-- ====== MAIN CONTENT ====== -->
 <div class="main-content">
-    <!-- Top Bar (User Info) -->
     <?php if ($is_logged_in): ?>
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
