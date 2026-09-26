@@ -1,4 +1,7 @@
 <?php
+// ============================================================
+// ⚙️ System Settings – Permanent Storage (Supabase + UPSERT)
+// ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -11,21 +14,29 @@ if(!hasViewPermission('settings', $pdo)) {
 }
 
 $message = '';
-$settings_keys = ['default_contact', 'company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent', 'spin_min_coins', 'spin_max_coins'];
+$settings_keys = [
+    'default_contact', 'company_bank_name', 'company_account_number', 
+    'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent', 
+    'spin_min_coins', 'spin_max_coins', 'company_qr_code'
+];
 
-// 🔒 सुनिश्चित करें कि सभी setting_key की rows मौजूद हैं
+// 🔒 Ensure all keys exist (UPSERT to handle UNIQUE constraint)
 foreach ($settings_keys as $key) {
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM settings WHERE setting_key = ?");
-    $stmt->execute([$key]);
-    if ($stmt->fetchColumn() == 0) {
-        $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, '')")->execute([$key]);
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO settings (setting_key, setting_value) 
+            VALUES (?, '') 
+            ON CONFLICT (setting_key) DO NOTHING
+        ");
+        $stmt->execute([$key]);
+    } catch (Exception $e) {
+        // If constraint doesn't exist yet, fallback to old method
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM settings WHERE setting_key = ?");
+        $stmt->execute([$key]);
+        if ($stmt->fetchColumn() == 0) {
+            $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, '')")->execute([$key]);
+        }
     }
-}
-// QR code key भी check करें
-$stmt = $pdo->prepare("SELECT COUNT(*) FROM settings WHERE setting_key = 'company_qr_code'");
-$stmt->execute();
-if ($stmt->fetchColumn() == 0) {
-    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('company_qr_code', '')")->execute();
 }
 
 // ---- Handle POST Actions (Section Wise) ----
@@ -44,12 +55,28 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     } else {
         $action = $_POST['action'];
         
+        // Helper: Save multiple settings via UPSERT
+        $saveSetting = function($key, $value) use ($pdo) {
+            try {
+                $stmt = $pdo->prepare("
+                    INSERT INTO settings (setting_key, setting_value) 
+                    VALUES (?, ?) 
+                    ON CONFLICT (setting_key) 
+                    DO UPDATE SET setting_value = EXCLUDED.setting_value
+                ");
+                $stmt->execute([$key, $value]);
+            } catch (Exception $e) {
+                // Fallback if no UNIQUE constraint
+                $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?")->execute([$value, $key]);
+            }
+        };
+        
         // 1. SAVE BANK & CONTACT DETAILS
         if ($action == 'save_bank') {
             $keys = ['company_bank_name', 'company_account_number', 'company_ifsc', 'company_branch', 'default_contact'];
             foreach($keys as $key) {
                 $val = trim($_POST[$key] ?? '');
-                $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?")->execute([$val, $key]);
+                $saveSetting($key, $val);
             }
             $message = "<div class='alert alert-success'>✅ Bank & Contact Details updated!</div>";
         }
@@ -59,7 +86,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             $keys = ['tds_percent', 'admin_charge_percent'];
             foreach($keys as $key) {
                 $val = trim($_POST[$key] ?? '');
-                $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?")->execute([$val, $key]);
+                $saveSetting($key, $val);
             }
             $message = "<div class='alert alert-success'>✅ Referral Payout Deductions updated!</div>";
         }
@@ -69,43 +96,78 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             $keys = ['spin_min_coins', 'spin_max_coins'];
             foreach($keys as $key) {
                 $val = trim($_POST[$key] ?? '');
-                $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?")->execute([$val, $key]);
+                $saveSetting($key, $val);
             }
             $message = "<div class='alert alert-success'>✅ Daily Spin Settings updated!</div>";
         }
         
-        // 4. SAVE QR CODE
+        // 4. SAVE QR CODE (using Supabase Storage)
         elseif ($action == 'save_qr') {
-            $upload_dir = 'uploads/';
-            if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
             
-            // Remove QR Code
+            // Get old QR for cleanup
+            $old_qr = '';
+            try {
+                $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'");
+                $stmt->execute();
+                $old_qr = $stmt->fetchColumn() ?: '';
+            } catch (Exception $e) {}
+            
+            // ---- REMOVE QR CODE ----
             if (isset($_POST['remove_qr']) && $_POST['remove_qr'] == '1') {
-                $old_qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
-                if ($old_qr && file_exists(__DIR__ . '/' . $old_qr)) {
-                    unlink(__DIR__ . '/' . $old_qr);
+                // Delete from Supabase if URL
+                if (!empty($old_qr) && strpos($old_qr, 'http') === 0) {
+                    if (function_exists('deleteFromSupabase')) {
+                        @deleteFromSupabase($old_qr);
+                    }
                 }
-                $pdo->prepare("UPDATE settings SET setting_value = '' WHERE setting_key = 'company_qr_code'")->execute();
+                // Delete local file if it exists
+                elseif (!empty($old_qr) && file_exists(__DIR__ . '/' . $old_qr)) {
+                    @unlink(__DIR__ . '/' . $old_qr);
+                }
+                
+                $saveSetting('company_qr_code', '');
                 $message = "<div class='alert alert-success'>✅ QR Code removed successfully!</div>";
             } 
-            // Upload New QR Code
+            // ---- UPLOAD NEW QR CODE ----
             elseif(isset($_FILES['qr_code']) && $_FILES['qr_code']['error'] == 0) {
-                $ext = pathinfo($_FILES['qr_code']['name'], PATHINFO_EXTENSION);
-                $filename = 'qr_' . time() . '.' . $ext;
-                if (move_uploaded_file($_FILES['qr_code']['tmp_name'], __DIR__ . '/' . $upload_dir . $filename)) {
-                    // Delete old QR file
-                    $old_qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
-                    if ($old_qr && file_exists(__DIR__ . '/' . $old_qr)) {
-                        unlink(__DIR__ . '/' . $old_qr);
+                
+                $uploaded_url = null;
+                
+                // 🔥 Try Supabase Storage first
+                if (function_exists('uploadToSupabase')) {
+                    $uploaded_url = uploadToSupabase($_FILES['qr_code'], 'qr_codes', 'payment_screenshots');
+                }
+                
+                // If Supabase fails, fallback to local
+                if (!$uploaded_url) {
+                    $upload_dir = 'uploads/';
+                    if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+                    $ext = pathinfo($_FILES['qr_code']['name'], PATHINFO_EXTENSION);
+                    $filename = 'qr_' . time() . '.' . $ext;
+                    if (move_uploaded_file($_FILES['qr_code']['tmp_name'], __DIR__ . '/' . $upload_dir . $filename)) {
+                        $uploaded_url = $upload_dir . $filename;
                     }
-                    // Save new path
-                    $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'company_qr_code'")->execute([$upload_dir . $filename]);
-                    $message = "<div class='alert alert-success'>✅ New QR Code uploaded!</div>";
+                }
+                
+                if ($uploaded_url) {
+                    // Delete old QR from Supabase if URL
+                    if (!empty($old_qr) && strpos($old_qr, 'http') === 0) {
+                        if (function_exists('deleteFromSupabase')) {
+                            @deleteFromSupabase($old_qr);
+                        }
+                    }
+                    // Delete old local file
+                    elseif (!empty($old_qr) && file_exists(__DIR__ . '/' . $old_qr)) {
+                        @unlink(__DIR__ . '/' . $old_qr);
+                    }
+                    
+                    $saveSetting('company_qr_code', $uploaded_url);
+                    $message = "<div class='alert alert-success'>✅ New QR Code uploaded successfully!<br><small>Storage: " . (strpos($uploaded_url, 'http') === 0 ? 'Supabase (permanent)' : 'Local (temporary)') . "</small></div>";
                 } else {
-                    $message = "<div class='alert alert-danger'>❌ QR Code upload failed. Check folder permissions.</div>";
+                    $message = "<div class='alert alert-danger'>❌ QR Code upload failed. Please check Supabase settings.</div>";
                 }
             } else {
-                $message = "<div class='alert alert-warning'>⚠️ No file selected or QR already removed.</div>";
+                $message = "<div class='alert alert-warning'>⚠️ No file selected.</div>";
             }
         }
     }
@@ -113,16 +175,36 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
 
 include 'header.php';
 
-// ---- Fetch current values ----
+// ---- Fetch current values (UPSERT-safe read) ----
 $settings = [];
 foreach($settings_keys as $key) {
-    $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
-    $stmt->execute([$key]);
-    $settings[$key] = $stmt->fetchColumn() ?: '';
+    try {
+        $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ? LIMIT 1");
+        $stmt->execute([$key]);
+        $settings[$key] = $stmt->fetchColumn() ?: '';
+    } catch (Exception $e) {
+        $settings[$key] = '';
+    }
 }
-$qr = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'")->fetchColumn();
-$qr_full_path = !empty($qr) ? __DIR__ . '/' . $qr : '';
-$has_qr = ($qr && file_exists($qr_full_path));
+
+$qr = $settings['company_qr_code'] ?? '';
+$has_qr = false;
+$qr_display_url = '';
+
+if (!empty($qr)) {
+    if (strpos($qr, 'http') === 0) {
+        // Supabase URL - always available
+        $has_qr = true;
+        $qr_display_url = $qr;
+    } else {
+        // Local path - check file exists
+        $qr_full_path = __DIR__ . '/' . $qr;
+        if (file_exists($qr_full_path)) {
+            $has_qr = true;
+            $qr_display_url = $qr;
+        }
+    }
+}
 ?>
 
 <style>
@@ -148,9 +230,7 @@ $has_qr = ($qr && file_exists($qr_full_path));
         color: #1e293b;
         font-size: 1.1rem;
     }
-    .setting-card-body {
-        padding: 20px;
-    }
+    .setting-card-body { padding: 20px; }
     .view-mode .label {
         font-size: 0.75rem;
         text-transform: uppercase;
@@ -183,12 +263,26 @@ $has_qr = ($qr && file_exists($qr_full_path));
         font-size: 0.8rem;
         border-radius: 20px;
     }
+    .storage-info {
+        background: #eff6ff;
+        border-left: 4px solid #2563eb;
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 0.78rem;
+        color: #1e40af;
+        margin-bottom: 15px;
+    }
 </style>
 
 <div class="container-fluid py-4">
     <h3 class="fw-bold mb-4"><i class="fas fa-cog me-2"></i> System Settings</h3>
     
     <?= $message ?>
+
+    <div class="storage-info">
+        <i class="fas fa-shield-alt me-1"></i> 
+        <strong>Permanent Storage Enabled:</strong> सभी settings और QR code अब डेटाबेस और Supabase Storage में सुरक्षित हैं। Code deploy होने पर भी कुछ नहीं हटेगा।
+    </div>
 
     <!-- ========================================== -->
     <!-- SECTION 1: BANK & CONTACT DETAILS          -->
@@ -201,7 +295,6 @@ $has_qr = ($qr && file_exists($qr_full_path));
             </button>
         </div>
         <div class="setting-card-body">
-            <!-- View Mode -->
             <div id="bank-view" class="view-mode row">
                 <div class="col-md-6">
                     <span class="label">Bank Name</span>
@@ -235,7 +328,6 @@ $has_qr = ($qr && file_exists($qr_full_path));
                 </div>
             </div>
 
-            <!-- Edit Mode -->
             <div id="bank-edit" class="edit-mode">
                 <form method="POST">
                     <input type="hidden" name="action" value="save_bank">
@@ -285,7 +377,6 @@ $has_qr = ($qr && file_exists($qr_full_path));
             </button>
         </div>
         <div class="setting-card-body">
-            <!-- View Mode -->
             <div id="payout-view" class="view-mode row">
                 <div class="col-md-6">
                     <span class="label">TDS %</span>
@@ -301,7 +392,6 @@ $has_qr = ($qr && file_exists($qr_full_path));
                 </div>
             </div>
 
-            <!-- Edit Mode -->
             <div id="payout-edit" class="edit-mode">
                 <form method="POST">
                     <input type="hidden" name="action" value="save_payout">
@@ -341,7 +431,6 @@ $has_qr = ($qr && file_exists($qr_full_path));
             </button>
         </div>
         <div class="setting-card-body">
-            <!-- View Mode -->
             <div id="spin-view" class="view-mode row">
                 <div class="col-md-6">
                     <span class="label">Min Coins per Spin</span>
@@ -360,7 +449,6 @@ $has_qr = ($qr && file_exists($qr_full_path));
                 </div>
             </div>
 
-            <!-- Edit Mode -->
             <div id="spin-edit" class="edit-mode">
                 <form method="POST">
                     <input type="hidden" name="action" value="save_spin">
@@ -398,11 +486,15 @@ $has_qr = ($qr && file_exists($qr_full_path));
             </button>
         </div>
         <div class="setting-card-body">
-            <!-- View Mode -->
             <div id="qr-view" class="view-mode text-center">
                 <?php if ($has_qr): ?>
                     <p class="text-muted mb-2">Current QR Code:</p>
-                    <img src="<?= htmlspecialchars($qr) ?>" style="max-height:200px; border:1px solid #ddd; border-radius:12px; padding:10px; background:white;">
+                    <img src="<?= htmlspecialchars($qr_display_url) ?>" style="max-height:200px; border:1px solid #ddd; border-radius:12px; padding:10px; background:white;">
+                    <?php if (strpos($qr, 'http') === 0): ?>
+                        <div class="mt-2 small text-success"><i class="fas fa-check-circle"></i> Stored on Supabase (permanent)</div>
+                    <?php else: ?>
+                        <div class="mt-2 small text-warning"><i class="fas fa-exclamation-triangle"></i> Stored locally (may disappear on redeploy)</div>
+                    <?php endif; ?>
                 <?php else: ?>
                     <div class="py-4">
                         <i class="fas fa-qrcode fa-3x text-muted opacity-25 mb-2"></i>
@@ -411,7 +503,6 @@ $has_qr = ($qr && file_exists($qr_full_path));
                 <?php endif; ?>
             </div>
 
-            <!-- Edit Mode -->
             <div id="qr-edit" class="edit-mode">
                 <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="save_qr">
@@ -419,6 +510,7 @@ $has_qr = ($qr && file_exists($qr_full_path));
                         <div class="col-12">
                             <label class="fw-bold small">Upload New QR Code</label>
                             <input type="file" name="qr_code" class="form-control" accept="image/*">
+                            <small class="text-muted">QR will be saved to Supabase Storage (permanent).</small>
                             
                             <?php if ($has_qr): ?>
                                 <div class="form-check mt-3 text-danger">
@@ -428,7 +520,6 @@ $has_qr = ($qr && file_exists($qr_full_path));
                                     </label>
                                 </div>
                             <?php endif; ?>
-                            
                         </div>
                         <div class="col-md-4 mt-3">
                             <label class="fw-bold small text-danger">Verify Password *</label>
