@@ -1,7 +1,6 @@
 <?php
 // ============================================================
-// ✅ Header – Top Nav with Hamburger + Sidebar
-// 🔥 Dynamic Sidebar + Manage Pages Link + URL-based Impersonation
+// ✅ Header – Top Nav + Sidebar + Collapsible Admin Sections
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -542,6 +541,83 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             display: block;
         }
 
+        /* ============ Admin Collapsible Sidebar ============ */
+        .sidebar .nav-section {
+            margin: 6px 0;
+        }
+        .sidebar .nav-section-title {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: #334155;
+            font-weight: 600;
+            font-size: 14.5px;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: all 0.25s ease;
+            user-select: none;
+            border-left: 3px solid transparent;
+        }
+        .sidebar .nav-section-title:hover {
+            background: #f1f5f9;
+            color: #1e3a8a;
+        }
+        .sidebar .nav-section-title.active {
+            background: #eef2ff;
+            color: #1e3a8a;
+        }
+        .sidebar .nav-section-title .section-arrow {
+            margin-left: auto;
+            font-size: 11px;
+            color: #94a3b8;
+            transition: transform 0.3s ease;
+        }
+        .sidebar .nav-section.open .nav-section-title .section-arrow {
+            transform: rotate(90deg);
+            color: #1e3a8a;
+        }
+        .sidebar .nav-section-title i.section-icon {
+            width: 28px;
+            font-size: 17px;
+            color: #64748b;
+            margin-right: 0;
+        }
+        .sidebar .nav-section.open .nav-section-title i.section-icon {
+            color: #1e3a8a;
+        }
+        
+        .sidebar .nav-section-items {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease;
+            padding-left: 8px;
+        }
+        .sidebar .nav-section.open .nav-section-items {
+            max-height: 600px;
+        }
+        
+        .sidebar .nav-section-items a {
+            padding: 9px 16px 9px 32px;
+            font-size: 13.5px;
+            font-weight: 500;
+            margin: 2px 0;
+            border-left: 2px solid transparent;
+            border-radius: 10px;
+        }
+        .sidebar .nav-section-items a i {
+            width: 22px;
+            font-size: 14px;
+        }
+        .sidebar .nav-section-items a:hover {
+            background: #f1f5f9;
+            border-left-color: #cbd5e1;
+        }
+        .sidebar .nav-section-items a.active {
+            background: #eef2ff;
+            color: #1e3a8a;
+            border-left-color: #1e3a8a;
+        }
+
         /* ====== Main Content ====== */
         .main-content {
             padding: 30px 35px;
@@ -911,87 +987,193 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property India</span></div>
 
     <?php if ($role == 'admin'): ?>
-        <!-- ADMIN SIDEBAR -->
-        <a href="admin_dashboard.php"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <!-- ============================================================ -->
+        <!-- ADMIN SIDEBAR - Collapsible Sections -->
+        <!-- ============================================================ -->
         
-        <?php if (hasViewPermission('properties', $pdo)): ?>
-            <a href="properties.php"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
-            <a href="bulk_upload_properties.php"><i class="fas fa-file-upload"></i> <span>Bulk Upload Properties</span></a>
-        <?php endif; ?>
-        
+        <!-- Dashboard (Always visible) -->
+        <a href="admin_dashboard.php" class="<?= $current_page == 'admin_dashboard.php' ? 'active' : '' ?>">
+            <i class="fas fa-th-large"></i> <span>Dashboard</span>
+        </a>
+
+        <!-- 🔷 1. PROPERTIES -->
+        <div class="nav-section <?= in_array($current_page, ['properties.php','bulk_upload_properties.php','admin_user_properties.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['properties.php','bulk_upload_properties.php','admin_user_properties.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-building section-icon"></i>
+                <span>Properties</span>
+                <i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <?php if (hasViewPermission('properties', $pdo)): ?>
+                    <a href="properties.php" class="<?= $current_page == 'properties.php' ? 'active' : '' ?>">
+                        <i class="fas fa-edit"></i> <span>Auction Properties</span>
+                    </a>
+                    <a href="bulk_upload_properties.php" class="<?= $current_page == 'bulk_upload_properties.php' ? 'active' : '' ?>">
+                        <i class="fas fa-file-upload"></i> <span>Bulk Upload</span>
+                    </a>
+                <?php endif; ?>
+                <a href="admin_user_properties.php" class="<?= $current_page == 'admin_user_properties.php' ? 'active' : '' ?>">
+                    <i class="fas fa-home"></i> <span>User Properties</span>
+                </a>
+                <a href="properties.php?filter_city=Dholera Smart City">
+                    <i class="fas fa-city"></i> <span>Dholera Properties</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 🔷 2. USERS & TEAM -->
         <?php if ($is_super_admin): ?>
-            <a href="users.php"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
-            <a href="admin_team.php"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
-            <a href="admin_permissions.php"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
-        <?php endif; ?>
-        
-        <!-- 🔥 Manage Pages Link -->
-        <a href="admin_pages.php"><i class="fas fa-file-alt"></i> <span>Manage Pages</span></a>
-        
-        <?php if (hasViewPermission('packages', $pdo)): ?>
-            <a href="admin_packages.php"><i class="fas fa-tags"></i> <span>Packages</span></a>
-        <?php endif; ?>
-        
-        <?php if (hasViewPermission('subscriptions', $pdo)): ?>
-            <a href="admin_subscriptions.php"><i class="fas fa-user-check"></i> <span>Pending Subscriptions</span></a>
-            <a href="admin_subscription_history.php"><i class="fas fa-history"></i> <span>Subscription History</span></a>
+        <div class="nav-section <?= in_array($current_page, ['users.php','admin_team.php','admin_permissions.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['users.php','admin_team.php','admin_permissions.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-users section-icon"></i>
+                <span>Users & Team</span>
+                <i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="users.php" class="<?= $current_page == 'users.php' ? 'active' : '' ?>">
+                    <i class="fas fa-users-cog"></i> <span>Manage Users</span>
+                </a>
+                <a href="admin_team.php" class="<?= $current_page == 'admin_team.php' ? 'active' : '' ?>">
+                    <i class="fas fa-sitemap"></i> <span>View Team</span>
+                </a>
+                <a href="admin_permissions.php" class="<?= $current_page == 'admin_permissions.php' ? 'active' : '' ?>">
+                    <i class="fas fa-user-shield"></i> <span>Sub-Admins</span>
+                </a>
+            </div>
+        </div>
         <?php endif; ?>
 
-            <!-- 🔥 Payout Preview & Tools -->
-        <a href="admin_payout_preview.php"><i class="fas fa-file-invoice-dollar"></i> <span>Payout Preview</span></a>
-        <a href="admin_payout_manager.php"><i class="fas fa-wallet"></i> <span>Payout Manager</span></a>
-        <a href="admin_fix_subscription_amounts.php"><i class="fas fa-tools"></i> <span>Fix Amounts</span></a>
-        <a href="admin_give_package.php"><i class="fas fa-gift"></i> <span>Give Free Package</span></a>
-        <a href="admin_extend_subscriptions.php"><i class="fas fa-calendar-plus"></i> <span>Extend Subscriptions</span></a>
-    
-        <?php if (hasViewPermission('referrals', $pdo)): ?>
-            <a href="admin_referrals.php"><i class="fas fa-hand-holding-usd"></i> <span>Referral Payouts</span></a>
+        <!-- 🔷 3. PACKAGES & SUBSCRIPTIONS -->
+        <?php if (hasViewPermission('packages', $pdo) || hasViewPermission('subscriptions', $pdo)): ?>
+        <div class="nav-section <?= in_array($current_page, ['admin_packages.php','admin_subscriptions.php','admin_subscription_history.php','admin_give_package.php','admin_extend_subscriptions.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['admin_packages.php','admin_subscriptions.php','admin_subscription_history.php','admin_give_package.php','admin_extend_subscriptions.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-tags section-icon"></i>
+                <span>Packages</span>
+                <i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <?php if (hasViewPermission('packages', $pdo)): ?>
+                    <a href="admin_packages.php" class="<?= $current_page == 'admin_packages.php' ? 'active' : '' ?>">
+                        <i class="fas fa-tags"></i> <span>Manage Packages</span>
+                    </a>
+                <?php endif; ?>
+                <?php if (hasViewPermission('subscriptions', $pdo)): ?>
+                    <a href="admin_subscriptions.php" class="<?= $current_page == 'admin_subscriptions.php' ? 'active' : '' ?>">
+                        <i class="fas fa-user-check"></i> <span>Pending Requests</span>
+                    </a>
+                    <a href="admin_subscription_history.php" class="<?= $current_page == 'admin_subscription_history.php' ? 'active' : '' ?>">
+                        <i class="fas fa-history"></i> <span>Subscription History</span>
+                    </a>
+                <?php endif; ?>
+                <a href="admin_give_package.php" class="<?= $current_page == 'admin_give_package.php' ? 'active' : '' ?>">
+                    <i class="fas fa-gift"></i> <span>Give Free Package</span>
+                </a>
+                <a href="admin_extend_subscriptions.php" class="<?= $current_page == 'admin_extend_subscriptions.php' ? 'active' : '' ?>">
+                    <i class="fas fa-calendar-plus"></i> <span>Extend Subscriptions</span>
+                </a>
+            </div>
+        </div>
         <?php endif; ?>
-        
-        <?php if (hasViewPermission('deductions', $pdo)): ?>
-            <a href="admin_deductions.php"><i class="fas fa-percent"></i> <span>Deductions</span></a>
+
+        <!-- 🔷 4. INCOME & PAYOUTS -->
+        <?php if (hasViewPermission('referrals', $pdo) || hasViewPermission('accounting', $pdo)): ?>
+        <div class="nav-section <?= in_array($current_page, ['admin_referrals.php','admin_payout_preview.php','admin_payout_manager.php','admin_fix_subscription_amounts.php','admin_accounting.php','admin_deductions.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['admin_referrals.php','admin_payout_preview.php','admin_payout_manager.php','admin_fix_subscription_amounts.php','admin_accounting.php','admin_deductions.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-hand-holding-usd section-icon"></i>
+                <span>Income & Payouts</span>
+                <i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="admin_payout_preview.php" class="<?= $current_page == 'admin_payout_preview.php' ? 'active' : '' ?>">
+                    <i class="fas fa-file-invoice-dollar"></i> <span>Payout Preview</span>
+                </a>
+                <a href="admin_referrals.php" class="<?= $current_page == 'admin_referrals.php' ? 'active' : '' ?>">
+                    <i class="fas fa-hand-holding-usd"></i> <span>Release Payouts</span>
+                </a>
+                <a href="admin_payout_manager.php" class="<?= $current_page == 'admin_payout_manager.php' ? 'active' : '' ?>">
+                    <i class="fas fa-wallet"></i> <span>Payout Manager</span>
+                </a>
+                <a href="admin_fix_subscription_amounts.php" class="<?= $current_page == 'admin_fix_subscription_amounts.php' ? 'active' : '' ?>">
+                    <i class="fas fa-tools"></i> <span>Fix Amounts</span>
+                </a>
+                <?php if (hasViewPermission('accounting', $pdo)): ?>
+                    <a href="admin_accounting.php" class="<?= $current_page == 'admin_accounting.php' ? 'active' : '' ?>">
+                        <i class="fas fa-wallet"></i> <span>Accounting</span>
+                    </a>
+                <?php endif; ?>
+                <?php if (hasViewPermission('deductions', $pdo)): ?>
+                    <a href="admin_deductions.php" class="<?= $current_page == 'admin_deductions.php' ? 'active' : '' ?>">
+                        <i class="fas fa-percent"></i> <span>Deductions</span>
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
         <?php endif; ?>
-        
-        <?php if (hasViewPermission('activity_logs', $pdo)): ?>
-            <a href="admin_activity_logs.php"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
-        <?php endif; ?>
-        
-        <?php if (hasViewPermission('accounting', $pdo)): ?>
-            <a href="admin_accounting.php"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
-        <?php endif; ?>
-        
+
+        <!-- 🔷 5. CONTENT & PAGES -->
+        <div class="nav-section <?= in_array($current_page, ['admin_pages.php','admin_navigation.php','admin_jobs.php','admin_social_links.php','admin_notification.php','admin_activity_logs.php','admin_kyc.php','support_admin.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['admin_pages.php','admin_navigation.php','admin_jobs.php','admin_social_links.php','admin_notification.php','admin_activity_logs.php','admin_kyc.php','support_admin.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-file-alt section-icon"></i>
+                <span>Content & Pages</span>
+                <i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="admin_pages.php" class="<?= $current_page == 'admin_pages.php' ? 'active' : '' ?>">
+                    <i class="fas fa-file-alt"></i> <span>Manage Pages</span>
+                </a>
+                <?php if ($is_super_admin): ?>
+                    <a href="admin_navigation.php" class="<?= $current_page == 'admin_navigation.php' ? 'active' : '' ?>">
+                        <i class="fas fa-bars"></i> <span>Navigation Manager</span>
+                    </a>
+                <?php endif; ?>
+                <a href="admin_jobs.php" class="<?= $current_page == 'admin_jobs.php' ? 'active' : '' ?>">
+                    <i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span>
+                </a>
+                <a href="admin_social_links.php" class="<?= $current_page == 'admin_social_links.php' ? 'active' : '' ?>">
+                    <i class="fas fa-share-alt"></i> <span>Social Links</span>
+                </a>
+                <a href="admin_notification.php" class="<?= $current_page == 'admin_notification.php' ? 'active' : '' ?>">
+                    <i class="fas fa-bullhorn"></i> <span>Popup Notification</span>
+                    <?php if (isset($notif_count) && $notif_count > 0): ?>
+                        <span class="badge bg-danger ms-2"><?= $notif_count ?></span>
+                    <?php endif; ?>
+                </a>
+                <?php if (hasViewPermission('activity_logs', $pdo)): ?>
+                    <a href="admin_activity_logs.php" class="<?= $current_page == 'admin_activity_logs.php' ? 'active' : '' ?>">
+                        <i class="fas fa-clock"></i> <span>Activity Logs</span>
+                    </a>
+                <?php endif; ?>
+                <?php if (hasViewPermission('kyc', $pdo)): ?>
+                    <a href="admin_kyc.php" class="<?= $current_page == 'admin_kyc.php' ? 'active' : '' ?>">
+                        <i class="fas fa-id-card"></i> <span>KYC Verification</span>
+                    </a>
+                <?php endif; ?>
+                <?php if (hasViewPermission('support', $pdo)): ?>
+                    <a href="support_admin.php" class="<?= $current_page == 'support_admin.php' ? 'active' : '' ?>">
+                        <i class="fas fa-headset"></i> <span>Support Tickets</span>
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- 🔷 6. SETTINGS -->
         <?php if (hasViewPermission('settings', $pdo)): ?>
-            <a href="settings.php"><i class="fas fa-cog"></i> <span>Settings</span></a>
+        <div class="nav-section <?= in_array($current_page, ['settings.php','admin_spin_settings.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['settings.php','admin_spin_settings.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-cog section-icon"></i>
+                <span>Settings</span>
+                <i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="settings.php" class="<?= $current_page == 'settings.php' ? 'active' : '' ?>">
+                    <i class="fas fa-cog"></i> <span>General Settings</span>
+                </a>
+                <a href="admin_spin_settings.php" class="<?= $current_page == 'admin_spin_settings.php' ? 'active' : '' ?>">
+                    <i class="fas fa-dharmachakra"></i> <span>Spin Settings</span>
+                </a>
+            </div>
+        </div>
         <?php endif; ?>
-        
-        <a href="admin_spin_settings.php"><i class="fas fa-cog"></i> <span>Spin Settings</span></a>
-        
-        <?php if (hasViewPermission('kyc', $pdo)): ?>
-            <a href="admin_kyc.php"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
-        <?php endif; ?>
-        
-        <?php if (hasViewPermission('support', $pdo)): ?>
-            <a href="support_admin.php"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
-        <?php endif; ?>
-        
-        <a href="admin_user_properties.php"><i class="fas fa-home"></i> <span>User Properties</span></a>
-        <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
-        
-        <?php if ($is_super_admin): ?>
-            <a href="admin_navigation.php"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
-        <?php endif; ?>
-        
-        <a href="admin_jobs.php"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
-        <a href="admin_social_links.php"><i class="fas fa-share-alt"></i> <span>Social Links</span></a>
-        
-        <!-- Notification Manager Link -->
-        <a href="admin_notification.php">
-            <i class="fas fa-bullhorn"></i> 
-            <span>Manage Popup Notification</span>
-            <?php if (isset($notif_count) && $notif_count > 0): ?>
-                <span class="badge bg-danger ms-2"><?= $notif_count ?></span>
-            <?php endif; ?>
-        </a>
 
     <?php elseif ($role == 'sales'): ?>
         <!-- SALES SIDEBAR -->
@@ -1097,7 +1279,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
 <!-- ====== SIDEBAR TOGGLE SCRIPTS ====== -->
 <script>
-// Toggle hamburger sidebar
+// Toggle hamburger sidebar (for guest/public pages)
 document.addEventListener('DOMContentLoaded', function() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const sidebar = document.getElementById('hamburgerSidebar');
@@ -1140,6 +1322,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// 🔥 Admin Collapsible Sidebar Sections
+function toggleSection(el) {
+    var section = el.closest('.nav-section');
+    if (!section) return;
+    section.classList.toggle('open');
+}
+
 // Countdown timer
 document.addEventListener('DOMContentLoaded', function() {
     const countdownEl = document.getElementById('countdownDisplay');
@@ -1164,7 +1353,6 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     var impSessionId = '<?= htmlspecialchars($current_imp_session) ?>';
     
-    // Inject into links
     document.querySelectorAll('a[href]').forEach(function(a) {
         var href = a.getAttribute('href');
         if (!href) return;
@@ -1183,7 +1371,6 @@ document.addEventListener('DOMContentLoaded', function() {
         a.setAttribute('href', href + sep + 'imp_session=' + impSessionId);
     });
     
-    // Inject into forms
     document.querySelectorAll('form').forEach(function(f) {
         if (f.querySelector('input[name="imp_session"]')) return;
         var method = (f.getAttribute('method') || 'GET').toUpperCase();
