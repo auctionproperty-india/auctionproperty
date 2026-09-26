@@ -1198,6 +1198,9 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             <span>My Earnings</span>
         </a>
         <a href="user_subscription_history.php"><i class="fas fa-history"></i> <span>Payment History</span></a>
+        <a href="user_wallet_history.php" class="<?= $current_page == 'user_wallet_history.php' ? 'active' : '' ?>">
+    <i class="fas fa-receipt"></i> <span>Payment History</span>
+</a>
         <a href="user_referrals.php"><i class="fas fa-link"></i> <span>Referrals</span></a>
         <a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
         <a href="support.php"><i class="fas fa-headset"></i> <span>Support</span></a>
