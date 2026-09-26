@@ -1090,6 +1090,9 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 <a href="admin_referrals.php" class="<?= $current_page == 'admin_referrals.php' ? 'active' : '' ?>">
                     <i class="fas fa-hand-holding-usd"></i> <span>Release Payouts</span>
                 </a>
+               <a href="admin_wallet_payout.php" class="<?= $current_page == 'admin_wallet_payout.php' ? 'active' : '' ?>">
+    <i class="fas fa-money-bill-wave"></i> <span>Wallet Payout</span>
+</a>
                 <a href="admin_payout_manager.php" class="<?= $current_page == 'admin_payout_manager.php' ? 'active' : '' ?>">
                     <i class="fas fa-wallet"></i> <span>Payout Manager</span>
                 </a>
