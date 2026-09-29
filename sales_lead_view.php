@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👁️ Sales CRM – View / Edit Lead (with Notes & Follow-ups)
+// 👁️ Sales CRM – View / Edit Lead (with Notes, Follow-ups, Alt Phone)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -40,7 +40,6 @@ if (!$is_admin && $lead['assigned_to'] != $user_id) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_lead'])) {
     $name = trim($_POST['name'] ?? '');
     $email = trim($_POST['email'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
     $city = trim($_POST['city'] ?? '');
     $property_type = trim($_POST['property_type'] ?? '');
     $budget_min = !empty($_POST['budget_min']) ? (float)$_POST['budget_min'] : null;
@@ -48,22 +47,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_lead'])) {
     $status = $_POST['status'] ?? 'new';
     $priority = $_POST['priority'] ?? 'medium';
     $follow_up_date = !empty($_POST['follow_up_date']) ? $_POST['follow_up_date'] : null;
+    $alternate_phone = trim($_POST['alternate_phone'] ?? '');
     $old_status = $lead['status'];
+
+    // 🔒 Phone: सिर्फ़ Admin बदल सकता है, Sales नहीं
+    if ($is_admin) {
+        $phone = trim($_POST['phone'] ?? $lead['phone']);
+    } else {
+        $phone = $lead['phone']; // Sales user का phone change silently ignore
+    }
 
     try {
         $pdo->prepare("
             UPDATE sales_leads 
-            SET name=?, email=?, phone=?, city=?, property_type=?, 
+            SET name=?, email=?, phone=?, alternate_phone=?, city=?, property_type=?, 
                 budget_min=?, budget_max=?, status=?, priority=?, 
                 follow_up_date=?, updated_at=CURRENT_TIMESTAMP
             WHERE id=?
-        ")->execute([$name, $email, $phone, $city, $property_type, 
+        ")->execute([$name, $email, $phone, $alternate_phone ?: null, $city, $property_type, 
                      $budget_min, $budget_max, $status, $priority, $follow_up_date, $lead_id]);
 
         // Log status change
         if ($old_status != $status) {
             $pdo->prepare("INSERT INTO sales_lead_notes (lead_id, user_id, note_type, note, old_status, new_status) VALUES (?, ?, 'status_change', ?, ?, ?)")
                 ->execute([$lead_id, $user_id, "Status changed from $old_status to $status", $old_status, $status]);
+        }
+
+        // Log alternate phone change
+        if ($alternate_phone && $alternate_phone != ($lead['alternate_phone'] ?? '')) {
+            $pdo->prepare("INSERT INTO sales_lead_notes (lead_id, user_id, note_type, note) VALUES (?, ?, 'note', ?)")
+                ->execute([$lead_id, $user_id, "📞 Alternate number added: $alternate_phone"]);
         }
 
         $message = "✅ Lead updated successfully!";
@@ -97,18 +110,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_followup'])) {
     if (!empty($fdate)) {
         $pdo->prepare("INSERT INTO sales_followups (lead_id, user_id, followup_date, followup_type, remarks) VALUES (?, ?, ?, ?, ?)")
             ->execute([$lead_id, $user_id, $fdate, $ftype, $fremark]);
-        // Also update lead's follow_up_date
         $pdo->prepare("UPDATE sales_leads SET follow_up_date = ? WHERE id = ?")->execute([$fdate, $lead_id]);
         $message = "✅ Follow-up scheduled!";
         $message_type = "success";
     }
 }
 
-// ---- Handle Delete ----
+// ---- Handle Delete (Admin only) ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_lead']) && $is_admin) {
-    $pdo->prepare("DELETE FROM sales_leads WHERE id = ?")->execute([$lead_id]);
-    header("Location: sales_leads.php");
-    exit;
+    try {
+        $pdo->beginTransaction();
+        $pdo->prepare("DELETE FROM sales_lead_notes WHERE lead_id = ?")->execute([$lead_id]);
+        $pdo->prepare("DELETE FROM sales_lead_transfers WHERE lead_id = ?")->execute([$lead_id]);
+        $pdo->prepare("DELETE FROM sales_followups WHERE lead_id = ?")->execute([$lead_id]);
+        $pdo->prepare("DELETE FROM sales_leads WHERE id = ?")->execute([$lead_id]);
+        $pdo->commit();
+        header("Location: sales_leads.php");
+        exit;
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $message = "❌ Delete Error: " . $e->getMessage();
+        $message_type = "danger";
+    }
 }
 
 // Fetch notes
@@ -120,6 +143,9 @@ $notes = $notes->fetchAll();
 $followups = $pdo->prepare("SELECT f.*, u.name as user_name FROM sales_followups f LEFT JOIN users u ON f.user_id = u.id WHERE f.lead_id = ? ORDER BY f.followup_date DESC");
 $followups->execute([$lead_id]);
 $followups = $followups->fetchAll();
+
+$clean_phone = preg_replace('/[^0-9]/', '', $lead['phone']);
+$clean_alt = !empty($lead['alternate_phone']) ? preg_replace('/[^0-9]/', '', $lead['alternate_phone']) : '';
 
 include 'header.php';
 ?>
@@ -139,6 +165,16 @@ include 'header.php';
     }
     .lead-header h3 { margin: 0; font-weight: 800; font-size: 1.4rem; }
     .lead-header .meta { font-size: 0.85rem; opacity: 0.85; margin-top: 6px; }
+
+    /* 🔒 ANTI-COPY: Header में phone select न हो सके */
+    .no-copy {
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -webkit-touch-callout: none;
+        cursor: default;
+    }
 
     .lead-body { padding: 30px; }
     .info-grid {
@@ -214,6 +250,32 @@ include 'header.php';
     .followup-item.upcoming { border-left: 4px solid #2563eb; }
     .followup-item.overdue { border-left: 4px solid #dc2626; background: #fef2f2; }
     .followup-item.done { border-left: 4px solid #10b981; background: #f0fdf4; }
+
+    /* 🔒 Locked field style */
+    .locked-field {
+        background: #f1f5f9 !important;
+        cursor: not-allowed !important;
+        color: #475569 !important;
+        font-weight: 700;
+        border: 2px dashed #cbd5e1 !important;
+    }
+    .lock-badge {
+        font-size: 0.65rem;
+        color: #dc2626;
+        font-weight: 700;
+        background: #fef2f2;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid #fecaca;
+        margin-left: 5px;
+    }
+
+    /* 🔥 Alternate phone highlight */
+    .alt-phone-box {
+        background: #f0fdf4;
+        border-left: 4px solid #10b981;
+    }
+    .alt-phone-box .val { color: #065f46; }
 </style>
 
 <div class="container py-4">
@@ -221,26 +283,43 @@ include 'header.php';
         <a href="sales_leads.php" class="btn btn-outline-secondary rounded-pill px-4">
             <i class="fas fa-arrow-left me-1"></i> Back to Leads
         </a>
-        <div class="d-flex gap-2">
-            <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $lead['phone']) ?>" target="_blank" class="btn btn-success rounded-pill px-3">
+        <div class="d-flex gap-2 flex-wrap">
+            <!-- Primary Phone Actions -->
+            <a href="https://wa.me/<?= $clean_phone ?>" target="_blank" class="btn btn-success rounded-pill px-3">
                 <i class="fab fa-whatsapp me-1"></i> WhatsApp
             </a>
-            <a href="tel:<?= $lead['phone'] ?>" class="btn btn-primary rounded-pill px-3">
+            <a href="tel:<?= htmlspecialchars($lead['phone']) ?>" class="btn btn-primary rounded-pill px-3">
                 <i class="fas fa-phone me-1"></i> Call
             </a>
+
+            <!-- Alternate Phone Actions (if exists) -->
+            <?php if ($clean_alt): ?>
+                <a href="https://wa.me/<?= $clean_alt ?>" target="_blank" class="btn btn-outline-success rounded-pill px-3">
+                    <i class="fab fa-whatsapp me-1"></i> WA (Alt)
+                </a>
+                <a href="tel:<?= htmlspecialchars($lead['alternate_phone']) ?>" class="btn btn-outline-primary rounded-pill px-3">
+                    <i class="fas fa-phone me-1"></i> Call (Alt)
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?= $message_type ?> alert-dismissible fade show"><?= $message ?></div>
+        <div class="alert alert-<?= $message_type ?> alert-dismissible fade show">
+            <?= $message ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
     <?php endif; ?>
 
     <div class="lead-container">
-        <!-- Header -->
-        <div class="lead-header">
+        <!-- Header (🔒 no-copy protection) -->
+        <div class="lead-header no-copy" oncontextmenu="return false;" ondragstart="return false;">
             <h3><?= htmlspecialchars($lead['name']) ?> <small style="opacity:0.6;font-size:0.9rem;">#<?= $lead['id'] ?></small></h3>
             <div class="meta">
                 <i class="fas fa-phone me-1"></i> <?= htmlspecialchars($lead['phone']) ?>
+                <?php if ($lead['alternate_phone']): ?>
+                    &nbsp;|&nbsp; <i class="fas fa-phone-volume me-1"></i> <span style="opacity:0.9;">Alt: <?= htmlspecialchars($lead['alternate_phone']) ?></span>
+                <?php endif; ?>
                 <?php if ($lead['email']): ?> &nbsp;|&nbsp; <i class="fas fa-envelope me-1"></i> <?= htmlspecialchars($lead['email']) ?><?php endif; ?>
                 <?php if ($lead['city']): ?> &nbsp;|&nbsp; <i class="fas fa-map-pin me-1"></i> <?= htmlspecialchars($lead['city']) ?><?php endif; ?>
             </div>
@@ -258,10 +337,47 @@ include 'header.php';
                                 <label class="small fw-bold">Name</label>
                                 <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($lead['name']) ?>" required>
                             </div>
+
+                            <!-- 🔒 PRIMARY PHONE (Sales: locked, Admin: editable) -->
                             <div class="col-md-6">
-                                <label class="small fw-bold">Phone</label>
-                                <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($lead['phone']) ?>" required>
+                                <label class="small fw-bold">
+                                    Primary Phone
+                                    <?php if (!$is_admin): ?>
+                                        <span class="lock-badge">🔒 Locked</span>
+                                    <?php endif; ?>
+                                </label>
+                                <?php if ($is_admin): ?>
+                                    <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($lead['phone']) ?>" required>
+                                <?php else: ?>
+                                    <input type="text" class="form-control locked-field" value="<?= htmlspecialchars($lead['phone']) ?>" readonly
+                                           oncopy="return false;" oncut="return false;" oncontextmenu="return false;"
+                                           ondragstart="return false;" onselectstart="return false;" autocomplete="off">
+                                    <small class="text-muted" style="font-size:0.68rem;">
+                                        <i class="fas fa-info-circle"></i> सिर्फ़ Admin primary number बदल सकता है
+                                    </small>
+                                <?php endif; ?>
                             </div>
+
+                            <!-- 🔥 NEW: ALTERNATE PHONE (Both can edit) -->
+                            <div class="col-md-6">
+                                <label class="small fw-bold" style="color: #065f46;">
+                                    <i class="fas fa-phone-volume me-1"></i> Alternate Number
+                                    <span class="badge bg-success" style="font-size:0.6rem;">NEW</span>
+                                </label>
+                                <input type="tel"
+                                       name="alternate_phone"
+                                       id="altPhoneInput"
+                                       class="form-control"
+                                       value="<?= htmlspecialchars($lead['alternate_phone'] ?? '') ?>"
+                                       placeholder="Party का दूसरा नंबर"
+                                       maxlength="15"
+                                       inputmode="numeric"
+                                       autocomplete="off">
+                                <small class="text-muted" style="font-size:0.68rem;">
+                                    💡 पार्टी का नया/दूसरा नंबर यहाँ add करें
+                                </small>
+                            </div>
+
                             <div class="col-md-6">
                                 <label class="small fw-bold">Email</label>
                                 <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($lead['email'] ?? '') ?>">
@@ -309,7 +425,7 @@ include 'header.php';
                             </button>
                             <?php if ($is_admin): ?>
                                 <button type="submit" name="delete_lead" value="1" class="btn btn-outline-danger rounded-pill px-4" 
-                                        onclick="return confirm('⚠️ Delete this lead permanently?');">
+                                        onclick="return confirm('⚠️ Delete this lead permanently?\n\nAll notes, follow-ups will also be deleted!');">
                                     <i class="fas fa-trash me-1"></i> Delete
                                 </button>
                             <?php endif; ?>
@@ -398,5 +514,119 @@ include 'header.php';
         </div>
     </div>
 </div>
+
+<script>
+// ============================================================
+// 🔒 ANTI-COPY PROTECTION
+// ============================================================
+
+// Block Ctrl+C, Ctrl+A, Ctrl+U, Ctrl+S, F12
+document.addEventListener('keydown', function(e) {
+    // Ctrl+C (copy)
+    if (e.ctrlKey && e.key === 'c') {
+        const selection = window.getSelection().toString();
+        // अगर selection में 20+ characters हैं (bulk copy attempt), तो block करें
+        if (selection.length > 20) {
+            e.preventDefault();
+            showCopyWarning();
+            return false;
+        }
+    }
+    
+    // Ctrl+A (select all)
+    if (e.ctrlKey && e.key === 'a') {
+        e.preventDefault();
+        showCopyWarning();
+        return false;
+    }
+    
+    // Ctrl+U (view source)
+    if (e.ctrlKey && e.key === 'u') {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Ctrl+S (save)
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        return false;
+    }
+    
+    // F12 (dev tools)
+    if (e.key === 'F12') {
+        e.preventDefault();
+        return false;
+    }
+});
+
+// Right click block on the whole container
+document.querySelector('.lead-container').addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    return false;
+});
+
+// Copy event block on the whole container
+document.querySelector('.lead-container').addEventListener('copy', function(e) {
+    const selection = window.getSelection().toString();
+    if (selection.length > 15) {
+        e.preventDefault();
+        showCopyWarning();
+        return false;
+    }
+});
+
+// Drag block
+document.querySelector('.lead-container').addEventListener('dragstart', function(e) {
+    e.preventDefault();
+    return false;
+});
+
+// Show warning toast
+function showCopyWarning() {
+    // Remove existing toast
+    const oldToast = document.getElementById('copyWarningToast');
+    if (oldToast) oldToast.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'copyWarningToast';
+    toast.innerHTML = '<i class="fas fa-ban me-2"></i> ⚠️ Data copy करना allowed नहीं है!';
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #dc2626;
+        color: #fff;
+        padding: 14px 22px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        box-shadow: 0 10px 30px rgba(220,38,38,0.4);
+        z-index: 99999;
+        animation: slideIn 0.3s ease;
+    `;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+    }, 2500);
+}
+
+// Alternate phone - only digits
+document.getElementById('altPhoneInput').addEventListener('input', function() {
+    this.value = this.value.replace(/[^0-9+\-\s]/g, '');
+});
+
+// Animation CSS
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(400px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+`;
+document.head.appendChild(style);
+</script>
 
 <?php include 'footer.php'; ?>
