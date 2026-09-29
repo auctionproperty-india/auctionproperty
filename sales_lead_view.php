@@ -352,13 +352,10 @@ include 'header.php';
                                     <input type="text" class="form-control locked-field" value="<?= htmlspecialchars($lead['phone']) ?>" readonly
                                            oncopy="return false;" oncut="return false;" oncontextmenu="return false;"
                                            ondragstart="return false;" onselectstart="return false;" autocomplete="off">
-                                    <small class="text-muted" style="font-size:0.68rem;">
-                                        <i class="fas fa-info-circle"></i> सिर्फ़ Admin primary number बदल सकता है
-                                    </small>
                                 <?php endif; ?>
                             </div>
 
-                            <!-- 🔥 NEW: ALTERNATE PHONE (Both can edit) -->
+                            <!-- 🔥 ALTERNATE PHONE (Both can edit) -->
                             <div class="col-md-6">
                                 <label class="small fw-bold" style="color: #065f46;">
                                     <i class="fas fa-phone-volume me-1"></i> Alternate Number
@@ -373,9 +370,6 @@ include 'header.php';
                                        maxlength="15"
                                        inputmode="numeric"
                                        autocomplete="off">
-                                <small class="text-muted" style="font-size:0.68rem;">
-                                    💡 पार्टी का नया/दूसरा नंबर यहाँ add करें
-                                </small>
                             </div>
 
                             <div class="col-md-6">
