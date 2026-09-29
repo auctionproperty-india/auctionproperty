@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📋 Admin – All Leads with Transfer & Bulk Actions
+// 📋 Admin – All Leads with Transfer, Bulk Actions & DELETE
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -36,17 +36,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_transfer'])) {
                 $old_stmt->execute([$lid]);
                 $old_data = $old_stmt->fetch();
 
-                // Transfer
+                if (!$old_data) continue; // Lead may have been deleted
+
+                // Transfer (0 = Unassign → NULL)
+                $assign_value = $new_assigned > 0 ? $new_assigned : null;
                 $pdo->prepare("UPDATE sales_leads SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-                    ->execute([$new_assigned ?: null, $lid]);
+                    ->execute([$assign_value, $lid]);
 
                 // Transfer history
                 $pdo->prepare("INSERT INTO sales_lead_transfers (lead_id, from_user_id, to_user_id, transferred_by, reason) VALUES (?, ?, ?, ?, ?)")
-                    ->execute([$lid, $old_data['assigned_to'] ?? null, $new_assigned, $user_id, $transfer_reason]);
+                    ->execute([$lid, $old_data['assigned_to'] ?? null, $assign_value, $user_id, $transfer_reason]);
 
                 // Add note
                 $pdo->prepare("INSERT INTO sales_lead_notes (lead_id, user_id, note_type, note) VALUES (?, ?, 'transfer', ?)")
-                    ->execute([$lid, $user_id, "Transferred to User ID: $new_assigned | Reason: $transfer_reason"]);
+                    ->execute([$lid, $user_id, "Transferred to User ID: " . ($assign_value ?? 'Unassigned') . " | Reason: $transfer_reason"]);
 
                 $count++;
             }
@@ -62,11 +65,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_transfer'])) {
 }
 
 // ============================================================
-// 🔥 SINGLE TRANSFER HANDLER
+// 🔥 SINGLE TRANSFER HANDLER (FIXED)
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['single_transfer'])) {
     $lead_id = (int)$_POST['lead_id'];
-    $new_assigned = (int)$_POST['new_assigned'];
+    $new_assigned_raw = $_POST['new_assigned'] ?? '';
+
+    // 🔥 If user just opened dropdown but didn't select any user, skip
+    if ($new_assigned_raw === '') {
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit;
+    }
+
+    $new_assigned = (int)$new_assigned_raw;
+    $assign_value = $new_assigned > 0 ? $new_assigned : null;
     $transfer_reason = trim($_POST['reason'] ?? 'Quick reassign');
 
     try {
@@ -75,19 +87,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['single_transfer'])) {
         $old_assigned = $old_stmt->fetchColumn();
 
         $pdo->prepare("UPDATE sales_leads SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-            ->execute([$new_assigned ?: null, $lead_id]);
+            ->execute([$assign_value, $lead_id]);
 
         $pdo->prepare("INSERT INTO sales_lead_transfers (lead_id, from_user_id, to_user_id, transferred_by, reason) VALUES (?, ?, ?, ?, ?)")
-            ->execute([$lead_id, $old_assigned, $new_assigned, $user_id, $transfer_reason]);
+            ->execute([$lead_id, $old_assigned, $assign_value, $user_id, $transfer_reason]);
 
         $pdo->prepare("INSERT INTO sales_lead_notes (lead_id, user_id, note_type, note) VALUES (?, ?, 'transfer', ?)")
-            ->execute([$lead_id, $user_id, "Reassigned to User ID: $new_assigned | $transfer_reason"]);
+            ->execute([$lead_id, $user_id, "Reassigned to User ID: " . ($assign_value ?? 'Unassigned') . " | $transfer_reason"]);
 
-        $message = "✅ Lead #$lead_id transferred!";
+        $message = $assign_value ? "✅ Lead #$lead_id transferred successfully!" : "✅ Lead #$lead_id unassigned!";
         $message_type = "success";
     } catch (Exception $e) {
         $message = "❌ " . $e->getMessage();
         $message_type = "danger";
+    }
+}
+
+// ============================================================
+// 🔥 SINGLE DELETE HANDLER (NEW)
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_lead'])) {
+    $lead_id = (int)$_POST['lead_id'];
+    try {
+        $pdo->beginTransaction();
+        // Delete child records first (FK safety)
+        $pdo->prepare("DELETE FROM sales_lead_notes WHERE lead_id = ?")->execute([$lead_id]);
+        $pdo->prepare("DELETE FROM sales_lead_transfers WHERE lead_id = ?")->execute([$lead_id]);
+        // Delete lead
+        $pdo->prepare("DELETE FROM sales_leads WHERE id = ?")->execute([$lead_id]);
+        $pdo->commit();
+        $message = "🗑️ Lead #$lead_id deleted successfully!";
+        $message_type = "success";
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $message = "❌ Delete Error: " . $e->getMessage();
+        $message_type = "danger";
+    }
+}
+
+// ============================================================
+// 🔥 BULK DELETE HANDLER (NEW)
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_delete'])) {
+    $lead_ids = $_POST['lead_ids'] ?? [];
+    if (empty($lead_ids)) {
+        $message = "❌ No leads selected!";
+        $message_type = "danger";
+    } else {
+        try {
+            $pdo->beginTransaction();
+            $count = 0;
+            foreach ($lead_ids as $lid) {
+                $lid = (int)$lid;
+                $pdo->prepare("DELETE FROM sales_lead_notes WHERE lead_id = ?")->execute([$lid]);
+                $pdo->prepare("DELETE FROM sales_lead_transfers WHERE lead_id = ?")->execute([$lid]);
+                $pdo->prepare("DELETE FROM sales_leads WHERE id = ?")->execute([$lid]);
+                $count++;
+            }
+            $pdo->commit();
+            $message = "🗑️ Deleted <b>$count</b> leads!";
+            $message_type = "success";
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $message = "❌ Bulk Delete Error: " . $e->getMessage();
+            $message_type = "danger";
+        }
     }
 }
 
@@ -269,6 +333,20 @@ include 'header.php';
         font-size: 0.75rem;
         font-weight: 600;
         background: #fff;
+        cursor: pointer;
+    }
+    .transfer-select:focus {
+        outline: none;
+        border-color: #2563eb;
+    }
+
+    /* 🔥 Action buttons */
+    .action-btn {
+        width: 32px; height: 32px;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 50%;
+        padding: 0;
+        font-size: 0.78rem;
     }
 </style>
 
@@ -276,7 +354,7 @@ include 'header.php';
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
             <h3 class="fw-bold mb-0"><i class="fas fa-list me-2 text-primary"></i> All Leads (<?= count($leads) ?>)</h3>
-            <p class="text-muted small mb-0">Admin control – View, Transfer, Manage all leads</p>
+            <p class="text-muted small mb-0">Admin control – View, Transfer, Delete leads</p>
         </div>
         <div class="d-flex gap-2">
             <a href="sales_lead_add.php" class="btn btn-primary rounded-pill px-4">
@@ -292,7 +370,10 @@ include 'header.php';
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?= $message_type ?> alert-dismissible fade show"><?= $message ?></div>
+        <div class="alert alert-<?= $message_type ?> alert-dismissible fade show">
+            <?= $message ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
     <?php endif; ?>
 
     <!-- Filters -->
@@ -341,106 +422,145 @@ include 'header.php';
         </form>
     </div>
 
-    <!-- Bulk Transfer Bar -->
-    <form method="POST" id="bulkForm">
-        <div class="bulk-bar" id="bulkBar">
-            <div style="font-weight:800;">
-                <i class="fas fa-check-square me-1"></i> <span id="selectedCount">0</span> leads selected
-            </div>
-            <div>
-                <label class="small fw-bold me-1">Transfer to:</label>
-                <select name="new_assigned" required>
-                    <option value="">-- Select Sales User --</option>
-                    <option value="0">🚫 Unassign</option>
-                    <?php foreach ($sales_users as $su): ?>
-                        <option value="<?= $su['id'] ?>"><?= htmlspecialchars($su['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <input type="text" name="reason" placeholder="Reason (optional)">
-            </div>
-            <button type="submit" name="bulk_transfer" value="1" class="btn btn-light btn-sm rounded-pill px-4 fw-bold" 
-                    onclick="return confirm('Transfer all selected leads?');">
-                <i class="fas fa-exchange-alt me-1"></i> Transfer Selected
-            </button>
-            <button type="button" class="btn btn-outline-light btn-sm rounded-pill px-3" onclick="clearSelection()">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
+    <!-- 🔥 EMPTY BULK FORM (checkboxes और bulk controls इससे जुड़ेंगे) -->
+    <form method="POST" id="bulkForm" onsubmit="return validateBulkAction(event);"></form>
 
-        <!-- Leads Table -->
-        <div class="table-responsive">
-            <table class="leads-table">
-                <thead>
-                    <tr>
-                        <th style="width:40px;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)" style="width:1.2rem;height:1.2rem;cursor:pointer;"></th>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>City</th>
-                        <th>Status</th>
-                        <th>Priority</th>
-                        <th>Assigned To</th>
-                        <th>Quick Transfer</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($leads)): ?>
-                        <tr><td colspan="10" class="text-center py-5 text-muted">
-                            <i class="fas fa-inbox fa-2x mb-2" style="opacity:0.3;"></i>
-                            <div>No leads found</div>
-                        </td></tr>
-                    <?php endif; ?>
-                    <?php foreach ($leads as $l): ?>
-                        <tr>
-                            <td><input type="checkbox" name="lead_ids[]" value="<?= $l['id'] ?>" class="lead-cb" onchange="updateBulkBar()" style="width:1.2rem;height:1.2rem;cursor:pointer;"></td>
-                            <td><strong>#<?= $l['id'] ?></strong></td>
-                            <td>
-                                <strong><?= htmlspecialchars($l['name']) ?></strong>
-                                <?php if (!empty($l['email'])): ?>
-                                    <div style="font-size:0.7rem;color:#64748b;"><?= htmlspecialchars($l['email']) ?></div>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= htmlspecialchars($l['phone']) ?></td>
-                            <td><?= htmlspecialchars($l['city'] ?? '—') ?></td>
-                            <td><span class="status-pill st-<?= $l['status'] ?>"><?= ucfirst(str_replace('_',' ',$l['status'])) ?></span></td>
-                            <td><span class="priority-pill pr-<?= $l['priority'] ?>"><?= ucfirst($l['priority']) ?></span></td>
-                            <td>
-                                <?php if (!empty($l['assigned_name'])): ?>
-                                    <span class="assignee-badge"><i class="fas fa-user"></i> <?= htmlspecialchars($l['assigned_name']) ?></span>
-                                <?php else: ?>
-                                    <span class="assignee-badge unassigned"><i class="fas fa-exclamation-triangle"></i> Unassigned</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <form method="POST" style="display:flex; gap:4px; align-items:center;">
-                                    <input type="hidden" name="single_transfer" value="1">
-                                    <input type="hidden" name="lead_id" value="<?= $l['id'] ?>">
-                                    <input type="hidden" name="reason" value="Quick transfer from list">
-                                    <select name="new_assigned" class="transfer-select" onchange="this.form.submit()">
-                                        <option value="">Transfer...</option>
-                                        <option value="0">🚫 Unassign</option>
-                                        <?php foreach ($sales_users as $su): ?>
-                                            <?php if ($su['id'] != $l['assigned_to']): ?>
-                                                <option value="<?= $su['id'] ?>"><?= htmlspecialchars($su['name']) ?></option>
-                                            <?php endif; ?>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </form>
-                            </td>
-                            <td>
-                                <a href="sales_lead_view.php?id=<?= $l['id'] ?>" class="btn btn-sm btn-outline-primary rounded-pill">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+    <!-- Bulk Action Bar -->
+    <div class="bulk-bar" id="bulkBar">
+        <div style="font-weight:800;">
+            <i class="fas fa-check-square me-1"></i> <span id="selectedCount">0</span> leads selected
         </div>
-    </form>
+        <div>
+            <label class="small fw-bold me-1">Transfer to:</label>
+            <select name="new_assigned" form="bulkForm">
+                <option value="">-- Select Sales User --</option>
+                <option value="0">🚫 Unassign</option>
+                <?php foreach ($sales_users as $su): ?>
+                    <option value="<?= $su['id'] ?>"><?= htmlspecialchars($su['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <input type="text" name="reason" form="bulkForm" placeholder="Reason (optional)">
+        </div>
+        <button type="submit" name="bulk_transfer" value="1" form="bulkForm"
+                class="btn btn-light btn-sm rounded-pill px-4 fw-bold"
+                onclick="return confirm('Transfer all selected leads?');">
+            <i class="fas fa-exchange-alt me-1"></i> Transfer Selected
+        </button>
+
+        <!-- 🔥 NEW: Bulk Delete Button -->
+        <button type="submit" name="bulk_delete" value="1" form="bulkForm"
+                class="btn btn-danger btn-sm rounded-pill px-4 fw-bold"
+                onclick="return confirm('⚠️ WARNING!\n\nDelete all selected leads?\n\nThis action CANNOT be undone!');">
+            <i class="fas fa-trash me-1"></i> Delete Selected
+        </button>
+
+        <button type="button" class="btn btn-outline-light btn-sm rounded-pill px-3" onclick="clearSelection()">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <!-- Leads Table (NO WRAPPING FORM) -->
+    <div class="table-responsive">
+        <table class="leads-table">
+            <thead>
+                <tr>
+                    <th style="width:40px;">
+                        <input type="checkbox" id="selectAll" onclick="toggleAll(this)"
+                               style="width:1.2rem;height:1.2rem;cursor:pointer;">
+                    </th>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>City</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Assigned To</th>
+                    <th>Quick Transfer</th>
+                    <th style="text-align:center;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($leads)): ?>
+                    <tr><td colspan="10" class="text-center py-5 text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2" style="opacity:0.3;"></i>
+                        <div>No leads found</div>
+                    </td></tr>
+                <?php endif; ?>
+                <?php foreach ($leads as $l): ?>
+                    <tr>
+                        <!-- 🔥 Checkbox uses form="bulkForm" -->
+                        <td>
+                            <input type="checkbox"
+                                   form="bulkForm"
+                                   name="lead_ids[]"
+                                   value="<?= $l['id'] ?>"
+                                   class="lead-cb"
+                                   onchange="updateBulkBar()"
+                                   style="width:1.2rem;height:1.2rem;cursor:pointer;">
+                        </td>
+                        <td><strong>#<?= $l['id'] ?></strong></td>
+                        <td>
+                            <strong><?= htmlspecialchars($l['name']) ?></strong>
+                            <?php if (!empty($l['email'])): ?>
+                                <div style="font-size:0.7rem;color:#64748b;"><?= htmlspecialchars($l['email']) ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= htmlspecialchars($l['phone']) ?></td>
+                        <td><?= htmlspecialchars($l['city'] ?? '—') ?></td>
+                        <td><span class="status-pill st-<?= $l['status'] ?>"><?= ucfirst(str_replace('_',' ',$l['status'])) ?></span></td>
+                        <td><span class="priority-pill pr-<?= $l['priority'] ?>"><?= ucfirst($l['priority']) ?></span></td>
+                        <td>
+                            <?php if (!empty($l['assigned_name'])): ?>
+                                <span class="assignee-badge"><i class="fas fa-user"></i> <?= htmlspecialchars($l['assigned_name']) ?></span>
+                            <?php else: ?>
+                                <span class="assignee-badge unassigned"><i class="fas fa-exclamation-triangle"></i> Unassigned</span>
+                            <?php endif; ?>
+                        </td>
+
+                        <!-- 🔥 SINGLE TRANSFER FORM (independent now) -->
+                        <td>
+                            <form method="POST" style="display:flex; gap:4px; align-items:center; margin:0;">
+                                <input type="hidden" name="single_transfer" value="1">
+                                <input type="hidden" name="lead_id" value="<?= $l['id'] ?>">
+                                <input type="hidden" name="reason" value="Quick transfer from list">
+                                <select name="new_assigned" class="transfer-select"
+                                        onchange="if(this.value !== '') this.form.submit();">
+                                    <option value="">Transfer...</option>
+                                    <option value="0">🚫 Unassign</option>
+                                    <?php foreach ($sales_users as $su): ?>
+                                        <?php if ($su['id'] != $l['assigned_to']): ?>
+                                            <option value="<?= $su['id'] ?>"><?= htmlspecialchars($su['name']) ?></option>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </select>
+                            </form>
+                        </td>
+
+                        <!-- 🔥 ACTION: View + Delete -->
+                        <td style="text-align:center; white-space:nowrap;">
+                            <a href="sales_lead_view.php?id=<?= $l['id'] ?>"
+                               class="btn btn-outline-primary action-btn"
+                               title="View Lead">
+                                <i class="fas fa-eye"></i>
+                            </a>
+
+                            <!-- 🔥 Delete Single Lead -->
+                            <form method="POST" style="display:inline; margin:0;"
+                                  onsubmit="return confirm('⚠️ DELETE Lead #<?= $l['id'] ?> – <?= htmlspecialchars($l['name'], ENT_QUOTES) ?>?\n\nThis cannot be undone!');">
+                                <input type="hidden" name="delete_lead" value="1">
+                                <input type="hidden" name="lead_id" value="<?= $l['id'] ?>">
+                                <button type="submit" class="btn btn-outline-danger action-btn" title="Delete Lead">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <script>
@@ -453,14 +573,25 @@ function updateBulkBar() {
     const selected = document.querySelectorAll('.lead-cb:checked').length;
     document.getElementById('selectedCount').textContent = selected;
     document.getElementById('bulkBar').classList.toggle('active', selected > 0);
-    document.getElementById('selectAll').checked = 
-        (selected > 0 && selected === document.querySelectorAll('.lead-cb').length);
+    const total = document.querySelectorAll('.lead-cb').length;
+    document.getElementById('selectAll').checked = (selected > 0 && selected === total);
 }
 
 function clearSelection() {
     document.querySelectorAll('.lead-cb').forEach(cb => cb.checked = false);
     document.getElementById('selectAll').checked = false;
     updateBulkBar();
+}
+
+// 🔥 Bulk form validation (either transfer or delete must be intended)
+function validateBulkAction(e) {
+    const selected = document.querySelectorAll('.lead-cb:checked').length;
+    if (selected === 0) {
+        e.preventDefault();
+        alert('कृपया पहले कोई lead select करें!');
+        return false;
+    }
+    return true;
 }
 </script>
 
