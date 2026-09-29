@@ -3,10 +3,14 @@
 // ✅ REGISTER – With Referral Code + City + Mobile Validation
 // ============================================================
 
-session_start();
-
+// 🔥 FIX: db.php पहले (session settings + session_start वहीं होता है)
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
+
+// 🔥 Safety: अगर किसी वजह से session active न हो
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // ====== 🔥 Capture Referral Code from URL ======
 if (isset($_GET['ref']) && !empty($_GET['ref'])) {
@@ -23,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $city = trim($_POST['city'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirm = $_POST['confirm_password'] ?? '';
-    
+
     // ====== Referral Code ======
     $ref_code = trim($_POST['referral_code'] ?? '');
     if (empty($ref_code) && isset($_SESSION['referral_code'])) {
@@ -31,13 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // 🔥 MOBILE NUMBER VALIDATION
-    // सिर्फ Digits Allow करें
     $phone_clean = preg_replace('/[^0-9]/', '', $phone);
 
     if (empty($name) || empty($email) || empty($password) || empty($city) || empty($phone)) {
         $error = 'All fields are required (Name, Email, Phone, City, Password).';
-    } 
-    // 🔥 Mobile Validation
+    }
     elseif (!preg_match('/^[6-9][0-9]{9}$/', $phone_clean)) {
         $error = '❌ Invalid Mobile Number! 10 digit का सही Mobile Number डालें (6, 7, 8, 9 से शुरू होना चाहिए)।';
     }
@@ -71,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
             $new_code = generateReferralCode();
 
-            // Insert with Cleaned Phone Number
+            // Insert
             $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, city, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
             $stmt->execute([$name, $email, $phone_clean, $city, $hashed, $new_code, $ref_by]);
 
@@ -259,11 +261,11 @@ include 'header.php';
                 </label>
                 <div class="phone-input-wrapper">
                     <span class="country-prefix">+91</span>
-                    <input type="tel" 
-                           name="phone" 
+                    <input type="tel"
+                           name="phone"
                            id="phoneInput"
-                           class="form-control" 
-                           required 
+                           class="form-control"
+                           required
                            maxlength="10"
                            minlength="10"
                            inputmode="numeric"
@@ -290,14 +292,14 @@ include 'header.php';
                 <label class="form-label">Confirm Password <span style="color:#dc2626;">*</span></label>
                 <input type="password" name="confirm_password" class="form-control" required minlength="6">
             </div>
-            
+
             <!-- Hidden Referral Code -->
             <input type="hidden" name="referral_code" value="<?= isset($_SESSION['referral_code']) ? htmlspecialchars($_SESSION['referral_code']) : '' ?>">
 
             <!-- Referral Info -->
             <div class="referral-info" id="referralInfo">
-                <i class="fas fa-gift"></i> 
-                <strong>🎉 Referral Code Applied:</strong> 
+                <i class="fas fa-gift"></i>
+                <strong>🎉 Referral Code Applied:</strong>
                 <span style="font-weight:700; color:#1e40af;">
                     <?= isset($_SESSION['referral_code']) ? htmlspecialchars($_SESSION['referral_code']) : '' ?>
                 </span>
@@ -323,15 +325,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 🔥 Only allow digits
     phoneInput.addEventListener('input', function(e) {
-        // Remove all non-digit characters
         this.value = this.value.replace(/[^0-9]/g, '');
-        
-        // Max 10 digits
+
         if (this.value.length > 10) {
             this.value = this.value.slice(0, 10);
         }
 
-        // Live Validation
         validatePhone(this.value);
     });
 
@@ -347,14 +346,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // 🔥 Prevent typing invalid first digit
     phoneInput.addEventListener('keypress', function(e) {
         const currentValue = this.value;
-        
-        // Only allow digits
+
         if (!/[0-9]/.test(e.key)) {
             e.preventDefault();
             return;
         }
 
-        // First digit must be 6-9
         if (currentValue.length === 0 && !/[6-9]/.test(e.key)) {
             e.preventDefault();
             phoneStatus.className = 'phone-status invalid';
