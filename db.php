@@ -16,13 +16,17 @@ date_default_timezone_set('Asia/Kolkata');
 // ============================================================
 $lifetime = 86400 * 90; // 90 days in seconds
 
-ini_set('session.gc_maxlifetime', $lifetime);
-ini_set('session.cookie_lifetime', $lifetime);
-ini_set('session.gc_probability', 1);
-ini_set('session.gc_divisor', 1000);  // Run GC only 0.1% of requests
-ini_set('session.use_strict_mode', 0);
-ini_set('session.use_cookies', 1);
-ini_set('session.use_only_cookies', 1);
+// ✅ These ini_set MUST run before session_start()
+// 🔥 FIX: Safe-guard so warnings never appear
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.gc_maxlifetime', $lifetime);
+    ini_set('session.cookie_lifetime', $lifetime);
+    ini_set('session.gc_probability', 1);
+    ini_set('session.gc_divisor', 1000);  // Run GC only 0.1% of requests
+    ini_set('session.use_strict_mode', 0);
+    ini_set('session.use_cookies', 1);
+    ini_set('session.use_only_cookies', 1);
+}
 
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
@@ -138,19 +142,19 @@ $sessionHandlerFile = __DIR__ . '/session_handler.php';
 
 if (file_exists($sessionHandlerFile)) {
     require_once $sessionHandlerFile;
-    
+
     if (class_exists('DatabaseSessionHandler')) {
         try {
             if (session_status() == PHP_SESSION_NONE) {
-                
+
                 $imp_session_id = null;
-                
+
                 if (isset($_GET['imp_session']) && !empty($_GET['imp_session'])) {
                     $imp_session_id = preg_replace('/[^a-f0-9]/', '', $_GET['imp_session']);
                 } elseif (isset($_POST['imp_session']) && !empty($_POST['imp_session'])) {
                     $imp_session_id = preg_replace('/[^a-f0-9]/', '', $_POST['imp_session']);
                 }
-                
+
                 if ($imp_session_id && strlen($imp_session_id) >= 32) {
                     ini_set('session.use_cookies', 0);
                     ini_set('session.use_only_cookies', 0);
@@ -162,27 +166,27 @@ if (file_exists($sessionHandlerFile)) {
                     session_name('PRIMEPROP_SESS');
                     define('IMPERSONATION_MODE', false);
                 }
-                
+
                 $handler = new DatabaseSessionHandler($pdo);
                 session_set_save_handler($handler, true);
-                
+
                 if (!IMPERSONATION_MODE) {
                     $is_https = (
-                        (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
+                        (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
                         || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
                         || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
                     );
-                    
+
                     session_set_cookie_params([
                         'lifetime' => $lifetime,
-                        'path' => '/',
-                        'domain' => '',
-                        'secure' => $is_https,
+                        'path'     => '/',
+                        'domain'   => '',
+                        'secure'   => $is_https,
                         'httponly' => true,
                         'samesite' => 'Lax'
                     ]);
                 }
-                
+
                 session_start();
             }
         } catch (Exception $e) {
