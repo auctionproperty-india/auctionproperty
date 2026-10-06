@@ -19,8 +19,8 @@ $stmt = $pdo->prepare("
         (SELECT COUNT(*) FROM user_properties WHERE user_id = ? AND status = 'approved') as total_properties,
         (SELECT COUNT(*) FROM user_properties WHERE user_id = ? AND status = 'pending') as pending_properties,
         (SELECT COUNT(*) FROM user_referral_earnings WHERE user_id = ?) as total_referrals,
-        (SELECT COALESCE(SUM(net_amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'paid') as total_earnings,
-        (SELECT COALESCE(SUM(net_amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'pending') as pending_earnings,
+        (SELECT COALESCE(SUM(gross_amount), 0) FROM user_referral_earnings WHERE user_id = ?) as total_earnings,
+        (SELECT COALESCE(SUM(gross_amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'pending') as pending_earnings,
         coins,
         wallet_balance
     FROM users 
@@ -413,7 +413,8 @@ include 'header.php';
             <div class="stat-number"><?= number_format($stats['total_referrals'] ?? 0) ?></div>
             <div class="stat-label">Referrals</div>
         </div>
-        <div class="stat-card">
+        <!-- 🔥 UPDATED: Total Earnings Card (Clickable + Gross Amount) -->
+        <div class="stat-card" onclick="window.location.href='my_earnings.php';" style="cursor: pointer;" title="Click to view Income History">
             <div class="stat-icon">💰</div>
             <div class="stat-number">₹ <?= number_format($stats['total_earnings'] ?? 0, 2) ?></div>
             <div class="stat-label">Total Earnings</div>
