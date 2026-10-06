@@ -18,9 +18,9 @@ $stmt = $pdo->prepare("
     SELECT 
         (SELECT COUNT(*) FROM user_properties WHERE user_id = ? AND status = 'approved') as total_properties,
         (SELECT COUNT(*) FROM user_properties WHERE user_id = ? AND status = 'pending') as pending_properties,
-        (SELECT COUNT(*) FROM user_referral_earnings WHERE user_id = ?) as total_referrals,
-        (SELECT COALESCE(SUM(gross_amount), 0) FROM user_referral_earnings WHERE user_id = ?) as total_earnings,
-        (SELECT COALESCE(SUM(gross_amount), 0) FROM user_referral_earnings WHERE user_id = ? AND status = 'pending') as pending_earnings,
+        (SELECT COUNT(*) FROM user_earnings WHERE user_id = ?) as total_referrals,
+        (SELECT COALESCE(SUM(amount), 0) FROM user_earnings WHERE user_id = ? AND status = 'paid') as total_earnings,
+        (SELECT COALESCE(SUM(amount), 0) FROM user_earnings WHERE user_id = ? AND status = 'pending') as pending_earnings,
         coins,
         wallet_balance
     FROM users 
