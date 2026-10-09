@@ -3,16 +3,15 @@
 // 📧 DAILY DATABASE BACKUP SCRIPT (Supabase -> Resend Email API)
 // ============================================================
 
-// 1. SECURITY TOKEN (Isko change karein aur yaad rakhein)
+// 1. SECURITY TOKEN
 define('BACKUP_SECRET_TOKEN', 'MySuperSecretBackupToken2026');
 
 // 2. RESEND API CONFIGURATION
-// Render ke Environment tab mein RESEND_API_KEY set karein
 define('RESEND_API_KEY', getenv('RESEND_API_KEY')); 
-define('EMAIL_TO', 'bliveindia2018@gmail.com'); // Backup is email par aayega
-define('EMAIL_FROM', 'onboarding@resend.dev'); // Resend ka default sender (free tier ke liye)
+define('EMAIL_TO', 'bliveindia2018@gmail.com'); 
+define('EMAIL_FROM', 'onboarding@resend.dev'); 
 
-// 3. SECURITY CHECK (Bina token ke koi is URL ko access na kar sake)
+// 3. SECURITY CHECK
 if (!isset($_GET['token']) || $_GET['token'] !== BACKUP_SECRET_TOKEN) {
     http_response_code(403);
     die("Access Denied. Invalid Token.");
@@ -130,25 +129,29 @@ function sendEmailWithResend($api_key, $to, $from, $subject, $body, $file_path, 
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    // Debugging ke liye (agar error aaye toh)
-    if ($http_code < 200 || $http_code >= 300) {
-        error_log("Resend API Error: " . $response);
+    // 🔥 ERROR DEBUGGING: Agar error aaye toh exact reason return karega
+    if ($http_code >= 200 && $http_code < 300) {
+        return true;
+    } else {
+        return "HTTP Code: $http_code | Response: " . $response;
     }
-
-    return ($http_code >= 200 && $http_code < 300);
 }
 
 $subject = "Daily Backup - " . date('d M Y');
 $body = "Hello Admin,\n\nPlease find attached the daily database backup for Prime Property India.\n\nDate: " . date('d M Y, h:i A') . "\n\nRegards,\nSystem";
 $file_name = basename($zip_file);
 
-if (sendEmailWithResend(RESEND_API_KEY, EMAIL_TO, EMAIL_FROM, $subject, $body, $zip_file, $file_name)) {
+$send_result = sendEmailWithResend(RESEND_API_KEY, EMAIL_TO, EMAIL_FROM, $subject, $body, $zip_file, $file_name);
+
+if ($send_result === true) {
     echo "✅ Backup successfully created and emailed!";
 } else {
-    echo "❌ Backup created, but email failed to send. Please check your Resend API Key.";
+    echo "❌ Backup created, but email failed to send.<br><br>";
+    echo "<strong>Exact Reason from Resend:</strong><br>";
+    echo "<pre style='background:#f4f4f4; padding:10px; border:1px solid #ddd;'>" . htmlspecialchars($send_result) . "</pre>";
 }
 
-// 9. CLEANUP OLD BACKUPS (Keep only last 3 days)
+// 9. CLEANUP OLD BACKUPS
 $files = glob($backup_dir . '*.zip');
 if (count($files) > 3) {
     usort($files, function($a, $b) { return filemtime($a) - filemtime($b); });
