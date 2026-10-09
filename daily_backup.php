@@ -1,15 +1,16 @@
 <?php
 // ============================================================
-// 📧 DAILY DATABASE BACKUP SCRIPT (Supabase -> Resend Email API)
+// 📧 DAILY DATABASE BACKUP SCRIPT (Supabase -> Brevo Email API)
 // ============================================================
 
 // 1. SECURITY TOKEN
 define('BACKUP_SECRET_TOKEN', 'MySuperSecretBackupToken2026');
 
-// 2. RESEND API CONFIGURATION (Direct Key Hardcoded for Testing)
-define('RESEND_API_KEY', 're_QFVDXBsp_EkUdSTgD2GHPcCzeWKdNLM4Y'); 
+// 2. BREVO API CONFIGURATION
+// Aapko yahan apni Brevo API Key daalni hai
+define('BREVO_API_KEY', 'xkeysib-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'); 
 define('EMAIL_TO', 'bliveindia2018@gmail.com'); 
-define('EMAIL_FROM', 'onboarding@resend.dev'); // Resend ka default sender
+define('EMAIL_FROM', 'bliveindia2018@gmail.com'); 
 
 // 3. SECURITY CHECK
 if (!isset($_GET['token']) || $_GET['token'] !== BACKUP_SECRET_TOKEN) {
@@ -99,29 +100,29 @@ try {
     die("Database Error: " . $e->getMessage());
 }
 
-// 8. SEND EMAIL VIA RESEND API (HTTP - Port 443)
-function sendEmailWithResend($api_key, $to, $from, $subject, $body, $file_path, $file_name) {
+// 8. SEND EMAIL VIA BREVO API (HTTP - Port 443)
+function sendEmailWithBrevo($api_key, $to, $from, $subject, $body, $file_path, $file_name) {
     $file_content = base64_encode(file_get_contents($file_path));
     
     $post_data = [
-        'from' => $from,
-        'to' => [$to],
+        'sender' => ['name' => 'Prime Property India', 'email' => $from],
+        'to' => [['email' => $to]],
         'subject' => $subject,
-        'html' => nl2br($body),
-        'attachments' => [
+        'htmlContent' => nl2br($body),
+        'attachment' => [
             [
-                'filename' => $file_name,
-                'content' => $file_content
+                'content' => $file_content,
+                'name' => $file_name
             ]
         ]
     ];
 
-    $ch = curl_init('https://api.resend.com/emails');
+    $ch = curl_init('https://api.brevo.com/v3/smtp/email');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($post_data));
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $api_key,
+        'api-key: ' . $api_key,
         'Content-Type: application/json'
     ]);
     
@@ -141,13 +142,13 @@ $subject = "Daily Backup - " . date('d M Y');
 $body = "Hello Admin,\n\nPlease find attached the daily database backup for Prime Property India.\n\nDate: " . date('d M Y, h:i A') . "\n\nRegards,\nSystem";
 $file_name = basename($zip_file);
 
-$send_result = sendEmailWithResend(RESEND_API_KEY, EMAIL_TO, EMAIL_FROM, $subject, $body, $zip_file, $file_name);
+$send_result = sendEmailWithBrevo(BREVO_API_KEY, EMAIL_TO, EMAIL_FROM, $subject, $body, $zip_file, $file_name);
 
 if ($send_result === true) {
     echo "✅ Backup successfully created and emailed!";
 } else {
     echo "❌ Backup created, but email failed to send.<br><br>";
-    echo "<strong>Exact Reason from Resend:</strong><br>";
+    echo "<strong>Exact Reason from Brevo:</strong><br>";
     echo "<pre style='background:#f4f4f4; padding:10px; border:1px solid #ddd;'>" . htmlspecialchars($send_result) . "</pre>";
 }
 
