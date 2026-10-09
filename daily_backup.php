@@ -4,15 +4,16 @@
 // ============================================================
 
 // 1. SECURITY TOKEN (Isko change karein aur yaad rakhein)
+// URL mein isi token ka use karna hai: daily_backup.php?token=MySuperSecretBackupToken2026
 define('BACKUP_SECRET_TOKEN', 'MySuperSecretBackupToken2026');
 
-// 2. EMAIL CONFIGURATION (Apne SMTP details yahan bharein)
-define('SMTP_HOST', 'smtp.gmail.com'); // Ya smtp-relay.brevo.com
-define('SMTP_PORT', 587); // 587 for TLS, 465 for SSL
-define('SMTP_USER', 'your_email@gmail.com');
-define('SMTP_PASS', 'your_app_password'); // Gmail ka App Password use karein
-define('EMAIL_TO', 'santoshdhakse829@gmail.com'); // Jis email par backup chahiye
-define('EMAIL_FROM', 'your_email@gmail.com');
+// 2. EMAIL CONFIGURATION (Aapki details bhar di gayi hain)
+define('SMTP_HOST', 'smtp.gmail.com');
+define('SMTP_PORT', 587); // 587 for TLS
+define('SMTP_USER', 'bliveindia2018@gmail.com'); 
+define('SMTP_PASS', 'gtvmrfvxsmgpqzgm'); // Aapka 16-digit App Password (bina space ke)
+define('EMAIL_TO', 'bliveindia2018@gmail.com'); // Backup is email par aayega
+define('EMAIL_FROM', 'bliveindia2018@gmail.com'); // Email yahan se jayega
 
 // 3. SECURITY CHECK (Bina token ke koi is URL ko access na kar sake)
 if (!isset($_GET['token']) || $_GET['token'] !== BACKUP_SECRET_TOKEN) {
@@ -20,9 +21,10 @@ if (!isset($_GET['token']) || $_GET['token'] !== BACKUP_SECRET_TOKEN) {
     die("Access Denied. Invalid Token.");
 }
 
-require_once __DIR__ . '/db.php'; // Aapki database connection file
+// 4. DATABASE CONNECTION (Aapki db.php file se connect hoga)
+require_once __DIR__ . '/db.php'; 
 
-// 4. CREATE BACKUP FILE
+// 5. CREATE BACKUP DIRECTORY
 $backup_dir = __DIR__ . '/backups/';
 if (!is_dir($backup_dir)) {
     mkdir($backup_dir, 0755, true);
@@ -32,7 +34,7 @@ $date = date('Y-m-d_H-i-s');
 $sql_file = $backup_dir . "backup_{$date}.sql";
 $zip_file = $backup_dir . "backup_{$date}.zip";
 
-// 5. FETCH ALL TABLES FROM SUPABASE (PostgreSQL)
+// 6. FETCH ALL TABLES FROM SUPABASE (PostgreSQL) AND GENERATE SQL DUMP
 try {
     $tables = [];
     $stmt = $pdo->query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'");
@@ -41,22 +43,32 @@ try {
     }
 
     $sql_dump = "-- Prime Property India Database Backup\n";
-    $sql_dump .= "-- Date: " . date('Y-m-d H:i:s') . "\n\n";
+    $sql_dump .= "-- Date: " . date('Y-m-d H:i:s') . "\n";
+    $sql_dump .= "-- Database: Supabase PostgreSQL\n\n";
 
     foreach ($tables as $table) {
-        // Get Create Table Statement (Optional but good)
-        $sql_dump .= "\n-- Table structure for `$table`\n";
+        $sql_dump .= "\n-- --------------------------------------------------------\n";
+        $sql_dump .= "-- Table structure and data for `$table`\n";
+        $sql_dump .= "-- --------------------------------------------------------\n";
         
         // Get Data
-        $sql_dump .= "INSERT INTO `$table` VALUES\n";
-        $data_stmt = $pdo->query("SELECT * FROM `$table`");
+        $data_stmt = $pdo->query("SELECT * FROM \"$table\"");
         $rows = $data_stmt->fetchAll(PDO::FETCH_ASSOC);
         
         if (count($rows) > 0) {
+            // Get column names
+            $columns = array_keys($rows[0]);
+            $col_list = implode(", ", array_map(function($c) { return "\"$c\""; }, $columns));
+            
+            $sql_dump .= "INSERT INTO \"$table\" ($col_list) VALUES\n";
+            
             $row_count = 0;
             foreach ($rows as $row) {
                 $values = array_map(function($val) use ($pdo) {
                     if ($val === null) return "NULL";
+                    // Handle boolean values for PostgreSQL
+                    if ($val === true) return "TRUE";
+                    if ($val === false) return "FALSE";
                     return $pdo->quote($val);
                 }, array_values($row));
                 
@@ -69,14 +81,18 @@ try {
                 }
             }
         } else {
-            $sql_dump .= "-- No data\n";
+            $sql_dump .= "-- No data in this table\n";
         }
     }
 
     // Write SQL to file
     file_put_contents($sql_file, $sql_dump);
 
-    // 6. ZIP THE FILE
+    // 7. ZIP THE FILE
+    if (!class_exists('ZipArchive')) {
+        die("Error: ZipArchive extension is not enabled on this server.");
+    }
+    
     $zip = new ZipArchive();
     if ($zip->open($zip_file, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
         $zip->addFile($sql_file, basename($sql_file));
@@ -92,7 +108,7 @@ try {
     die("Database Error: " . $e->getMessage());
 }
 
-// 7. SEND EMAIL WITH ATTACHMENT (Native SMTP)
+// 8. SEND EMAIL WITH ATTACHMENT (Native SMTP)
 function sendEmailWithAttachment($to, $from, $subject, $body, $file_path, $file_name) {
     $boundary = md5(time());
     
@@ -157,10 +173,10 @@ $file_name = basename($zip_file);
 if (sendEmailWithAttachment(EMAIL_TO, EMAIL_FROM, $subject, $body, $zip_file, $file_name)) {
     echo "✅ Backup successfully created and emailed!";
 } else {
-    echo "❌ Backup created, but email failed to send.";
+    echo "❌ Backup created, but email failed to send. Please check your SMTP settings.";
 }
 
-// 8. CLEANUP OLD BACKUPS (Optional - Keep only last 3 days)
+// 9. CLEANUP OLD BACKUPS (Keep only last 3 days)
 $files = glob($backup_dir . '*.zip');
 if (count($files) > 3) {
     usort($files, function($a, $b) { return filemtime($a) - filemtime($b); });
