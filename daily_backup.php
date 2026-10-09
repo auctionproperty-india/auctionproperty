@@ -6,10 +6,10 @@
 // 1. SECURITY TOKEN
 define('BACKUP_SECRET_TOKEN', 'MySuperSecretBackupToken2026');
 
-// 2. RESEND API CONFIGURATION
-define('RESEND_API_KEY', getenv('RESEND_API_KEY')); 
+// 2. RESEND API CONFIGURATION (Direct Key Hardcoded for Testing)
+define('RESEND_API_KEY', 're_QFVDXBsp_EkUdSTgD2GHPcCzeWKdNLM4Y'); 
 define('EMAIL_TO', 'bliveindia2018@gmail.com'); 
-define('EMAIL_FROM', 'onboarding@resend.dev'); 
+define('EMAIL_FROM', 'onboarding@resend.dev'); // Resend ka default sender
 
 // 3. SECURITY CHECK
 if (!isset($_GET['token']) || $_GET['token'] !== BACKUP_SECRET_TOKEN) {
@@ -129,7 +129,7 @@ function sendEmailWithResend($api_key, $to, $from, $subject, $body, $file_path, 
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    // 🔥 ERROR DEBUGGING: Agar error aaye toh exact reason return karega
+    // Debugging output
     if ($http_code >= 200 && $http_code < 300) {
         return true;
     } else {
