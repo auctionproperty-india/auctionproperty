@@ -59,6 +59,14 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
 // ---- Handle Delete ----
 if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     $delete_id = (int)$_GET['delete'];
+    // Delete document file if exists
+    $stmt = $pdo->prepare("SELECT admin_document FROM properties WHERE id = ?");
+    $stmt->execute([$delete_id]);
+    $old_doc = $stmt->fetchColumn();
+    if ($old_doc && file_exists(__DIR__ . '/' . $old_doc)) {
+        unlink(__DIR__ . '/' . $old_doc);
+    }
+    
     $stmt = $pdo->prepare("DELETE FROM properties WHERE id = ?");
     $stmt->execute([$delete_id]);
     header("Location: properties.php?msg=deleted");
@@ -74,11 +82,9 @@ function parseDate($dateStr) {
     $parts = explode(' ', $dateStr);
     $dateStr = $parts[0];
 
-    // DD/MM/YYYY
     if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $dateStr, $m)) {
         return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
     }
-    // YYYY-MM-DD
     if (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/', $dateStr, $m)) {
         return sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3]);
     }
@@ -89,13 +95,11 @@ function parseDate($dateStr) {
 
 // ============================================================
 // 🔥 HELPER: Parse Date-Time (MANUAL – 100% Reliable)
-// Handles: 19/08/2026 12:00 PM, 1/9/2026 17:00, 2/9/2026 14:00 etc.
 // ============================================================
 function parseDateTimeFlexible($str) {
     if (empty($str) || trim($str) === '') return null;
     $str = trim($str);
 
-    // Skip invalid values
     $lower = strtolower($str);
     if (in_array($lower, ['#value!', 'na', 'n/a', 'null', '-', 'club', 'club case'])) {
         return null;
@@ -103,14 +107,12 @@ function parseDateTimeFlexible($str) {
 
     $year = 0; $month = 0; $day = 0; $timePart = '';
 
-    // Pattern 1: YYYY-MM-DD HH:MM (Year first)
     if (preg_match('/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})\s*(.*)$/', $str, $m)) {
         $year = (int)$m[1];
         $month = (int)$m[2];
         $day = (int)$m[3];
         $timePart = trim($m[4]);
     }
-    // Pattern 2: DD/MM/YYYY HH:MM (Day first)
     elseif (preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s*(.*)$/', $str, $m)) {
         $day = (int)$m[1];
         $month = (int)$m[2];
@@ -119,17 +121,14 @@ function parseDateTimeFlexible($str) {
         $timePart = trim($m[4]);
     }
     else {
-        // Fallback to strtotime
         $ts = strtotime($str);
         if ($ts !== false && $ts > 0) return date('Y-m-d H:i:s', $ts);
         return null;
     }
 
-    // ---- Parse Time Part ----
     $hour = 0; $minute = 0; $second = 0;
 
     if (!empty($timePart)) {
-        // Format: 12:00 PM / 5:00 PM
         if (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM|am|pm)$/', $timePart, $t)) {
             $hour = (int)$t[1];
             $minute = (int)$t[2];
@@ -138,19 +137,16 @@ function parseDateTimeFlexible($str) {
             if ($ampm === 'PM' && $hour < 12) $hour += 12;
             if ($ampm === 'AM' && $hour == 12) $hour = 0;
         }
-        // Format: 17:00 / 17:00:00 (24-hour)
         elseif (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/', $timePart, $t)) {
             $hour = (int)$t[1];
             $minute = (int)$t[2];
             $second = isset($t[3]) && $t[3] !== '' ? (int)$t[3] : 0;
         }
-        // Format: 17 (hour only)
         elseif (preg_match('/^(\d{1,2})$/', $timePart, $t)) {
             $hour = (int)$t[1];
         }
     }
 
-    // ---- Validate ----
     if ($month < 1 || $month > 12) return null;
     if ($day < 1 || $day > 31) return null;
     if ($year < 1900 || $year > 2100) return null;
@@ -158,7 +154,6 @@ function parseDateTimeFlexible($str) {
     if ($minute < 0 || $minute > 59) return null;
     if ($second < 0 || $second > 59) return null;
 
-    // Check date validity
     if (!checkdate($month, $day, $year)) return null;
 
     return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second);
@@ -198,6 +193,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_start_parsed = parseDateTimeFlexible($auction_start_time);
     $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
+    // ---- FILE UPLOAD LOGIC ----
+    $admin_document_path = $edit_mode ? ($prop['admin_document'] ?? null) : null;
+    $upload_error = '';
+
+    if (isset($_FILES['admin_document']) && $_FILES['admin_document']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = __DIR__ . '/uploads/admin_documents/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        $file_tmp = $_FILES['admin_document']['tmp_name'];
+        $file_name = basename($_FILES['admin_document']['name']);
+        $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+        $allowed = ['pdf', 'jpg', 'jpeg', 'png'];
+
+        if (in_array($file_ext, $allowed)) {
+            $new_file_name = uniqid('admin_doc_') . '.' . $file_ext;
+            $dest_path = $upload_dir . $new_file_name;
+            if (move_uploaded_file($file_tmp, $dest_path)) {
+                // Delete old file if editing
+                if ($edit_mode && !empty($prop['admin_document']) && file_exists(__DIR__ . '/' . $prop['admin_document'])) {
+                    unlink(__DIR__ . '/' . $prop['admin_document']);
+                }
+                $admin_document_path = 'uploads/admin_documents/' . $new_file_name;
+            } else {
+                $upload_error = "Failed to move uploaded file.";
+            }
+        } else {
+            $upload_error = "Invalid file type. Only PDF, JPG, JPEG, PNG allowed.";
+        }
+    }
+
     $action = $_POST['action'];
 
     if ($action === 'add') {
@@ -207,15 +233,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 sqft, possession_type, borrower_name, emd_amount, bid_increment, 
                 emd_deadline, auction_start_time, auction_end_time, locality, 
                 reserve_price_per_sqft, contact_number, status, auction_date, 
-                inspection_date, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                inspection_date, admin_document, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $title, $description, $price, $location, $city, $state, $type, $bank_name,
             $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
             $emd_deadline_parsed, $auction_start_parsed, $auction_end_parsed, $locality,
             $reserve_price_per_sqft, $contact_number, $status, $auction_date_parsed,
-            $inspection_date_parsed
+            $inspection_date_parsed, $admin_document_path
         ]);
         header("Location: properties.php?msg=added");
         exit;
@@ -227,7 +253,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 type = ?, bank_name = ?, sqft = ?, possession_type = ?, borrower_name = ?, 
                 emd_amount = ?, bid_increment = ?, emd_deadline = ?, auction_start_time = ?, 
                 auction_end_time = ?, locality = ?, reserve_price_per_sqft = ?, 
-                contact_number = ?, status = ?, auction_date = ?, inspection_date = ?
+                contact_number = ?, status = ?, auction_date = ?, inspection_date = ?,
+                admin_document = ?
             WHERE id = ?
         ");
         $stmt->execute([
@@ -235,7 +262,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
             $emd_deadline_parsed, $auction_start_parsed, $auction_end_parsed, $locality,
             $reserve_price_per_sqft, $contact_number, $status, $auction_date_parsed,
-            $inspection_date_parsed, $id
+            $inspection_date_parsed, $admin_document_path, $id
         ]);
         header("Location: properties.php?msg=updated");
         exit;
@@ -263,6 +290,13 @@ include 'header.php';
         </div>
     <?php endif; ?>
 
+    <?php if (!empty($upload_error)): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            ❌ <?= htmlspecialchars($upload_error) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
     <!-- ============================================================
     ADD/EDIT FORM
     ============================================================ -->
@@ -272,7 +306,8 @@ include 'header.php';
             <h5 class="mb-0"><i class="fas fa-<?= $edit_mode ? 'edit' : 'plus' ?> me-2"></i> <?= $edit_mode ? 'Edit Property' : 'Add New Property' ?></h5>
         </div>
         <div class="card-body p-4">
-            <form method="POST">
+            <!-- 🔥 enctype="multipart/form-data" is required for file upload -->
+            <form method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="<?= $edit_mode ? 'edit' : 'add' ?>">
                 <?php if ($edit_mode): ?>
                     <input type="hidden" name="id" value="<?= htmlspecialchars($prop['id'] ?? '') ?>">
@@ -412,6 +447,19 @@ include 'header.php';
                             <option value="pending" <?= $currentStatus == 'pending' ? 'selected' : '' ?>>Pending</option>
                         </select>
                     </div>
+
+                    <!-- 🔥 ADMIN DOCUMENT UPLOAD -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-danger">Admin Document (PDF/JPG/JPEG/PNG - Only for Admins)</label>
+                        <input type="file" name="admin_document" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                        <?php if ($edit_mode && !empty($prop['admin_document'])): ?>
+                            <small class="text-success d-block mt-1">
+                                Current file: <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank">View Document</a>
+                            </small>
+                        <?php endif; ?>
+                        <small class="text-muted d-block mt-1">This file will NOT be visible to regular users.</small>
+                    </div>
+
                     <div class="col-12">
                         <label class="form-label fw-bold">Description</label>
                         <textarea name="description" class="form-control" rows="3"><?= $edit_mode ? htmlspecialchars($prop['description'] ?? '') : '' ?></textarea>
@@ -481,6 +529,7 @@ include 'header.php';
                         <th>Price</th>
                         <th>Auction Date</th>
                         <th>Status</th>
+                        <th>Admin Doc</th> <!-- 🔥 NEW COLUMN -->
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -505,6 +554,16 @@ include 'header.php';
                                 $badgeClass = ($statusVal == 'available') ? 'success' : (($statusVal == 'sold') ? 'danger' : 'warning');
                                 ?>
                                 <span class="badge bg-<?= $badgeClass ?>"><?= htmlspecialchars($statusVal) ?></span>
+                            </td>
+                            <!-- 🔥 VIEW DOCUMENT BUTTON -->
+                            <td>
+                                <?php if (!empty($row['admin_document'])): ?>
+                                    <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-outline-info" title="View Admin Document">
+                                        <i class="fas fa-file-pdf"></i> View
+                                    </a>
+                                <?php else: ?>
+                                    <span class="text-muted small">No File</span>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></a>
