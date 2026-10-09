@@ -1,9 +1,12 @@
 FROM php:8.2-apache
 
-# Install PostgreSQL driver
+# Install PostgreSQL driver AND Zip extension
 RUN apt-get update && apt-get install -y \
     libpq-dev \
-    && docker-php-ext-install pdo pdo_pgsql pgsql
+    libzip-dev \
+    zip \
+    unzip \
+    && docker-php-ext-install pdo pdo_pgsql pgsql zip
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
