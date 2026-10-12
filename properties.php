@@ -10,11 +10,30 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['
 $user_id = $_SESSION['user_id'];
 $is_admin = ($_SESSION['role'] == 'admin' || $_SESSION['role'] == 'sub_admin');
 
+// ============================================================
+// 🔥 MASTER LIST OF PROPERTY TYPES (index.php के साथ match करता है)
+// ============================================================
+$property_types = [
+    'Flat',
+    'Plot',
+    'Shop',
+    'Land',
+    'House',
+    'Land & Building',
+    'Car/Vehicle',
+    'Commercial',
+    'Office',
+    'Row House',
+    'Bungalow',
+    'Other',
+];
+
 // ---- Get filters ----
 $city_filter = $_GET['city'] ?? '';
 $bank_filter = $_GET['bank'] ?? '';
 $min_price = $_GET['min_price'] ?? '';
 $max_price = $_GET['max_price'] ?? '';
+$type_filter = $_GET['type'] ?? '';
 
 $where = "1=1";
 $params = [];
@@ -34,6 +53,11 @@ if (!empty($min_price)) {
 if (!empty($max_price)) {
     $where .= " AND price <= ?";
     $params[] = (float)$max_price;
+}
+// 🔥 Type filter
+if (!empty($type_filter)) {
+    $where .= " AND type = ?";
+    $params[] = $type_filter;
 }
 
 // ---- Get properties ----
@@ -306,7 +330,6 @@ include 'header.php';
             <h5 class="mb-0"><i class="fas fa-<?= $edit_mode ? 'edit' : 'plus' ?> me-2"></i> <?= $edit_mode ? 'Edit Property' : 'Add New Property' ?></h5>
         </div>
         <div class="card-body p-4">
-            <!-- 🔥 enctype="multipart/form-data" is required for file upload -->
             <form method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="<?= $edit_mode ? 'edit' : 'add' ?>">
                 <?php if ($edit_mode): ?>
@@ -342,23 +365,22 @@ include 'header.php';
                         <label class="form-label fw-bold">Bank Name</label>
                         <input type="text" name="bank_name" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['bank_name'] ?? '') : '' ?>">
                     </div>
+
+                    <!-- 🔥 PROPERTY TYPE – Master list from PHP array -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Property Type</label>
                         <?php $currentType = $edit_mode ? ($prop['type'] ?? '') : ''; ?>
                         <select name="type" class="form-control">
-                            <option value="Flat" <?= $currentType == 'Flat' ? 'selected' : '' ?>>Flat</option>
-                            <option value="Plot" <?= $currentType == 'Plot' ? 'selected' : '' ?>>Plot</option>
-                            <option value="Shop" <?= $currentType == 'Shop' ? 'selected' : '' ?>>Shop</option>
-                            <option value="Land" <?= $currentType == 'Land' ? 'selected' : '' ?>>Land</option>
-                            <option value="House" <?= $currentType == 'House' ? 'selected' : '' ?>>House</option>
-                            <option value="Car/Vehicle" <?= ($currentType == 'Car/Vehicle' || $currentType == 'Car') ? 'selected' : '' ?>>Car / Vehicle</option>
-                            <option value="Commercial" <?= $currentType == 'Commercial' ? 'selected' : '' ?>>Commercial</option>
-                            <option value="Office" <?= $currentType == 'Office' ? 'selected' : '' ?>>Office</option>
-                            <option value="Row House" <?= $currentType == 'Row House' ? 'selected' : '' ?>>Row House</option>
-                            <option value="Bungalow" <?= $currentType == 'Bungalow' ? 'selected' : '' ?>>Bungalow</option>
-                            <option value="Other" <?= $currentType == 'Other' ? 'selected' : '' ?>>Other</option>
+                            <option value="">-- Select Type --</option>
+                            <?php foreach ($property_types as $pt): ?>
+                                <option value="<?= htmlspecialchars($pt) ?>" 
+                                        <?= ($currentType === $pt || ($pt === 'Car/Vehicle' && $currentType === 'Car')) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($pt) ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
+
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Possession</label>
                         <?php $currentPoss = $edit_mode ? ($prop['possession_type'] ?? '') : ''; ?>
@@ -448,7 +470,7 @@ include 'header.php';
                         </select>
                     </div>
 
-                    <!-- 🔥 ADMIN DOCUMENT UPLOAD -->
+                    <!-- ADMIN DOCUMENT UPLOAD -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-danger">Admin Document (PDF/JPG/JPEG/PNG - Only for Admins)</label>
                         <input type="file" name="admin_document" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
@@ -486,13 +508,25 @@ include 'header.php';
     <div class="card shadow-sm rounded-4 mb-4 border-0">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label fw-bold small text-muted">City</label>
                     <input type="text" name="city" class="form-control" placeholder="Search by City..." value="<?= htmlspecialchars($city_filter) ?>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label fw-bold small text-muted">Bank Name</label>
                     <input type="text" name="bank" class="form-control" placeholder="Search by Bank..." value="<?= htmlspecialchars($bank_filter) ?>">
+                </div>
+                <!-- 🔥 TYPE FILTER (matches index.php master list) -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small text-muted">Property Type</label>
+                    <select name="type" class="form-control">
+                        <option value="">All Types</option>
+                        <?php foreach ($property_types as $pt): ?>
+                            <option value="<?= htmlspecialchars($pt) ?>" <?= ($type_filter == $pt) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($pt) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label fw-bold small text-muted">Min Price</label>
@@ -524,12 +558,14 @@ include 'header.php';
                     <tr>
                         <th>ID</th>
                         <th>Title</th>
+                        <th>Type</th>
                         <th>Bank</th>
                         <th>City</th>
+                        <th>Locality</th>
                         <th>Price</th>
                         <th>Auction Date</th>
                         <th>Status</th>
-                        <th>Admin Doc</th> <!-- 🔥 NEW COLUMN -->
+                        <th>Admin Doc</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -538,8 +574,16 @@ include 'header.php';
                         <tr>
                             <td><?= htmlspecialchars($row['id'] ?? '') ?></td>
                             <td><?= htmlspecialchars($row['title'] ?? '') ?></td>
+                            <td>
+                                <?php if (!empty($row['type'])): ?>
+                                    <span class="badge bg-info text-dark"><?= htmlspecialchars($row['type']) ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted small">—</span>
+                                <?php endif; ?>
+                            </td>
                             <td><?= htmlspecialchars($row['bank_name'] ?? 'N/A') ?></td>
                             <td><?= htmlspecialchars($row['city'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($row['locality'] ?? '—') ?></td>
                             <td>₹ <?= number_format($row['price'] ?? 0, 2) ?></td>
                             <td>
                                 <?php if (!empty($row['auction_date'])): ?>
@@ -555,7 +599,6 @@ include 'header.php';
                                 ?>
                                 <span class="badge bg-<?= $badgeClass ?>"><?= htmlspecialchars($statusVal) ?></span>
                             </td>
-                            <!-- 🔥 VIEW DOCUMENT BUTTON -->
                             <td>
                                 <?php if (!empty($row['admin_document'])): ?>
                                     <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-outline-info" title="View Admin Document">
