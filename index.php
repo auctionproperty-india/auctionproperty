@@ -1,6 +1,7 @@
 <?php
 // ============================================================
 // 🏠 Home Page – With Private Treaty + Date + Min/Max Price + Locality Search
+// (Safe version - no error if locality column missing)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -17,6 +18,27 @@ if (!function_exists('safeDateFormat')) {
     }
 }
 
+// ============================================================
+// 🔥 DYNAMIC COLUMN CHECK – कौन-सी table में locality column है?
+// ============================================================
+if (!function_exists('tableHasColumn')) {
+    function tableHasColumn($pdo, $table, $column) {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) FROM information_schema.columns 
+                WHERE table_name = ? AND column_name = ?
+            ");
+            $stmt->execute([$table, $column]);
+            return $stmt->fetchColumn() > 0;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
+
+$properties_has_locality      = tableHasColumn($pdo, 'properties', 'locality');
+$user_properties_has_locality = tableHasColumn($pdo, 'user_properties', 'locality');
+
 $user_id = $_SESSION['user_id'] ?? null;
 $show_images = userHasActiveSubscription($pdo, $user_id);
 
@@ -30,7 +52,7 @@ $search_date      = $_GET['date']  ?? '';
 $tab              = $_GET['tab'] ?? 'auction';
 
 // ============================================================
-// 🔥 TOTAL COUNTS (पूरे पोर्टल की कुल संख्या – बिना किसी फ़िल्टर के)
+// 🔥 TOTAL COUNTS
 // ============================================================
 
 $total_auction_stmt = $pdo->query("SELECT COUNT(*) as total FROM properties WHERE status = 'available'");
@@ -40,45 +62,77 @@ $total_customer_stmt = $pdo->query("SELECT COUNT(*) as total FROM user_propertie
 $total_customer = $total_customer_stmt->fetchColumn();
 
 // ============================================================
-// SEARCH FILTERS (City, Locality, Type, Min Price, Max Price, Date)
+// SEARCH FILTERS – Two Sets (properties vs user_properties)
 // ============================================================
 
-$where = [];
-$params = [];
+// ---- Filters for `properties` table ----
+$where_props = [];
+$params_props = [];
 
 if(!empty($search_city)) {
-    $where[] = "city ILIKE ?";
-    $params[] = '%'.$search_city.'%';
+    $where_props[] = "city ILIKE ?";
+    $params_props[] = '%'.$search_city.'%';
 }
 
-// 🔥 Locality filter
-if(!empty($search_locality)) {
-    $where[] = "locality ILIKE ?";
-    $params[] = '%'.$search_locality.'%';
+// 🔥 Locality filter – ONLY if column exists
+if(!empty($search_locality) && $properties_has_locality) {
+    $where_props[] = "locality ILIKE ?";
+    $params_props[] = '%'.$search_locality.'%';
 }
 
 if(!empty($search_type)) {
-    $where[] = "type = ?";
-    $params[] = $search_type;
+    $where_props[] = "type = ?";
+    $params_props[] = $search_type;
 }
 
-// 🔥 Min Price filter
 if(!empty($search_min_price)) {
-    $where[] = "price >= ?";
-    $params[] = (float)$search_min_price;
+    $where_props[] = "price >= ?";
+    $params_props[] = (float)$search_min_price;
 }
 
 if(!empty($search_max_price)) {
-    $where[] = "price <= ?";
-    $params[] = (float)$search_max_price;
+    $where_props[] = "price <= ?";
+    $params_props[] = (float)$search_max_price;
 }
 
-$where_clause = implode(" AND ", $where);
+$where_clause_props = implode(" AND ", $where_props);
+
+// ---- Filters for `user_properties` table ----
+$where_cust = [];
+$params_cust = [];
+
+if(!empty($search_city)) {
+    $where_cust[] = "city ILIKE ?";
+    $params_cust[] = '%'.$search_city.'%';
+}
+
+// 🔥 Locality filter – ONLY if column exists
+if(!empty($search_locality) && $user_properties_has_locality) {
+    $where_cust[] = "locality ILIKE ?";
+    $params_cust[] = '%'.$search_locality.'%';
+}
+
+if(!empty($search_type)) {
+    $where_cust[] = "type = ?";
+    $params_cust[] = $search_type;
+}
+
+if(!empty($search_min_price)) {
+    $where_cust[] = "price >= ?";
+    $params_cust[] = (float)$search_min_price;
+}
+
+if(!empty($search_max_price)) {
+    $where_cust[] = "price <= ?";
+    $params_cust[] = (float)$search_max_price;
+}
+
+$where_clause_cust = implode(" AND ", $where_cust);
 
 // ---- Auction Properties ----
 $base_sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available'";
-if(!empty($where_clause)) {
-    $base_sql .= " AND " . $where_clause;
+if(!empty($where_clause_props)) {
+    $base_sql .= " AND " . $where_clause_props;
 }
 
 // ============================================================
@@ -87,37 +141,37 @@ if(!empty($where_clause)) {
 if(!empty($search_date)) {
     $date_sql = $base_sql . " AND auction_date = ? ORDER BY id DESC";
     $date_stmt = $pdo->prepare($date_sql);
-    $date_stmt->execute(array_merge($params, [$search_date]));
+    $date_stmt->execute(array_merge($params_props, [$search_date]));
     $today_props = $date_stmt->fetchAll();
     $upcoming_props = [];
     $past_props = [];
 } else {
-    // 1. Today's Auctions (including Private Treaty)
+    // 1. Today's Auctions
     $today_sql = $base_sql . " AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC";
     $today_stmt = $pdo->prepare($today_sql);
-    $today_stmt->execute($params);
+    $today_stmt->execute($params_props);
     $today_props = $today_stmt->fetchAll();
 
     // 2. Upcoming Auctions
     $upcoming_sql = $base_sql . " AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC";
     $upcoming_stmt = $pdo->prepare($upcoming_sql);
-    $upcoming_stmt->execute($params);
+    $upcoming_stmt->execute($params_props);
     $upcoming_props = $upcoming_stmt->fetchAll();
 
     // 3. Past Auctions
     $past_sql = $base_sql . " AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC";
     $past_stmt = $pdo->prepare($past_sql);
-    $past_stmt->execute($params);
+    $past_stmt->execute($params_props);
     $past_props = $past_stmt->fetchAll();
 }
 
 // ---- Customer Properties ----
 $customer_where = "status = 'approved'";
-if(!empty($where_clause)) {
-    $customer_where .= " AND " . $where_clause;
+if(!empty($where_clause_cust)) {
+    $customer_where .= " AND " . $where_clause_cust;
 }
 
-$customer_params = $params;
+$customer_params = $params_cust;
 if(!empty($search_date)) {
     $customer_where .= " AND DATE(created_at) = ?";
     $customer_params[] = $search_date;
@@ -127,6 +181,74 @@ $customer_sql = "SELECT *, 'customer' as source FROM user_properties WHERE $cust
 $customer_stmt = $pdo->prepare($customer_sql);
 $customer_stmt->execute($customer_params);
 $customer_props = $customer_stmt->fetchAll();
+
+// ============================================================
+// 🔥 SMART FALLBACK: अगर locality filter से 0 results आएँ,
+// तो city-only results दिखाओ (बिना error, बिना empty screen)
+// ============================================================
+$locality_fallback_used = false;
+
+if(!empty($search_locality) && empty($customer_props) && empty($today_props) && empty($upcoming_props) && empty($past_props)) {
+    // Locality से कुछ नहीं मिला – दोबारा try करो बिना locality के (city + other filters से)
+    $locality_fallback_used = true;
+
+    // Properties retry without locality
+    $where_props_fb = array_filter($where_props, function($w) {
+        return strpos($w, 'locality') === false;
+    });
+    $params_props_fb = [];
+    if(!empty($search_city)) $params_props_fb[] = '%'.$search_city.'%';
+    if(!empty($search_type)) $params_props_fb[] = $search_type;
+    if(!empty($search_min_price)) $params_props_fb[] = (float)$search_min_price;
+    if(!empty($search_max_price)) $params_props_fb[] = (float)$search_max_price;
+
+    $fb_where = implode(" AND ", $where_props_fb);
+    $fb_sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available'";
+    if(!empty($fb_where)) $fb_sql .= " AND " . $fb_where;
+
+    if(!empty($search_date)) {
+        $fb_sql .= " AND auction_date = ? ORDER BY id DESC";
+        $fb_stmt = $pdo->prepare($fb_sql);
+        $fb_stmt->execute(array_merge($params_props_fb, [$search_date]));
+        $today_props = $fb_stmt->fetchAll();
+    } else {
+        $fb_sql_today = $fb_sql . " AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC";
+        $fb_stmt = $pdo->prepare($fb_sql_today);
+        $fb_stmt->execute($params_props_fb);
+        $today_props = $fb_stmt->fetchAll();
+
+        $fb_sql_up = $fb_sql . " AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC";
+        $fb_stmt = $pdo->prepare($fb_sql_up);
+        $fb_stmt->execute($params_props_fb);
+        $upcoming_props = $fb_stmt->fetchAll();
+
+        $fb_sql_past = $fb_sql . " AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC";
+        $fb_stmt = $pdo->prepare($fb_sql_past);
+        $fb_stmt->execute($params_props_fb);
+        $past_props = $fb_stmt->fetchAll();
+    }
+
+    // Customer properties retry without locality
+    $where_cust_fb = array_filter($where_cust, function($w) {
+        return strpos($w, 'locality') === false;
+    });
+    $params_cust_fb = [];
+    if(!empty($search_city)) $params_cust_fb[] = '%'.$search_city.'%';
+    if(!empty($search_type)) $params_cust_fb[] = $search_type;
+    if(!empty($search_min_price)) $params_cust_fb[] = (float)$search_min_price;
+    if(!empty($search_max_price)) $params_cust_fb[] = (float)$search_max_price;
+
+    $fb_cust_where = "status = 'approved'";
+    if(!empty($where_cust_fb)) $fb_cust_where .= " AND " . implode(" AND ", $where_cust_fb);
+    if(!empty($search_date)) {
+        $fb_cust_where .= " AND DATE(created_at) = ?";
+        $params_cust_fb[] = $search_date;
+    }
+    $fb_cust_sql = "SELECT *, 'customer' as source FROM user_properties WHERE $fb_cust_where ORDER BY created_at DESC";
+    $fb_cust_stmt = $pdo->prepare($fb_cust_sql);
+    $fb_cust_stmt->execute($params_cust_fb);
+    $customer_props = $fb_cust_stmt->fetchAll();
+}
 
 // ---- Render Property Card ----
 function renderPropertyCard($prop, $show_images, $is_today = false) {
@@ -183,7 +305,7 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                 <h5 style="font-size:1.2rem; font-weight:700; margin:12px 0 6px; color:<?= $text_color ?>;"><?= htmlspecialchars($prop['title']) ?></h5>
                 <div style="font-size:1.6rem; font-weight:800; color:<?= $text_color ?>;">₹ <?= indianCurrencyFormat($prop['price']) ?> <span style="font-size:0.9rem; font-weight:400; opacity:0.7;">Reserve</span></div>
                 
-                <!-- 🔥 City + Locality -->
+                <!-- 🔥 City + Locality (only if column exists and value present) -->
                 <div style="font-size:0.85rem; opacity:0.8; margin-top:6px; color:<?= $text_color ?>;">
                     <i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?>
                     <?php if(!empty($prop['locality'])): ?>
@@ -268,26 +390,37 @@ function buildTabUrl($tab, $city, $locality, $type, $min_price, $max_price, $dat
         .no-auction-msg { background: #f8fafc; border-radius: 30px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
         .no-auction-msg i { font-size: 2.5rem; opacity:0.3; }
 
+        /* 🔥 Fallback notice */
+        .fallback-notice {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-left: 4px solid #f59e0b;
+            border-radius: 12px;
+            padding: 12px 18px;
+            margin-bottom: 20px;
+            font-size: 0.88rem;
+            color: #78350f;
+        }
+
         @media (max-width:576px) { .search-box { padding:20px; } }
     </style>
 </head>
 <body>
     <div class="container mt-4">
         <!-- ============================================================ -->
-        <!-- 🔥 SEARCH BOX (2 Rows: Main + Price Range) -->
+        <!-- 🔥 SEARCH BOX -->
         <!-- ============================================================ -->
         <div class="search-box">
             <form method="GET" class="row g-3 align-items-center">
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
 
-                <!-- ROW 1: City | Locality | Type | Date -->
+                <!-- ROW 1 -->
                 <div class="col-md-3">
                     <input type="text" name="city" class="form-control"
                            placeholder="🔍 Search by City..."
                            value="<?= htmlspecialchars($search_city) ?>">
                 </div>
 
-                <!-- 🔥 LOCALITY FIELD -->
                 <div class="col-md-3">
                     <input type="text" name="locality" class="form-control"
                            placeholder="📍 Search by Locality / Area..."
@@ -313,11 +446,10 @@ function buildTabUrl($tab, $city, $locality, $type, $min_price, $max_price, $dat
 
                 <div class="col-md-3">
                     <input type="date" name="date" class="form-control"
-                           value="<?= htmlspecialchars($search_date) ?>"
-                           placeholder="Select Date">
+                           value="<?= htmlspecialchars($search_date) ?>">
                 </div>
 
-                <!-- ROW 2: Min Price | Max Price | Search | Reset -->
+                <!-- ROW 2 -->
                 <div class="col-md-3">
                     <input type="number" name="min_price" class="form-control"
                            placeholder="💰 Min Price (₹)"
@@ -370,7 +502,19 @@ function buildTabUrl($tab, $city, $locality, $type, $min_price, $max_price, $dat
             <?php endif; ?>
         </div>
 
-        <!-- Tabs with Total Counts -->
+        <!-- 🔥 Fallback notice -->
+        <?php if($locality_fallback_used): ?>
+            <div class="fallback-notice">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>"<?= htmlspecialchars($search_locality) ?>"</strong> locality में कुछ नहीं मिला। 
+                आस-पास की properties दिखा रहे हैं 
+                <?php if(!empty($search_city)): ?>
+                    (<strong><?= htmlspecialchars($search_city) ?></strong> में)
+                <?php endif; ?>।
+            </div>
+        <?php endif; ?>
+
+        <!-- Tabs -->
         <ul class="nav nav-tabs mb-4">
             <li class="nav-item">
                 <a class="nav-link <?= ($tab=='auction')?'active':'' ?>"
@@ -389,7 +533,7 @@ function buildTabUrl($tab, $city, $locality, $type, $min_price, $max_price, $dat
         </ul>
 
         <?php if($tab == 'auction'): ?>
-            <!-- ==================== AUCTION TAB ==================== -->
+            <!-- AUCTION TAB -->
             <?php if(!empty($search_date)): ?>
                 <div class="section-title">
                     <i class="fas fa-calendar-day" style="color:#2563eb;"></i> 
@@ -402,7 +546,6 @@ function buildTabUrl($tab, $city, $locality, $type, $min_price, $max_price, $dat
                     <div class="no-auction-msg"><i class="fas fa-calendar-times"></i><p class="mt-2 fw-bold">📭 No property on this date</p></div>
                 <?php endif; ?>
             <?php else: ?>
-                <!-- TODAY'S AUCTIONS -->
                 <div class="section-title">
                     <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
                     <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
@@ -423,7 +566,6 @@ function buildTabUrl($tab, $city, $locality, $type, $min_price, $max_price, $dat
 
                 <hr class="my-5">
 
-                <!-- UPCOMING AUCTIONS -->
                 <div class="section-title">
                     <i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions
                     <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span>
@@ -436,7 +578,6 @@ function buildTabUrl($tab, $city, $locality, $type, $min_price, $max_price, $dat
 
                 <hr class="my-5">
 
-                <!-- PAST AUCTIONS -->
                 <div class="section-title">
                     <i class="fas fa-history" style="color:#64748b;"></i> Past Auctions
                     <span class="badge bg-secondary rounded-pill ms-2"><?= count($past_props) ?></span>
@@ -449,13 +590,10 @@ function buildTabUrl($tab, $city, $locality, $type, $min_price, $max_price, $dat
             <?php endif; ?>
 
         <?php else: ?>
-            <!-- ==================== CUSTOMER TAB ==================== -->
+            <!-- CUSTOMER TAB -->
             <div class="section-title">
                 <i class="fas fa-home" style="color:#10b981;"></i> Customer Properties
                 <span class="badge bg-primary rounded-pill ms-2"><?= count($customer_props) ?></span>
-                <?php if(!empty($search_date)): ?>
-                    <span class="badge bg-info rounded-pill ms-2">📅 <?= htmlspecialchars($search_date) ?></span>
-                <?php endif; ?>
             </div>
             <?php if(count($customer_props) > 0): ?>
                 <div class="row"><?php foreach($customer_props as $prop) renderPropertyCard($prop, $show_images, false); ?></div>
