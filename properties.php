@@ -32,34 +32,26 @@ if (!empty($min_price))   { $where .= " AND price >= ?"; $params[] = (float)$min
 if (!empty($max_price))   { $where .= " AND price <= ?"; $params[] = (float)$max_price; }
 if (!empty($type_filter)) { $where .= " AND type = ?";   $params[] = $type_filter; }
 
-// ============================================================
-// 🔥 PAGINATION — Fast loading even with 10000+ properties
-// ============================================================
-$per_page = 50;
+// PAGINATION
+$per_page = 100;
 $page = max(1, (int)($_GET['page'] ?? 1));
 $offset = ($page - 1) * $per_page;
 
-// Total count (1 fast query)
-$count_sql = "SELECT COUNT(*) FROM properties WHERE $where";
-$count_stmt = $pdo->prepare($count_sql);
+$count_stmt = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE $where");
 $count_stmt->execute($params);
 $total_properties = (int)$count_stmt->fetchColumn();
 $total_pages = max(1, (int)ceil($total_properties / $per_page));
 
-// Main query (LIMIT + OFFSET)
 $sql = "SELECT * FROM properties WHERE $where ORDER BY id DESC LIMIT $per_page OFFSET $offset";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $properties = $stmt->fetchAll();
 
-// ============================================================
-// 🔥 BATCH LOAD GALLERY COUNTS (1 query instead of N)
-// ============================================================
+// BATCH LOAD GALLERY COUNTS
 $gallery_counts = [];
 if (!empty($properties)) {
     $prop_ids = array_column($properties, 'id');
     $placeholders = implode(',', array_fill(0, count($prop_ids), '?'));
-
     try {
         $g_stmt = $pdo->prepare("
             SELECT property_id, COUNT(*) as cnt 
@@ -71,12 +63,10 @@ if (!empty($properties)) {
         while ($r = $g_stmt->fetch()) {
             $gallery_counts[$r['property_id']] = (int)$r['cnt'];
         }
-    } catch (Exception $e) {
-        $gallery_counts = [];
-    }
+    } catch (Exception $e) {}
 }
 
-// ---- Handle Add/Edit ----
+// Handle Add/Edit
 $edit_mode = false;
 $prop = null;
 $existing_images = [];
@@ -88,26 +78,20 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     $prop = $stmt->fetch();
     if ($prop) {
         $edit_mode = true;
-
-        // Load existing gallery images
         try {
             $img_stmt = $pdo->prepare("SELECT * FROM property_images WHERE property_id = ? ORDER BY display_order ASC, id ASC");
             $img_stmt->execute([$edit_id]);
             $existing_images = $img_stmt->fetchAll();
-        } catch (Exception $e) {
-            $existing_images = [];
-        }
+        } catch (Exception $e) {}
     }
 }
 
-// ---- Handle Delete Property ----
+// Handle Delete
 if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     $delete_id = (int)$_GET['delete'];
-
     $stmt = $pdo->prepare("SELECT admin_document, image_url FROM properties WHERE id = ?");
     $stmt->execute([$delete_id]);
     $row_to_del = $stmt->fetch();
-
     if ($row_to_del) {
         if (!empty($row_to_del['admin_document'])) {
             $f = __DIR__ . '/' . ltrim($row_to_del['admin_document'], '/');
@@ -118,8 +102,6 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
             if (file_exists($f)) @unlink($f);
         }
     }
-
-    // Delete all gallery images
     try {
         $imgs = $pdo->prepare("SELECT image_url FROM property_images WHERE property_id = ?");
         $imgs->execute([$delete_id]);
@@ -129,13 +111,12 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
         }
         $pdo->prepare("DELETE FROM property_images WHERE property_id = ?")->execute([$delete_id]);
     } catch (Exception $e) {}
-
     $pdo->prepare("DELETE FROM properties WHERE id = ?")->execute([$delete_id]);
     header("Location: properties.php?msg=deleted");
     exit;
 }
 
-// ---- Parse helpers ----
+// Parse helpers
 function parseDate($dateStr) {
     if (empty($dateStr) || trim($dateStr) === '') return null;
     $dateStr = trim($dateStr);
@@ -199,9 +180,7 @@ function parseDateTimeFlexible($str) {
     return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second);
 }
 
-// ============================================================
 // Handle Form Submission
-// ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
@@ -232,7 +211,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_start_parsed = parseDateTimeFlexible($auction_start_time);
     $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
-    // UPLOAD: Admin Document
     $admin_document_path = $edit_mode ? ($prop['admin_document'] ?? null) : null;
     $upload_error = '';
 
@@ -253,13 +231,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $upload_error = "Failed to move uploaded document.";
             }
         } else {
-            $upload_error = "Invalid document type. Only PDF, JPG, JPEG, PNG allowed.";
+            $upload_error = "Invalid document type.";
         }
     }
 
-    // UPLOAD: Main Image
     $image_url_path = $edit_mode ? ($prop['image_url'] ?? null) : null;
-
     if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $img_dir = __DIR__ . '/uploads/property_images/';
         if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
@@ -273,11 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     if (file_exists($old)) @unlink($old);
                 }
                 $image_url_path = 'uploads/property_images/' . $new_img_name;
-            } else {
-                $upload_error = "Failed to move uploaded image.";
             }
-        } else {
-            $upload_error = "Invalid image type.";
         }
     }
 
@@ -309,12 +281,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $inspection_date_parsed, $admin_document_path, $image_url_path
         ]);
         $new_prop_id = $pdo->lastInsertId();
-
         saveGalleryImages($pdo, $new_prop_id, $image_url_path);
-
         header("Location: properties.php?msg=added");
         exit;
-
     } elseif ($action === 'edit' && isset($_POST['id'])) {
         $id = (int)$_POST['id'];
         $stmt = $pdo->prepare("
@@ -334,53 +303,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $reserve_price_per_sqft, $contact_number, $status, $auction_date_parsed,
             $inspection_date_parsed, $admin_document_path, $image_url_path, $id
         ]);
-
         saveGalleryImages($pdo, $id, $image_url_path);
-
         header("Location: properties.php?msg=updated");
         exit;
     }
 }
 
-// ============================================================
-// 🔥 HELPER: Save Multiple Gallery Images
-// ============================================================
 function saveGalleryImages($pdo, $property_id, $main_image = null) {
     if (empty($_FILES['images']['name'][0])) return;
-
     $img_dir = __DIR__ . '/uploads/property_images/';
     if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
-
     $maxOrder = 0;
     try {
         $stmt = $pdo->prepare("SELECT COALESCE(MAX(display_order), 0) FROM property_images WHERE property_id = ?");
         $stmt->execute([$property_id]);
         $maxOrder = (int)$stmt->fetchColumn();
     } catch (Exception $e) {}
-
     $first_uploaded = null;
-
     foreach ($_FILES['images']['name'] as $i => $name) {
         if ($_FILES['images']['error'][$i] !== UPLOAD_ERR_OK) continue;
-
         $tmp = $_FILES['images']['tmp_name'][$i];
         $ext = strtolower(pathinfo(basename($name), PATHINFO_EXTENSION));
-
         if (!in_array($ext, ['jpg','jpeg','png','webp','gif'])) continue;
-
         $new_name = uniqid('gallery_') . '.' . $ext;
         if (move_uploaded_file($tmp, $img_dir . $new_name)) {
             $url = 'uploads/property_images/' . $new_name;
-
-            $pdo->prepare("
-                INSERT INTO property_images (property_id, image_url, display_order, created_at)
-                VALUES (?, ?, ?, NOW())
-            ")->execute([$property_id, $url, ++$maxOrder]);
-
+            $pdo->prepare("INSERT INTO property_images (property_id, image_url, display_order, created_at) VALUES (?, ?, ?, NOW())")
+                ->execute([$property_id, $url, ++$maxOrder]);
             if ($first_uploaded === null) $first_uploaded = $url;
         }
     }
-
     if (!empty($first_uploaded)) {
         $pdo->prepare("UPDATE properties SET image_url = COALESCE(NULLIF(image_url, ''), ?) WHERE id = ?")
             ->execute([$first_uploaded, $property_id]);
@@ -390,43 +342,292 @@ function saveGalleryImages($pdo, $property_id, $main_image = null) {
 include 'header.php';
 ?>
 
-<div class="container-fluid mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<!-- 🔥 COMPACT TABLE STYLES -->
+<style>
+    .compact-table-wrapper {
+        background: #fff;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        border: 1px solid #e2e8f0;
+    }
+    .compact-table {
+        width: 100%;
+        margin: 0;
+        font-size: 0.8rem;
+        border-collapse: collapse;
+    }
+    .compact-table thead th {
+        background: #1e293b;
+        color: #fff;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        padding: 8px 8px;
+        text-align: left;
+        white-space: nowrap;
+        border: none;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+    .compact-table tbody td {
+        padding: 6px 8px;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+        line-height: 1.3;
+    }
+    .compact-table tbody tr:hover {
+        background: #f8faff;
+    }
+    .compact-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* Specific columns */
+    .compact-table .col-id {
+        width: 55px;
+        font-weight: 700;
+        color: #1e40af;
+        font-size: 0.75rem;
+    }
+    .compact-table .col-img {
+        width: 55px;
+    }
+    .compact-table .col-img img {
+        width: 42px;
+        height: 42px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        display: block;
+        cursor: pointer;
+        transition: transform 0.15s;
+    }
+    .compact-table .col-img img:hover {
+        transform: scale(1.5);
+        z-index: 10;
+        position: relative;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .compact-table .col-title {
+        max-width: 220px;
+        font-weight: 600;
+        color: #0f172a;
+    }
+    .compact-table .col-title .ellipsis {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .compact-table .col-bank {
+        max-width: 130px;
+        font-size: 0.75rem;
+        color: #475569;
+    }
+    .compact-table .col-bank .ellipsis {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .compact-table .col-city {
+        font-size: 0.78rem;
+        color: #334155;
+        font-weight: 600;
+    }
+    .compact-table .col-locality {
+        font-size: 0.72rem;
+        color: #64748b;
+        max-width: 110px;
+    }
+    .compact-table .col-locality .ellipsis {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .compact-table .col-price {
+        font-weight: 700;
+        color: #059669;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+    .compact-table .col-date {
+        font-size: 0.72rem;
+        color: #64748b;
+        white-space: nowrap;
+    }
+    .compact-table .col-status .badge {
+        font-size: 0.62rem;
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-weight: 700;
+    }
+    .compact-table .col-type .badge {
+        font-size: 0.62rem;
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-weight: 700;
+    }
+    .compact-table .col-doc {
+        width: 60px;
+        text-align: center;
+    }
+    .compact-table .col-actions {
+        width: 90px;
+        white-space: nowrap;
+        text-align: right;
+    }
+
+    /* Small buttons */
+    .btn-xs {
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        border: none;
+    }
+    .btn-xs.btn-primary { background: #2563eb; color: #fff; }
+    .btn-xs.btn-primary:hover { background: #1d4ed8; }
+    .btn-xs.btn-danger { background: #dc2626; color: #fff; }
+    .btn-xs.btn-danger:hover { background: #b91c1c; }
+    .btn-xs.btn-info { background: #0891b2; color: #fff; text-decoration: none; }
+    .btn-xs.btn-info:hover { background: #0e7490; color: #fff; }
+
+    /* Sidebar + table area adjustment */
+    .page-header-compact {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .page-header-compact h1 {
+        font-size: 1.3rem;
+        font-weight: 800;
+        margin: 0;
+        color: #0f172a;
+    }
+    .page-header-compact .count-badge {
+        background: #2563eb;
+        color: #fff;
+        font-size: 0.72rem;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-weight: 700;
+        margin-left: 6px;
+    }
+
+    /* Compact filter bar */
+    .filter-bar-compact {
+        background: #fff;
+        border-radius: 12px;
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    .filter-bar-compact .form-control {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        height: 34px;
+        border-radius: 8px;
+    }
+    .filter-bar-compact .btn {
+        font-size: 0.8rem;
+        padding: 6px 14px;
+        height: 34px;
+        border-radius: 8px;
+    }
+
+    /* Pagination compact */
+    .compact-pagination {
+        margin-top: 14px;
+        display: flex;
+        justify-content: center;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .compact-pagination a, .compact-pagination span {
+        padding: 5px 11px;
+        border-radius: 8px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        color: #334155;
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    .compact-pagination a:hover {
+        background: #eff6ff;
+        border-color: #2563eb;
+        color: #2563eb;
+    }
+    .compact-pagination .active {
+        background: #2563eb;
+        color: #fff;
+        border-color: #2563eb;
+    }
+    .compact-pagination .disabled {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+    .compact-pagination .dots {
+        border: none;
+        background: transparent;
+    }
+
+    /* Responsive — hide less important columns on small screens */
+    @media (max-width: 1400px) {
+        .compact-table .col-bank { max-width: 100px; }
+    }
+    @media (max-width: 1200px) {
+        .compact-table { font-size: 0.75rem; }
+        .compact-table .col-title { max-width: 150px; }
+    }
+</style>
+
+<div class="container-fluid mt-3">
+
+    <!-- Page Header -->
+    <div class="page-header-compact">
         <h1>
             🏠 All Properties 
-            <span class="badge bg-primary" style="font-size:0.9rem;"><?= number_format($total_properties) ?></span>
+            <span class="count-badge"><?= number_format($total_properties) ?></span>
             <?php if ($total_pages > 1): ?>
-                <small class="text-muted" style="font-size:0.85rem;">
-                    (Page <?= $page ?> of <?= $total_pages ?>)
+                <small class="text-muted ms-2" style="font-size:0.75rem; font-weight:500;">
+                    Page <?= $page ?> / <?= $total_pages ?>
                 </small>
             <?php endif; ?>
         </h1>
-        <a href="?add=1" class="btn btn-primary btn-lg rounded-pill shadow <?= isset($_GET['add']) ? 'disabled' : '' ?>">
-            <i class="fas fa-plus-circle me-2"></i> Add New Property
+        <a href="?add=1" class="btn btn-primary btn-sm rounded-pill px-3 <?= isset($_GET['add']) ? 'disabled' : '' ?>">
+            <i class="fas fa-plus-circle me-1"></i> Add New Property
         </a>
     </div>
 
     <?php if (isset($_GET['msg'])): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <?php if ($_GET['msg'] === 'added'): ?>✅ Property added successfully!
-            <?php elseif ($_GET['msg'] === 'updated'): ?>✅ Property updated successfully!
-            <?php elseif ($_GET['msg'] === 'deleted'): ?>✅ Property deleted successfully!
+        <div class="alert alert-success alert-dismissible fade show py-2 px-3" role="alert" style="font-size:0.85rem;">
+            <?php if ($_GET['msg'] === 'added'): ?>✅ Property added!
+            <?php elseif ($_GET['msg'] === 'updated'): ?>✅ Property updated!
+            <?php elseif ($_GET['msg'] === 'deleted'): ?>✅ Property deleted!
             <?php elseif ($_GET['msg'] === 'image_deleted'): ?>✅ Image deleted!
             <?php endif; ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
 
-    <?php if (!empty($upload_error)): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            ❌ <?= htmlspecialchars($upload_error) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <!-- ============ ADD/EDIT FORM ============ -->
+    <!-- ADD/EDIT FORM -->
     <?php if (isset($_GET['add']) || $edit_mode): ?>
-    <div class="card shadow-lg rounded-4 mb-5 border-0">
+    <div class="card shadow-lg rounded-4 mb-4 border-0">
         <div class="card-header bg-primary text-white p-3 rounded-top-4">
             <h5 class="mb-0"><i class="fas fa-<?= $edit_mode ? 'edit' : 'plus' ?> me-2"></i> <?= $edit_mode ? 'Edit Property' : 'Add New Property' ?></h5>
         </div>
@@ -545,7 +746,6 @@ include 'header.php';
                         </select>
                     </div>
 
-                    <!-- MAIN IMAGE -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-primary">
                             <i class="fas fa-image me-1"></i> Main / Cover Image
@@ -576,7 +776,6 @@ include 'header.php';
                         <?php endif; ?>
                     </div>
 
-                    <!-- GALLERY IMAGES -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-success">
                             <i class="fas fa-images me-1"></i> Gallery Images (Multiple)
@@ -609,29 +808,17 @@ include 'header.php';
                         <?php endif; ?>
                     </div>
 
-                    <!-- ADMIN DOCUMENT -->
                     <div class="col-12">
                         <label class="form-label fw-bold text-danger">
                             <i class="fas fa-file-pdf me-1"></i> Admin Document (PDF/JPG/PNG - Only for Admins)
                         </label>
                         <input type="file" name="admin_document" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
                         <?php if ($edit_mode && !empty($prop['admin_document'])): ?>
-                            <?php 
-                            $doc_check = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
-                            $doc_exists = file_exists($doc_check);
-                            ?>
-                            <?php if ($doc_exists): ?>
-                                <small class="text-success d-block mt-1">
-                                    Current file: <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank">
-                                        <i class="fas fa-external-link-alt me-1"></i>View Document
-                                    </a>
-                                </small>
-                            <?php else: ?>
-                                <small class="text-danger d-block mt-1">
-                                    <i class="fas fa-exclamation-triangle me-1"></i>
-                                    Previous document is missing on server. कृपया दोबारा upload करें।
-                                </small>
-                            <?php endif; ?>
+                            <small class="text-success d-block mt-1">
+                                Current file: <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank">
+                                    <i class="fas fa-external-link-alt me-1"></i>View Document
+                                </a>
+                            </small>
                         <?php endif; ?>
                     </div>
 
@@ -651,129 +838,138 @@ include 'header.php';
     </div>
     <?php endif; ?>
 
-    <!-- ============ SEARCH FILTERS ============ -->
-    <div class="card shadow-sm rounded-4 mb-4 border-0">
-        <div class="card-body">
-            <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">City</label>
-                    <input type="text" name="city" class="form-control" placeholder="City..." value="<?= htmlspecialchars($city_filter) ?>">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Bank</label>
-                    <input type="text" name="bank" class="form-control" placeholder="Bank..." value="<?= htmlspecialchars($bank_filter) ?>">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Type</label>
-                    <select name="type" class="form-control">
-                        <option value="">All Types</option>
-                        <?php foreach ($property_types as $pt): ?>
-                            <option value="<?= htmlspecialchars($pt) ?>" <?= ($type_filter == $pt) ? 'selected' : '' ?>><?= htmlspecialchars($pt) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Min Price</label>
-                    <input type="number" name="min_price" class="form-control" placeholder="Min" value="<?= htmlspecialchars($min_price) ?>">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Max Price</label>
-                    <input type="number" name="max_price" class="form-control" placeholder="Max" value="<?= htmlspecialchars($max_price) ?>">
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100 rounded-pill">
-                        <i class="fas fa-search me-2"></i> Filter
-                    </button>
-                    <a href="properties.php" class="btn btn-outline-secondary w-100 mt-1 rounded-pill">
-                        <i class="fas fa-undo me-2"></i> Reset
-                    </a>
-                </div>
-            </form>
-        </div>
+    <!-- COMPACT FILTER BAR -->
+    <div class="filter-bar-compact">
+        <form method="GET" class="row g-2 align-items-center">
+            <div class="col-auto" style="min-width:140px;">
+                <input type="text" name="city" class="form-control form-control-sm" placeholder="🔍 City" value="<?= htmlspecialchars($city_filter) ?>">
+            </div>
+            <div class="col-auto" style="min-width:140px;">
+                <input type="text" name="bank" class="form-control form-control-sm" placeholder="🏦 Bank" value="<?= htmlspecialchars($bank_filter) ?>">
+            </div>
+            <div class="col-auto" style="min-width:130px;">
+                <select name="type" class="form-control form-control-sm">
+                    <option value="">All Types</option>
+                    <?php foreach ($property_types as $pt): ?>
+                        <option value="<?= htmlspecialchars($pt) ?>" <?= ($type_filter == $pt) ? 'selected' : '' ?>><?= htmlspecialchars($pt) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-auto" style="min-width:110px;">
+                <input type="number" name="min_price" class="form-control form-control-sm" placeholder="Min ₹" value="<?= htmlspecialchars($min_price) ?>">
+            </div>
+            <div class="col-auto" style="min-width:110px;">
+                <input type="number" name="max_price" class="form-control form-control-sm" placeholder="Max ₹" value="<?= htmlspecialchars($max_price) ?>">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-search me-1"></i> Filter
+                </button>
+            </div>
+            <div class="col-auto">
+                <a href="properties.php" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-undo"></i>
+                </a>
+            </div>
+        </form>
     </div>
 
-    <!-- ============ PROPERTY LIST ============ -->
+    <!-- COMPACT TABLE -->
     <?php if (count($properties) > 0): ?>
-        <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle">
-                <thead class="table-dark">
+        <div class="compact-table-wrapper">
+            <table class="compact-table">
+                <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Image</th>
-                        <th>Title</th>
-                        <th>Type</th>
-                        <th>Bank</th>
-                        <th>City</th>
-                        <th>Locality</th>
-                        <th>Price</th>
-                        <th>Auction Date</th>
-                        <th>Status</th>
-                        <th>Admin Doc</th>
-                        <th>Actions</th>
+                        <th class="col-id">ID</th>
+                        <th class="col-img">Img</th>
+                        <th class="col-title">Title</th>
+                        <th class="col-type">Type</th>
+                        <th class="col-bank">Bank</th>
+                        <th class="col-city">City</th>
+                        <th class="col-locality">Locality</th>
+                        <th class="col-price">Price</th>
+                        <th class="col-date">Auction</th>
+                        <th class="col-status">Status</th>
+                        <th class="col-doc">Doc</th>
+                        <th class="col-actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($properties as $row):
-                        // 🔥 Gallery count from batch-loaded array (no extra query!)
                         $gallery_count = $gallery_counts[$row['id']] ?? 0;
-
-                        // 🔥 Show image if path exists (skip file_exists per row for speed)
-                        // Use a faster heuristic: if path is non-empty, show it
                         $has_main_img = !empty($row['image_url']);
                         $has_doc = !empty($row['admin_document']);
                     ?>
                         <tr>
-                            <td><?= htmlspecialchars($row['id'] ?? '') ?></td>
-                            <td>
+                            <td class="col-id"><?= htmlspecialchars($row['id'] ?? '') ?></td>
+                            <td class="col-img">
                                 <?php if ($has_main_img): ?>
                                     <img src="<?= htmlspecialchars($row['image_url']) ?>"
-                                         alt="Property"
-                                         style="width:60px; height:60px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid #e2e8f0;"
+                                         alt="img"
                                          loading="lazy"
                                          onclick="window.open(this.src, '_blank')">
                                 <?php else: ?>
-                                    <span class="badge bg-secondary">No Image</span>
+                                    <div style="width:42px; height:42px; background:#f1f5f9; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:0.65rem; font-weight:600;">
+                                        NO
+                                    </div>
                                 <?php endif; ?>
                                 <?php if ($gallery_count > 0): ?>
-                                    <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">+<?= $gallery_count ?> gallery</div>
+                                    <div style="font-size:0.6rem; color:#2563eb; margin-top:1px; font-weight:700; text-align:center;">+<?= $gallery_count ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td><?= htmlspecialchars($row['title'] ?? '') ?></td>
-                            <td>
+                            <td class="col-title">
+                                <span class="ellipsis" title="<?= htmlspecialchars($row['title'] ?? '') ?>">
+                                    <?= htmlspecialchars($row['title'] ?? '') ?>
+                                </span>
+                            </td>
+                            <td class="col-type">
                                 <?php if (!empty($row['type'])): ?>
                                     <span class="badge bg-info text-dark"><?= htmlspecialchars($row['type']) ?></span>
-                                <?php else: ?><span class="text-muted small">—</span><?php endif; ?>
+                                <?php else: ?><span class="text-muted">—</span><?php endif; ?>
                             </td>
-                            <td><?= htmlspecialchars($row['bank_name'] ?? 'N/A') ?></td>
-                            <td><?= htmlspecialchars($row['city'] ?? 'N/A') ?></td>
-                            <td><?= htmlspecialchars($row['locality'] ?? '—') ?></td>
-                            <td>₹ <?= number_format($row['price'] ?? 0, 2) ?></td>
-                            <td>
+                            <td class="col-bank">
+                                <span class="ellipsis" title="<?= htmlspecialchars($row['bank_name'] ?? '') ?>">
+                                    <?= htmlspecialchars($row['bank_name'] ?? '—') ?>
+                                </span>
+                            </td>
+                            <td class="col-city"><?= htmlspecialchars($row['city'] ?? '—') ?></td>
+                            <td class="col-locality">
+                                <span class="ellipsis" title="<?= htmlspecialchars($row['locality'] ?? '') ?>">
+                                    <?= htmlspecialchars($row['locality'] ?? '—') ?>
+                                </span>
+                            </td>
+                            <td class="col-price">₹<?= number_format($row['price'] ?? 0, 0) ?></td>
+                            <td class="col-date">
                                 <?php if (!empty($row['auction_date'])): ?>
-                                    <?= date('d M Y', strtotime($row['auction_date'])) ?>
-                                <?php else: ?><span class="text-muted">N/A</span><?php endif; ?>
+                                    <?= date('d/m/y', strtotime($row['auction_date'])) ?>
+                                <?php else: ?>—<?php endif; ?>
                             </td>
-                            <td>
+                            <td class="col-status">
                                 <?php 
                                 $statusVal = $row['status'] ?? 'available';
                                 $badgeClass = ($statusVal == 'available') ? 'success' : (($statusVal == 'sold') ? 'danger' : 'warning');
                                 ?>
                                 <span class="badge bg-<?= $badgeClass ?>"><?= htmlspecialchars($statusVal) ?></span>
                             </td>
-                            <td>
+                            <td class="col-doc">
                                 <?php if ($has_doc): ?>
                                     <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" 
-                                       class="btn btn-sm btn-outline-info" title="View Admin Document">
-                                        <i class="fas fa-file-pdf"></i> View
+                                       class="btn-xs btn-info" title="View Document">
+                                        <i class="fas fa-file-pdf"></i>
                                     </a>
                                 <?php else: ?>
-                                    <span class="text-muted small">No File</span>
+                                    <span style="font-size:0.65rem; color:#94a3b8;">—</span>
                                 <?php endif; ?>
                             </td>
-                            <td>
-                                <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></a>
+                            <td class="col-actions">
+                                <a href="properties.php?edit=<?= $row['id'] ?>" class="btn-xs btn-primary" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
                                 <?php if ($is_admin): ?>
-                                    <a href="properties.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?\n\nAll images and documents will be deleted!')"><i class="fas fa-trash"></i></a>
+                                    <a href="properties.php?delete=<?= $row['id'] ?>" class="btn-xs btn-danger" 
+                                       onclick="return confirm('Delete this property?\n\nAll images and documents will also be deleted!')" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -782,51 +978,56 @@ include 'header.php';
             </table>
         </div>
 
-        <!-- ============ PAGINATION ============ -->
+        <!-- COMPACT PAGINATION -->
         <?php if ($total_pages > 1): ?>
-            <nav class="mt-4">
-                <ul class="pagination justify-content-center">
-                    <!-- Prev -->
-                    <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => max(1, $page - 1)])) ?>">
-                            <i class="fas fa-chevron-left"></i> Prev
-                        </a>
-                    </li>
+            <div class="compact-pagination">
+                <!-- Prev -->
+                <?php if ($page > 1): ?>
+                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                <?php else: ?>
+                    <span class="disabled"><i class="fas fa-chevron-left"></i></span>
+                <?php endif; ?>
 
-                    <?php
-                    // Show max 7 page numbers around current
-                    $start = max(1, $page - 3);
-                    $end = min($total_pages, $page + 3);
-                    if ($start > 1): ?>
-                        <li class="page-item"><a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => 1])) ?>">1</a></li>
-                        <?php if ($start > 2): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
-                    <?php endif;
+                <?php
+                $start = max(1, $page - 3);
+                $end = min($total_pages, $page + 3);
 
-                    for ($i = $start; $i <= $end; $i++): ?>
-                        <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                            <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>"><?= $i ?></a>
-                        </li>
-                    <?php endfor;
+                if ($start > 1): ?>
+                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => 1])) ?>">1</a>
+                    <?php if ($start > 2): ?><span class="dots">...</span><?php endif; ?>
+                <?php endif;
 
-                    if ($end < $total_pages): ?>
-                        <?php if ($end < $total_pages - 1): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
-                        <li class="page-item"><a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $total_pages])) ?>"><?= $total_pages ?></a></li>
+                for ($i = $start; $i <= $end; $i++): ?>
+                    <?php if ($i == $page): ?>
+                        <span class="active"><?= $i ?></span>
+                    <?php else: ?>
+                        <a href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>"><?= $i ?></a>
                     <?php endif; ?>
+                <?php endfor;
 
-                    <!-- Next -->
-                    <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => min($total_pages, $page + 1)])) ?>">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
+                if ($end < $total_pages): ?>
+                    <?php if ($end < $total_pages - 1): ?><span class="dots">...</span><?php endif; ?>
+                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => $total_pages])) ?>"><?= $total_pages ?></a>
+                <?php endif; ?>
+
+                <!-- Next -->
+                <?php if ($page < $total_pages): ?>
+                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                <?php else: ?>
+                    <span class="disabled"><i class="fas fa-chevron-right"></i></span>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
 
     <?php else: ?>
-        <div class="alert alert-info text-center py-4">
+        <div class="alert alert-info text-center py-5" style="border-radius:14px;">
             <i class="fas fa-inbox fa-3x d-block mb-3 opacity-50"></i>
-            <h5>No properties found</h5>
+            <h5 class="mb-1">No properties found</h5>
+            <small class="text-muted">Try adjusting your filters</small>
         </div>
     <?php endif; ?>
 </div>
