@@ -179,7 +179,9 @@ function parseDateTimeFlexible($str) {
     return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second);
 }
 
+// ============================================================
 // Handle Form Submission
+// ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
@@ -210,9 +212,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_start_parsed = parseDateTimeFlexible($auction_start_time);
     $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
+    // ============================================================
+    // 📄 ADMIN DOCUMENT UPLOAD + REMOVE
+    // ============================================================
     $admin_document_path = $edit_mode ? ($prop['admin_document'] ?? null) : null;
     $upload_error = '';
 
+    // Handle new upload
     if (isset($_FILES['admin_document']) && $_FILES['admin_document']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = __DIR__ . '/uploads/admin_documents/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -234,6 +240,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
+    // 🔥 Handle REMOVE existing admin document
+    if (isset($_POST['remove_admin_document']) && $_POST['remove_admin_document'] == '1') {
+        if ($edit_mode && !empty($prop['admin_document'])) {
+            $old = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
+            if (file_exists($old)) @unlink($old);
+        }
+        $admin_document_path = null;
+    }
+
+    // ============================================================
+    // 🖼️ MAIN IMAGE UPLOAD + REMOVE
+    // ============================================================
     $image_url_path = $edit_mode ? ($prop['image_url'] ?? null) : null;
     if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $img_dir = __DIR__ . '/uploads/property_images/';
@@ -343,7 +361,6 @@ include 'header.php';
 
 <!-- 🔥 ALL STYLES -->
 <style>
-    /* ========== COMPACT TABLE ========== */
     .compact-table-wrapper {
         background: #fff;
         border-radius: 14px;
@@ -384,12 +401,8 @@ include 'header.php';
         background: #fff;
         color: #1e293b;
     }
-    .compact-table tbody tr:hover td {
-        background: #f8faff;
-    }
-    .compact-table tbody tr:last-child td {
-        border-bottom: none;
-    }
+    .compact-table tbody tr:hover td { background: #f8faff; }
+    .compact-table tbody tr:last-child td { border-bottom: none; }
     .compact-table .col-id { width: 55px; font-weight: 700; color: #1e40af; font-size: 0.75rem; }
     .compact-table .col-img { width: 55px; }
     .compact-table .col-img img {
@@ -474,7 +487,6 @@ include 'header.php';
     .btn-xs.btn-info { background: #0891b2; color: #fff; text-decoration: none; }
     .btn-xs.btn-info:hover { background: #0e7490; transform: scale(1.1); color: #fff; }
 
-    /* ========== PAGE HEADER / FILTERS ========== */
     .page-header-compact {
         display: flex;
         justify-content: space-between;
@@ -549,7 +561,7 @@ include 'header.php';
     .compact-pagination .disabled { opacity: 0.4; pointer-events: none; }
     .compact-pagination .dots { border: none; background: transparent; }
 
-    /* ========== 🔥 CUSTOM FILE UPLOAD UI ========== */
+    /* ========== CUSTOM FILE UPLOAD UI ========== */
     .custom-upload-box {
         border: 2px dashed #cbd5e1;
         border-radius: 12px;
@@ -563,14 +575,17 @@ include 'header.php';
         border-color: #2563eb;
         background: #eff6ff;
     }
-    .custom-upload-box input[type="file"] {
-        display: none;
+    .custom-upload-box.danger:hover {
+        border-color: #dc2626;
+        background: #fef2f2;
     }
+    .custom-upload-box input[type="file"] { display: none; }
     .custom-upload-box .upload-icon {
         font-size: 1.8rem;
         color: #94a3b8;
         margin-bottom: 6px;
     }
+    .custom-upload-box.danger .upload-icon { color: #dc2626; }
     .custom-upload-box .upload-text {
         font-size: 0.85rem;
         color: #475569;
@@ -656,6 +671,76 @@ include 'header.php';
         letter-spacing: 0.5px;
         margin-bottom: 6px;
     }
+
+    /* 🔥 Document preview card */
+    .doc-preview-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #fef3c7;
+        border: 1px solid #fcd34d;
+        margin-top: 10px;
+        transition: all 0.2s;
+    }
+    .doc-preview-card .doc-icon {
+        width: 42px;
+        height: 42px;
+        background: #dc2626;
+        color: #fff;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+    .doc-preview-card .doc-info {
+        flex: 1;
+        min-width: 0;
+    }
+    .doc-preview-card .doc-name {
+        font-weight: 700;
+        font-size: 0.82rem;
+        color: #78350f;
+        word-break: break-all;
+        line-height: 1.2;
+    }
+    .doc-preview-card .doc-meta {
+        font-size: 0.7rem;
+        color: #92400e;
+        margin-top: 2px;
+    }
+    .doc-preview-card .doc-remove {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #dc2626;
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        transition: all 0.15s;
+        flex-shrink: 0;
+    }
+    .doc-preview-card .doc-remove:hover {
+        background: #b91c1c;
+        transform: scale(1.1);
+    }
+    .doc-preview-card.marked-remove {
+        background: #fee2e2;
+        border-color: #f87171;
+        opacity: 0.7;
+    }
+    .doc-preview-card.marked-remove .doc-name,
+    .doc-preview-card.marked-remove .doc-meta {
+        text-decoration: line-through;
+        color: #991b1b;
+    }
 </style>
 
 <div class="container-fluid mt-3">
@@ -686,7 +771,7 @@ include 'header.php';
         </div>
     <?php endif; ?>
 
-    <!-- ============ ADD/EDIT FORM ============ -->
+    <!-- ADD/EDIT FORM -->
     <?php if (isset($_GET['add']) || $edit_mode): ?>
     <div class="card shadow-lg rounded-4 mb-4 border-0">
         <div class="card-header bg-primary text-white p-3 rounded-top-4">
@@ -808,14 +893,13 @@ include 'header.php';
                     </div>
 
                     <!-- ============================================================
-                         🔥 MAIN / COVER IMAGE — Remove Option #1
+                         MAIN / COVER IMAGE
                          ============================================================ -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-primary">
                             <i class="fas fa-image me-1"></i> Main / Cover Image
                         </label>
 
-                        <!-- Custom upload box -->
                         <div class="custom-upload-box" onclick="document.getElementById('mainImageInput').click();">
                             <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
                             <div class="upload-text">Click to select image</div>
@@ -824,10 +908,8 @@ include 'header.php';
                                    onchange="handleMainImageSelect(this)">
                         </div>
 
-                        <!-- 🔥 Preview + Remove (New Selection) -->
                         <div class="preview-grid" id="mainImagePreview"></div>
 
-                        <!-- 🔥 Existing Image on Server + Remove (Edit mode) -->
                         <?php if ($edit_mode && !empty($prop['image_url'])): ?>
                             <div class="mt-3 p-3 rounded-3" style="background:#f0fdf4; border:1px solid #86efac;">
                                 <span class="preview-label">
@@ -846,9 +928,6 @@ include 'header.php';
                                                 <i class="fas fa-trash me-1"></i> Remove This Cover
                                             </label>
                                         </div>
-                                        <small class="text-muted d-block mt-1" style="font-size:0.68rem;">
-                                            नई image select नहीं करते तो यह बनी रहेगी
-                                        </small>
                                     </div>
                                 </div>
                             </div>
@@ -856,14 +935,13 @@ include 'header.php';
                     </div>
 
                     <!-- ============================================================
-                         🔥 GALLERY IMAGES — Remove Option #2 & #3
+                         GALLERY IMAGES
                          ============================================================ -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-success">
                             <i class="fas fa-images me-1"></i> Gallery Images (Multiple)
                         </label>
 
-                        <!-- Custom upload box -->
                         <div class="custom-upload-box" onclick="document.getElementById('galleryInput').click();">
                             <div class="upload-icon"><i class="fas fa-images"></i></div>
                             <div class="upload-text">Click to select multiple images</div>
@@ -872,10 +950,8 @@ include 'header.php';
                                    onchange="handleGallerySelect(this)">
                         </div>
 
-                        <!-- 🔥 Preview + Remove (New Selection) -->
                         <div class="preview-grid" id="galleryPreview"></div>
 
-                        <!-- 🔥 Existing Gallery on Server + Remove (Edit mode) -->
                         <?php if ($edit_mode && !empty($existing_images)): ?>
                             <div class="mt-3 p-3 rounded-3" style="background:#eff6ff; border:1px solid #93c5fd;">
                                 <span class="preview-label">
@@ -896,24 +972,68 @@ include 'header.php';
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
-                                <small class="text-muted d-block mt-2" style="font-size:0.68rem;">
-                                    <i class="fas fa-info-circle me-1"></i> ऊपर red × click करते ही server से image हट जाएगी
-                                </small>
                             </div>
                         <?php endif; ?>
                     </div>
 
-                    <!-- ADMIN DOCUMENT -->
+                    <!-- ============================================================
+                         🔥 ADMIN DOCUMENT — With Remove Option
+                         ============================================================ -->
                     <div class="col-12">
                         <label class="form-label fw-bold text-danger">
                             <i class="fas fa-file-pdf me-1"></i> Admin Document (PDF/JPG/PNG - Only for Admins)
                         </label>
-                        <input type="file" name="admin_document" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
-                        <?php if ($edit_mode && !empty($prop['admin_document'])): ?>
-                            <small class="text-success d-block mt-1">
-                                Current file: <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank">
-                                    <i class="fas fa-external-link-alt me-1"></i>View Document
-                                </a>
+
+                        <!-- Custom upload box -->
+                        <div class="custom-upload-box danger" onclick="document.getElementById('adminDocInput').click();">
+                            <div class="upload-icon"><i class="fas fa-file-upload"></i></div>
+                            <div class="upload-text">Click to select document</div>
+                            <div class="upload-hint">PDF, JPG, JPEG, PNG • Max 10MB</div>
+                            <input type="file" name="admin_document" id="adminDocInput" 
+                                   accept=".pdf,.jpg,.jpeg,.png"
+                                   onchange="handleAdminDocSelect(this)">
+                        </div>
+
+                        <!-- 🔥 New selection preview -->
+                        <div id="adminDocPreview"></div>
+
+                        <!-- 🔥 Existing admin document + remove (Edit mode) -->
+                        <?php if ($edit_mode && !empty($prop['admin_document'])): 
+                            $doc_check = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
+                            $doc_exists = file_exists($doc_check);
+                            $doc_ext = strtolower(pathinfo($prop['admin_document'], PATHINFO_EXTENSION));
+                            $doc_icon = ($doc_ext === 'pdf') ? 'fa-file-pdf' : 'fa-file-image';
+                        ?>
+                            <div class="doc-preview-card" id="serverDocCard">
+                                <div class="doc-icon">
+                                    <i class="fas <?= $doc_icon ?>"></i>
+                                </div>
+                                <div class="doc-info">
+                                    <div class="doc-name">
+                                        <?= htmlspecialchars(basename($prop['admin_document'])) ?>
+                                    </div>
+                                    <div class="doc-meta">
+                                        <i class="fas fa-server me-1"></i> On Server
+                                        <?php if ($doc_exists): ?>
+                                            • <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank" style="color:#2563eb; font-weight:600;">View</a>
+                                        <?php else: ?>
+                                            • <span style="color:#dc2626;">File Missing</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <!-- 🔥 REMOVE BUTTON -->
+                                <input type="checkbox" name="remove_admin_document" value="1"
+                                       id="remove_admin_document" style="display:none;">
+                                <button type="button" class="doc-remove" 
+                                        onclick="toggleAdminDocRemove()" 
+                                        id="adminDocRemoveBtn"
+                                        title="Remove this document">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted d-block mt-2" style="font-size:0.7rem;">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Trash icon दबाने पर submit के बाद document server से हट जाएगा
                             </small>
                         <?php endif; ?>
                     </div>
@@ -1125,10 +1245,10 @@ include 'header.php';
     <?php endif; ?>
 </div>
 
-<!-- 🔥 IMAGE PREVIEW + REMOVE JAVASCRIPT -->
+<!-- 🔥 JAVASCRIPT -->
 <script>
 // ============================================================
-// 🔥 MAIN IMAGE — Select + Preview + Remove (Option #1)
+// MAIN IMAGE — Select + Preview + Remove
 // ============================================================
 function handleMainImageSelect(input) {
     const preview = document.getElementById('mainImagePreview');
@@ -1164,7 +1284,7 @@ function removeMainImage(event) {
 }
 
 // ============================================================
-// 🔥 GALLERY — Multiple Select + Preview + Individual Remove (Option #2)
+// GALLERY — Multiple Select + Preview + Individual Remove
 // ============================================================
 let galleryFiles = [];
 
@@ -1231,7 +1351,77 @@ function syncGalleryInput() {
 }
 
 // ============================================================
-// 🔥 SERVER IMAGE REMOVAL — Option #3 (Visual feedback)
+// 🔥 ADMIN DOCUMENT — Select + Preview + Remove
+// ============================================================
+function handleAdminDocSelect(input) {
+    const preview = document.getElementById('adminDocPreview');
+    preview.innerHTML = '';
+
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        if (file.size > 10 * 1024 * 1024) {
+            alert('❌ Document is too large. Max 10MB allowed.');
+            input.value = '';
+            return;
+        }
+        const ext = file.name.split('.').pop().toLowerCase();
+        const icon = (ext === 'pdf') ? 'fa-file-pdf' : 'fa-file-image';
+
+        const card = document.createElement('div');
+        card.className = 'doc-preview-card';
+        card.id = 'newDocCard';
+        card.innerHTML = `
+            <div class="doc-icon"><i class="fas ${icon}"></i></div>
+            <div class="doc-info">
+                <div class="doc-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+                <div class="doc-meta">
+                    <i class="fas fa-cloud-upload-alt me-1"></i> New selection • 
+                    ${(file.size / 1024).toFixed(0)} KB
+                </div>
+            </div>
+            <button type="button" class="doc-remove" onclick="removeNewAdminDoc(event)" title="Remove this document">
+                <i class="fas fa-trash"></i>
+            </button>
+        `;
+        preview.appendChild(card);
+    }
+}
+
+function removeNewAdminDoc(event) {
+    event.stopPropagation();
+    const input = document.getElementById('adminDocInput');
+    input.value = '';
+    document.getElementById('adminDocPreview').innerHTML = '';
+}
+
+// 🔥 Toggle remove state for EXISTING server document
+function toggleAdminDocRemove() {
+    const checkbox = document.getElementById('remove_admin_document');
+    const card = document.getElementById('serverDocCard');
+    const btn = document.getElementById('adminDocRemoveBtn');
+
+    if (checkbox.checked) {
+        // Unmark
+        checkbox.checked = false;
+        card.classList.remove('marked-remove');
+        btn.innerHTML = '<i class="fas fa-trash"></i>';
+        btn.title = 'Remove this document';
+        btn.style.background = '#dc2626';
+    } else {
+        // Mark for removal
+        if (!confirm('⚠️ क्या आप इस admin document को हटाना चाहते हैं?\n\nSubmit करते ही यह server से हट जाएगा।')) {
+            return;
+        }
+        checkbox.checked = true;
+        card.classList.add('marked-remove');
+        btn.innerHTML = '<i class="fas fa-undo"></i>';
+        btn.title = 'Undo remove';
+        btn.style.background = '#059669';
+    }
+}
+
+// ============================================================
+// SERVER IMAGE REMOVAL — Visual feedback
 // ============================================================
 function toggleServerMainRemoval(checkbox) {
     const container = checkbox.closest('.p-3');
@@ -1261,7 +1451,6 @@ function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 }
 
-// Ensure gallery input is synced before submit
 document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('form[enctype="multipart/form-data"]');
     forms.forEach(form => {
