@@ -54,7 +54,6 @@ if (!empty($max_price)) {
     $where .= " AND price <= ?";
     $params[] = (float)$max_price;
 }
-// 🔥 Type filter
 if (!empty($type_filter)) {
     $where .= " AND type = ?";
     $params[] = $type_filter;
@@ -83,14 +82,21 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
 // ---- Handle Delete ----
 if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     $delete_id = (int)$_GET['delete'];
-    // Delete document file if exists
-    $stmt = $pdo->prepare("SELECT admin_document FROM properties WHERE id = ?");
+
+    // Delete admin document if exists
+    $stmt = $pdo->prepare("SELECT admin_document, image_url FROM properties WHERE id = ?");
     $stmt->execute([$delete_id]);
-    $old_doc = $stmt->fetchColumn();
-    if ($old_doc && file_exists(__DIR__ . '/' . $old_doc)) {
-        unlink(__DIR__ . '/' . $old_doc);
+    $row_to_del = $stmt->fetch();
+    if ($row_to_del) {
+        if (!empty($row_to_del['admin_document']) && file_exists(__DIR__ . '/' . $row_to_del['admin_document'])) {
+            unlink(__DIR__ . '/' . $row_to_del['admin_document']);
+        }
+        // 🔥 Delete image too
+        if (!empty($row_to_del['image_url']) && file_exists(__DIR__ . '/' . $row_to_del['image_url'])) {
+            unlink(__DIR__ . '/' . $row_to_del['image_url']);
+        }
     }
-    
+
     $stmt = $pdo->prepare("DELETE FROM properties WHERE id = ?");
     $stmt->execute([$delete_id]);
     header("Location: properties.php?msg=deleted");
@@ -98,7 +104,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
 }
 
 // ============================================================
-// 🔥 HELPER: Parse Date (only date part)
+// 🔥 HELPER: Parse Date
 // ============================================================
 function parseDate($dateStr) {
     if (empty($dateStr) || trim($dateStr) === '') return null;
@@ -118,7 +124,7 @@ function parseDate($dateStr) {
 }
 
 // ============================================================
-// 🔥 HELPER: Parse Date-Time (MANUAL – 100% Reliable)
+// 🔥 HELPER: Parse Date-Time
 // ============================================================
 function parseDateTimeFlexible($str) {
     if (empty($str) || trim($str) === '') return null;
@@ -217,7 +223,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_start_parsed = parseDateTimeFlexible($auction_start_time);
     $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
-    // ---- FILE UPLOAD LOGIC ----
+    // ============================================================
+    // 🔥 ADMIN DOCUMENT UPLOAD
+    // ============================================================
     $admin_document_path = $edit_mode ? ($prop['admin_document'] ?? null) : null;
     $upload_error = '';
 
@@ -235,17 +243,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $new_file_name = uniqid('admin_doc_') . '.' . $file_ext;
             $dest_path = $upload_dir . $new_file_name;
             if (move_uploaded_file($file_tmp, $dest_path)) {
-                // Delete old file if editing
                 if ($edit_mode && !empty($prop['admin_document']) && file_exists(__DIR__ . '/' . $prop['admin_document'])) {
                     unlink(__DIR__ . '/' . $prop['admin_document']);
                 }
                 $admin_document_path = 'uploads/admin_documents/' . $new_file_name;
             } else {
-                $upload_error = "Failed to move uploaded file.";
+                $upload_error = "Failed to move uploaded document.";
             }
         } else {
-            $upload_error = "Invalid file type. Only PDF, JPG, JPEG, PNG allowed.";
+            $upload_error = "Invalid document type. Only PDF, JPG, JPEG, PNG allowed.";
         }
+    }
+
+    // ============================================================
+    // 🔥 PROPERTY IMAGE UPLOAD (NEW - PRESERVES EXISTING IMAGE)
+    // ============================================================
+    $image_url_path = $edit_mode ? ($prop['image_url'] ?? null) : null;
+
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $img_dir = __DIR__ . '/uploads/property_images/';
+        if (!is_dir($img_dir)) {
+            mkdir($img_dir, 0755, true);
+        }
+        $img_tmp = $_FILES['image']['tmp_name'];
+        $img_name = basename($_FILES['image']['name']);
+        $img_ext = strtolower(pathinfo($img_name, PATHINFO_EXTENSION));
+        $allowed_img = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+        if (in_array($img_ext, $allowed_img)) {
+            $new_img_name = uniqid('prop_img_') . '.' . $img_ext;
+            $img_dest = $img_dir . $new_img_name;
+
+            if (move_uploaded_file($img_tmp, $img_dest)) {
+                // 🔥 Delete old image only AFTER new upload succeeds
+                if ($edit_mode && !empty($prop['image_url']) && file_exists(__DIR__ . '/' . $prop['image_url'])) {
+                    unlink(__DIR__ . '/' . $prop['image_url']);
+                }
+                $image_url_path = 'uploads/property_images/' . $new_img_name;
+            } else {
+                $upload_error = "Failed to move uploaded image.";
+            }
+        } else {
+            $upload_error = "Invalid image type. Only JPG, JPEG, PNG, WEBP, GIF allowed.";
+        }
+    }
+
+    // 🔥 Handle "Remove Image" checkbox
+    if (isset($_POST['remove_image']) && $_POST['remove_image'] == '1') {
+        if ($edit_mode && !empty($prop['image_url']) && file_exists(__DIR__ . '/' . $prop['image_url'])) {
+            unlink(__DIR__ . '/' . $prop['image_url']);
+        }
+        $image_url_path = null;
     }
 
     $action = $_POST['action'];
@@ -257,15 +305,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 sqft, possession_type, borrower_name, emd_amount, bid_increment, 
                 emd_deadline, auction_start_time, auction_end_time, locality, 
                 reserve_price_per_sqft, contact_number, status, auction_date, 
-                inspection_date, admin_document, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                inspection_date, admin_document, image_url, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $title, $description, $price, $location, $city, $state, $type, $bank_name,
             $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
             $emd_deadline_parsed, $auction_start_parsed, $auction_end_parsed, $locality,
             $reserve_price_per_sqft, $contact_number, $status, $auction_date_parsed,
-            $inspection_date_parsed, $admin_document_path
+            $inspection_date_parsed, $admin_document_path, $image_url_path
         ]);
         header("Location: properties.php?msg=added");
         exit;
@@ -278,7 +326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 emd_amount = ?, bid_increment = ?, emd_deadline = ?, auction_start_time = ?, 
                 auction_end_time = ?, locality = ?, reserve_price_per_sqft = ?, 
                 contact_number = ?, status = ?, auction_date = ?, inspection_date = ?,
-                admin_document = ?
+                admin_document = ?, image_url = ?
             WHERE id = ?
         ");
         $stmt->execute([
@@ -286,7 +334,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $sqft, $possession_type, $borrower_name, $emd_amount, $bid_increment,
             $emd_deadline_parsed, $auction_start_parsed, $auction_end_parsed, $locality,
             $reserve_price_per_sqft, $contact_number, $status, $auction_date_parsed,
-            $inspection_date_parsed, $admin_document_path, $id
+            $inspection_date_parsed, $admin_document_path, $image_url_path, $id
         ]);
         header("Location: properties.php?msg=updated");
         exit;
@@ -366,7 +414,7 @@ include 'header.php';
                         <input type="text" name="bank_name" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['bank_name'] ?? '') : '' ?>">
                     </div>
 
-                    <!-- 🔥 PROPERTY TYPE – Master list from PHP array -->
+                    <!-- PROPERTY TYPE -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Property Type</label>
                         <?php $currentType = $edit_mode ? ($prop['type'] ?? '') : ''; ?>
@@ -470,13 +518,53 @@ include 'header.php';
                         </select>
                     </div>
 
+                    <!-- ============================================================
+                    🔥 PROPERTY IMAGE UPLOAD (NEW - SAFE)
+                    ============================================================ -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-primary">
+                            <i class="fas fa-image me-1"></i> Property Image
+                        </label>
+                        <input type="file" name="image" class="form-control" accept="image/*">
+                        <small class="text-muted d-block mt-1">
+                            Allowed: JPG, PNG, WEBP, GIF • Max size: 5MB
+                        </small>
+
+                        <?php if ($edit_mode && !empty($prop['image_url'])): ?>
+                            <div class="mt-3 p-3 rounded-3" style="background:#f0fdf4; border:1px solid #86efac;">
+                                <div class="d-flex align-items-center gap-3">
+                                    <img src="<?= htmlspecialchars($prop['image_url']) ?>" 
+                                         alt="Current Image"
+                                         style="width:80px; height:80px; object-fit:cover; border-radius:10px; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                                    <div>
+                                        <strong class="d-block small text-success">
+                                            <i class="fas fa-check-circle me-1"></i> Current Image
+                                        </strong>
+                                        <small class="text-muted">नई image upload करने पर यह replace हो जाएगी</small>
+                                        <div class="form-check mt-2">
+                                            <input type="checkbox" name="remove_image" value="1" 
+                                                   class="form-check-input" id="remove_image">
+                                            <label class="form-check-label small text-danger fw-bold" for="remove_image">
+                                                <i class="fas fa-trash me-1"></i> Remove Image
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
                     <!-- ADMIN DOCUMENT UPLOAD -->
                     <div class="col-md-6">
-                        <label class="form-label fw-bold text-danger">Admin Document (PDF/JPG/JPEG/PNG - Only for Admins)</label>
+                        <label class="form-label fw-bold text-danger">
+                            <i class="fas fa-file-pdf me-1"></i> Admin Document (PDF/JPG/PNG - Only for Admins)
+                        </label>
                         <input type="file" name="admin_document" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
                         <?php if ($edit_mode && !empty($prop['admin_document'])): ?>
                             <small class="text-success d-block mt-1">
-                                Current file: <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank">View Document</a>
+                                Current file: <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank">
+                                    <i class="fas fa-external-link-alt me-1"></i>View Document
+                                </a>
                             </small>
                         <?php endif; ?>
                         <small class="text-muted d-block mt-1">This file will NOT be visible to regular users.</small>
@@ -516,7 +604,6 @@ include 'header.php';
                     <label class="form-label fw-bold small text-muted">Bank Name</label>
                     <input type="text" name="bank" class="form-control" placeholder="Search by Bank..." value="<?= htmlspecialchars($bank_filter) ?>">
                 </div>
-                <!-- 🔥 TYPE FILTER (matches index.php master list) -->
                 <div class="col-md-2">
                     <label class="form-label fw-bold small text-muted">Property Type</label>
                     <select name="type" class="form-control">
@@ -557,6 +644,7 @@ include 'header.php';
                 <thead class="table-dark">
                     <tr>
                         <th>ID</th>
+                        <th>Image</th>  <!-- 🔥 NEW -->
                         <th>Title</th>
                         <th>Type</th>
                         <th>Bank</th>
@@ -573,6 +661,19 @@ include 'header.php';
                     <?php foreach ($properties as $row): ?>
                         <tr>
                             <td><?= htmlspecialchars($row['id'] ?? '') ?></td>
+
+                            <!-- 🔥 IMAGE PREVIEW -->
+                            <td>
+                                <?php if (!empty($row['image_url']) && file_exists(__DIR__ . '/' . $row['image_url'])): ?>
+                                    <img src="<?= htmlspecialchars($row['image_url']) ?>" 
+                                         alt="Property"
+                                         style="width:60px; height:60px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid #e2e8f0;"
+                                         onclick="window.open(this.src, '_blank')">
+                                <?php else: ?>
+                                    <span class="badge bg-secondary">No Image</span>
+                                <?php endif; ?>
+                            </td>
+
                             <td><?= htmlspecialchars($row['title'] ?? '') ?></td>
                             <td>
                                 <?php if (!empty($row['type'])): ?>
@@ -611,7 +712,7 @@ include 'header.php';
                             <td>
                                 <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></a>
                                 <?php if ($is_admin): ?>
-                                    <a href="properties.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')"><i class="fas fa-trash"></i></a>
+                                    <a href="properties.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?\n\nAll images and documents will also be deleted!')"><i class="fas fa-trash"></i></a>
                                 <?php endif; ?>
                             </td>
                         </tr>
