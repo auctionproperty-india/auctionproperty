@@ -32,10 +32,49 @@ if (!empty($min_price))   { $where .= " AND price >= ?"; $params[] = (float)$min
 if (!empty($max_price))   { $where .= " AND price <= ?"; $params[] = (float)$max_price; }
 if (!empty($type_filter)) { $where .= " AND type = ?";   $params[] = $type_filter; }
 
-$sql = "SELECT * FROM properties WHERE $where ORDER BY id DESC";
+// ============================================================
+// 🔥 PAGINATION — Fast loading even with 10000+ properties
+// ============================================================
+$per_page = 50;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$offset = ($page - 1) * $per_page;
+
+// Total count (1 fast query)
+$count_sql = "SELECT COUNT(*) FROM properties WHERE $where";
+$count_stmt = $pdo->prepare($count_sql);
+$count_stmt->execute($params);
+$total_properties = (int)$count_stmt->fetchColumn();
+$total_pages = max(1, (int)ceil($total_properties / $per_page));
+
+// Main query (LIMIT + OFFSET)
+$sql = "SELECT * FROM properties WHERE $where ORDER BY id DESC LIMIT $per_page OFFSET $offset";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $properties = $stmt->fetchAll();
+
+// ============================================================
+// 🔥 BATCH LOAD GALLERY COUNTS (1 query instead of N)
+// ============================================================
+$gallery_counts = [];
+if (!empty($properties)) {
+    $prop_ids = array_column($properties, 'id');
+    $placeholders = implode(',', array_fill(0, count($prop_ids), '?'));
+
+    try {
+        $g_stmt = $pdo->prepare("
+            SELECT property_id, COUNT(*) as cnt 
+            FROM property_images 
+            WHERE property_id IN ($placeholders) 
+            GROUP BY property_id
+        ");
+        $g_stmt->execute($prop_ids);
+        while ($r = $g_stmt->fetch()) {
+            $gallery_counts[$r['property_id']] = (int)$r['cnt'];
+        }
+    } catch (Exception $e) {
+        $gallery_counts = [];
+    }
+}
 
 // ---- Handle Add/Edit ----
 $edit_mode = false;
@@ -50,7 +89,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     if ($prop) {
         $edit_mode = true;
 
-        // 🔥 Load existing gallery images
+        // Load existing gallery images
         try {
             $img_stmt = $pdo->prepare("SELECT * FROM property_images WHERE property_id = ? ORDER BY display_order ASC, id ASC");
             $img_stmt->execute([$edit_id]);
@@ -80,7 +119,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
         }
     }
 
-    // 🔥 Delete all gallery images
+    // Delete all gallery images
     try {
         $imgs = $pdo->prepare("SELECT image_url FROM property_images WHERE property_id = ?");
         $imgs->execute([$delete_id]);
@@ -193,9 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_start_parsed = parseDateTimeFlexible($auction_start_time);
     $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
-    // ============================================================
     // UPLOAD: Admin Document
-    // ============================================================
     $admin_document_path = $edit_mode ? ($prop['admin_document'] ?? null) : null;
     $upload_error = '';
 
@@ -220,9 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    // ============================================================
     // UPLOAD: Main Image
-    // ============================================================
     $image_url_path = $edit_mode ? ($prop['image_url'] ?? null) : null;
 
     if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
@@ -254,9 +289,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $image_url_path = null;
     }
 
-    // ============================================================
-    // INSERT / UPDATE
-    // ============================================================
     $action = $_POST['action'];
 
     if ($action === 'add') {
@@ -360,7 +392,15 @@ include 'header.php';
 
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>🏠 All Properties (<?= count($properties) ?>)</h1>
+        <h1>
+            🏠 All Properties 
+            <span class="badge bg-primary" style="font-size:0.9rem;"><?= number_format($total_properties) ?></span>
+            <?php if ($total_pages > 1): ?>
+                <small class="text-muted" style="font-size:0.85rem;">
+                    (Page <?= $page ?> of <?= $total_pages ?>)
+                </small>
+            <?php endif; ?>
+        </h1>
         <a href="?add=1" class="btn btn-primary btn-lg rounded-pill shadow <?= isset($_GET['add']) ? 'disabled' : '' ?>">
             <i class="fas fa-plus-circle me-2"></i> Add New Property
         </a>
@@ -674,38 +714,23 @@ include 'header.php';
                 </thead>
                 <tbody>
                     <?php foreach ($properties as $row):
-                        // 🔥 Count gallery images
-                        $gallery_count = 0;
-                        try {
-                            $c = $pdo->prepare("SELECT COUNT(*) FROM property_images WHERE property_id = ?");
-                            $c->execute([$row['id']]);
-                            $gallery_count = (int)$c->fetchColumn();
-                        } catch (Exception $e) {}
+                        // 🔥 Gallery count from batch-loaded array (no extra query!)
+                        $gallery_count = $gallery_counts[$row['id']] ?? 0;
 
-                        // 🔥 Check main image exists on disk
-                        $main_img_check = !empty($row['image_url']) 
-                            ? __DIR__ . '/' . ltrim($row['image_url'], '/') 
-                            : '';
-                        $main_img_exists = ($main_img_check && file_exists($main_img_check));
-
-                        // 🔥 Check admin doc exists on disk
-                        $doc_check = !empty($row['admin_document']) 
-                            ? __DIR__ . '/' . ltrim($row['admin_document'], '/') 
-                            : '';
-                        $doc_exists = ($doc_check && file_exists($doc_check) && is_file($doc_check));
+                        // 🔥 Show image if path exists (skip file_exists per row for speed)
+                        // Use a faster heuristic: if path is non-empty, show it
+                        $has_main_img = !empty($row['image_url']);
+                        $has_doc = !empty($row['admin_document']);
                     ?>
                         <tr>
                             <td><?= htmlspecialchars($row['id'] ?? '') ?></td>
                             <td>
-                                <?php if ($main_img_exists): ?>
+                                <?php if ($has_main_img): ?>
                                     <img src="<?= htmlspecialchars($row['image_url']) ?>"
                                          alt="Property"
                                          style="width:60px; height:60px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid #e2e8f0;"
+                                         loading="lazy"
                                          onclick="window.open(this.src, '_blank')">
-                                <?php elseif (!empty($row['image_url'])): ?>
-                                    <span class="badge bg-danger" style="font-size:0.6rem;">
-                                        <i class="fas fa-exclamation-triangle"></i> Missing
-                                    </span>
                                 <?php else: ?>
                                     <span class="badge bg-secondary">No Image</span>
                                 <?php endif; ?>
@@ -736,16 +761,10 @@ include 'header.php';
                                 <span class="badge bg-<?= $badgeClass ?>"><?= htmlspecialchars($statusVal) ?></span>
                             </td>
                             <td>
-                                <?php if ($doc_exists): ?>
+                                <?php if ($has_doc): ?>
                                     <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" 
                                        class="btn btn-sm btn-outline-info" title="View Admin Document">
                                         <i class="fas fa-file-pdf"></i> View
-                                    </a>
-                                <?php elseif (!empty($row['admin_document'])): ?>
-                                    <a href="properties.php?edit=<?= $row['id'] ?>" 
-                                       class="badge bg-danger text-decoration-none" 
-                                       title="File missing – click to re-upload">
-                                        <i class="fas fa-exclamation-triangle"></i> Missing
                                     </a>
                                 <?php else: ?>
                                     <span class="text-muted small">No File</span>
@@ -762,6 +781,48 @@ include 'header.php';
                 </tbody>
             </table>
         </div>
+
+        <!-- ============ PAGINATION ============ -->
+        <?php if ($total_pages > 1): ?>
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <!-- Prev -->
+                    <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => max(1, $page - 1)])) ?>">
+                            <i class="fas fa-chevron-left"></i> Prev
+                        </a>
+                    </li>
+
+                    <?php
+                    // Show max 7 page numbers around current
+                    $start = max(1, $page - 3);
+                    $end = min($total_pages, $page + 3);
+                    if ($start > 1): ?>
+                        <li class="page-item"><a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => 1])) ?>">1</a></li>
+                        <?php if ($start > 2): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
+                    <?php endif;
+
+                    for ($i = $start; $i <= $end; $i++): ?>
+                        <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
+                            <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>"><?= $i ?></a>
+                        </li>
+                    <?php endfor;
+
+                    if ($end < $total_pages): ?>
+                        <?php if ($end < $total_pages - 1): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
+                        <li class="page-item"><a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $total_pages])) ?>"><?= $total_pages ?></a></li>
+                    <?php endif; ?>
+
+                    <!-- Next -->
+                    <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
+                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => min($total_pages, $page + 1)])) ?>">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        <?php endif; ?>
+
     <?php else: ?>
         <div class="alert alert-info text-center py-4">
             <i class="fas fa-inbox fa-3x d-block mb-3 opacity-50"></i>
