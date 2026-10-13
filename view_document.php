@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📄 View Admin Document – Robust Path Resolver
+// 📄 View Admin Document – With Auto-Cleanup of Missing Files
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -26,21 +26,17 @@ if (!$row) {
 $doc = trim($row['admin_document'] ?? '');
 
 if (empty($doc)) {
-    die("<div style='font-family:sans-serif;padding:20px;color:#dc2626;'>❌ No document uploaded for this property.</div>");
+    die("<div style='font-family:sans-serif;padding:20px;color:#dc2626;'>❌ No document uploaded.</div>");
 }
 
-// ============================================================
-// 🔥 TRY MULTIPLE POSSIBLE PATHS
-// ============================================================
+// Try multiple paths
 $clean_doc = ltrim($doc, '/');
-
 $possible_paths = [
-    __DIR__ . '/' . $clean_doc,                       // /var/www/html/uploads/...
-    __DIR__ . '/' . $doc,                             // with leading slash
-    dirname(__DIR__) . '/' . $clean_doc,              // parent dir
+    __DIR__ . '/' . $clean_doc,
+    __DIR__ . '/' . $doc,
+    dirname(__DIR__) . '/' . $clean_doc,
     ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/' . $clean_doc,
     ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/' . $doc,
-    __DIR__ . '/uploads/admin_documents/' . basename($clean_doc),
 ];
 
 $found_path = null;
@@ -52,33 +48,68 @@ foreach ($possible_paths as $p) {
 }
 
 // ============================================================
-// 🔥 IF NOT FOUND – Detailed debug info
+// 🔥 FILE MISSING → Auto-cleanup DB entry + friendly message
 // ============================================================
 if (!$found_path) {
-    $debug_paths = implode('<br>', array_map('htmlspecialchars', array_filter($possible_paths)));
+    // Auto-clean: DB entry clear कर दें ताकि भविष्य में यह error न आए
+    try {
+        $pdo->prepare("UPDATE properties SET admin_document = NULL WHERE id = ?")->execute([$id]);
+    } catch (Exception $e) { /* silent */ }
+
     die("
-    <div style='font-family:sans-serif;padding:30px;max-width:800px;margin:auto;background:#fef2f2;border:2px solid #fecaca;border-radius:12px;'>
-        <h2 style='color:#dc2626;margin-top:0;'>❌ File not found on server</h2>
-        <p><strong>Property:</strong> #" . htmlspecialchars($id) . " – " . htmlspecialchars($row['title']) . "</p>
-        <p><strong>Stored path in DB:</strong><br><code style='background:#fff;padding:6px 10px;border-radius:6px;display:inline-block;'>" . htmlspecialchars($doc) . "</code></p>
-        <p><strong>Paths tried:</strong></p>
-        <ul style='background:#fff;padding:12px 24px;border-radius:8px;'>
-            " . implode('', array_map(function($p) { return '<li><code>' . htmlspecialchars($p) . '</code></li>'; }, array_filter($possible_paths))) . "
-        </ul>
-        <p style='background:#fffbeb;border-left:4px solid #f59e0b;padding:12px;border-radius:8px;'>
-            <strong>💡 Fix:</strong> Document file server पर मौजूद नहीं है। Property edit करके दोबारा upload करें।
-        </p>
-        <a href='properties.php?edit=" . $id . "' style='display:inline-block;margin-top:10px;padding:10px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:20px;font-weight:600;'>Edit Property</a>
-        <a href='properties.php' style='display:inline-block;margin-top:10px;padding:10px 24px;background:#64748b;color:#fff;text-decoration:none;border-radius:20px;font-weight:600;margin-left:10px;'>Back</a>
-    </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Document Missing</title>
+        <meta name='viewport' content='width=device-width, initial-scale=1'>
+        <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>
+        <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'>
+    </head>
+    <body style='background:#f4f6fa; font-family:sans-serif; padding:30px;'>
+        <div style='max-width:600px; margin:60px auto; background:#fff; border-radius:20px; padding:40px 30px; box-shadow:0 10px 40px rgba(0,0,0,0.08); text-align:center;'>
+
+            <div style='width:80px; height:80px; background:#fef2f2; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px;'>
+                <i class='fas fa-file-circle-xmark' style='font-size:2rem; color:#dc2626;'></i>
+            </div>
+
+            <h3 style='color:#1e293b; font-weight:800; margin-bottom:10px;'>Document Missing</h3>
+            <p style='color:#64748b; font-size:0.95rem; margin-bottom:25px;'>
+                This property's document was not found on the server.<br>
+                The database entry has been cleaned up automatically.
+            </p>
+
+            <div style='background:#f8fafc; border-radius:12px; padding:16px; margin-bottom:25px; text-align:left;'>
+                <div style='font-size:0.8rem; color:#64748b; margin-bottom:6px;'>
+                    <strong>Property:</strong> #" . htmlspecialchars($id) . " – " . htmlspecialchars($row['title']) . "
+                </div>
+                <div style='font-size:0.8rem; color:#64748b; word-break:break-all;'>
+                    <strong>Missing file:</strong> <code style='background:#fff; padding:2px 6px; border-radius:4px;'>" . htmlspecialchars($doc) . "</code>
+                </div>
+            </div>
+
+            <p style='background:#fffbeb; border-left:4px solid #f59e0b; padding:14px 18px; border-radius:8px; font-size:0.88rem; color:#78350f; text-align:left; margin-bottom:25px;'>
+                <strong>💡 What to do:</strong><br>
+                Property को edit करके admin document दोबारा upload करें।
+            </p>
+
+            <div style='display:flex; gap:10px; justify-content:center; flex-wrap:wrap;'>
+                <a href='properties.php?edit=" . $id . "' style='padding:12px 28px; background:#2563eb; color:#fff; text-decoration:none; border-radius:30px; font-weight:600; font-size:0.92rem;'>
+                    <i class='fas fa-upload me-1'></i> Re-upload Document
+                </a>
+                <a href='properties.php' style='padding:12px 28px; background:#e2e8f0; color:#1e293b; text-decoration:none; border-radius:30px; font-weight:600; font-size:0.92rem;'>
+                    <i class='fas fa-arrow-left me-1'></i> Back to Properties
+                </a>
+            </div>
+        </div>
+    </body>
+    </html>
     ");
 }
 
 // ============================================================
-// 🔥 STREAM FILE
+// STREAM FILE
 // ============================================================
 $ext = strtolower(pathinfo($found_path, PATHINFO_EXTENSION));
-
 $mime_types = [
     'pdf'  => 'application/pdf',
     'jpg'  => 'image/jpeg',
@@ -87,10 +118,8 @@ $mime_types = [
     'gif'  => 'image/gif',
     'webp' => 'image/webp',
 ];
-
 $mime = $mime_types[$ext] ?? 'application/octet-stream';
 
-// Clear any previous output
 if (ob_get_level()) ob_end_clean();
 
 header('Content-Type: ' . $mime);
