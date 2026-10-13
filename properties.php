@@ -10,13 +10,11 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['
 $user_id = $_SESSION['user_id'];
 $is_admin = ($_SESSION['role'] == 'admin' || $_SESSION['role'] == 'sub_admin');
 
-// 🔥 Master types list
 $property_types = [
     'Flat', 'Plot', 'Shop', 'Land', 'House', 'Land & Building',
     'Car/Vehicle', 'Commercial', 'Office', 'Row House', 'Bungalow', 'Other',
 ];
 
-// ---- Filters ----
 $city_filter = $_GET['city'] ?? '';
 $bank_filter = $_GET['bank'] ?? '';
 $min_price = $_GET['min_price'] ?? '';
@@ -342,20 +340,24 @@ function saveGalleryImages($pdo, $property_id, $main_image = null) {
 include 'header.php';
 ?>
 
-<!-- 🔥 COMPACT TABLE STYLES -->
+<!-- 🔥 COMPACT TABLE WITH STICKY ACTIONS -->
 <style>
     .compact-table-wrapper {
         background: #fff;
         border-radius: 14px;
-        overflow: hidden;
+        overflow-x: auto;
+        overflow-y: visible;
         box-shadow: 0 4px 20px rgba(0,0,0,0.05);
         border: 1px solid #e2e8f0;
+        position: relative;
     }
     .compact-table {
         width: 100%;
+        min-width: 1200px;
         margin: 0;
         font-size: 0.8rem;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
     }
     .compact-table thead th {
         background: #1e293b;
@@ -364,28 +366,30 @@ include 'header.php';
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.4px;
-        padding: 8px 8px;
+        padding: 9px 8px;
         text-align: left;
         white-space: nowrap;
         border: none;
         position: sticky;
         top: 0;
-        z-index: 2;
+        z-index: 3;
     }
     .compact-table tbody td {
         padding: 6px 8px;
         vertical-align: middle;
         border-bottom: 1px solid #f1f5f9;
         line-height: 1.3;
+        background: #fff;
+        color: #1e293b;
     }
-    .compact-table tbody tr:hover {
+    .compact-table tbody tr:hover td {
         background: #f8faff;
     }
     .compact-table tbody tr:last-child td {
         border-bottom: none;
     }
 
-    /* Specific columns */
+    /* Column widths */
     .compact-table .col-id {
         width: 55px;
         font-weight: 700;
@@ -396,8 +400,8 @@ include 'header.php';
         width: 55px;
     }
     .compact-table .col-img img {
-        width: 42px;
-        height: 42px;
+        width: 40px;
+        height: 40px;
         object-fit: cover;
         border-radius: 6px;
         border: 1px solid #e2e8f0;
@@ -406,53 +410,61 @@ include 'header.php';
         transition: transform 0.15s;
     }
     .compact-table .col-img img:hover {
-        transform: scale(1.5);
-        z-index: 10;
+        transform: scale(2);
+        z-index: 100;
         position: relative;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+    }
+    .compact-table .col-img .no-img {
+        width: 40px;
+        height: 40px;
+        background: #f1f5f9;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        font-size: 0.6rem;
+        font-weight: 700;
     }
     .compact-table .col-title {
-        max-width: 220px;
+        max-width: 200px;
         font-weight: 600;
         color: #0f172a;
     }
-    .compact-table .col-title .ellipsis {
+    .compact-table .ellipsis {
         display: block;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+    .compact-table .col-type .badge,
+    .compact-table .col-status .badge {
+        font-size: 0.62rem;
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-weight: 700;
     }
     .compact-table .col-bank {
-        max-width: 130px;
+        max-width: 120px;
         font-size: 0.75rem;
         color: #475569;
-    }
-    .compact-table .col-bank .ellipsis {
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
     .compact-table .col-city {
         font-size: 0.78rem;
         color: #334155;
         font-weight: 600;
+        white-space: nowrap;
     }
     .compact-table .col-locality {
         font-size: 0.72rem;
         color: #64748b;
         max-width: 110px;
     }
-    .compact-table .col-locality .ellipsis {
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
     .compact-table .col-price {
         font-weight: 700;
         color: #059669;
-        font-size: 0.8rem;
+        font-size: 0.82rem;
         white-space: nowrap;
     }
     .compact-table .col-date {
@@ -460,29 +472,31 @@ include 'header.php';
         color: #64748b;
         white-space: nowrap;
     }
-    .compact-table .col-status .badge {
-        font-size: 0.62rem;
-        padding: 3px 8px;
-        border-radius: 20px;
-        font-weight: 700;
-    }
-    .compact-table .col-type .badge {
-        font-size: 0.62rem;
-        padding: 3px 8px;
-        border-radius: 20px;
-        font-weight: 700;
-    }
     .compact-table .col-doc {
-        width: 60px;
+        width: 55px;
         text-align: center;
     }
+
+    /* 🔥 STICKY ACTIONS COLUMN — Always visible on right */
     .compact-table .col-actions {
-        width: 90px;
+        width: 85px;
+        text-align: center;
         white-space: nowrap;
-        text-align: right;
+        position: sticky;
+        right: 0;
+        background: #fff !important;
+        box-shadow: -4px 0 8px -2px rgba(0,0,0,0.06);
+        z-index: 2;
+    }
+    .compact-table thead .col-actions {
+        background: #1e293b !important;
+        z-index: 4;
+    }
+    .compact-table tbody tr:hover .col-actions {
+        background: #f8faff !important;
     }
 
-    /* Small buttons */
+    /* Small round action buttons */
     .btn-xs {
         width: 26px;
         height: 26px;
@@ -493,15 +507,17 @@ include 'header.php';
         border-radius: 6px;
         font-size: 0.7rem;
         border: none;
+        transition: all 0.15s;
+        vertical-align: middle;
     }
     .btn-xs.btn-primary { background: #2563eb; color: #fff; }
-    .btn-xs.btn-primary:hover { background: #1d4ed8; }
+    .btn-xs.btn-primary:hover { background: #1d4ed8; transform: scale(1.1); }
     .btn-xs.btn-danger { background: #dc2626; color: #fff; }
-    .btn-xs.btn-danger:hover { background: #b91c1c; }
+    .btn-xs.btn-danger:hover { background: #b91c1c; transform: scale(1.1); }
     .btn-xs.btn-info { background: #0891b2; color: #fff; text-decoration: none; }
-    .btn-xs.btn-info:hover { background: #0e7490; color: #fff; }
+    .btn-xs.btn-info:hover { background: #0e7490; transform: scale(1.1); color: #fff; }
 
-    /* Sidebar + table area adjustment */
+    /* Page header compact */
     .page-header-compact {
         display: flex;
         justify-content: space-between;
@@ -585,15 +601,6 @@ include 'header.php';
         border: none;
         background: transparent;
     }
-
-    /* Responsive — hide less important columns on small screens */
-    @media (max-width: 1400px) {
-        .compact-table .col-bank { max-width: 100px; }
-    }
-    @media (max-width: 1200px) {
-        .compact-table { font-size: 0.75rem; }
-        .compact-table .col-title { max-width: 150px; }
-    }
 </style>
 
 <div class="container-fluid mt-3">
@@ -625,7 +632,7 @@ include 'header.php';
         </div>
     <?php endif; ?>
 
-    <!-- ADD/EDIT FORM -->
+    <!-- ADD/EDIT FORM (Unchanged) -->
     <?php if (isset($_GET['add']) || $edit_mode): ?>
     <div class="card shadow-lg rounded-4 mb-4 border-0">
         <div class="card-header bg-primary text-white p-3 rounded-top-4">
@@ -909,9 +916,7 @@ include 'header.php';
                                          loading="lazy"
                                          onclick="window.open(this.src, '_blank')">
                                 <?php else: ?>
-                                    <div style="width:42px; height:42px; background:#f1f5f9; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:0.65rem; font-weight:600;">
-                                        NO
-                                    </div>
+                                    <div class="no-img">NO</div>
                                 <?php endif; ?>
                                 <?php if ($gallery_count > 0): ?>
                                     <div style="font-size:0.6rem; color:#2563eb; margin-top:1px; font-weight:700; text-align:center;">+<?= $gallery_count ?></div>
@@ -954,7 +959,7 @@ include 'header.php';
                             <td class="col-doc">
                                 <?php if ($has_doc): ?>
                                     <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" 
-                                       class="btn-xs btn-info" title="View Document">
+                                       class="btn-xs btn-info" title="View Admin Document">
                                         <i class="fas fa-file-pdf"></i>
                                     </a>
                                 <?php else: ?>
@@ -962,12 +967,13 @@ include 'header.php';
                                 <?php endif; ?>
                             </td>
                             <td class="col-actions">
-                                <a href="properties.php?edit=<?= $row['id'] ?>" class="btn-xs btn-primary" title="Edit">
+                                <a href="properties.php?edit=<?= $row['id'] ?>" class="btn-xs btn-primary" title="Edit Property">
                                     <i class="fas fa-edit"></i>
                                 </a>
                                 <?php if ($is_admin): ?>
                                     <a href="properties.php?delete=<?= $row['id'] ?>" class="btn-xs btn-danger" 
-                                       onclick="return confirm('Delete this property?\n\nAll images and documents will also be deleted!')" title="Delete">
+                                       onclick="return confirm('Delete this property?\n\nAll images and documents will also be deleted!')" 
+                                       title="Delete Property">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 <?php endif; ?>
@@ -981,7 +987,6 @@ include 'header.php';
         <!-- COMPACT PAGINATION -->
         <?php if ($total_pages > 1): ?>
             <div class="compact-pagination">
-                <!-- Prev -->
                 <?php if ($page > 1): ?>
                     <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>">
                         <i class="fas fa-chevron-left"></i>
@@ -1012,7 +1017,6 @@ include 'header.php';
                     <a href="?<?= http_build_query(array_merge($_GET, ['page' => $total_pages])) ?>"><?= $total_pages ?></a>
                 <?php endif; ?>
 
-                <!-- Next -->
                 <?php if ($page < $total_pages): ?>
                     <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>">
                         <i class="fas fa-chevron-right"></i>
