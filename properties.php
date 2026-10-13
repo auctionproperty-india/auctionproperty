@@ -10,25 +10,13 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['
 $user_id = $_SESSION['user_id'];
 $is_admin = ($_SESSION['role'] == 'admin' || $_SESSION['role'] == 'sub_admin');
 
-// ============================================================
-// 🔥 MASTER LIST OF PROPERTY TYPES (index.php के साथ match करता है)
-// ============================================================
+// 🔥 Master types list
 $property_types = [
-    'Flat',
-    'Plot',
-    'Shop',
-    'Land',
-    'House',
-    'Land & Building',
-    'Car/Vehicle',
-    'Commercial',
-    'Office',
-    'Row House',
-    'Bungalow',
-    'Other',
+    'Flat', 'Plot', 'Shop', 'Land', 'House', 'Land & Building',
+    'Car/Vehicle', 'Commercial', 'Office', 'Row House', 'Bungalow', 'Other',
 ];
 
-// ---- Get filters ----
+// ---- Filters ----
 $city_filter = $_GET['city'] ?? '';
 $bank_filter = $_GET['bank'] ?? '';
 $min_price = $_GET['min_price'] ?? '';
@@ -38,28 +26,12 @@ $type_filter = $_GET['type'] ?? '';
 $where = "1=1";
 $params = [];
 
-if (!empty($city_filter)) {
-    $where .= " AND city ILIKE ?";
-    $params[] = '%' . $city_filter . '%';
-}
-if (!empty($bank_filter)) {
-    $where .= " AND bank_name ILIKE ?";
-    $params[] = '%' . $bank_filter . '%';
-}
-if (!empty($min_price)) {
-    $where .= " AND price >= ?";
-    $params[] = (float)$min_price;
-}
-if (!empty($max_price)) {
-    $where .= " AND price <= ?";
-    $params[] = (float)$max_price;
-}
-if (!empty($type_filter)) {
-    $where .= " AND type = ?";
-    $params[] = $type_filter;
-}
+if (!empty($city_filter)) { $where .= " AND city ILIKE ?"; $params[] = '%'.$city_filter.'%'; }
+if (!empty($bank_filter)) { $where .= " AND bank_name ILIKE ?"; $params[] = '%'.$bank_filter.'%'; }
+if (!empty($min_price))   { $where .= " AND price >= ?"; $params[] = (float)$min_price; }
+if (!empty($max_price))   { $where .= " AND price <= ?"; $params[] = (float)$max_price; }
+if (!empty($type_filter)) { $where .= " AND type = ?";   $params[] = $type_filter; }
 
-// ---- Get properties ----
 $sql = "SELECT * FROM properties WHERE $where ORDER BY id DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
@@ -68,6 +40,7 @@ $properties = $stmt->fetchAll();
 // ---- Handle Add/Edit ----
 $edit_mode = false;
 $prop = null;
+$existing_images = [];
 
 if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     $edit_id = (int)$_GET['edit'];
@@ -76,42 +49,60 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     $prop = $stmt->fetch();
     if ($prop) {
         $edit_mode = true;
+
+        // 🔥 Load existing gallery images
+        try {
+            $img_stmt = $pdo->prepare("SELECT * FROM property_images WHERE property_id = ? ORDER BY display_order ASC, id ASC");
+            $img_stmt->execute([$edit_id]);
+            $existing_images = $img_stmt->fetchAll();
+        } catch (Exception $e) {
+            $existing_images = [];
+        }
     }
 }
 
-// ---- Handle Delete ----
+// ---- Handle Delete Property ----
 if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     $delete_id = (int)$_GET['delete'];
 
-    // Delete admin document if exists
+    // Delete admin document
     $stmt = $pdo->prepare("SELECT admin_document, image_url FROM properties WHERE id = ?");
     $stmt->execute([$delete_id]);
     $row_to_del = $stmt->fetch();
+
     if ($row_to_del) {
-        if (!empty($row_to_del['admin_document']) && file_exists(__DIR__ . '/' . $row_to_del['admin_document'])) {
-            unlink(__DIR__ . '/' . $row_to_del['admin_document']);
+        if (!empty($row_to_del['admin_document'])) {
+            $f = __DIR__ . '/' . ltrim($row_to_del['admin_document'], '/');
+            if (file_exists($f)) @unlink($f);
         }
-        // 🔥 Delete image too
-        if (!empty($row_to_del['image_url']) && file_exists(__DIR__ . '/' . $row_to_del['image_url'])) {
-            unlink(__DIR__ . '/' . $row_to_del['image_url']);
+        if (!empty($row_to_del['image_url'])) {
+            $f = __DIR__ . '/' . ltrim($row_to_del['image_url'], '/');
+            if (file_exists($f)) @unlink($f);
         }
     }
 
-    $stmt = $pdo->prepare("DELETE FROM properties WHERE id = ?");
-    $stmt->execute([$delete_id]);
+    // 🔥 Delete all gallery images
+    try {
+        $imgs = $pdo->prepare("SELECT image_url FROM property_images WHERE property_id = ?");
+        $imgs->execute([$delete_id]);
+        foreach ($imgs->fetchAll() as $im) {
+            $f = __DIR__ . '/' . ltrim($im['image_url'], '/');
+            if (file_exists($f)) @unlink($f);
+        }
+        $pdo->prepare("DELETE FROM property_images WHERE property_id = ?")->execute([$delete_id]);
+    } catch (Exception $e) {}
+
+    $pdo->prepare("DELETE FROM properties WHERE id = ?")->execute([$delete_id]);
     header("Location: properties.php?msg=deleted");
     exit;
 }
 
-// ============================================================
-// 🔥 HELPER: Parse Date
-// ============================================================
+// ---- Parse helpers ----
 function parseDate($dateStr) {
     if (empty($dateStr) || trim($dateStr) === '') return null;
     $dateStr = trim($dateStr);
     $parts = explode(' ', $dateStr);
     $dateStr = $parts[0];
-
     if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $dateStr, $m)) {
         return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
     }
@@ -123,56 +114,38 @@ function parseDate($dateStr) {
     return null;
 }
 
-// ============================================================
-// 🔥 HELPER: Parse Date-Time
-// ============================================================
 function parseDateTimeFlexible($str) {
     if (empty($str) || trim($str) === '') return null;
     $str = trim($str);
-
     $lower = strtolower($str);
-    if (in_array($lower, ['#value!', 'na', 'n/a', 'null', '-', 'club', 'club case'])) {
-        return null;
-    }
+    if (in_array($lower, ['#value!', 'na', 'n/a', 'null', '-', 'club', 'club case'])) return null;
 
     $year = 0; $month = 0; $day = 0; $timePart = '';
 
     if (preg_match('/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})\s*(.*)$/', $str, $m)) {
-        $year = (int)$m[1];
-        $month = (int)$m[2];
-        $day = (int)$m[3];
-        $timePart = trim($m[4]);
-    }
-    elseif (preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s*(.*)$/', $str, $m)) {
-        $day = (int)$m[1];
-        $month = (int)$m[2];
-        $year = (int)$m[3];
+        $year = (int)$m[1]; $month = (int)$m[2]; $day = (int)$m[3]; $timePart = trim($m[4]);
+    } elseif (preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s*(.*)$/', $str, $m)) {
+        $day = (int)$m[1]; $month = (int)$m[2]; $year = (int)$m[3];
         if ($year < 100) $year += 2000;
         $timePart = trim($m[4]);
-    }
-    else {
+    } else {
         $ts = strtotime($str);
         if ($ts !== false && $ts > 0) return date('Y-m-d H:i:s', $ts);
         return null;
     }
 
     $hour = 0; $minute = 0; $second = 0;
-
     if (!empty($timePart)) {
         if (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM|am|pm)$/', $timePart, $t)) {
-            $hour = (int)$t[1];
-            $minute = (int)$t[2];
+            $hour = (int)$t[1]; $minute = (int)$t[2];
             $second = isset($t[3]) && $t[3] !== '' ? (int)$t[3] : 0;
             $ampm = strtoupper($t[4]);
             if ($ampm === 'PM' && $hour < 12) $hour += 12;
             if ($ampm === 'AM' && $hour == 12) $hour = 0;
-        }
-        elseif (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/', $timePart, $t)) {
-            $hour = (int)$t[1];
-            $minute = (int)$t[2];
+        } elseif (preg_match('/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/', $timePart, $t)) {
+            $hour = (int)$t[1]; $minute = (int)$t[2];
             $second = isset($t[3]) && $t[3] !== '' ? (int)$t[3] : 0;
-        }
-        elseif (preg_match('/^(\d{1,2})$/', $timePart, $t)) {
+        } elseif (preg_match('/^(\d{1,2})$/', $timePart, $t)) {
             $hour = (int)$t[1];
         }
     }
@@ -183,7 +156,6 @@ function parseDateTimeFlexible($str) {
     if ($hour < 0 || $hour > 23) return null;
     if ($minute < 0 || $minute > 59) return null;
     if ($second < 0 || $second > 59) return null;
-
     if (!checkdate($month, $day, $year)) return null;
 
     return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second);
@@ -216,7 +188,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_date = trim($_POST['auction_date'] ?? '');
     $inspection_date = trim($_POST['inspection_date'] ?? '');
 
-    // Parse dates
     $auction_date_parsed = parseDate($auction_date);
     $inspection_date_parsed = parseDate($inspection_date);
     $emd_deadline_parsed = parseDateTimeFlexible($emd_deadline);
@@ -224,29 +195,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
     // ============================================================
-    // 🔥 ADMIN DOCUMENT UPLOAD
+    // UPLOAD: Admin Document
     // ============================================================
     $admin_document_path = $edit_mode ? ($prop['admin_document'] ?? null) : null;
     $upload_error = '';
 
     if (isset($_FILES['admin_document']) && $_FILES['admin_document']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = __DIR__ . '/uploads/admin_documents/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0755, true);
-        }
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $file_tmp = $_FILES['admin_document']['tmp_name'];
-        $file_name = basename($_FILES['admin_document']['name']);
-        $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-        $allowed = ['pdf', 'jpg', 'jpeg', 'png'];
-
-        if (in_array($file_ext, $allowed)) {
-            $new_file_name = uniqid('admin_doc_') . '.' . $file_ext;
-            $dest_path = $upload_dir . $new_file_name;
-            if (move_uploaded_file($file_tmp, $dest_path)) {
-                if ($edit_mode && !empty($prop['admin_document']) && file_exists(__DIR__ . '/' . $prop['admin_document'])) {
-                    unlink(__DIR__ . '/' . $prop['admin_document']);
+        $file_ext = strtolower(pathinfo(basename($_FILES['admin_document']['name']), PATHINFO_EXTENSION));
+        if (in_array($file_ext, ['pdf','jpg','jpeg','png'])) {
+            $new_name = uniqid('admin_doc_') . '.' . $file_ext;
+            if (move_uploaded_file($file_tmp, $upload_dir . $new_name)) {
+                if ($edit_mode && !empty($prop['admin_document'])) {
+                    $old = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
+                    if (file_exists($old)) @unlink($old);
                 }
-                $admin_document_path = 'uploads/admin_documents/' . $new_file_name;
+                $admin_document_path = 'uploads/admin_documents/' . $new_name;
             } else {
                 $upload_error = "Failed to move uploaded document.";
             }
@@ -256,46 +222,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     // ============================================================
-    // 🔥 PROPERTY IMAGE UPLOAD (NEW - PRESERVES EXISTING IMAGE)
+    // 🔥 UPLOAD: Main Image (single, kept for backward compat)
     // ============================================================
     $image_url_path = $edit_mode ? ($prop['image_url'] ?? null) : null;
 
     if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $img_dir = __DIR__ . '/uploads/property_images/';
-        if (!is_dir($img_dir)) {
-            mkdir($img_dir, 0755, true);
-        }
+        if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
         $img_tmp = $_FILES['image']['tmp_name'];
-        $img_name = basename($_FILES['image']['name']);
-        $img_ext = strtolower(pathinfo($img_name, PATHINFO_EXTENSION));
-        $allowed_img = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-
-        if (in_array($img_ext, $allowed_img)) {
+        $img_ext = strtolower(pathinfo(basename($_FILES['image']['name']), PATHINFO_EXTENSION));
+        if (in_array($img_ext, ['jpg','jpeg','png','webp','gif'])) {
             $new_img_name = uniqid('prop_img_') . '.' . $img_ext;
-            $img_dest = $img_dir . $new_img_name;
-
-            if (move_uploaded_file($img_tmp, $img_dest)) {
-                // 🔥 Delete old image only AFTER new upload succeeds
-                if ($edit_mode && !empty($prop['image_url']) && file_exists(__DIR__ . '/' . $prop['image_url'])) {
-                    unlink(__DIR__ . '/' . $prop['image_url']);
+            if (move_uploaded_file($img_tmp, $img_dir . $new_img_name)) {
+                if ($edit_mode && !empty($prop['image_url'])) {
+                    $old = __DIR__ . '/' . ltrim($prop['image_url'], '/');
+                    if (file_exists($old)) @unlink($old);
                 }
                 $image_url_path = 'uploads/property_images/' . $new_img_name;
             } else {
                 $upload_error = "Failed to move uploaded image.";
             }
         } else {
-            $upload_error = "Invalid image type. Only JPG, JPEG, PNG, WEBP, GIF allowed.";
+            $upload_error = "Invalid image type.";
         }
     }
 
-    // 🔥 Handle "Remove Image" checkbox
     if (isset($_POST['remove_image']) && $_POST['remove_image'] == '1') {
-        if ($edit_mode && !empty($prop['image_url']) && file_exists(__DIR__ . '/' . $prop['image_url'])) {
-            unlink(__DIR__ . '/' . $prop['image_url']);
+        if ($edit_mode && !empty($prop['image_url'])) {
+            $old = __DIR__ . '/' . ltrim($prop['image_url'], '/');
+            if (file_exists($old)) @unlink($old);
         }
         $image_url_path = null;
     }
 
+    // ============================================================
+    // 🔥 INSERT / UPDATE
+    // ============================================================
     $action = $_POST['action'];
 
     if ($action === 'add') {
@@ -315,8 +277,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $reserve_price_per_sqft, $contact_number, $status, $auction_date_parsed,
             $inspection_date_parsed, $admin_document_path, $image_url_path
         ]);
+        $new_prop_id = $pdo->lastInsertId();
+
+        // 🔥 Handle multi-image gallery upload
+        saveGalleryImages($pdo, $new_prop_id, $image_url_path);
+
         header("Location: properties.php?msg=added");
         exit;
+
     } elseif ($action === 'edit' && isset($_POST['id'])) {
         $id = (int)$_POST['id'];
         $stmt = $pdo->prepare("
@@ -336,8 +304,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $reserve_price_per_sqft, $contact_number, $status, $auction_date_parsed,
             $inspection_date_parsed, $admin_document_path, $image_url_path, $id
         ]);
+
+        // 🔥 Handle multi-image gallery upload
+        saveGalleryImages($pdo, $id, $image_url_path);
+
         header("Location: properties.php?msg=updated");
         exit;
+    }
+}
+
+// ============================================================
+// 🔥 HELPER: Save Multiple Gallery Images
+// ============================================================
+function saveGalleryImages($pdo, $property_id, $main_image = null) {
+    if (empty($_FILES['images']['name'][0])) return;
+
+    $img_dir = __DIR__ . '/uploads/property_images/';
+    if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
+
+    // Get current max display_order
+    $maxOrder = 0;
+    try {
+        $stmt = $pdo->prepare("SELECT COALESCE(MAX(display_order), 0) FROM property_images WHERE property_id = ?");
+        $stmt->execute([$property_id]);
+        $maxOrder = (int)$stmt->fetchColumn();
+    } catch (Exception $e) {}
+
+    $first_uploaded = null;
+
+    foreach ($_FILES['images']['name'] as $i => $name) {
+        if ($_FILES['images']['error'][$i] !== UPLOAD_ERR_OK) continue;
+
+        $tmp = $_FILES['images']['tmp_name'][$i];
+        $ext = strtolower(pathinfo(basename($name), PATHINFO_EXTENSION));
+
+        if (!in_array($ext, ['jpg','jpeg','png','webp','gif'])) continue;
+
+        $new_name = uniqid('gallery_') . '.' . $ext;
+        if (move_uploaded_file($tmp, $img_dir . $new_name)) {
+            $url = 'uploads/property_images/' . $new_name;
+
+            $pdo->prepare("
+                INSERT INTO property_images (property_id, image_url, display_order, created_at)
+                VALUES (?, ?, ?, NOW())
+            ")->execute([$property_id, $url, ++$maxOrder]);
+
+            if ($first_uploaded === null) $first_uploaded = $url;
+        }
+    }
+
+    // 🔥 If main image_url is empty, set first uploaded gallery image as main
+    if (!empty($first_uploaded)) {
+        $pdo->prepare("UPDATE properties SET image_url = COALESCE(NULLIF(image_url, ''), ?) WHERE id = ?")
+            ->execute([$first_uploaded, $property_id]);
     }
 }
 
@@ -357,6 +376,7 @@ include 'header.php';
             <?php if ($_GET['msg'] === 'added'): ?>✅ Property added successfully!
             <?php elseif ($_GET['msg'] === 'updated'): ?>✅ Property updated successfully!
             <?php elseif ($_GET['msg'] === 'deleted'): ?>✅ Property deleted successfully!
+            <?php elseif ($_GET['msg'] === 'image_deleted'): ?>✅ Image deleted!
             <?php endif; ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
@@ -369,9 +389,7 @@ include 'header.php';
         </div>
     <?php endif; ?>
 
-    <!-- ============================================================
-    ADD/EDIT FORM
-    ============================================================ -->
+    <!-- ============ ADD/EDIT FORM ============ -->
     <?php if (isset($_GET['add']) || $edit_mode): ?>
     <div class="card shadow-lg rounded-4 mb-5 border-0">
         <div class="card-header bg-primary text-white p-3 rounded-top-4">
@@ -413,22 +431,18 @@ include 'header.php';
                         <label class="form-label fw-bold">Bank Name</label>
                         <input type="text" name="bank_name" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['bank_name'] ?? '') : '' ?>">
                     </div>
-
-                    <!-- PROPERTY TYPE -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Property Type</label>
                         <?php $currentType = $edit_mode ? ($prop['type'] ?? '') : ''; ?>
                         <select name="type" class="form-control">
                             <option value="">-- Select Type --</option>
                             <?php foreach ($property_types as $pt): ?>
-                                <option value="<?= htmlspecialchars($pt) ?>" 
-                                        <?= ($currentType === $pt || ($pt === 'Car/Vehicle' && $currentType === 'Car')) ? 'selected' : '' ?>>
+                                <option value="<?= htmlspecialchars($pt) ?>" <?= ($currentType === $pt || ($pt === 'Car/Vehicle' && $currentType === 'Car')) ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($pt) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
-
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Possession</label>
                         <?php $currentPoss = $edit_mode ? ($prop['possession_type'] ?? '') : ''; ?>
@@ -457,53 +471,31 @@ include 'header.php';
                         <label class="form-label fw-bold">BID Increment (₹)</label>
                         <input type="number" name="bid_increment" class="form-control" step="0.01" value="<?= $edit_mode ? ($prop['bid_increment'] ?? '') : '' ?>">
                     </div>
-
-                    <!-- EMD Deadline -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">EMD Deadline</label>
                         <input type="text" name="emd_deadline" class="form-control"
-                               value="<?= ($edit_mode && !empty($prop['emd_deadline'])) 
-                                        ? date('d/m/Y h:i A', strtotime($prop['emd_deadline'])) 
-                                        : '' ?>">
+                               value="<?= ($edit_mode && !empty($prop['emd_deadline'])) ? date('d/m/Y h:i A', strtotime($prop['emd_deadline'])) : '' ?>">
                     </div>
-
-                    <!-- Auction Start -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Start</label>
                         <input type="text" name="auction_start_time" class="form-control"
-                               value="<?= ($edit_mode && !empty($prop['auction_start_time'])) 
-                                        ? date('d/m/Y h:i A', strtotime($prop['auction_start_time'])) 
-                                        : '' ?>">
+                               value="<?= ($edit_mode && !empty($prop['auction_start_time'])) ? date('d/m/Y h:i A', strtotime($prop['auction_start_time'])) : '' ?>">
                     </div>
-
-                    <!-- Auction End -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction End</label>
                         <input type="text" name="auction_end_time" class="form-control"
-                               value="<?= ($edit_mode && !empty($prop['auction_end_time'])) 
-                                        ? date('d/m/Y h:i A', strtotime($prop['auction_end_time'])) 
-                                        : '' ?>">
+                               value="<?= ($edit_mode && !empty($prop['auction_end_time'])) ? date('d/m/Y h:i A', strtotime($prop['auction_end_time'])) : '' ?>">
                     </div>
-
-                    <!-- Inspection Date -->
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">Inspection Date (DD/MM/YYYY)</label>
+                        <label class="form-label fw-bold">Inspection Date</label>
                         <input type="text" name="inspection_date" class="form-control"
-                               value="<?= ($edit_mode && !empty($prop['inspection_date'])) 
-                                        ? date('d/m/Y', strtotime($prop['inspection_date'])) 
-                                        : '' ?>">
+                               value="<?= ($edit_mode && !empty($prop['inspection_date'])) ? date('d/m/Y', strtotime($prop['inspection_date'])) : '' ?>">
                     </div>
-
-                    <!-- Auction Date -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Auction Date (DD/MM/YYYY) *</label>
                         <input type="text" name="auction_date" class="form-control" required
-                               value="<?= ($edit_mode && !empty($prop['auction_date'])) 
-                                        ? date('d/m/Y', strtotime($prop['auction_date'])) 
-                                        : '' ?>">
-                        <small class="text-muted">Enter only date (e.g., 24/08/2026).</small>
+                               value="<?= ($edit_mode && !empty($prop['auction_date'])) ? date('d/m/Y', strtotime($prop['auction_date'])) : '' ?>">
                     </div>
-
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Contact Number</label>
                         <input type="text" name="contact_number" class="form-control" value="<?= $edit_mode ? htmlspecialchars($prop['contact_number'] ?? '') : '' ?>">
@@ -519,33 +511,30 @@ include 'header.php';
                     </div>
 
                     <!-- ============================================================
-                    🔥 PROPERTY IMAGE UPLOAD (NEW - SAFE)
+                    🔥 MAIN IMAGE (single)
                     ============================================================ -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-primary">
-                            <i class="fas fa-image me-1"></i> Property Image
+                            <i class="fas fa-image me-1"></i> Main / Cover Image
                         </label>
                         <input type="file" name="image" class="form-control" accept="image/*">
-                        <small class="text-muted d-block mt-1">
-                            Allowed: JPG, PNG, WEBP, GIF • Max size: 5MB
-                        </small>
+                        <small class="text-muted d-block mt-1">JPG, PNG, WEBP, GIF allowed</small>
 
                         <?php if ($edit_mode && !empty($prop['image_url'])): ?>
                             <div class="mt-3 p-3 rounded-3" style="background:#f0fdf4; border:1px solid #86efac;">
                                 <div class="d-flex align-items-center gap-3">
-                                    <img src="<?= htmlspecialchars($prop['image_url']) ?>" 
-                                         alt="Current Image"
+                                    <img src="<?= htmlspecialchars($prop['image_url']) ?>"
+                                         alt="Main"
                                          style="width:80px; height:80px; object-fit:cover; border-radius:10px; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
                                     <div>
                                         <strong class="d-block small text-success">
-                                            <i class="fas fa-check-circle me-1"></i> Current Image
+                                            <i class="fas fa-check-circle me-1"></i> Current Cover
                                         </strong>
-                                        <small class="text-muted">नई image upload करने पर यह replace हो जाएगी</small>
                                         <div class="form-check mt-2">
-                                            <input type="checkbox" name="remove_image" value="1" 
+                                            <input type="checkbox" name="remove_image" value="1"
                                                    class="form-check-input" id="remove_image">
                                             <label class="form-check-label small text-danger fw-bold" for="remove_image">
-                                                <i class="fas fa-trash me-1"></i> Remove Image
+                                                <i class="fas fa-trash me-1"></i> Remove Cover
                                             </label>
                                         </div>
                                     </div>
@@ -554,8 +543,44 @@ include 'header.php';
                         <?php endif; ?>
                     </div>
 
-                    <!-- ADMIN DOCUMENT UPLOAD -->
+                    <!-- ============================================================
+                    🔥 MULTIPLE GALLERY IMAGES (NEW)
+                    ============================================================ -->
                     <div class="col-md-6">
+                        <label class="form-label fw-bold text-success">
+                            <i class="fas fa-images me-1"></i> Gallery Images (Multiple)
+                        </label>
+                        <input type="file" name="images[]" class="form-control" accept="image/*" multiple>
+                        <small class="text-muted d-block mt-1">
+                            एक साथ कई images select करें (Ctrl/Cmd दबाकर)
+                        </small>
+
+                        <?php if ($edit_mode && !empty($existing_images)): ?>
+                            <div class="mt-3 p-3 rounded-3" style="background:#eff6ff; border:1px solid #93c5fd;">
+                                <strong class="d-block small mb-2 text-primary">
+                                    <i class="fas fa-images me-1"></i> Current Gallery (<?= count($existing_images) ?>)
+                                </strong>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <?php foreach ($existing_images as $img): ?>
+                                        <div style="position:relative;">
+                                            <img src="<?= htmlspecialchars($img['image_url']) ?>"
+                                                 alt="Gallery"
+                                                 style="width:70px; height:70px; object-fit:cover; border-radius:8px; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+                                            <a href="delete_property_image.php?id=<?= $img['id'] ?>&prop=<?= $prop['id'] ?>"
+                                               onclick="return confirm('Delete this image?')"
+                                               style="position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:#dc2626; color:#fff; font-size:11px; text-align:center; line-height:22px; text-decoration:none; font-weight:bold; box-shadow:0 2px 6px rgba(220,38,38,0.4);">
+                                                ×
+                                            </a>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                <small class="text-muted d-block mt-2">ऊपर red × दबाकर कोई भी image हटा सकते हैं</small>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- ADMIN DOCUMENT UPLOAD -->
+                    <div class="col-12">
                         <label class="form-label fw-bold text-danger">
                             <i class="fas fa-file-pdf me-1"></i> Admin Document (PDF/JPG/PNG - Only for Admins)
                         </label>
@@ -567,7 +592,6 @@ include 'header.php';
                                 </a>
                             </small>
                         <?php endif; ?>
-                        <small class="text-muted d-block mt-1">This file will NOT be visible to regular users.</small>
                     </div>
 
                     <div class="col-12">
@@ -578,11 +602,7 @@ include 'header.php';
                         <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill shadow">
                             <i class="fas fa-save me-2"></i> <?= $edit_mode ? 'Update Property' : 'Add Property' ?>
                         </button>
-                        <?php if ($edit_mode): ?>
-                            <a href="properties.php" class="btn btn-outline-secondary w-100 mt-2 rounded-pill">Cancel Edit</a>
-                        <?php else: ?>
-                            <a href="properties.php" class="btn btn-outline-secondary w-100 mt-2 rounded-pill">Cancel</a>
-                        <?php endif; ?>
+                        <a href="properties.php" class="btn btn-outline-secondary w-100 mt-2 rounded-pill">Cancel</a>
                     </div>
                 </div>
             </form>
@@ -590,28 +610,24 @@ include 'header.php';
     </div>
     <?php endif; ?>
 
-    <!-- ============================================================
-    SEARCH BAR (FILTERS)
-    ============================================================ -->
+    <!-- ============ SEARCH FILTERS ============ -->
     <div class="card shadow-sm rounded-4 mb-4 border-0">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-2">
                     <label class="form-label fw-bold small text-muted">City</label>
-                    <input type="text" name="city" class="form-control" placeholder="Search by City..." value="<?= htmlspecialchars($city_filter) ?>">
+                    <input type="text" name="city" class="form-control" placeholder="City..." value="<?= htmlspecialchars($city_filter) ?>">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Bank Name</label>
-                    <input type="text" name="bank" class="form-control" placeholder="Search by Bank..." value="<?= htmlspecialchars($bank_filter) ?>">
+                    <label class="form-label fw-bold small text-muted">Bank</label>
+                    <input type="text" name="bank" class="form-control" placeholder="Bank..." value="<?= htmlspecialchars($bank_filter) ?>">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Property Type</label>
+                    <label class="form-label fw-bold small text-muted">Type</label>
                     <select name="type" class="form-control">
                         <option value="">All Types</option>
                         <?php foreach ($property_types as $pt): ?>
-                            <option value="<?= htmlspecialchars($pt) ?>" <?= ($type_filter == $pt) ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($pt) ?>
-                            </option>
+                            <option value="<?= htmlspecialchars($pt) ?>" <?= ($type_filter == $pt) ? 'selected' : '' ?>><?= htmlspecialchars($pt) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -635,16 +651,14 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- ============================================================
-    PROPERTY LIST
-    ============================================================ -->
+    <!-- ============ PROPERTY LIST ============ -->
     <?php if (count($properties) > 0): ?>
         <div class="table-responsive">
             <table class="table table-striped table-hover align-middle">
                 <thead class="table-dark">
                     <tr>
                         <th>ID</th>
-                        <th>Image</th>  <!-- 🔥 NEW -->
+                        <th>Image</th>
                         <th>Title</th>
                         <th>Type</th>
                         <th>Bank</th>
@@ -658,29 +672,35 @@ include 'header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($properties as $row): ?>
+                    <?php foreach ($properties as $row):
+                        // 🔥 Count gallery images
+                        $gallery_count = 0;
+                        try {
+                            $c = $pdo->prepare("SELECT COUNT(*) FROM property_images WHERE property_id = ?");
+                            $c->execute([$row['id']]);
+                            $gallery_count = (int)$c->fetchColumn();
+                        } catch (Exception $e) {}
+                    ?>
                         <tr>
                             <td><?= htmlspecialchars($row['id'] ?? '') ?></td>
-
-                            <!-- 🔥 IMAGE PREVIEW -->
                             <td>
-                                <?php if (!empty($row['image_url']) && file_exists(__DIR__ . '/' . $row['image_url'])): ?>
-                                    <img src="<?= htmlspecialchars($row['image_url']) ?>" 
+                                <?php if (!empty($row['image_url']) && file_exists(__DIR__ . '/' . ltrim($row['image_url'], '/'))): ?>
+                                    <img src="<?= htmlspecialchars($row['image_url']) ?>"
                                          alt="Property"
                                          style="width:60px; height:60px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid #e2e8f0;"
                                          onclick="window.open(this.src, '_blank')">
                                 <?php else: ?>
                                     <span class="badge bg-secondary">No Image</span>
                                 <?php endif; ?>
+                                <?php if ($gallery_count > 0): ?>
+                                    <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">+<?= $gallery_count ?> gallery</div>
+                                <?php endif; ?>
                             </td>
-
                             <td><?= htmlspecialchars($row['title'] ?? '') ?></td>
                             <td>
                                 <?php if (!empty($row['type'])): ?>
                                     <span class="badge bg-info text-dark"><?= htmlspecialchars($row['type']) ?></span>
-                                <?php else: ?>
-                                    <span class="text-muted small">—</span>
-                                <?php endif; ?>
+                                <?php else: ?><span class="text-muted small">—</span><?php endif; ?>
                             </td>
                             <td><?= htmlspecialchars($row['bank_name'] ?? 'N/A') ?></td>
                             <td><?= htmlspecialchars($row['city'] ?? 'N/A') ?></td>
@@ -689,9 +709,7 @@ include 'header.php';
                             <td>
                                 <?php if (!empty($row['auction_date'])): ?>
                                     <?= date('d M Y', strtotime($row['auction_date'])) ?>
-                                <?php else: ?>
-                                    <span class="text-muted">N/A</span>
-                                <?php endif; ?>
+                                <?php else: ?><span class="text-muted">N/A</span><?php endif; ?>
                             </td>
                             <td>
                                 <?php 
@@ -702,7 +720,7 @@ include 'header.php';
                             </td>
                             <td>
                                 <?php if (!empty($row['admin_document'])): ?>
-                                    <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-outline-info" title="View Admin Document">
+                                    <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-outline-info">
                                         <i class="fas fa-file-pdf"></i> View
                                     </a>
                                 <?php else: ?>
@@ -712,7 +730,7 @@ include 'header.php';
                             <td>
                                 <a href="properties.php?edit=<?= $row['id'] ?>" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></a>
                                 <?php if ($is_admin): ?>
-                                    <a href="properties.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?\n\nAll images and documents will also be deleted!')"><i class="fas fa-trash"></i></a>
+                                    <a href="properties.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?\n\nAll images and documents will be deleted!')"><i class="fas fa-trash"></i></a>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -724,7 +742,6 @@ include 'header.php';
         <div class="alert alert-info text-center py-4">
             <i class="fas fa-inbox fa-3x d-block mb-3 opacity-50"></i>
             <h5>No properties found</h5>
-            <p class="text-muted">Try adjusting your filters or add a new property.</p>
         </div>
     <?php endif; ?>
 </div>
