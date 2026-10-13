@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // 📄 Property Detail – Full Detail for Paid / Basic for Free
-// (Updated: High-Tech Blur Effect for Free Users)
+// (Updated: With Multi-Image Gallery)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -36,6 +36,24 @@ if ($source == 'auction') {
 
 if(!$prop) { die("Property not found!"); }
 
+// ============================================================
+// 🔥 LOAD GALLERY IMAGES (from property_images table)
+// ============================================================
+$gallery_images = [];
+if ($source == 'auction') {
+    try {
+        $g_stmt = $pdo->prepare("
+            SELECT * FROM property_images 
+            WHERE property_id = ? 
+            ORDER BY display_order ASC, id ASC
+        ");
+        $g_stmt->execute([$property_id]);
+        $gallery_images = $g_stmt->fetchAll();
+    } catch (Exception $e) {
+        $gallery_images = [];
+    }
+}
+
 // Subscription check
 if ($source == 'auction') {
     $has_subscription = userHasActiveSubscription($pdo, $user_id);
@@ -51,7 +69,6 @@ include 'header.php';
 if (!$has_subscription && $source == 'auction') {
     ?>
     <style>
-        /* 🔥 High-Tech Blur Effect Styles */
         .blurred-content {
             filter: blur(6px);
             user-select: none;
@@ -103,13 +120,11 @@ if (!$has_subscription && $source == 'auction') {
         <div class="row justify-content-center">
             <div class="col-lg-9">
                 
-                <!-- Back Button -->
                 <a href="javascript:history.back()" class="btn btn-outline-secondary rounded-pill mb-3">
                     <i class="fas fa-arrow-left me-1"></i> Back
                 </a>
 
                 <div class="card border-0 shadow-lg" style="border-radius: 24px; overflow: hidden;">
-                    <!-- Header -->
                     <div class="card-header text-white text-center p-4" style="background: linear-gradient(135deg, #1e293b, #3b82f6);">
                         <h3><i class="fas fa-lock me-2"></i> Premium Property Details</h3>
                         <p class="mb-0 opacity-75">Unlock full details by subscribing to a package</p>
@@ -159,9 +174,8 @@ if (!$has_subscription && $source == 'auction') {
                             </div>
                         </div>
 
-                        <!-- 🔥 Locked / Blurred Section -->
+                        <!-- Locked Section -->
                         <div class="position-relative">
-                            <!-- Overlay -->
                             <div class="lock-overlay">
                                 <i class="fas fa-crown lock-icon"></i>
                                 <h4 class="fw-bold text-dark mb-2">Unlock Full Property Details</h4>
@@ -171,7 +185,6 @@ if (!$has_subscription && $source == 'auction') {
                                 </a>
                             </div>
                             
-                            <!-- Blurred Grid -->
                             <div class="row g-3 blurred-content">
                                 <div class="col-md-6">
                                     <div class="p-3 rounded-4 shadow-sm text-center" style="background: #f3e8ff; border-left: 5px solid #a855f7;">
@@ -217,11 +230,22 @@ if (!$has_subscription && $source == 'auction') {
 }
 
 // ============================================================
-// 2️⃣ PAID USER VIEW – SUPER BOLD + STYLISH (Unchanged)
+// 2️⃣ PAID USER VIEW – SUPER BOLD + STYLISH + GALLERY
 // ============================================================
 
 $image_url  = $prop['image_url'] ?? '';
 $show_images = true;
+
+// 🔥 Combine main + gallery images (avoid duplicates)
+$all_images = [];
+if (!empty($image_url)) {
+    $all_images[] = $image_url;
+}
+foreach ($gallery_images as $gimg) {
+    if (!empty($gimg['image_url']) && $gimg['image_url'] !== $image_url) {
+        $all_images[] = $gimg['image_url'];
+    }
+}
 
 function getPossessionValue($prop) {
     $possession = '';
@@ -279,18 +303,13 @@ if ($source == 'auction') {
         overflow: hidden;
         transition: all 0.3s ease;
     }
-    .sb-card:hover {
-        box-shadow: 0 20px 60px rgba(0,0,0,0.10);
-    }
+    .sb-card:hover { box-shadow: 0 20px 60px rgba(0,0,0,0.10); }
     .sb-card-header {
         background: linear-gradient(135deg, #f8faff, #ffffff);
         border-bottom: 2px solid #e8edf4;
         padding: 24px 32px;
     }
-    .sb-card-body {
-        padding: 28px 32px 32px;
-        background: #ffffff;
-    }
+    .sb-card-body { padding: 28px 32px 32px; background: #ffffff; }
     .sb-title {
         font-size: 1.8rem;
         font-weight: 800;
@@ -298,10 +317,7 @@ if ($source == 'auction') {
         letter-spacing: -0.5px;
         margin: 0;
     }
-    .sb-title i {
-        color: #2563eb;
-        margin-right: 10px;
-    }
+    .sb-title i { color: #2563eb; margin-right: 10px; }
     .sb-badge {
         background: #f1f5f9;
         color: #1e293b;
@@ -313,10 +329,7 @@ if ($source == 'auction') {
         letter-spacing: 0.4px;
         border: 1px solid #e8edf4;
     }
-    .sb-badge i {
-        margin-right: 6px;
-        color: #2563eb;
-    }
+    .sb-badge i { margin-right: 6px; color: #2563eb; }
     .sb-badge-subscribed {
         background: #dbeafe;
         color: #1e40af;
@@ -355,11 +368,7 @@ if ($source == 'auction') {
         margin-bottom: 24px;
         border: 1px solid #bfdbfe;
     }
-    .sb-address-box i {
-        color: #2563eb;
-        margin-right: 8px;
-        font-size: 1.1rem;
-    }
+    .sb-address-box i { color: #2563eb; margin-right: 8px; font-size: 1.1rem; }
     .sb-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -445,6 +454,56 @@ if ($source == 'auction') {
         color: #64748b;
         border-top: 1px solid #e8edf4;
     }
+
+    /* 🔥 GALLERY STYLES */
+    .sb-gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+    }
+    .sb-gallery-item {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 2px solid #e8edf4;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        background: #f8fafc;
+        aspect-ratio: 1 / 1;
+    }
+    .sb-gallery-item:hover {
+        transform: scale(1.04);
+        border-color: #2563eb;
+        box-shadow: 0 8px 22px rgba(37,99,235,0.2);
+    }
+    .sb-gallery-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .sb-gallery-item .badge-num {
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        background: rgba(15,23,42,0.75);
+        color: #fff;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 20px;
+        backdrop-filter: blur(4px);
+    }
+    .sb-gallery-item.main-photo {
+        border-color: #fbbf24;
+        box-shadow: 0 4px 15px rgba(251,191,36,0.3);
+    }
+    .sb-gallery-item.main-photo .badge-num {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        color: #0a0f1a;
+    }
+
     .sb-similar-card {
         background: #ffffff;
         border-radius: 16px;
@@ -458,9 +517,7 @@ if ($source == 'auction') {
         box-shadow: 0 12px 35px rgba(0,0,0,0.08);
         border-color: #2563eb;
     }
-    .sb-similar-card .body {
-        padding: 16px;
-    }
+    .sb-similar-card .body { padding: 16px; }
     .sb-similar-card .body h6 {
         font-size: 0.95rem;
         font-weight: 800;
@@ -522,9 +579,11 @@ if ($source == 'auction') {
         .sb-card-header { flex-direction: column; align-items: stretch; padding: 18px 20px; }
         .sb-price-tag { margin-top: 12px; }
         .sb-card-body { padding: 18px 18px 22px; }
+        .sb-gallery { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
     }
     @media (max-width: 576px) {
         .sb-grid { grid-template-columns: 1fr; }
+        .sb-gallery { grid-template-columns: repeat(3, 1fr); }
     }
 </style>
 
@@ -603,7 +662,7 @@ if ($source == 'auction') {
                         </div>
                         <div class="sb-grid-item">
                             <span class="label">Price per Sq Ft</span>
-                            <span class="value">₹ <?= number_format($prop['price_per_sqft'] ?? 0, 2) ?></span>
+                            <span class="value">₹ <?= number_format($prop['price_per_sqft'] ?? $prop['reserve_price_per_sqft'] ?? 0, 2) ?></span>
                         </div>
                     </div>
 
@@ -672,21 +731,68 @@ if ($source == 'auction') {
                     </div>
                     <?php endif; ?>
 
-                    <!-- Image -->
-                    <div class="sb-section-title"><i class="fas fa-image"></i> Property Image</div>
-                    <div class="sb-image-box">
-                        <?php if(!empty($image_url)): ?>
-                            <a href="<?= htmlspecialchars($image_url) ?>" target="_blank">
-                                <img src="<?= htmlspecialchars($image_url) ?>" alt="Property Image">
+                    <!-- ============================================================
+                    🔥 PROPERTY IMAGES (MAIN + GALLERY)
+                    ============================================================ -->
+                    <div class="sb-section-title">
+                        <i class="fas fa-image"></i> 
+                        Property Images 
+                        <?php if (count($all_images) > 0): ?>
+                            <span class="badge bg-primary rounded-pill ms-2" style="font-size:0.7rem;">
+                                <?= count($all_images) ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if (count($all_images) > 0): ?>
+
+                        <!-- Main / Featured Image -->
+                        <div class="sb-image-box">
+                            <a href="<?= htmlspecialchars($all_images[0]) ?>" target="_blank" id="mainImageLink">
+                                <img src="<?= htmlspecialchars($all_images[0]) ?>" 
+                                     alt="Main Property Image"
+                                     id="mainImageDisplay">
                             </a>
-                            <div class="caption"><i class="fas fa-expand me-1"></i> Click to view full size</div>
-                        <?php else: ?>
+                            <div class="caption">
+                                <i class="fas fa-expand me-1"></i> 
+                                Click any image to view full size
+                                <?php if (count($all_images) > 1): ?>
+                                    • Total <?= count($all_images) ?> images
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Gallery Thumbnails (if more than 1 image) -->
+                        <?php if (count($all_images) > 1): ?>
+                            <div class="mt-3">
+                                <small class="text-muted fw-bold d-block mb-2">
+                                    <i class="fas fa-images me-1"></i> Gallery (<?= count($all_images) ?> images)
+                                </small>
+                                <div class="sb-gallery">
+                                    <?php foreach ($all_images as $idx => $img_url): ?>
+                                        <div class="sb-gallery-item <?= $idx === 0 ? 'main-photo' : '' ?>"
+                                             onclick="swapMainImage('<?= htmlspecialchars($img_url, ENT_QUOTES) ?>', this)">
+                                            <span class="badge-num">
+                                                <?= $idx === 0 ? '★ Main' : '#' . ($idx + 1) ?>
+                                            </span>
+                                            <img src="<?= htmlspecialchars($img_url) ?>" 
+                                                 alt="Gallery Image <?= $idx + 1 ?>"
+                                                 loading="lazy">
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                    <?php else: ?>
+                        <!-- No Image -->
+                        <div class="sb-image-box">
                             <div style="height:200px; display:flex; align-items:center; justify-content:center; background:#fafcfd; color:#94a3b8; font-weight:700;">
                                 <i class="fas fa-image fa-2x opacity-25 me-2"></i>
                                 <span style="font-size:1rem;">No Image Available</span>
                             </div>
-                        <?php endif; ?>
-                    </div>
+                        </div>
+                    <?php endif; ?>
 
                     <!-- Similar Properties -->
                     <?php if($source == 'auction' && count($similar_props) > 0): ?>
@@ -720,5 +826,31 @@ if ($source == 'auction') {
         </div>
     </div>
 </div>
+
+<!-- 🔥 Gallery JS: Click thumbnail to swap main image -->
+<script>
+function swapMainImage(url, elem) {
+    // Swap main image
+    const mainImg = document.getElementById('mainImageDisplay');
+    const mainLink = document.getElementById('mainImageLink');
+    if (mainImg) mainImg.src = url;
+    if (mainLink) mainLink.href = url;
+
+    // Highlight selected thumbnail
+    document.querySelectorAll('.sb-gallery-item').forEach(el => {
+        el.style.borderColor = '#e8edf4';
+        el.style.boxShadow = 'none';
+    });
+    if (elem) {
+        elem.style.borderColor = '#2563eb';
+        elem.style.boxShadow = '0 8px 22px rgba(37,99,235,0.3)';
+    }
+
+    // Scroll to main image
+    if (mainImg) {
+        mainImg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+</script>
 
 <?php include 'footer.php'; ?>
