@@ -15,6 +15,7 @@ $property_types = [
     'Car/Vehicle', 'Commercial', 'Office', 'Row House', 'Bungalow', 'Other',
 ];
 
+// ---- Filters ----
 $city_filter = $_GET['city'] ?? '';
 $bank_filter = $_GET['bank'] ?? '';
 $min_price = $_GET['min_price'] ?? '';
@@ -84,7 +85,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     }
 }
 
-// Handle Delete
+// Handle Delete Property
 if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     $delete_id = (int)$_GET['delete'];
     $stmt = $pdo->prepare("SELECT admin_document, image_url FROM properties WHERE id = ?");
@@ -340,8 +341,9 @@ function saveGalleryImages($pdo, $property_id, $main_image = null) {
 include 'header.php';
 ?>
 
-<!-- 🔥 COMPACT TABLE WITH STICKY ACTIONS -->
+<!-- 🔥 ALL STYLES -->
 <style>
+    /* ========== COMPACT TABLE ========== */
     .compact-table-wrapper {
         background: #fff;
         border-radius: 14px;
@@ -388,20 +390,10 @@ include 'header.php';
     .compact-table tbody tr:last-child td {
         border-bottom: none;
     }
-
-    /* Column widths */
-    .compact-table .col-id {
-        width: 55px;
-        font-weight: 700;
-        color: #1e40af;
-        font-size: 0.75rem;
-    }
-    .compact-table .col-img {
-        width: 55px;
-    }
+    .compact-table .col-id { width: 55px; font-weight: 700; color: #1e40af; font-size: 0.75rem; }
+    .compact-table .col-img { width: 55px; }
     .compact-table .col-img img {
-        width: 40px;
-        height: 40px;
+        width: 40px; height: 40px;
         object-fit: cover;
         border-radius: 6px;
         border: 1px solid #e2e8f0;
@@ -416,8 +408,7 @@ include 'header.php';
         box-shadow: 0 8px 25px rgba(0,0,0,0.25);
     }
     .compact-table .col-img .no-img {
-        width: 40px;
-        height: 40px;
+        width: 40px; height: 40px;
         background: #f1f5f9;
         border-radius: 6px;
         display: flex;
@@ -427,11 +418,7 @@ include 'header.php';
         font-size: 0.6rem;
         font-weight: 700;
     }
-    .compact-table .col-title {
-        max-width: 200px;
-        font-weight: 600;
-        color: #0f172a;
-    }
+    .compact-table .col-title { max-width: 200px; font-weight: 600; color: #0f172a; }
     .compact-table .ellipsis {
         display: block;
         white-space: nowrap;
@@ -445,39 +432,12 @@ include 'header.php';
         border-radius: 20px;
         font-weight: 700;
     }
-    .compact-table .col-bank {
-        max-width: 120px;
-        font-size: 0.75rem;
-        color: #475569;
-    }
-    .compact-table .col-city {
-        font-size: 0.78rem;
-        color: #334155;
-        font-weight: 600;
-        white-space: nowrap;
-    }
-    .compact-table .col-locality {
-        font-size: 0.72rem;
-        color: #64748b;
-        max-width: 110px;
-    }
-    .compact-table .col-price {
-        font-weight: 700;
-        color: #059669;
-        font-size: 0.82rem;
-        white-space: nowrap;
-    }
-    .compact-table .col-date {
-        font-size: 0.72rem;
-        color: #64748b;
-        white-space: nowrap;
-    }
-    .compact-table .col-doc {
-        width: 55px;
-        text-align: center;
-    }
-
-    /* 🔥 STICKY ACTIONS COLUMN — Always visible on right */
+    .compact-table .col-bank { max-width: 120px; font-size: 0.75rem; color: #475569; }
+    .compact-table .col-city { font-size: 0.78rem; color: #334155; font-weight: 600; white-space: nowrap; }
+    .compact-table .col-locality { font-size: 0.72rem; color: #64748b; max-width: 110px; }
+    .compact-table .col-price { font-weight: 700; color: #059669; font-size: 0.82rem; white-space: nowrap; }
+    .compact-table .col-date { font-size: 0.72rem; color: #64748b; white-space: nowrap; }
+    .compact-table .col-doc { width: 55px; text-align: center; }
     .compact-table .col-actions {
         width: 85px;
         text-align: center;
@@ -495,11 +455,8 @@ include 'header.php';
     .compact-table tbody tr:hover .col-actions {
         background: #f8faff !important;
     }
-
-    /* Small round action buttons */
     .btn-xs {
-        width: 26px;
-        height: 26px;
+        width: 26px; height: 26px;
         padding: 0;
         display: inline-flex;
         align-items: center;
@@ -517,7 +474,7 @@ include 'header.php';
     .btn-xs.btn-info { background: #0891b2; color: #fff; text-decoration: none; }
     .btn-xs.btn-info:hover { background: #0e7490; transform: scale(1.1); color: #fff; }
 
-    /* Page header compact */
+    /* ========== PAGE HEADER / FILTERS ========== */
     .page-header-compact {
         display: flex;
         justify-content: space-between;
@@ -541,8 +498,6 @@ include 'header.php';
         font-weight: 700;
         margin-left: 6px;
     }
-
-    /* Compact filter bar */
     .filter-bar-compact {
         background: #fff;
         border-radius: 12px;
@@ -563,8 +518,6 @@ include 'header.php';
         height: 34px;
         border-radius: 8px;
     }
-
-    /* Pagination compact */
     .compact-pagination {
         margin-top: 14px;
         display: flex;
@@ -593,19 +546,120 @@ include 'header.php';
         color: #fff;
         border-color: #2563eb;
     }
-    .compact-pagination .disabled {
-        opacity: 0.4;
-        pointer-events: none;
+    .compact-pagination .disabled { opacity: 0.4; pointer-events: none; }
+    .compact-pagination .dots { border: none; background: transparent; }
+
+    /* ========== 🔥 CUSTOM FILE UPLOAD UI ========== */
+    .custom-upload-box {
+        border: 2px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 18px;
+        text-align: center;
+        background: #f8fafc;
+        transition: all 0.2s;
+        cursor: pointer;
     }
-    .compact-pagination .dots {
-        border: none;
-        background: transparent;
+    .custom-upload-box:hover {
+        border-color: #2563eb;
+        background: #eff6ff;
+    }
+    .custom-upload-box input[type="file"] {
+        display: none;
+    }
+    .custom-upload-box .upload-icon {
+        font-size: 1.8rem;
+        color: #94a3b8;
+        margin-bottom: 6px;
+    }
+    .custom-upload-box .upload-text {
+        font-size: 0.85rem;
+        color: #475569;
+        font-weight: 600;
+    }
+    .custom-upload-box .upload-hint {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        margin-top: 4px;
+    }
+
+    /* Preview grid */
+    .preview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 8px;
+        margin-top: 10px;
+    }
+    .preview-item {
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 2px solid #e2e8f0;
+        background: #fff;
+        aspect-ratio: 1;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    .preview-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .preview-item .file-name {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(15,23,42,0.75);
+        color: #fff;
+        font-size: 0.6rem;
+        padding: 3px 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        backdrop-filter: blur(4px);
+    }
+    .preview-item .remove-btn {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #dc2626;
+        color: #fff;
+        border: 2px solid #fff;
+        font-size: 12px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-weight: bold;
+        box-shadow: 0 2px 6px rgba(220,38,38,0.4);
+        transition: all 0.15s;
+    }
+    .preview-item .remove-btn:hover {
+        background: #b91c1c;
+        transform: scale(1.15);
+    }
+    .preview-item.single .remove-btn {
+        width: 26px;
+        height: 26px;
+        font-size: 14px;
+    }
+    .preview-label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
     }
 </style>
 
 <div class="container-fluid mt-3">
 
-    <!-- Page Header -->
     <div class="page-header-compact">
         <h1>
             🏠 All Properties 
@@ -632,7 +686,7 @@ include 'header.php';
         </div>
     <?php endif; ?>
 
-    <!-- ADD/EDIT FORM (Unchanged) -->
+    <!-- ============ ADD/EDIT FORM ============ -->
     <?php if (isset($_GET['add']) || $edit_mode): ?>
     <div class="card shadow-lg rounded-4 mb-4 border-0">
         <div class="card-header bg-primary text-white p-3 rounded-top-4">
@@ -753,68 +807,103 @@ include 'header.php';
                         </select>
                     </div>
 
+                    <!-- ============================================================
+                         🔥 MAIN / COVER IMAGE — Remove Option #1
+                         ============================================================ -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-primary">
                             <i class="fas fa-image me-1"></i> Main / Cover Image
                         </label>
-                        <input type="file" name="image" class="form-control" accept="image/*">
-                        <small class="text-muted d-block mt-1">JPG, PNG, WEBP, GIF allowed</small>
 
+                        <!-- Custom upload box -->
+                        <div class="custom-upload-box" onclick="document.getElementById('mainImageInput').click();">
+                            <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                            <div class="upload-text">Click to select image</div>
+                            <div class="upload-hint">JPG, PNG, WEBP, GIF • Max 5MB</div>
+                            <input type="file" name="image" id="mainImageInput" accept="image/*"
+                                   onchange="handleMainImageSelect(this)">
+                        </div>
+
+                        <!-- 🔥 Preview + Remove (New Selection) -->
+                        <div class="preview-grid" id="mainImagePreview"></div>
+
+                        <!-- 🔥 Existing Image on Server + Remove (Edit mode) -->
                         <?php if ($edit_mode && !empty($prop['image_url'])): ?>
                             <div class="mt-3 p-3 rounded-3" style="background:#f0fdf4; border:1px solid #86efac;">
+                                <span class="preview-label">
+                                    <i class="fas fa-server me-1"></i> Current on Server
+                                </span>
                                 <div class="d-flex align-items-center gap-3">
                                     <img src="<?= htmlspecialchars($prop['image_url']) ?>"
-                                         alt="Main"
-                                         style="width:80px; height:80px; object-fit:cover; border-radius:10px; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                                         alt="Current"
+                                         style="width:70px; height:70px; object-fit:cover; border-radius:10px; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
                                     <div>
-                                        <strong class="d-block small text-success">
-                                            <i class="fas fa-check-circle me-1"></i> Current Cover
-                                        </strong>
-                                        <div class="form-check mt-2">
+                                        <div class="form-check">
                                             <input type="checkbox" name="remove_image" value="1"
-                                                   class="form-check-input" id="remove_image">
+                                                   class="form-check-input" id="remove_image"
+                                                   onchange="toggleServerMainRemoval(this)">
                                             <label class="form-check-label small text-danger fw-bold" for="remove_image">
-                                                <i class="fas fa-trash me-1"></i> Remove Cover
+                                                <i class="fas fa-trash me-1"></i> Remove This Cover
                                             </label>
                                         </div>
+                                        <small class="text-muted d-block mt-1" style="font-size:0.68rem;">
+                                            नई image select नहीं करते तो यह बनी रहेगी
+                                        </small>
                                     </div>
                                 </div>
                             </div>
                         <?php endif; ?>
                     </div>
 
+                    <!-- ============================================================
+                         🔥 GALLERY IMAGES — Remove Option #2 & #3
+                         ============================================================ -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-success">
                             <i class="fas fa-images me-1"></i> Gallery Images (Multiple)
                         </label>
-                        <input type="file" name="images[]" class="form-control" accept="image/*" multiple>
-                        <small class="text-muted d-block mt-1">
-                            एक साथ कई images select करें (Ctrl/Cmd दबाकर)
-                        </small>
 
+                        <!-- Custom upload box -->
+                        <div class="custom-upload-box" onclick="document.getElementById('galleryInput').click();">
+                            <div class="upload-icon"><i class="fas fa-images"></i></div>
+                            <div class="upload-text">Click to select multiple images</div>
+                            <div class="upload-hint">एक साथ कई images select करें</div>
+                            <input type="file" name="images[]" id="galleryInput" accept="image/*" multiple
+                                   onchange="handleGallerySelect(this)">
+                        </div>
+
+                        <!-- 🔥 Preview + Remove (New Selection) -->
+                        <div class="preview-grid" id="galleryPreview"></div>
+
+                        <!-- 🔥 Existing Gallery on Server + Remove (Edit mode) -->
                         <?php if ($edit_mode && !empty($existing_images)): ?>
                             <div class="mt-3 p-3 rounded-3" style="background:#eff6ff; border:1px solid #93c5fd;">
-                                <strong class="d-block small mb-2 text-primary">
-                                    <i class="fas fa-images me-1"></i> Current Gallery (<?= count($existing_images) ?>)
-                                </strong>
+                                <span class="preview-label">
+                                    <i class="fas fa-server me-1"></i> Current Gallery on Server (<?= count($existing_images) ?>)
+                                </span>
                                 <div class="d-flex flex-wrap gap-2">
                                     <?php foreach ($existing_images as $img): ?>
                                         <div style="position:relative;">
                                             <img src="<?= htmlspecialchars($img['image_url']) ?>"
                                                  alt="Gallery"
-                                                 style="width:70px; height:70px; object-fit:cover; border-radius:8px; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+                                                 style="width:65px; height:65px; object-fit:cover; border-radius:8px; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
                                             <a href="delete_property_image.php?id=<?= $img['id'] ?>&prop=<?= $prop['id'] ?>"
-                                               onclick="return confirm('Delete this image?')"
-                                               style="position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:#dc2626; color:#fff; font-size:11px; text-align:center; line-height:22px; text-decoration:none; font-weight:bold; box-shadow:0 2px 6px rgba(220,38,38,0.4);">
+                                               onclick="return confirm('Delete this image from server?')"
+                                               style="position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:#dc2626; color:#fff; font-size:11px; text-align:center; line-height:22px; text-decoration:none; font-weight:bold; box-shadow:0 2px 6px rgba(220,38,38,0.4);"
+                                               title="Delete from server">
                                                 ×
                                             </a>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
+                                <small class="text-muted d-block mt-2" style="font-size:0.68rem;">
+                                    <i class="fas fa-info-circle me-1"></i> ऊपर red × click करते ही server से image हट जाएगी
+                                </small>
                             </div>
                         <?php endif; ?>
                     </div>
 
+                    <!-- ADMIN DOCUMENT -->
                     <div class="col-12">
                         <label class="form-label fw-bold text-danger">
                             <i class="fas fa-file-pdf me-1"></i> Admin Document (PDF/JPG/PNG - Only for Admins)
@@ -845,7 +934,7 @@ include 'header.php';
     </div>
     <?php endif; ?>
 
-    <!-- COMPACT FILTER BAR -->
+    <!-- FILTER BAR -->
     <div class="filter-bar-compact">
         <form method="GET" class="row g-2 align-items-center">
             <div class="col-auto" style="min-width:140px;">
@@ -984,7 +1073,7 @@ include 'header.php';
             </table>
         </div>
 
-        <!-- COMPACT PAGINATION -->
+        <!-- PAGINATION -->
         <?php if ($total_pages > 1): ?>
             <div class="compact-pagination">
                 <?php if ($page > 1): ?>
@@ -1035,5 +1124,152 @@ include 'header.php';
         </div>
     <?php endif; ?>
 </div>
+
+<!-- 🔥 IMAGE PREVIEW + REMOVE JAVASCRIPT -->
+<script>
+// ============================================================
+// 🔥 MAIN IMAGE — Select + Preview + Remove (Option #1)
+// ============================================================
+function handleMainImageSelect(input) {
+    const preview = document.getElementById('mainImagePreview');
+    preview.innerHTML = '';
+
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        if (file.size > 5 * 1024 * 1024) {
+            alert('❌ Image is too large. Max 5MB allowed.');
+            input.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const item = document.createElement('div');
+            item.className = 'preview-item single';
+            item.innerHTML = `
+                <img src="${e.target.result}" alt="Preview">
+                <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+                <button type="button" class="remove-btn" onclick="removeMainImage(event)" title="Remove this image">×</button>
+            `;
+            preview.appendChild(item);
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function removeMainImage(event) {
+    event.stopPropagation();
+    const input = document.getElementById('mainImageInput');
+    input.value = '';
+    document.getElementById('mainImagePreview').innerHTML = '';
+}
+
+// ============================================================
+// 🔥 GALLERY — Multiple Select + Preview + Individual Remove (Option #2)
+// ============================================================
+let galleryFiles = [];
+
+function handleGallerySelect(input) {
+    if (!input.files) return;
+
+    const existingNames = galleryFiles.map(f => f.name + '_' + f.size);
+    for (let i = 0; i < input.files.length; i++) {
+        const f = input.files[i];
+        if (f.size > 5 * 1024 * 1024) {
+            alert(`❌ "${f.name}" is too large (Max 5MB)`);
+            continue;
+        }
+        const key = f.name + '_' + f.size;
+        if (!existingNames.includes(key)) {
+            galleryFiles.push(f);
+            existingNames.push(key);
+        }
+    }
+    renderGalleryPreview();
+    syncGalleryInput();
+}
+
+function renderGalleryPreview() {
+    const preview = document.getElementById('galleryPreview');
+    preview.innerHTML = '';
+
+    if (galleryFiles.length > 0) {
+        const label = document.createElement('div');
+        label.className = 'preview-label';
+        label.style.gridColumn = '1 / -1';
+        label.innerHTML = `<i class="fas fa-eye me-1"></i> New selection (${galleryFiles.length}) — not uploaded yet`;
+        preview.appendChild(label);
+    }
+
+    galleryFiles.forEach((file, idx) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const item = document.createElement('div');
+            item.className = 'preview-item';
+            item.innerHTML = `
+                <img src="${e.target.result}" alt="Preview">
+                <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+                <button type="button" class="remove-btn" onclick="removeGalleryImage(event, ${idx})" title="Remove this image">×</button>
+            `;
+            preview.appendChild(item);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function removeGalleryImage(event, idx) {
+    event.stopPropagation();
+    galleryFiles.splice(idx, 1);
+    renderGalleryPreview();
+    syncGalleryInput();
+}
+
+function syncGalleryInput() {
+    const input = document.getElementById('galleryInput');
+    const dt = new DataTransfer();
+    galleryFiles.forEach(f => dt.items.add(f));
+    input.files = dt.files;
+}
+
+// ============================================================
+// 🔥 SERVER IMAGE REMOVAL — Option #3 (Visual feedback)
+// ============================================================
+function toggleServerMainRemoval(checkbox) {
+    const container = checkbox.closest('.p-3');
+    const img = container.querySelector('img');
+    if (checkbox.checked) {
+        img.style.opacity = '0.3';
+        img.style.filter = 'grayscale(1)';
+        container.style.background = '#fef2f2';
+        container.style.borderColor = '#fecaca';
+    } else {
+        img.style.opacity = '1';
+        img.style.filter = 'none';
+        container.style.background = '#f0fdf4';
+        container.style.borderColor = '#86efac';
+    }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Ensure gallery input is synced before submit
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('form[enctype="multipart/form-data"]');
+    forms.forEach(form => {
+        form.addEventListener('submit', function() {
+            syncGalleryInput();
+        });
+    });
+});
+</script>
 
 <?php include 'footer.php'; ?>
