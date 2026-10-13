@@ -65,7 +65,6 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
 if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     $delete_id = (int)$_GET['delete'];
 
-    // Delete admin document
     $stmt = $pdo->prepare("SELECT admin_document, image_url FROM properties WHERE id = ?");
     $stmt->execute([$delete_id]);
     $row_to_del = $stmt->fetch();
@@ -222,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     // ============================================================
-    // 🔥 UPLOAD: Main Image (single, kept for backward compat)
+    // UPLOAD: Main Image
     // ============================================================
     $image_url_path = $edit_mode ? ($prop['image_url'] ?? null) : null;
 
@@ -256,7 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     // ============================================================
-    // 🔥 INSERT / UPDATE
+    // INSERT / UPDATE
     // ============================================================
     $action = $_POST['action'];
 
@@ -279,7 +278,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         ]);
         $new_prop_id = $pdo->lastInsertId();
 
-        // 🔥 Handle multi-image gallery upload
         saveGalleryImages($pdo, $new_prop_id, $image_url_path);
 
         header("Location: properties.php?msg=added");
@@ -305,7 +303,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $inspection_date_parsed, $admin_document_path, $image_url_path, $id
         ]);
 
-        // 🔥 Handle multi-image gallery upload
         saveGalleryImages($pdo, $id, $image_url_path);
 
         header("Location: properties.php?msg=updated");
@@ -322,7 +319,6 @@ function saveGalleryImages($pdo, $property_id, $main_image = null) {
     $img_dir = __DIR__ . '/uploads/property_images/';
     if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
 
-    // Get current max display_order
     $maxOrder = 0;
     try {
         $stmt = $pdo->prepare("SELECT COALESCE(MAX(display_order), 0) FROM property_images WHERE property_id = ?");
@@ -353,7 +349,6 @@ function saveGalleryImages($pdo, $property_id, $main_image = null) {
         }
     }
 
-    // 🔥 If main image_url is empty, set first uploaded gallery image as main
     if (!empty($first_uploaded)) {
         $pdo->prepare("UPDATE properties SET image_url = COALESCE(NULLIF(image_url, ''), ?) WHERE id = ?")
             ->execute([$first_uploaded, $property_id]);
@@ -510,9 +505,7 @@ include 'header.php';
                         </select>
                     </div>
 
-                    <!-- ============================================================
-                    🔥 MAIN IMAGE (single)
-                    ============================================================ -->
+                    <!-- MAIN IMAGE -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-primary">
                             <i class="fas fa-image me-1"></i> Main / Cover Image
@@ -543,9 +536,7 @@ include 'header.php';
                         <?php endif; ?>
                     </div>
 
-                    <!-- ============================================================
-                    🔥 MULTIPLE GALLERY IMAGES (NEW)
-                    ============================================================ -->
+                    <!-- GALLERY IMAGES -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-success">
                             <i class="fas fa-images me-1"></i> Gallery Images (Multiple)
@@ -574,23 +565,33 @@ include 'header.php';
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
-                                <small class="text-muted d-block mt-2">ऊपर red × दबाकर कोई भी image हटा सकते हैं</small>
                             </div>
                         <?php endif; ?>
                     </div>
 
-                    <!-- ADMIN DOCUMENT UPLOAD -->
+                    <!-- ADMIN DOCUMENT -->
                     <div class="col-12">
                         <label class="form-label fw-bold text-danger">
                             <i class="fas fa-file-pdf me-1"></i> Admin Document (PDF/JPG/PNG - Only for Admins)
                         </label>
                         <input type="file" name="admin_document" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
                         <?php if ($edit_mode && !empty($prop['admin_document'])): ?>
-                            <small class="text-success d-block mt-1">
-                                Current file: <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank">
-                                    <i class="fas fa-external-link-alt me-1"></i>View Document
-                                </a>
-                            </small>
+                            <?php 
+                            $doc_check = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
+                            $doc_exists = file_exists($doc_check);
+                            ?>
+                            <?php if ($doc_exists): ?>
+                                <small class="text-success d-block mt-1">
+                                    Current file: <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank">
+                                        <i class="fas fa-external-link-alt me-1"></i>View Document
+                                    </a>
+                                </small>
+                            <?php else: ?>
+                                <small class="text-danger d-block mt-1">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    Previous document is missing on server. कृपया दोबारा upload करें।
+                                </small>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
 
@@ -680,15 +681,31 @@ include 'header.php';
                             $c->execute([$row['id']]);
                             $gallery_count = (int)$c->fetchColumn();
                         } catch (Exception $e) {}
+
+                        // 🔥 Check main image exists on disk
+                        $main_img_check = !empty($row['image_url']) 
+                            ? __DIR__ . '/' . ltrim($row['image_url'], '/') 
+                            : '';
+                        $main_img_exists = ($main_img_check && file_exists($main_img_check));
+
+                        // 🔥 Check admin doc exists on disk
+                        $doc_check = !empty($row['admin_document']) 
+                            ? __DIR__ . '/' . ltrim($row['admin_document'], '/') 
+                            : '';
+                        $doc_exists = ($doc_check && file_exists($doc_check) && is_file($doc_check));
                     ?>
                         <tr>
                             <td><?= htmlspecialchars($row['id'] ?? '') ?></td>
                             <td>
-                                <?php if (!empty($row['image_url']) && file_exists(__DIR__ . '/' . ltrim($row['image_url'], '/'))): ?>
+                                <?php if ($main_img_exists): ?>
                                     <img src="<?= htmlspecialchars($row['image_url']) ?>"
                                          alt="Property"
                                          style="width:60px; height:60px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid #e2e8f0;"
                                          onclick="window.open(this.src, '_blank')">
+                                <?php elseif (!empty($row['image_url'])): ?>
+                                    <span class="badge bg-danger" style="font-size:0.6rem;">
+                                        <i class="fas fa-exclamation-triangle"></i> Missing
+                                    </span>
                                 <?php else: ?>
                                     <span class="badge bg-secondary">No Image</span>
                                 <?php endif; ?>
@@ -719,9 +736,16 @@ include 'header.php';
                                 <span class="badge bg-<?= $badgeClass ?>"><?= htmlspecialchars($statusVal) ?></span>
                             </td>
                             <td>
-                                <?php if (!empty($row['admin_document'])): ?>
-                                    <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-outline-info">
+                                <?php if ($doc_exists): ?>
+                                    <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" 
+                                       class="btn btn-sm btn-outline-info" title="View Admin Document">
                                         <i class="fas fa-file-pdf"></i> View
+                                    </a>
+                                <?php elseif (!empty($row['admin_document'])): ?>
+                                    <a href="properties.php?edit=<?= $row['id'] ?>" 
+                                       class="badge bg-danger text-decoration-none" 
+                                       title="File missing – click to re-upload">
+                                        <i class="fas fa-exclamation-triangle"></i> Missing
                                     </a>
                                 <?php else: ?>
                                     <span class="text-muted small">No File</span>
