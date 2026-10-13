@@ -1,49 +1,103 @@
 <?php
+// ============================================================
+// 📄 View Admin Document – Robust Path Resolver
+// ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// 🔥 SIRF ADMIN YA SUB-ADMIN HI DEKH SAKTE HAIN
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['role'] != 'sub_admin')) {
-    http_response_code(403);
-    die("<h2 style='color:red; text-align:center; margin-top:50px;'>Access Denied</h2><p style='text-align:center;'>You do not have permission to view this document.</p>");
+    header("Location: login.php");
+    exit;
 }
 
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
-    die("Invalid Request");
+    die("<div style='font-family:sans-serif;padding:20px;color:#dc2626;'>❌ Invalid Property ID</div>");
 }
 
-// Fetch file path from database
-$stmt = $pdo->prepare("SELECT admin_document FROM properties WHERE id = ?");
+$stmt = $pdo->prepare("SELECT admin_document, title FROM properties WHERE id = ?");
 $stmt->execute([$id]);
-$doc_path = $stmt->fetchColumn();
+$row = $stmt->fetch();
 
-if (!$doc_path || !file_exists(__DIR__ . '/' . $doc_path)) {
-    http_response_code(404);
-    die("File not found on server.");
+if (!$row) {
+    die("<div style='font-family:sans-serif;padding:20px;color:#dc2626;'>❌ Property not found</div>");
 }
 
-$full_path = __DIR__ . '/' . $doc_path;
-$ext = strtolower(pathinfo($full_path, PATHINFO_EXTENSION));
+$doc = trim($row['admin_document'] ?? '');
 
-// Set appropriate headers based on file type
-if ($ext == 'pdf') {
-    header('Content-Type: application/pdf');
-} elseif (in_array($ext, ['jpg', 'jpeg'])) {
-    header('Content-Type: image/jpeg');
-} elseif ($ext == 'png') {
-    header('Content-Type: image/png');
-} else {
-    header('Content-Type: application/octet-stream');
+if (empty($doc)) {
+    die("<div style='font-family:sans-serif;padding:20px;color:#dc2626;'>❌ No document uploaded for this property.</div>");
 }
 
-// Display inline (browser mein khulega)
-header('Content-Disposition: inline; filename="' . basename($full_path) . '"');
-header('Content-Length: ' . filesize($full_path));
-header('Cache-Control: private, max-age=0, must-revalidate');
-header('Pragma: public');
+// ============================================================
+// 🔥 TRY MULTIPLE POSSIBLE PATHS
+// ============================================================
+$clean_doc = ltrim($doc, '/');
 
-// Output the file
-readfile($full_path);
+$possible_paths = [
+    __DIR__ . '/' . $clean_doc,                       // /var/www/html/uploads/...
+    __DIR__ . '/' . $doc,                             // with leading slash
+    dirname(__DIR__) . '/' . $clean_doc,              // parent dir
+    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/' . $clean_doc,
+    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/' . $doc,
+    __DIR__ . '/uploads/admin_documents/' . basename($clean_doc),
+];
+
+$found_path = null;
+foreach ($possible_paths as $p) {
+    if (!empty($p) && file_exists($p) && is_file($p)) {
+        $found_path = $p;
+        break;
+    }
+}
+
+// ============================================================
+// 🔥 IF NOT FOUND – Detailed debug info
+// ============================================================
+if (!$found_path) {
+    $debug_paths = implode('<br>', array_map('htmlspecialchars', array_filter($possible_paths)));
+    die("
+    <div style='font-family:sans-serif;padding:30px;max-width:800px;margin:auto;background:#fef2f2;border:2px solid #fecaca;border-radius:12px;'>
+        <h2 style='color:#dc2626;margin-top:0;'>❌ File not found on server</h2>
+        <p><strong>Property:</strong> #" . htmlspecialchars($id) . " – " . htmlspecialchars($row['title']) . "</p>
+        <p><strong>Stored path in DB:</strong><br><code style='background:#fff;padding:6px 10px;border-radius:6px;display:inline-block;'>" . htmlspecialchars($doc) . "</code></p>
+        <p><strong>Paths tried:</strong></p>
+        <ul style='background:#fff;padding:12px 24px;border-radius:8px;'>
+            " . implode('', array_map(function($p) { return '<li><code>' . htmlspecialchars($p) . '</code></li>'; }, array_filter($possible_paths))) . "
+        </ul>
+        <p style='background:#fffbeb;border-left:4px solid #f59e0b;padding:12px;border-radius:8px;'>
+            <strong>💡 Fix:</strong> Document file server पर मौजूद नहीं है। Property edit करके दोबारा upload करें।
+        </p>
+        <a href='properties.php?edit=" . $id . "' style='display:inline-block;margin-top:10px;padding:10px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:20px;font-weight:600;'>Edit Property</a>
+        <a href='properties.php' style='display:inline-block;margin-top:10px;padding:10px 24px;background:#64748b;color:#fff;text-decoration:none;border-radius:20px;font-weight:600;margin-left:10px;'>Back</a>
+    </div>
+    ");
+}
+
+// ============================================================
+// 🔥 STREAM FILE
+// ============================================================
+$ext = strtolower(pathinfo($found_path, PATHINFO_EXTENSION));
+
+$mime_types = [
+    'pdf'  => 'application/pdf',
+    'jpg'  => 'image/jpeg',
+    'jpeg' => 'image/jpeg',
+    'png'  => 'image/png',
+    'gif'  => 'image/gif',
+    'webp' => 'image/webp',
+];
+
+$mime = $mime_types[$ext] ?? 'application/octet-stream';
+
+// Clear any previous output
+if (ob_get_level()) ob_end_clean();
+
+header('Content-Type: ' . $mime);
+header('Content-Length: ' . filesize($found_path));
+header('Content-Disposition: inline; filename="' . basename($found_path) . '"');
+header('Cache-Control: private, max-age=3600');
+header('X-Content-Type-Options: nosniff');
+
+readfile($found_path);
 exit;
-?>
