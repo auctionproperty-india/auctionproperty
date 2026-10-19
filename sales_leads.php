@@ -245,7 +245,9 @@ include 'header.php';
                     <option value="">All Status</option>
                     <option value="new" <?= $status_filter=='new'?'selected':'' ?>>New</option>
                     <option value="contacted" <?= $status_filter=='contacted'?'selected':'' ?>>Contacted</option>
-                    <option value="call_not_picked" <?= $status_filter=='call_not_picked'?'selected':'' ?>>Call Not Picked</option> <!-- 🔥 Added -->
+                    <!-- 🔥 Naya Status Filter -->
+                    <option value="call_not_picked" <?= $status_filter=='call_not_picked'?'selected':'' ?>>Call Not Picked</option>
+                    
                     <option value="interested" <?= $status_filter=='interested'?'selected':'' ?>>Interested</option>
                     <option value="not_interested" <?= $status_filter=='not_interested'?'selected':'' ?>>Not Interested</option>
                     <option value="converted" <?= $status_filter=='converted'?'selected':'' ?>>Converted</option>
@@ -319,7 +321,7 @@ include 'header.php';
                             else { $fb_class = 'fb-upcoming'; $fb_text = date('d M', $fd); }
                         }
                         
-                        // 🔥 WhatsApp Web Link (Same tab login issue fixed)
+                        // 🔥 WhatsApp Web Link
                         $clean_phone = preg_replace('/[^0-9]/', '', $l['phone']);
                         $clean_phone = ltrim($clean_phone, '0');
                         if (strlen($clean_phone) == 10) {
@@ -355,7 +357,7 @@ include 'header.php';
                                 <a href="sales_lead_view.php?id=<?= $l['id'] ?>" class="btn-action btn-view" title="View">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <!-- 🔥 Yahan WhatsApp Web link laga hai -->
+                                <!-- 🔥 WhatsApp Web Link -->
                                 <a href="<?= $wa_link ?>" target="_blank" class="btn-action btn-wa" title="WhatsApp par bhejein">
                                     <i class="fab fa-whatsapp"></i>
                                 </a>
