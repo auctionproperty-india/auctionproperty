@@ -143,7 +143,7 @@ include 'header.php';
     }
     .st-new { background: #dbeafe; color: #1e40af; }
     .st-contacted { background: #fef3c7; color: #92400e; }
-    /* 🔥 Naya Status */
+    /* 🔥 Naya Status Color */
     .st-call_not_picked { background: #ffedd5; color: #c2410c; }
     .st-interested { background: #ddd6fe; color: #5b21b6; }
     .st-not_interested { background: #fee2e2; color: #991b1b; }
