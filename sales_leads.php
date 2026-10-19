@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📋 Sales CRM – All Leads (with filters)
+// 📋 Sales CRM – All Leads (with filters + WhatsApp + Bulk Email)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -12,6 +12,11 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['sales', 'admi
 
 $user_id = $_SESSION['user_id'];
 $is_admin = ($_SESSION['role'] == 'admin');
+
+// ---- Flash Messages ----
+$flash_success = $_SESSION['flash_success'] ?? '';
+$flash_error   = $_SESSION['flash_error'] ?? '';
+unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 
 // ---- Filters ----
 $search = trim($_GET['search'] ?? '');
@@ -156,6 +161,8 @@ include 'header.php';
     }
     .btn-view { background: #eff6ff; color: #1e40af; }
     .btn-view:hover { background: #2563eb; color: #fff; }
+    .btn-wa { background: #dcfce7; color: #166534; }
+    .btn-wa:hover { background: #25d366; color: #fff; }
 
     .followup-badge {
         font-size: 0.7rem;
@@ -166,6 +173,35 @@ include 'header.php';
     .fb-overdue { background: #fee2e2; color: #b91c1c; }
     .fb-today { background: #fef3c7; color: #92400e; }
     .fb-upcoming { background: #e0f2fe; color: #075985; }
+
+    .bulk-bar {
+        background: linear-gradient(135deg, #1e3a8a, #2563eb);
+        color: #fff;
+        border-radius: 14px;
+        padding: 14px 20px;
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        box-shadow: 0 8px 20px rgba(37,99,235,0.25);
+    }
+    .bulk-bar .btn-email {
+        background: #fbbf24;
+        color: #0f172a;
+        border: none;
+        font-weight: 700;
+        padding: 10px 22px;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .bulk-bar .btn-email:hover { background: #fcd34d; transform: translateY(-2px); }
+
+    .lead-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: #2563eb; }
+    #selectAll { width: 18px; height: 18px; cursor: pointer; accent-color: #2563eb; }
 </style>
 
 <div class="container-fluid py-4">
@@ -180,6 +216,19 @@ include 'header.php';
             </a>
         </div>
     </div>
+
+    <?php if ($flash_success): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i> <?= htmlspecialchars($flash_success) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+    <?php if ($flash_error): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i> <?= htmlspecialchars($flash_error) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
 
     <!-- Filters -->
     <div class="filter-bar">
@@ -231,68 +280,183 @@ include 'header.php';
         </form>
     </div>
 
-    <!-- Leads Table -->
-    <div class="table-responsive">
-        <table class="leads-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>City</th>
-                    <th>Property</th>
-                    <th>Status</th>
-                    <th>Priority</th>
-                    <th>Follow-up</th>
-                    <?php if ($is_admin): ?><th>Assigned</th><?php endif; ?>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($leads)): ?>
-                    <tr><td colspan="<?= $is_admin?10:9 ?>" class="text-center py-5 text-muted">
-                        <i class="fas fa-inbox fa-2x mb-2" style="opacity:0.3;"></i>
-                        <div>No leads found</div>
-                    </td></tr>
-                <?php endif; ?>
-                <?php foreach ($leads as $l): 
-                    $fb_class = '';
-                    $fb_text = '—';
-                    if (!empty($l['follow_up_date'])) {
-                        $fd = strtotime($l['follow_up_date']);
-                        $td = strtotime(date('Y-m-d'));
-                        if ($fd < $td) { $fb_class = 'fb-overdue'; $fb_text = '⚠️ ' . date('d M', $fd); }
-                        elseif ($fd == $td) { $fb_class = 'fb-today'; $fb_text = '🔔 Today'; }
-                        else { $fb_class = 'fb-upcoming'; $fb_text = date('d M', $fd); }
-                    }
-                ?>
+    <!-- 🔥 FORM: Bulk Email wrappers around table + modal -->
+    <form method="POST" action="send_bulk_email.php" id="bulkEmailForm">
+        <div class="table-responsive">
+            <table class="leads-table">
+                <thead>
                     <tr>
-                        <td><strong>#<?= $l['id'] ?></strong></td>
-                        <td>
-                            <strong><?= htmlspecialchars($l['name']) ?></strong>
-                            <?php if (!empty($l['email'])): ?>
-                                <div style="font-size:0.7rem;color:#64748b;"><?= htmlspecialchars($l['email']) ?></div>
-                            <?php endif; ?>
-                        </td>
-                        <td><?= htmlspecialchars($l['phone']) ?></td>
-                        <td><?= htmlspecialchars($l['city'] ?? '—') ?></td>
-                        <td style="font-size:0.8rem;"><?= htmlspecialchars($l['property_type'] ?? '—') ?></td>
-                        <td><span class="status-pill st-<?= $l['status'] ?>"><?= ucfirst(str_replace('_', ' ', $l['status'])) ?></span></td>
-                        <td><span class="priority-pill pr-<?= $l['priority'] ?>"><?= ucfirst($l['priority']) ?></span></td>
-                        <td><span class="followup-badge <?= $fb_class ?>"><?= $fb_text ?></span></td>
-                        <?php if ($is_admin): ?>
-                            <td style="font-size:0.78rem;"><?= htmlspecialchars($l['assigned_name'] ?? '—') ?></td>
-                        <?php endif; ?>
-                        <td>
-                            <a href="sales_lead_view.php?id=<?= $l['id'] ?>" class="btn-action btn-view">
-                                <i class="fas fa-eye"></i> View
-                            </a>
-                        </td>
+                        <th style="width:36px;"><input type="checkbox" id="selectAll" title="Select All"></th>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>City</th>
+                        <th>Property</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Follow-up</th>
+                        <?php if ($is_admin): ?><th>Assigned</th><?php endif; ?>
+                        <th>Action</th>
                     </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                    <?php if (empty($leads)): ?>
+                        <tr><td colspan="<?= $is_admin?11:10 ?>" class="text-center py-5 text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2" style="opacity:0.3;"></i>
+                            <div>No leads found</div>
+                        </td></tr>
+                    <?php endif; ?>
+                    <?php foreach ($leads as $l): 
+                        // Follow-up badge
+                        $fb_class = ''; $fb_text = '—';
+                        if (!empty($l['follow_up_date'])) {
+                            $fd = strtotime($l['follow_up_date']);
+                            $td = strtotime(date('Y-m-d'));
+                            if ($fd < $td) { $fb_class = 'fb-overdue'; $fb_text = '⚠️ ' . date('d M', $fd); }
+                            elseif ($fd == $td) { $fb_class = 'fb-today'; $fb_text = '🔔 Today'; }
+                            else { $fb_class = 'fb-upcoming'; $fb_text = date('d M', $fd); }
+                        }
+                        
+                        // WhatsApp link — clean phone
+                        $clean_phone = preg_replace('/[^0-9]/', '', $l['phone']);
+                        $clean_phone = ltrim($clean_phone, '0');
+                        if (strlen($clean_phone) == 10) {
+                            $clean_phone = '91' . $clean_phone;
+                        }
+                        $wa_link = "https://wa.me/" . $clean_phone;
+                    ?>
+                        <tr>
+                            <td>
+                                <input type="checkbox" 
+                                       name="lead_ids[]" 
+                                       value="<?= $l['id'] ?>" 
+                                       class="lead-checkbox"
+                                       data-email="<?= htmlspecialchars($l['email'] ?? '') ?>">
+                            </td>
+                            <td><strong>#<?= $l['id'] ?></strong></td>
+                            <td>
+                                <strong><?= htmlspecialchars($l['name']) ?></strong>
+                                <?php if (!empty($l['email'])): ?>
+                                    <div style="font-size:0.7rem;color:#64748b;"><?= htmlspecialchars($l['email']) ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= htmlspecialchars($l['phone']) ?></td>
+                            <td><?= htmlspecialchars($l['city'] ?? '—') ?></td>
+                            <td style="font-size:0.8rem;"><?= htmlspecialchars($l['property_type'] ?? '—') ?></td>
+                            <td><span class="status-pill st-<?= $l['status'] ?>"><?= ucfirst(str_replace('_', ' ', $l['status'])) ?></span></td>
+                            <td><span class="priority-pill pr-<?= $l['priority'] ?>"><?= ucfirst($l['priority']) ?></span></td>
+                            <td><span class="followup-badge <?= $fb_class ?>"><?= $fb_text ?></span></td>
+                            <?php if ($is_admin): ?>
+                                <td style="font-size:0.78rem;"><?= htmlspecialchars($l['assigned_name'] ?? '—') ?></td>
+                            <?php endif; ?>
+                            <td style="white-space:nowrap;">
+                                <a href="sales_lead_view.php?id=<?= $l['id'] ?>" class="btn-action btn-view" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="<?= $wa_link ?>" target="_blank" class="btn-action btn-wa" title="WhatsApp par bhejein">
+                                    <i class="fab fa-whatsapp"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 🔥 Bulk Email Bar -->
+        <div class="bulk-bar">
+            <div>
+                <i class="fas fa-envelope-open-text me-2"></i>
+                <strong id="bulkCountLabel">0</strong> customers selected
+            </div>
+            <button type="button" class="btn-email" data-bs-toggle="modal" data-bs-target="#emailModal" id="openEmailModal">
+                <i class="fas fa-paper-plane me-1"></i> Send Email to Selected
+            </button>
+        </div>
+
+        <!-- 🔥 Email Modal (inside form) -->
+        <div class="modal fade" id="emailModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-envelope me-2"></i> Send Bulk Email</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Subject <span class="text-danger">*</span></label>
+                            <input type="text" name="subject" class="form-control" required placeholder="Email subject...">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Message <span class="text-danger">*</span></label>
+                            <textarea name="message" class="form-control" rows="8" required placeholder="Type your message here..."></textarea>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> Personalization: <code>{name}</code> use karein — customer ka naam auto-replace hoga. HTML allowed.
+                            </small>
+                        </div>
+                        <div class="alert alert-info small mb-0">
+                            <i class="fas fa-info-circle"></i> 
+                            <strong id="selectedCount">0</strong> customers ko email jayega. 
+                            Jin leads ka email nahi hai unhe skip kar diya jayega.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="sendEmailBtn">
+                            <i class="fas fa-paper-plane"></i> Send Now
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
 </div>
+
+<script>
+// 🔥 Select All functionality
+document.getElementById('selectAll').addEventListener('change', function() {
+    document.querySelectorAll('.lead-checkbox').forEach(cb => cb.checked = this.checked);
+    updateCount();
+});
+
+// 🔥 Update count
+document.querySelectorAll('.lead-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateCount);
+});
+
+function updateCount() {
+    const count = document.querySelectorAll('.lead-checkbox:checked').length;
+    document.getElementById('selectedCount').textContent = count;
+    document.getElementById('bulkCountLabel').textContent = count;
+    
+    // Uncheck select all if not all checked
+    const total = document.querySelectorAll('.lead-checkbox').length;
+    const selectAll = document.getElementById('selectAll');
+    if (selectAll) selectAll.checked = (count === total && total > 0);
+}
+
+// 🔥 Prevent opening modal if no checkbox selected
+document.getElementById('openEmailModal').addEventListener('click', function(e) {
+    const count = document.querySelectorAll('.lead-checkbox:checked').length;
+    if (count === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        alert('⚠️ Kam se kam ek customer select karein!');
+    }
+});
+
+// 🔥 Confirm before submit
+document.getElementById('sendEmailBtn').addEventListener('click', function(e) {
+    const count = document.querySelectorAll('.lead-checkbox:checked').length;
+    if (count === 0) {
+        e.preventDefault();
+        alert('⚠️ Kam se kam ek customer select karein!');
+        return;
+    }
+    if (!confirm(count + ' customers ko email bhejein?')) {
+        e.preventDefault();
+    }
+});
+</script>
 
 <?php include 'footer.php'; ?>
