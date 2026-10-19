@@ -20,7 +20,7 @@ include 'header.php';
         <script>
             window.fbAsyncInit = function() {
                 FB.init({
-                    appId      : '1832057331478345', // 🔥 Updated App ID
+                    appId      : '1832057331478345', // ✅ Aapka App ID
                     autoLogAppEvents : true,
                     xfbml      : true,
                     version    : 'v23.0'
@@ -36,6 +36,7 @@ include 'header.php';
 </div>
 
 <script>
+    // 1. Meta se WABA ID aur Phone ID receive karna
     window.addEventListener('message', (event) => {
         if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") return;
         let data;
@@ -51,6 +52,7 @@ include 'header.php';
         }
     });
 
+    // 2. Button dabane par Facebook Popup kholna
     document.getElementById('wa-connect-btn').addEventListener('click', () => {
         FB.login(function(response) {
             if (response.authResponse) {
@@ -60,7 +62,7 @@ include 'header.php';
                 }
             }
         }, {
-            config_id: 'YOUR_META_CONFIG_ID', // 🔥 Yahan apni Config ID daalein (Meta Dashboard -> WhatsApp -> Configuration)
+            config_id: '1140373918569755', // ✅ Aapki Config ID
             response_type: 'code',
             override_default_response_type: true,
             extras: {
@@ -71,6 +73,7 @@ include 'header.php';
         });
     });
 
+    // 3. Data ko backend (PHP) me bhejna
     function saveWhatsAppConnection(phoneId, wabaId) {
         if (!window.fbAuthCode) {
             alert('Error: Auth code missing. Please try again.');
