@@ -132,6 +132,8 @@ include 'header.php';
     }
     .st-new { background: #dbeafe; color: #1e40af; }
     .st-contacted { background: #fef3c7; color: #92400e; }
+    /* 🔥 Naya Status Color */
+    .st-call_not_picked { background: #ffedd5; color: #c2410c; } 
     .st-interested { background: #ddd6fe; color: #5b21b6; }
     .st-not_interested { background: #fee2e2; color: #991b1b; }
     .st-converted { background: #d1fae5; color: #065f46; }
@@ -243,6 +245,7 @@ include 'header.php';
                     <option value="">All Status</option>
                     <option value="new" <?= $status_filter=='new'?'selected':'' ?>>New</option>
                     <option value="contacted" <?= $status_filter=='contacted'?'selected':'' ?>>Contacted</option>
+                    <option value="call_not_picked" <?= $status_filter=='call_not_picked'?'selected':'' ?>>Call Not Picked</option> <!-- 🔥 Added -->
                     <option value="interested" <?= $status_filter=='interested'?'selected':'' ?>>Interested</option>
                     <option value="not_interested" <?= $status_filter=='not_interested'?'selected':'' ?>>Not Interested</option>
                     <option value="converted" <?= $status_filter=='converted'?'selected':'' ?>>Converted</option>
@@ -280,7 +283,6 @@ include 'header.php';
         </form>
     </div>
 
-    <!-- 🔥 FORM: Bulk Email wrappers around table + modal -->
     <form method="POST" action="send_bulk_email.php" id="bulkEmailForm">
         <div class="table-responsive">
             <table class="leads-table">
@@ -317,13 +319,13 @@ include 'header.php';
                             else { $fb_class = 'fb-upcoming'; $fb_text = date('d M', $fd); }
                         }
                         
-                        // WhatsApp link — clean phone
+                        // 🔥 WhatsApp Web Link (Same tab login issue fixed)
                         $clean_phone = preg_replace('/[^0-9]/', '', $l['phone']);
                         $clean_phone = ltrim($clean_phone, '0');
                         if (strlen($clean_phone) == 10) {
                             $clean_phone = '91' . $clean_phone;
                         }
-                        $wa_link = "https://wa.me/" . $clean_phone;
+                        $wa_link = "https://web.whatsapp.com/send?phone=" . $clean_phone;
                     ?>
                         <tr>
                             <td>
@@ -353,6 +355,7 @@ include 'header.php';
                                 <a href="sales_lead_view.php?id=<?= $l['id'] ?>" class="btn-action btn-view" title="View">
                                     <i class="fas fa-eye"></i>
                                 </a>
+                                <!-- 🔥 Yahan WhatsApp Web link laga hai -->
                                 <a href="<?= $wa_link ?>" target="_blank" class="btn-action btn-wa" title="WhatsApp par bhejein">
                                     <i class="fab fa-whatsapp"></i>
                                 </a>
@@ -363,7 +366,7 @@ include 'header.php';
             </table>
         </div>
 
-        <!-- 🔥 Bulk Email Bar -->
+        <!-- Bulk Email Bar -->
         <div class="bulk-bar">
             <div>
                 <i class="fas fa-envelope-open-text me-2"></i>
@@ -374,7 +377,7 @@ include 'header.php';
             </button>
         </div>
 
-        <!-- 🔥 Email Modal (inside form) -->
+        <!-- Email Modal -->
         <div class="modal fade" id="emailModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
@@ -391,13 +394,12 @@ include 'header.php';
                             <label class="form-label fw-bold">Message <span class="text-danger">*</span></label>
                             <textarea name="message" class="form-control" rows="8" required placeholder="Type your message here..."></textarea>
                             <small class="text-muted">
-                                <i class="fas fa-info-circle"></i> Personalization: <code>{name}</code> use karein — customer ka naam auto-replace hoga. HTML allowed.
+                                <i class="fas fa-info-circle"></i> Personalization: <code>{name}</code> use karein — customer ka naam auto-replace hoga.
                             </small>
                         </div>
                         <div class="alert alert-info small mb-0">
                             <i class="fas fa-info-circle"></i> 
                             <strong id="selectedCount">0</strong> customers ko email jayega. 
-                            Jin leads ka email nahi hai unhe skip kar diya jayega.
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -413,13 +415,12 @@ include 'header.php';
 </div>
 
 <script>
-// 🔥 Select All functionality
+// Select All functionality
 document.getElementById('selectAll').addEventListener('change', function() {
     document.querySelectorAll('.lead-checkbox').forEach(cb => cb.checked = this.checked);
     updateCount();
 });
 
-// 🔥 Update count
 document.querySelectorAll('.lead-checkbox').forEach(cb => {
     cb.addEventListener('change', updateCount);
 });
@@ -429,13 +430,11 @@ function updateCount() {
     document.getElementById('selectedCount').textContent = count;
     document.getElementById('bulkCountLabel').textContent = count;
     
-    // Uncheck select all if not all checked
     const total = document.querySelectorAll('.lead-checkbox').length;
     const selectAll = document.getElementById('selectAll');
     if (selectAll) selectAll.checked = (count === total && total > 0);
 }
 
-// 🔥 Prevent opening modal if no checkbox selected
 document.getElementById('openEmailModal').addEventListener('click', function(e) {
     const count = document.querySelectorAll('.lead-checkbox:checked').length;
     if (count === 0) {
@@ -445,7 +444,6 @@ document.getElementById('openEmailModal').addEventListener('click', function(e) 
     }
 });
 
-// 🔥 Confirm before submit
 document.getElementById('sendEmailBtn').addEventListener('click', function(e) {
     const count = document.querySelectorAll('.lead-checkbox:checked').length;
     if (count === 0) {
