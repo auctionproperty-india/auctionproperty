@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📊 Sales CRM – Dashboard (with WhatsApp direct button)
+// 📊 Sales CRM – Dashboard
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -143,6 +143,8 @@ include 'header.php';
     }
     .st-new { background: #dbeafe; color: #1e40af; }
     .st-contacted { background: #fef3c7; color: #92400e; }
+    /* 🔥 Naya Status */
+    .st-call_not_picked { background: #ffedd5; color: #c2410c; }
     .st-interested { background: #ddd6fe; color: #5b21b6; }
     .st-not_interested { background: #fee2e2; color: #991b1b; }
     .st-converted { background: #d1fae5; color: #065f46; }
@@ -276,7 +278,8 @@ include 'header.php';
             <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
                 <div class="section-title"><i class="fas fa-chart-pie"></i> Lead Status</div>
                 <?php 
-                $all_statuses = ['new', 'contacted', 'interested', 'not_interested', 'converted', 'closed'];
+                // 🔥 Naya status array me add kiya
+                $all_statuses = ['new', 'contacted', 'call_not_picked', 'interested', 'not_interested', 'converted', 'closed'];
                 foreach ($all_statuses as $st): 
                     $cnt = $status_data[$st] ?? 0;
                     $pct = $total_leads > 0 ? round(($cnt / $total_leads) * 100) : 0;
@@ -315,13 +318,13 @@ include 'header.php';
                                 <tr><td colspan="6" class="text-center text-muted py-4">No leads yet. Add one!</td></tr>
                             <?php endif; ?>
                             <?php foreach ($recent_leads as $l): 
-                                // Clean phone for WhatsApp
+                                // 🔥 WhatsApp Web Link Update
                                 $clean_phone = preg_replace('/[^0-9]/', '', $l['phone']);
                                 $clean_phone = ltrim($clean_phone, '0');
                                 if (strlen($clean_phone) == 10) {
                                     $clean_phone = '91' . $clean_phone;
                                 }
-                                $wa_link = "https://wa.me/" . $clean_phone;
+                                $wa_link = "https://web.whatsapp.com/send?phone=" . $clean_phone;
                             ?>
                                 <tr style="cursor:pointer;" onclick="window.location='sales_lead_view.php?id=<?= $l['id'] ?>'">
                                     <td><strong><?= htmlspecialchars($l['name']) ?></strong></td>
@@ -335,6 +338,7 @@ include 'header.php';
                                            title="View Lead">
                                             <i class="fas fa-eye"></i>
                                         </a>
+                                        <!-- 🔥 WhatsApp Web Link -->
                                         <a href="<?= $wa_link ?>" 
                                            target="_blank" 
                                            class="row-action-btn wa" 
