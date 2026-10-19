@@ -15,9 +15,9 @@ if (empty($code) || empty($phone_id) || empty($waba_id)) {
     echo json_encode(['success' => false, 'message' => 'Missing parameters']); exit;
 }
 
-// 🔥 Meta App Details (App Settings > Basic se lein)
-$app_id = 'YOUR_META_APP_ID';           // Apna App ID daalein
-$app_secret = 'YOUR_META_APP_SECRET';   // Apna App Secret daalein
+// 🔥 Updated Meta App Details
+$app_id = '1832057331478345'; 
+$app_secret = 'b43cfffa633a688e36dedea4ea3e554e'; // ⚠️ Reset this in Meta Dashboard later!
 
 // 1. Code ko Access Token me exchange karein
 $url = "https://graph.facebook.com/v23.0/oauth/access_token?client_id={$app_id}&client_secret={$app_secret}&code={$code}";
