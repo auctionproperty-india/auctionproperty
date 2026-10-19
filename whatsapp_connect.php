@@ -20,7 +20,7 @@ include 'header.php';
         <script>
             window.fbAsyncInit = function() {
                 FB.init({
-                    appId      : 'YOUR_META_APP_ID', // 🔥 Yahan apna Meta App ID daalein
+                    appId      : '1832057331478345', // 🔥 Updated App ID
                     autoLogAppEvents : true,
                     xfbml      : true,
                     version    : 'v23.0'
@@ -36,7 +36,6 @@ include 'header.php';
 </div>
 
 <script>
-    // Meta se WABA ID aur Phone ID receive karna
     window.addEventListener('message', (event) => {
         if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") return;
         let data;
@@ -52,7 +51,6 @@ include 'header.php';
         }
     });
 
-    // Button dabane par Facebook Popup kholna
     document.getElementById('wa-connect-btn').addEventListener('click', () => {
         FB.login(function(response) {
             if (response.authResponse) {
@@ -73,7 +71,6 @@ include 'header.php';
         });
     });
 
-    // Backend ko data save karne ke liye bhejna
     function saveWhatsAppConnection(phoneId, wabaId) {
         if (!window.fbAuthCode) {
             alert('Error: Auth code missing. Please try again.');
