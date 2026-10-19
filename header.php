@@ -79,7 +79,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
         /* ====== Global ====== */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: 'Inter', sans-serif;
             background: #f4f7fc;
@@ -95,8 +99,12 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             -ms-user-select: text !important;
             user-select: text !important;
         }
-        body { padding-top: 70px; }
-        body.top-nav-hidden { padding-top: 0; }
+        body {
+            padding-top: 70px;
+        }
+        body.top-nav-hidden {
+            padding-top: 0;
+        }
         body.role-admin { background: #f8fafc; }
         body.role-user { background: #f0f5fa; }
         body.role-guest { background: #f8fafc; }
@@ -108,21 +116,33 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
         /* ====== Impersonation Banner ====== */
         .impersonate-banner {
-            position: fixed; top: 0; left: 0; right: 0;
+            position: fixed;
+            top: 0; left: 0; right: 0;
             background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: #fff; padding: 12px 20px; text-align: center;
-            z-index: 99999; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            font-size: 0.9rem; font-weight: 500;
-            display: flex; justify-content: center; align-items: center;
-            gap: 14px; flex-wrap: wrap;
+            color: #fff;
+            padding: 12px 20px;
+            text-align: center;
+            z-index: 99999;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
         }
         .impersonate-banner b { color: #fff; }
         .impersonate-banner .btn-exit {
             background: rgba(255,255,255,0.25);
             border: 1px solid rgba(255,255,255,0.4);
-            color: #fff; padding: 4px 14px; border-radius: 20px;
-            font-size: 0.8rem; font-weight: 700;
-            text-decoration: none; transition: all 0.2s;
+            color: #fff;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.2s;
         }
         .impersonate-banner .btn-exit:hover { background: #fff; color: #d97706; }
         body.impersonate-mode { padding-top: 120px !important; }
@@ -130,19 +150,27 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         body.impersonate-mode .top-nav { top: 50px !important; }
         body.impersonate-mode .hamburger-sidebar { top: 50px !important; }
 
-        /* ====== Top Navigation ====== */
+        /* ====== Top Navigation – Dark Blue Gradient ====== */
         .top-nav {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 1030;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1030;
             background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
-            padding: 10px 20px; display: flex; align-items: center;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
             justify-content: space-between;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3); height: 70px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            height: 70px;
         }
         body.top-nav-hidden .top-nav { display: none !important; }
+
         .top-nav .nav-brand { display: flex; align-items: center; gap: 12px; }
         .top-nav .nav-brand .brand-icon { color: #fbbf24; font-size: 1.8rem; }
         .top-nav .nav-brand .brand-text {
-            color: #ffffff; font-weight: 700; font-size: 1.4rem;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 1.4rem;
             letter-spacing: -0.5px;
         }
         .top-nav .nav-brand .brand-text span { color: #fbbf24; }
@@ -154,13 +182,19 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .top-nav .hamburger:hover { transform: scale(1.1); }
         .top-nav .nav-right { display: flex; align-items: center; gap: 10px; }
         .top-nav .nav-right a {
-            color: rgba(255,255,255,0.85); text-decoration: none;
-            padding: 6px 14px; border-radius: 20px;
-            font-weight: 500; font-size: 0.9rem; transition: all 0.3s;
+            color: rgba(255,255,255,0.85);
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.3s;
         }
         .top-nav .nav-right a:hover { background: rgba(255,255,255,0.12); color: #fff; }
         .top-nav .nav-right .btn-login {
-            background: #fbbf24; color: #0f172a !important; font-weight: 600;
+            background: #fbbf24;
+            color: #0f172a !important;
+            font-weight: 600;
         }
         .top-nav .nav-right .btn-login:hover { background: #fcd34d; }
         .top-nav .nav-right .btn-register { border: 1px solid rgba(255,255,255,0.3); }
@@ -175,53 +209,82 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
         /* ====== Hamburger Sidebar (Off-canvas) ====== */
         .sidebar-overlay {
-            display: none; position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 1050;
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1050;
         }
         .sidebar-overlay.show { display: block; }
         .hamburger-sidebar {
-            position: fixed; top: 0; left: -320px;
-            width: 320px; height: 100%; background: #ffffff;
-            z-index: 1060; transition: left 0.3s ease-in-out;
+            position: fixed;
+            top: 0; left: -320px;
+            width: 320px; height: 100%;
+            background: #ffffff;
+            z-index: 1060;
+            transition: left 0.3s ease-in-out;
             box-shadow: 2px 0 20px rgba(0,0,0,0.15);
-            padding: 25px 20px; overflow-y: auto;
+            padding: 25px 20px;
+            overflow-y: auto;
         }
         .hamburger-sidebar.open { left: 0; }
         .hamburger-sidebar .sidebar-header {
-            display: flex; justify-content: space-between;
-            align-items: center; border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 15px; margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
         }
         .hamburger-sidebar .sidebar-header .close-btn {
-            background: none; border: none; font-size: 1.8rem;
-            color: #475569; cursor: pointer;
+            background: none; border: none;
+            font-size: 1.8rem; color: #475569; cursor: pointer;
         }
         .hamburger-sidebar .sidebar-header .brand-small {
             font-weight: 700; font-size: 1.2rem; color: #1e293b;
         }
         .hamburger-sidebar .sidebar-header .brand-small i { color: #1e3a8a; }
+
         .hamburger-sidebar .nav-list { list-style: none; padding: 0; margin: 0; }
         .hamburger-sidebar .nav-list li { margin: 4px 0; }
         .hamburger-sidebar .nav-list li a {
-            display: block; padding: 12px 16px; color: #475569;
-            text-decoration: none; border-radius: 10px;
-            font-weight: 500; transition: all 0.2s;
+            display: block;
+            padding: 12px 16px;
+            color: #475569;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 500;
+            transition: all 0.2s;
         }
         .hamburger-sidebar .nav-list li a:hover { background: #f1f5f9; color: #1e3a8a; }
-        .hamburger-sidebar .nav-list li a i { width: 28px; color: #94a3b8; margin-right: 10px; }
+        .hamburger-sidebar .nav-list li a i {
+            width: 28px; color: #94a3b8; margin-right: 10px;
+        }
+
         .hamburger-sidebar .auth-links {
-            margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 15px;
+            margin-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
         }
         .hamburger-sidebar .auth-links a {
-            display: block; padding: 10px 16px; color: #1e3a8a;
-            font-weight: 600; text-decoration: none; border-radius: 8px;
-            background: #f1f5f9; margin-bottom: 8px; text-align: center;
+            display: block;
+            padding: 10px 16px;
+            color: #1e3a8a;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 8px;
+            background: #f1f5f9;
+            margin-bottom: 8px;
+            text-align: center;
         }
         .hamburger-sidebar .auth-links a:hover { background: #1e3a8a; color: #fff; }
         .hamburger-sidebar .auth-links .register-link { background: #eef2ff; }
+
         .hamburger-sidebar .social-section {
-            margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px;
+            margin-top: 30px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
         }
         .hamburger-sidebar .social-section h6 {
             font-weight: 600; color: #1e293b; margin-bottom: 12px;
@@ -230,31 +293,55 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             display: flex; gap: 12px; flex-wrap: wrap;
         }
         .hamburger-sidebar .social-section .social-icons a {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 40px; height: 40px; border-radius: 50%;
-            background: #f1f5f9; color: #1e293b;
-            text-decoration: none; transition: all 0.2s; font-size: 1.2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            color: #1e293b;
+            text-decoration: none;
+            transition: all 0.2s;
+            font-size: 1.2rem;
         }
         .hamburger-sidebar .social-section .social-icons a:hover {
-            background: #1e3a8a; color: #fff; transform: translateY(-3px);
+            background: #1e3a8a;
+            color: #fff;
+            transform: translateY(-3px);
         }
 
-        /* ====== Existing Sidebar ====== */
+        /* ====== Existing Sidebar (for logged-in users) ====== */
         .sidebar {
-            height: 100vh; width: 280px; position: fixed;
-            top: 0; left: 0; padding: 30px 15px;
+            height: 100vh;
+            width: 280px;
+            position: fixed;
+            top: 0; left: 0;
+            padding: 30px 15px;
             box-shadow: 2px 0 12px rgba(0,0,0,0.06);
-            z-index: 1050; transition: transform 0.3s ease-in-out, background 0.3s;
+            z-index: 1050;
+            transition: transform 0.3s ease-in-out, background 0.3s;
             overflow-y: auto;
         }
         body:not(.top-nav-hidden) .sidebar { top: 70px; }
         body.top-nav-hidden .sidebar { top: 0; }
-        body.role-admin .sidebar { background: #ffffff; color: #1e293b; border-right: 1px solid #e2e8f0; }
-        body.role-user .sidebar { background: #ffffff; color: #334155; border-right: 1px solid #e2e8f0; }
-        body.role-sales .sidebar { background: #ffffff; color: #334155; border-right: 1px solid #e2e8f0; }
+        body.role-admin .sidebar {
+            background: #ffffff; color: #1e293b;
+            border-right: 1px solid #e2e8f0;
+        }
+        body.role-user .sidebar {
+            background: #ffffff; color: #334155;
+            border-right: 1px solid #e2e8f0;
+        }
+        body.role-sales .sidebar {
+            background: #ffffff; color: #334155;
+            border-right: 1px solid #e2e8f0;
+        }
 
         @media (max-width: 991px) {
-            .sidebar { transform: translateX(-100%); top: 0 !important; }
+            .sidebar {
+                transform: translateX(-100%);
+                top: 0 !important;
+            }
             .sidebar.show { transform: translateX(0); }
         }
         @media (min-width: 992px) {
@@ -262,83 +349,154 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         }
 
         .sidebar .brand {
-            font-size: 24px; font-weight: 800; text-align: center;
-            padding-bottom: 25px; border-bottom: 1px solid #e2e8f0;
-            margin-bottom: 25px; letter-spacing: 1px; color: #1e293b;
+            font-size: 24px;
+            font-weight: 800;
+            text-align: center;
+            padding-bottom: 25px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 25px;
+            letter-spacing: 1px;
+            color: #1e293b;
         }
         .sidebar .brand i { color: #1e3a8a; }
 
         .sidebar a {
-            display: flex; align-items: center; padding: 12px 20px;
-            margin: 4px 0; text-decoration: none; border-radius: 12px;
-            font-weight: 500; font-size: 15px; transition: all 0.3s ease;
-            border-left: 3px solid transparent; color: #475569;
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            margin: 4px 0;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            color: #475569;
         }
-        .sidebar a i { width: 28px; font-size: 18px; transition: all 0.3s; color: #94a3b8; }
+        .sidebar a i {
+            width: 28px;
+            font-size: 18px;
+            transition: all 0.3s;
+            color: #94a3b8;
+        }
         .sidebar a:hover { background: #f1f5f9; color: #1e3a8a; }
         .sidebar a:hover i { color: #1e3a8a; }
-        .sidebar a.active { background: #eef2ff; color: #1e3a8a; border-left-color: #1e3a8a; }
+        .sidebar a.active {
+            background: #eef2ff;
+            color: #1e3a8a;
+            border-left-color: #1e3a8a;
+        }
         .sidebar a.active i { color: #1e3a8a; }
 
         .sidebar .logout-link {
-            margin-top: 30px; border-top: 1px solid #e2e8f0;
-            padding-top: 20px; color: #dc2626 !important;
+            margin-top: 30px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+            color: #dc2626 !important;
         }
         .sidebar .logout-link i { color: #dc2626 !important; }
-        .sidebar .logout-link:hover { background: #fef2f2 !important; color: #b91c1c !important; }
+        .sidebar .logout-link:hover {
+            background: #fef2f2 !important;
+            color: #b91c1c !important;
+        }
 
         .sidebar-overlay-main {
-            display: none; position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4); z-index: 1040;
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4);
+            z-index: 1040;
         }
         .sidebar-overlay-main.show { display: block; }
 
         /* ============ Admin Collapsible Sidebar ============ */
         .sidebar .nav-section { margin: 6px 0; }
         .sidebar .nav-section-title {
-            display: flex; align-items: center; padding: 12px 20px;
-            color: #334155; font-weight: 600; font-size: 14.5px;
-            cursor: pointer; border-radius: 12px;
-            transition: all 0.25s ease; user-select: none;
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: #334155;
+            font-weight: 600;
+            font-size: 14.5px;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: all 0.25s ease;
+            user-select: none;
             border-left: 3px solid transparent;
         }
-        .sidebar .nav-section-title:hover { background: #f1f5f9; color: #1e3a8a; }
-        .sidebar .nav-section-title.active { background: #eef2ff; color: #1e3a8a; }
+        .sidebar .nav-section-title:hover {
+            background: #f1f5f9;
+            color: #1e3a8a;
+        }
+        .sidebar .nav-section-title.active {
+            background: #eef2ff;
+            color: #1e3a8a;
+        }
         .sidebar .nav-section-title .section-arrow {
-            margin-left: auto; font-size: 11px; color: #94a3b8;
+            margin-left: auto;
+            font-size: 11px;
+            color: #94a3b8;
             transition: transform 0.3s ease;
         }
         .sidebar .nav-section.open .nav-section-title .section-arrow {
-            transform: rotate(90deg); color: #1e3a8a;
+            transform: rotate(90deg);
+            color: #1e3a8a;
         }
         .sidebar .nav-section-title i.section-icon {
-            width: 28px; font-size: 17px; color: #64748b; margin-right: 0;
+            width: 28px;
+            font-size: 17px;
+            color: #64748b;
+            margin-right: 0;
         }
-        .sidebar .nav-section.open .nav-section-title i.section-icon { color: #1e3a8a; }
+        .sidebar .nav-section.open .nav-section-title i.section-icon {
+            color: #1e3a8a;
+        }
+        
         .sidebar .nav-section-items {
-            max-height: 0; overflow: hidden;
-            transition: max-height 0.35s ease; padding-left: 8px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease;
+            padding-left: 8px;
         }
-        .sidebar .nav-section.open .nav-section-items { max-height: 600px; }
+        .sidebar .nav-section.open .nav-section-items {
+            max-height: 600px;
+        }
+        
         .sidebar .nav-section-items a {
-            padding: 9px 16px 9px 32px; font-size: 13.5px;
-            font-weight: 500; margin: 2px 0;
-            border-left: 2px solid transparent; border-radius: 10px;
+            padding: 9px 16px 9px 32px;
+            font-size: 13.5px;
+            font-weight: 500;
+            margin: 2px 0;
+            border-left: 2px solid transparent;
+            border-radius: 10px;
         }
-        .sidebar .nav-section-items a i { width: 22px; font-size: 14px; }
-        .sidebar .nav-section-items a:hover { background: #f1f5f9; border-left-color: #cbd5e1; }
-        .sidebar .nav-section-items a.active { background: #eef2ff; color: #1e3a8a; border-left-color: #1e3a8a; }
+        .sidebar .nav-section-items a i {
+            width: 22px;
+            font-size: 14px;
+        }
+        .sidebar .nav-section-items a:hover {
+            background: #f1f5f9;
+            border-left-color: #cbd5e1;
+        }
+        .sidebar .nav-section-items a.active {
+            background: #eef2ff;
+            color: #1e3a8a;
+            border-left-color: #1e3a8a;
+        }
 
         /* ====== Main Content ====== */
         .main-content {
-            padding: 30px 35px; min-height: 100vh;
+            padding: 30px 35px;
+            min-height: 100vh;
             transition: margin-left 0.3s;
         }
         body.role-admin .main-content { padding-top: 0 !important; }
         body.role-admin .main-content,
         body.role-user .main-content,
-        body.role-sales .main-content { margin-left: 280px; }
+        body.role-sales .main-content {
+            margin-left: 280px;
+        }
         body.role-guest .main-content { margin-left: 0 !important; }
         @media (max-width: 991px) {
             .main-content { margin-left: 0 !important; padding: 15px; }
@@ -346,20 +504,31 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
         /* ====== Top Bar (User Info) ====== */
         .top-bar {
-            padding: 15px 20px; border-radius: 20px;
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 25px; flex-wrap: wrap; gap: 10px;
-            background: #ffffff; border: 1px solid rgba(0,0,0,0.02);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.03); color: #0f172a;
+            padding: 15px 20px;
+            border-radius: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 10px;
+            background: #ffffff;
+            border: 1px solid rgba(0,0,0,0.02);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            color: #0f172a;
         }
         body.role-admin .top-bar {
-            background: #ffffff; border: 1px solid #e2e8f0;
-            color: #1e293b; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            color: #1e293b;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             margin-bottom: 10px;
         }
         body.role-sales .top-bar {
-            background: #ffffff; border: 1px solid #e2e8f0;
-            color: #1e293b; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            color: #1e293b;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             margin-bottom: 10px;
         }
         .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
@@ -368,46 +537,71 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         body.role-user .top-bar .user-info .name { color: #0f172a; }
         body.role-sales .top-bar .user-info .name { color: #0f172a; }
         .top-bar .badge-role {
-            padding: 4px 14px; border-radius: 30px;
-            font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+            padding: 4px 14px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
         }
         .top-bar .user-dates {
-            font-size: 0.75rem; opacity: 0.7; margin-top: 2px;
-            color: inherit; display: flex; flex-wrap: wrap;
-            gap: 8px; align-items: center;
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 2px;
+            color: inherit;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
         }
         .top-bar .countdown-timer {
-            font-weight: 700 !important; color: #dc3545 !important;
-            background: rgba(220, 53, 69, 0.1); padding: 2px 12px;
-            border-radius: 20px; font-size: 0.8rem;
-            display: inline-flex; align-items: center; gap: 4px;
+            font-weight: 700 !important;
+            color: #dc3545 !important;
+            background: rgba(220, 53, 69, 0.1);
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
         .hamburger-btn {
-            background: transparent; border: none; font-size: 28px;
-            padding: 5px 10px; cursor: pointer; display: inline-block;
+            background: transparent;
+            border: none;
+            font-size: 28px;
+            padding: 5px 10px;
+            cursor: pointer;
+            display: inline-block;
         }
         body.role-admin .hamburger-btn { color: #1e293b; }
         body.role-user .hamburger-btn { color: #1e293b; }
         body.role-sales .hamburger-btn { color: #1e293b; }
-        @media (min-width: 992px) { .hamburger-btn { display: none !important; } }
+        @media (min-width: 992px) {
+            .hamburger-btn { display: none !important; }
+        }
 
         /* ====== Cards ====== */
         .card-premium {
-            border-radius: 20px; border: none; padding: 20px 24px;
-            margin-bottom: 20px; transition: transform 0.2s, box-shadow 0.2s;
+            border-radius: 20px;
+            border: none;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
         body.role-admin .card-premium {
-            background: #ffffff; color: #0f172a;
+            background: #ffffff;
+            color: #0f172a;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             border: 1px solid #e2e8f0;
         }
         body.role-user .card-premium {
-            background: #ffffff; color: #0f172a;
+            background: #ffffff;
+            color: #0f172a;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
         }
         body.role-sales .card-premium {
-            background: #ffffff; color: #0f172a;
+            background: #ffffff;
+            color: #0f172a;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
         }
         .card-premium:hover {
@@ -415,9 +609,14 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             box-shadow: 0 20px 30px -10px rgba(0,0,0,0.08);
         }
         .stat-icon {
-            width: 50px; height: 50px; border-radius: 15px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px; flex-shrink: 0;
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
         }
         body.role-admin .stat-icon.bg-soft-primary { background: #eef2ff; color: #1e3a8a; }
         body.role-admin .stat-icon.bg-soft-success { background: #dcfce7; color: #166534; }
@@ -434,8 +633,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .btn-sm { padding: 5px 10px; font-size: 12px; }
         .user-welcome-banner {
             background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
-            border-radius: 24px; padding: 30px; color: white;
-            margin-bottom: 25px; box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3);
+            border-radius: 24px;
+            padding: 30px;
+            color: white;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3);
         }
         .user-welcome-banner h2 { font-weight: 800; }
         .user-welcome-banner p { opacity: 0.9; }
@@ -568,6 +770,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <!-- ADMIN SIDEBAR - Collapsible Sections -->
         <!-- ============================================================ -->
         
+        <!-- Dashboard (Always visible) -->
         <a href="admin_dashboard.php" class="<?= $current_page == 'admin_dashboard.php' ? 'active' : '' ?>">
             <i class="fas fa-th-large"></i> <span>Dashboard</span>
         </a>
@@ -689,7 +892,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         </div>
         <?php endif; ?>
 
-        <!-- 🔷 5. SALES CRM -->
+        <!-- 🔷 5. SALES CRM (NEW) -->
         <div class="nav-section <?= in_array($current_page, ['admin_sales_crm.php','admin_sales_leads.php','admin_sales_users.php']) ? 'open' : '' ?>">
             <div class="nav-section-title <?= in_array($current_page, ['admin_sales_crm.php','admin_sales_leads.php','admin_sales_users.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
                 <i class="fas fa-chart-line section-icon"></i>
@@ -776,17 +979,17 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
     <?php elseif ($role == 'sales'): ?>
         <!-- ============================================================ -->
-        <!-- SALES SIDEBAR (UPDATED: Added All Properties) -->
+        <!-- 🔥 SALES SIDEBAR (UPDATED) -->
         <!-- ============================================================ -->
         <a href="sales_dashboard.php" class="<?= $current_page == 'sales_dashboard.php' ? 'active' : '' ?>">
             <i class="fas fa-th-large"></i> <span>Dashboard</span>
         </a>
         
-        <!-- 🔥 NEW: All Properties (like free user view) -->
-        <a href="properties.php" class="<?= $current_page == 'properties.php' ? 'active' : '' ?>">
+        <!-- 🔥 Yahan naya page link add kiya hai -->
+        <a href="sales_properties.php" class="<?= $current_page == 'sales_properties.php' ? 'active' : '' ?>">
             <i class="fas fa-building"></i> <span>All Properties</span>
         </a>
-        
+
         <a href="sales_leads.php" class="<?= $current_page == 'sales_leads.php' ? 'active' : '' ?>">
             <i class="fas fa-tasks"></i> <span>My Leads</span>
         </a>
@@ -922,6 +1125,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
 <!-- ====== SIDEBAR TOGGLE SCRIPTS ====== -->
 <script>
+// Toggle hamburger sidebar (for guest/public pages)
 document.addEventListener('DOMContentLoaded', function() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const sidebar = document.getElementById('hamburgerSidebar');
@@ -948,6 +1152,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (overlay) overlay.addEventListener('click', closeSidebar);
 });
 
+// Toggle main sidebar (for logged-in users)
 function toggleSidebar() {
     const sidebar = document.getElementById('mainSidebar');
     const overlay = document.getElementById('sidebarOverlayMain');
@@ -963,12 +1168,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// 🔥 Admin Collapsible Sidebar Sections
 function toggleSection(el) {
     var section = el.closest('.nav-section');
     if (!section) return;
     section.classList.toggle('open');
 }
 
+// Countdown timer
 document.addEventListener('DOMContentLoaded', function() {
     const countdownEl = document.getElementById('countdownDisplay');
     if (countdownEl && countdownEl.dataset.expiry) {
@@ -987,6 +1194,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// 🔥 Impersonation: Auto-inject imp_session into all links and forms
 <?php if ($is_impersonating): ?>
 document.addEventListener('DOMContentLoaded', function() {
     var impSessionId = '<?= htmlspecialchars($current_imp_session) ?>';
