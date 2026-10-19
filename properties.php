@@ -2,13 +2,17 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'admin' && $_SESSION['role'] != 'sub_admin')) {
+// 🔥 1. Yahan fix kiya gaya hai: Sales role ko allow kiya
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'sub_admin', 'sales'])) {
     header("Location: login.php");
     exit;
 }
 
 $user_id = $_SESSION['user_id'];
-$is_admin = ($_SESSION['role'] == 'admin' || $_SESSION['role'] == 'sub_admin');
+$current_role = $_SESSION['role'];
+
+// 🔥 2. Sirf Admin aur Sub-admin hi edit/delete kar sakte hain
+$is_admin = ($current_role == 'admin' || $current_role == 'sub_admin');
 
 $property_types = [
     'Flat', 'Plot', 'Shop', 'Land', 'House', 'Land & Building',
@@ -70,7 +74,8 @@ $edit_mode = false;
 $prop = null;
 $existing_images = [];
 
-if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
+// 🔥 3. Sales user edit page nahi khol sakta
+if (isset($_GET['edit']) && is_numeric($_GET['edit']) && $is_admin) {
     $edit_id = (int)$_GET['edit'];
     $stmt = $pdo->prepare("SELECT * FROM properties WHERE id = ?");
     $stmt->execute([$edit_id]);
@@ -180,9 +185,9 @@ function parseDateTimeFlexible($str) {
 }
 
 // ============================================================
-// Handle Form Submission
+// Handle Form Submission (Only Admin)
 // ============================================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $is_admin) {
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $price = (float)($_POST['price'] ?? 0);
@@ -212,13 +217,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_start_parsed = parseDateTimeFlexible($auction_start_time);
     $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
-    // ============================================================
     // 📄 ADMIN DOCUMENT UPLOAD + REMOVE
-    // ============================================================
     $admin_document_path = $edit_mode ? ($prop['admin_document'] ?? null) : null;
     $upload_error = '';
 
-    // Handle new upload
     if (isset($_FILES['admin_document']) && $_FILES['admin_document']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = __DIR__ . '/uploads/admin_documents/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -232,15 +234,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     if (file_exists($old)) @unlink($old);
                 }
                 $admin_document_path = 'uploads/admin_documents/' . $new_name;
-            } else {
-                $upload_error = "Failed to move uploaded document.";
             }
-        } else {
-            $upload_error = "Invalid document type.";
         }
     }
 
-    // 🔥 Handle REMOVE existing admin document
     if (isset($_POST['remove_admin_document']) && $_POST['remove_admin_document'] == '1') {
         if ($edit_mode && !empty($prop['admin_document'])) {
             $old = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
@@ -249,9 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $admin_document_path = null;
     }
 
-    // ============================================================
     // 🖼️ MAIN IMAGE UPLOAD + REMOVE
-    // ============================================================
     $image_url_path = $edit_mode ? ($prop['image_url'] ?? null) : null;
     if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $img_dir = __DIR__ . '/uploads/property_images/';
@@ -359,127 +354,32 @@ function saveGalleryImages($pdo, $property_id, $main_image = null) {
 include 'header.php';
 ?>
 
-<!-- 🔥 ALL STYLES -->
+<!-- 🔥 ALL STYLES (Same as before) -->
 <style>
-    .compact-table-wrapper {
-        background: #fff;
-        border-radius: 14px;
-        overflow-x: auto;
-        overflow-y: visible;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-        border: 1px solid #e2e8f0;
-        position: relative;
-    }
-    .compact-table {
-        width: 100%;
-        min-width: 1200px;
-        margin: 0;
-        font-size: 0.8rem;
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-    .compact-table thead th {
-        background: #1e293b;
-        color: #fff;
-        font-size: 0.68rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        padding: 9px 8px;
-        text-align: left;
-        white-space: nowrap;
-        border: none;
-        position: sticky;
-        top: 0;
-        z-index: 3;
-    }
-    .compact-table tbody td {
-        padding: 6px 8px;
-        vertical-align: middle;
-        border-bottom: 1px solid #f1f5f9;
-        line-height: 1.3;
-        background: #fff;
-        color: #1e293b;
-    }
+    .compact-table-wrapper { background: #fff; border-radius: 14px; overflow-x: auto; overflow-y: visible; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; position: relative; }
+    .compact-table { width: 100%; min-width: 1200px; margin: 0; font-size: 0.8rem; border-collapse: separate; border-spacing: 0; }
+    .compact-table thead th { background: #1e293b; color: #fff; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 9px 8px; text-align: left; white-space: nowrap; border: none; position: sticky; top: 0; z-index: 3; }
+    .compact-table tbody td { padding: 6px 8px; vertical-align: middle; border-bottom: 1px solid #f1f5f9; line-height: 1.3; background: #fff; color: #1e293b; }
     .compact-table tbody tr:hover td { background: #f8faff; }
     .compact-table tbody tr:last-child td { border-bottom: none; }
     .compact-table .col-id { width: 55px; font-weight: 700; color: #1e40af; font-size: 0.75rem; }
     .compact-table .col-img { width: 55px; }
-    .compact-table .col-img img {
-        width: 40px; height: 40px;
-        object-fit: cover;
-        border-radius: 6px;
-        border: 1px solid #e2e8f0;
-        display: block;
-        cursor: pointer;
-        transition: transform 0.15s;
-    }
-    .compact-table .col-img img:hover {
-        transform: scale(2);
-        z-index: 100;
-        position: relative;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.25);
-    }
-    .compact-table .col-img .no-img {
-        width: 40px; height: 40px;
-        background: #f1f5f9;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #94a3b8;
-        font-size: 0.6rem;
-        font-weight: 700;
-    }
+    .compact-table .col-img img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0; display: block; cursor: pointer; transition: transform 0.15s; }
+    .compact-table .col-img img:hover { transform: scale(2); z-index: 100; position: relative; box-shadow: 0 8px 25px rgba(0,0,0,0.25); }
+    .compact-table .col-img .no-img { width: 40px; height: 40px; background: #f1f5f9; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.6rem; font-weight: 700; }
     .compact-table .col-title { max-width: 200px; font-weight: 600; color: #0f172a; }
-    .compact-table .ellipsis {
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .compact-table .col-type .badge,
-    .compact-table .col-status .badge {
-        font-size: 0.62rem;
-        padding: 3px 8px;
-        border-radius: 20px;
-        font-weight: 700;
-    }
+    .compact-table .ellipsis { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .compact-table .col-type .badge, .compact-table .col-status .badge { font-size: 0.62rem; padding: 3px 8px; border-radius: 20px; font-weight: 700; }
     .compact-table .col-bank { max-width: 120px; font-size: 0.75rem; color: #475569; }
     .compact-table .col-city { font-size: 0.78rem; color: #334155; font-weight: 600; white-space: nowrap; }
     .compact-table .col-locality { font-size: 0.72rem; color: #64748b; max-width: 110px; }
     .compact-table .col-price { font-weight: 700; color: #059669; font-size: 0.82rem; white-space: nowrap; }
     .compact-table .col-date { font-size: 0.72rem; color: #64748b; white-space: nowrap; }
     .compact-table .col-doc { width: 55px; text-align: center; }
-    .compact-table .col-actions {
-        width: 85px;
-        text-align: center;
-        white-space: nowrap;
-        position: sticky;
-        right: 0;
-        background: #fff !important;
-        box-shadow: -4px 0 8px -2px rgba(0,0,0,0.06);
-        z-index: 2;
-    }
-    .compact-table thead .col-actions {
-        background: #1e293b !important;
-        z-index: 4;
-    }
-    .compact-table tbody tr:hover .col-actions {
-        background: #f8faff !important;
-    }
-    .btn-xs {
-        width: 26px; height: 26px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 6px;
-        font-size: 0.7rem;
-        border: none;
-        transition: all 0.15s;
-        vertical-align: middle;
-    }
+    .compact-table .col-actions { width: 85px; text-align: center; white-space: nowrap; position: sticky; right: 0; background: #fff !important; box-shadow: -4px 0 8px -2px rgba(0,0,0,0.06); z-index: 2; }
+    .compact-table thead .col-actions { background: #1e293b !important; z-index: 4; }
+    .compact-table tbody tr:hover .col-actions { background: #f8faff !important; }
+    .btn-xs { width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 0.7rem; border: none; transition: all 0.15s; vertical-align: middle; }
     .btn-xs.btn-primary { background: #2563eb; color: #fff; }
     .btn-xs.btn-primary:hover { background: #1d4ed8; transform: scale(1.1); }
     .btn-xs.btn-danger { background: #dc2626; color: #fff; }
@@ -487,260 +387,45 @@ include 'header.php';
     .btn-xs.btn-info { background: #0891b2; color: #fff; text-decoration: none; }
     .btn-xs.btn-info:hover { background: #0e7490; transform: scale(1.1); color: #fff; }
 
-    .page-header-compact {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 14px;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .page-header-compact h1 {
-        font-size: 1.3rem;
-        font-weight: 800;
-        margin: 0;
-        color: #0f172a;
-    }
-    .page-header-compact .count-badge {
-        background: #2563eb;
-        color: #fff;
-        font-size: 0.72rem;
-        padding: 3px 10px;
-        border-radius: 20px;
-        font-weight: 700;
-        margin-left: 6px;
-    }
-    .filter-bar-compact {
-        background: #fff;
-        border-radius: 12px;
-        padding: 10px 14px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 14px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-    }
-    .filter-bar-compact .form-control {
-        font-size: 0.8rem;
-        padding: 6px 12px;
-        height: 34px;
-        border-radius: 8px;
-    }
-    .filter-bar-compact .btn {
-        font-size: 0.8rem;
-        padding: 6px 14px;
-        height: 34px;
-        border-radius: 8px;
-    }
-    .compact-pagination {
-        margin-top: 14px;
-        display: flex;
-        justify-content: center;
-        gap: 4px;
-        flex-wrap: wrap;
-    }
-    .compact-pagination a, .compact-pagination span {
-        padding: 5px 11px;
-        border-radius: 8px;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        color: #334155;
-        font-size: 0.78rem;
-        font-weight: 600;
-        text-decoration: none;
-        transition: all 0.2s;
-    }
-    .compact-pagination a:hover {
-        background: #eff6ff;
-        border-color: #2563eb;
-        color: #2563eb;
-    }
-    .compact-pagination .active {
-        background: #2563eb;
-        color: #fff;
-        border-color: #2563eb;
-    }
+    .page-header-compact { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+    .page-header-compact h1 { font-size: 1.3rem; font-weight: 800; margin: 0; color: #0f172a; }
+    .page-header-compact .count-badge { background: #2563eb; color: #fff; font-size: 0.72rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; margin-left: 6px; }
+    .filter-bar-compact { background: #fff; border-radius: 12px; padding: 10px 14px; border: 1px solid #e2e8f0; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+    .filter-bar-compact .form-control { font-size: 0.8rem; padding: 6px 12px; height: 34px; border-radius: 8px; }
+    .filter-bar-compact .btn { font-size: 0.8rem; padding: 6px 14px; height: 34px; border-radius: 8px; }
+    .compact-pagination { margin-top: 14px; display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; }
+    .compact-pagination a, .compact-pagination span { padding: 5px 11px; border-radius: 8px; background: #fff; border: 1px solid #e2e8f0; color: #334155; font-size: 0.78rem; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+    .compact-pagination a:hover { background: #eff6ff; border-color: #2563eb; color: #2563eb; }
+    .compact-pagination .active { background: #2563eb; color: #fff; border-color: #2563eb; }
     .compact-pagination .disabled { opacity: 0.4; pointer-events: none; }
     .compact-pagination .dots { border: none; background: transparent; }
 
-    /* ========== CUSTOM FILE UPLOAD UI ========== */
-    .custom-upload-box {
-        border: 2px dashed #cbd5e1;
-        border-radius: 12px;
-        padding: 18px;
-        text-align: center;
-        background: #f8fafc;
-        transition: all 0.2s;
-        cursor: pointer;
-    }
-    .custom-upload-box:hover {
-        border-color: #2563eb;
-        background: #eff6ff;
-    }
-    .custom-upload-box.danger:hover {
-        border-color: #dc2626;
-        background: #fef2f2;
-    }
+    /* CUSTOM FILE UPLOAD UI */
+    .custom-upload-box { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 18px; text-align: center; background: #f8fafc; transition: all 0.2s; cursor: pointer; }
+    .custom-upload-box:hover { border-color: #2563eb; background: #eff6ff; }
+    .custom-upload-box.danger:hover { border-color: #dc2626; background: #fef2f2; }
     .custom-upload-box input[type="file"] { display: none; }
-    .custom-upload-box .upload-icon {
-        font-size: 1.8rem;
-        color: #94a3b8;
-        margin-bottom: 6px;
-    }
+    .custom-upload-box .upload-icon { font-size: 1.8rem; color: #94a3b8; margin-bottom: 6px; }
     .custom-upload-box.danger .upload-icon { color: #dc2626; }
-    .custom-upload-box .upload-text {
-        font-size: 0.85rem;
-        color: #475569;
-        font-weight: 600;
-    }
-    .custom-upload-box .upload-hint {
-        font-size: 0.72rem;
-        color: #94a3b8;
-        margin-top: 4px;
-    }
-
-    /* Preview grid */
-    .preview-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-        gap: 8px;
-        margin-top: 10px;
-    }
-    .preview-item {
-        position: relative;
-        border-radius: 10px;
-        overflow: hidden;
-        border: 2px solid #e2e8f0;
-        background: #fff;
-        aspect-ratio: 1;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-    }
-    .preview-item img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-    }
-    .preview-item .file-name {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(15,23,42,0.75);
-        color: #fff;
-        font-size: 0.6rem;
-        padding: 3px 5px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        backdrop-filter: blur(4px);
-    }
-    .preview-item .remove-btn {
-        position: absolute;
-        top: 4px;
-        right: 4px;
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: #dc2626;
-        color: #fff;
-        border: 2px solid #fff;
-        font-size: 12px;
-        line-height: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        font-weight: bold;
-        box-shadow: 0 2px 6px rgba(220,38,38,0.4);
-        transition: all 0.15s;
-    }
-    .preview-item .remove-btn:hover {
-        background: #b91c1c;
-        transform: scale(1.15);
-    }
-    .preview-item.single .remove-btn {
-        width: 26px;
-        height: 26px;
-        font-size: 14px;
-    }
-    .preview-label {
-        display: block;
-        font-size: 0.7rem;
-        font-weight: 700;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 6px;
-    }
-
-    /* 🔥 Document preview card */
-    .doc-preview-card {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 14px;
-        border-radius: 12px;
-        background: #fef3c7;
-        border: 1px solid #fcd34d;
-        margin-top: 10px;
-        transition: all 0.2s;
-    }
-    .doc-preview-card .doc-icon {
-        width: 42px;
-        height: 42px;
-        background: #dc2626;
-        color: #fff;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.1rem;
-        flex-shrink: 0;
-    }
-    .doc-preview-card .doc-info {
-        flex: 1;
-        min-width: 0;
-    }
-    .doc-preview-card .doc-name {
-        font-weight: 700;
-        font-size: 0.82rem;
-        color: #78350f;
-        word-break: break-all;
-        line-height: 1.2;
-    }
-    .doc-preview-card .doc-meta {
-        font-size: 0.7rem;
-        color: #92400e;
-        margin-top: 2px;
-    }
-    .doc-preview-card .doc-remove {
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
-        background: #dc2626;
-        color: #fff;
-        border: none;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.85rem;
-        transition: all 0.15s;
-        flex-shrink: 0;
-    }
-    .doc-preview-card .doc-remove:hover {
-        background: #b91c1c;
-        transform: scale(1.1);
-    }
-    .doc-preview-card.marked-remove {
-        background: #fee2e2;
-        border-color: #f87171;
-        opacity: 0.7;
-    }
-    .doc-preview-card.marked-remove .doc-name,
-    .doc-preview-card.marked-remove .doc-meta {
-        text-decoration: line-through;
-        color: #991b1b;
-    }
+    .custom-upload-box .upload-text { font-size: 0.85rem; color: #475569; font-weight: 600; }
+    .custom-upload-box .upload-hint { font-size: 0.72rem; color: #94a3b8; margin-top: 4px; }
+    .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; margin-top: 10px; }
+    .preview-item { position: relative; border-radius: 10px; overflow: hidden; border: 2px solid #e2e8f0; background: #fff; aspect-ratio: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+    .preview-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .preview-item .file-name { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(15,23,42,0.75); color: #fff; font-size: 0.6rem; padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; backdrop-filter: blur(4px); }
+    .preview-item .remove-btn { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; background: #dc2626; color: #fff; border: 2px solid #fff; font-size: 12px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; box-shadow: 0 2px 6px rgba(220,38,38,0.4); transition: all 0.15s; }
+    .preview-item .remove-btn:hover { background: #b91c1c; transform: scale(1.15); }
+    .preview-item.single .remove-btn { width: 26px; height: 26px; font-size: 14px; }
+    .preview-label { display: block; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .doc-preview-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #fef3c7; border: 1px solid #fcd34d; margin-top: 10px; transition: all 0.2s; }
+    .doc-preview-card .doc-icon { width: 42px; height: 42px; background: #dc2626; color: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .doc-preview-card .doc-info { flex: 1; min-width: 0; }
+    .doc-preview-card .doc-name { font-weight: 700; font-size: 0.82rem; color: #78350f; word-break: break-all; line-height: 1.2; }
+    .doc-preview-card .doc-meta { font-size: 0.7rem; color: #92400e; margin-top: 2px; }
+    .doc-preview-card .doc-remove { width: 32px; height: 32px; border-radius: 8px; background: #dc2626; color: #fff; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; transition: all 0.15s; flex-shrink: 0; }
+    .doc-preview-card .doc-remove:hover { background: #b91c1c; transform: scale(1.1); }
+    .doc-preview-card.marked-remove { background: #fee2e2; border-color: #f87171; opacity: 0.7; }
+    .doc-preview-card.marked-remove .doc-name, .doc-preview-card.marked-remove .doc-meta { text-decoration: line-through; color: #991b1b; }
 </style>
 
 <div class="container-fluid mt-3">
@@ -750,14 +435,16 @@ include 'header.php';
             🏠 All Properties 
             <span class="count-badge"><?= number_format($total_properties) ?></span>
             <?php if ($total_pages > 1): ?>
-                <small class="text-muted ms-2" style="font-size:0.75rem; font-weight:500;">
-                    Page <?= $page ?> / <?= $total_pages ?>
-                </small>
+                <small class="text-muted ms-2" style="font-size:0.75rem; font-weight:500;">Page <?= $page ?> / <?= $total_pages ?></small>
             <?php endif; ?>
         </h1>
+        
+        <!-- 🔥 4. Add button sirf admin ko dikhega -->
+        <?php if ($is_admin): ?>
         <a href="?add=1" class="btn btn-primary btn-sm rounded-pill px-3 <?= isset($_GET['add']) ? 'disabled' : '' ?>">
             <i class="fas fa-plus-circle me-1"></i> Add New Property
         </a>
+        <?php endif; ?>
     </div>
 
     <?php if (isset($_GET['msg'])): ?>
@@ -771,8 +458,8 @@ include 'header.php';
         </div>
     <?php endif; ?>
 
-    <!-- ADD/EDIT FORM -->
-    <?php if (isset($_GET['add']) || $edit_mode): ?>
+    <!-- 🔥 5. ADD/EDIT FORM (Sirf Admin ko dikhega) -->
+    <?php if ($is_admin && (isset($_GET['add']) || $edit_mode)): ?>
     <div class="card shadow-lg rounded-4 mb-4 border-0">
         <div class="card-header bg-primary text-white p-3 rounded-top-4">
             <h5 class="mb-0"><i class="fas fa-<?= $edit_mode ? 'edit' : 'plus' ?> me-2"></i> <?= $edit_mode ? 'Edit Property' : 'Add New Property' ?></h5>
@@ -892,41 +579,26 @@ include 'header.php';
                         </select>
                     </div>
 
-                    <!-- ============================================================
-                         MAIN / COVER IMAGE
-                         ============================================================ -->
+                    <!-- MAIN / COVER IMAGE -->
                     <div class="col-md-6">
-                        <label class="form-label fw-bold text-primary">
-                            <i class="fas fa-image me-1"></i> Main / Cover Image
-                        </label>
-
+                        <label class="form-label fw-bold text-primary"><i class="fas fa-image me-1"></i> Main / Cover Image</label>
                         <div class="custom-upload-box" onclick="document.getElementById('mainImageInput').click();">
                             <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
                             <div class="upload-text">Click to select image</div>
                             <div class="upload-hint">JPG, PNG, WEBP, GIF • Max 5MB</div>
-                            <input type="file" name="image" id="mainImageInput" accept="image/*"
-                                   onchange="handleMainImageSelect(this)">
+                            <input type="file" name="image" id="mainImageInput" accept="image/*" onchange="handleMainImageSelect(this)">
                         </div>
-
                         <div class="preview-grid" id="mainImagePreview"></div>
 
                         <?php if ($edit_mode && !empty($prop['image_url'])): ?>
                             <div class="mt-3 p-3 rounded-3" style="background:#f0fdf4; border:1px solid #86efac;">
-                                <span class="preview-label">
-                                    <i class="fas fa-server me-1"></i> Current on Server
-                                </span>
+                                <span class="preview-label"><i class="fas fa-server me-1"></i> Current on Server</span>
                                 <div class="d-flex align-items-center gap-3">
-                                    <img src="<?= htmlspecialchars($prop['image_url']) ?>"
-                                         alt="Current"
-                                         style="width:70px; height:70px; object-fit:cover; border-radius:10px; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                                    <img src="<?= htmlspecialchars($prop['image_url']) ?>" alt="Current" style="width:70px; height:70px; object-fit:cover; border-radius:10px; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
                                     <div>
                                         <div class="form-check">
-                                            <input type="checkbox" name="remove_image" value="1"
-                                                   class="form-check-input" id="remove_image"
-                                                   onchange="toggleServerMainRemoval(this)">
-                                            <label class="form-check-label small text-danger fw-bold" for="remove_image">
-                                                <i class="fas fa-trash me-1"></i> Remove This Cover
-                                            </label>
+                                            <input type="checkbox" name="remove_image" value="1" class="form-check-input" id="remove_image" onchange="toggleServerMainRemoval(this)">
+                                            <label class="form-check-label small text-danger fw-bold" for="remove_image"><i class="fas fa-trash me-1"></i> Remove This Cover</label>
                                         </div>
                                     </div>
                                 </div>
@@ -934,41 +606,25 @@ include 'header.php';
                         <?php endif; ?>
                     </div>
 
-                    <!-- ============================================================
-                         GALLERY IMAGES
-                         ============================================================ -->
+                    <!-- GALLERY IMAGES -->
                     <div class="col-md-6">
-                        <label class="form-label fw-bold text-success">
-                            <i class="fas fa-images me-1"></i> Gallery Images (Multiple)
-                        </label>
-
+                        <label class="form-label fw-bold text-success"><i class="fas fa-images me-1"></i> Gallery Images (Multiple)</label>
                         <div class="custom-upload-box" onclick="document.getElementById('galleryInput').click();">
                             <div class="upload-icon"><i class="fas fa-images"></i></div>
                             <div class="upload-text">Click to select multiple images</div>
                             <div class="upload-hint">एक साथ कई images select करें</div>
-                            <input type="file" name="images[]" id="galleryInput" accept="image/*" multiple
-                                   onchange="handleGallerySelect(this)">
+                            <input type="file" name="images[]" id="galleryInput" accept="image/*" multiple onchange="handleGallerySelect(this)">
                         </div>
-
                         <div class="preview-grid" id="galleryPreview"></div>
 
                         <?php if ($edit_mode && !empty($existing_images)): ?>
                             <div class="mt-3 p-3 rounded-3" style="background:#eff6ff; border:1px solid #93c5fd;">
-                                <span class="preview-label">
-                                    <i class="fas fa-server me-1"></i> Current Gallery on Server (<?= count($existing_images) ?>)
-                                </span>
+                                <span class="preview-label"><i class="fas fa-server me-1"></i> Current Gallery on Server (<?= count($existing_images) ?>)</span>
                                 <div class="d-flex flex-wrap gap-2">
                                     <?php foreach ($existing_images as $img): ?>
                                         <div style="position:relative;">
-                                            <img src="<?= htmlspecialchars($img['image_url']) ?>"
-                                                 alt="Gallery"
-                                                 style="width:65px; height:65px; object-fit:cover; border-radius:8px; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
-                                            <a href="delete_property_image.php?id=<?= $img['id'] ?>&prop=<?= $prop['id'] ?>"
-                                               onclick="return confirm('Delete this image from server?')"
-                                               style="position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:#dc2626; color:#fff; font-size:11px; text-align:center; line-height:22px; text-decoration:none; font-weight:bold; box-shadow:0 2px 6px rgba(220,38,38,0.4);"
-                                               title="Delete from server">
-                                                ×
-                                            </a>
+                                            <img src="<?= htmlspecialchars($img['image_url']) ?>" alt="Gallery" style="width:65px; height:65px; object-fit:cover; border-radius:8px; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+                                            <a href="delete_property_image.php?id=<?= $img['id'] ?>&prop=<?= $prop['id'] ?>" onclick="return confirm('Delete this image from server?')" style="position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:#dc2626; color:#fff; font-size:11px; text-align:center; line-height:22px; text-decoration:none; font-weight:bold; box-shadow:0 2px 6px rgba(220,38,38,0.4);" title="Delete from server">×</a>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -976,28 +632,17 @@ include 'header.php';
                         <?php endif; ?>
                     </div>
 
-                    <!-- ============================================================
-                         🔥 ADMIN DOCUMENT — With Remove Option
-                         ============================================================ -->
+                    <!-- ADMIN DOCUMENT -->
                     <div class="col-12">
-                        <label class="form-label fw-bold text-danger">
-                            <i class="fas fa-file-pdf me-1"></i> Admin Document (PDF/JPG/PNG - Only for Admins)
-                        </label>
-
-                        <!-- Custom upload box -->
+                        <label class="form-label fw-bold text-danger"><i class="fas fa-file-pdf me-1"></i> Admin Document (PDF/JPG/PNG - Only for Admins)</label>
                         <div class="custom-upload-box danger" onclick="document.getElementById('adminDocInput').click();">
                             <div class="upload-icon"><i class="fas fa-file-upload"></i></div>
                             <div class="upload-text">Click to select document</div>
                             <div class="upload-hint">PDF, JPG, JPEG, PNG • Max 10MB</div>
-                            <input type="file" name="admin_document" id="adminDocInput" 
-                                   accept=".pdf,.jpg,.jpeg,.png"
-                                   onchange="handleAdminDocSelect(this)">
+                            <input type="file" name="admin_document" id="adminDocInput" accept=".pdf,.jpg,.jpeg,.png" onchange="handleAdminDocSelect(this)">
                         </div>
-
-                        <!-- 🔥 New selection preview -->
                         <div id="adminDocPreview"></div>
 
-                        <!-- 🔥 Existing admin document + remove (Edit mode) -->
                         <?php if ($edit_mode && !empty($prop['admin_document'])): 
                             $doc_check = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
                             $doc_exists = file_exists($doc_check);
@@ -1005,13 +650,9 @@ include 'header.php';
                             $doc_icon = ($doc_ext === 'pdf') ? 'fa-file-pdf' : 'fa-file-image';
                         ?>
                             <div class="doc-preview-card" id="serverDocCard">
-                                <div class="doc-icon">
-                                    <i class="fas <?= $doc_icon ?>"></i>
-                                </div>
+                                <div class="doc-icon"><i class="fas <?= $doc_icon ?>"></i></div>
                                 <div class="doc-info">
-                                    <div class="doc-name">
-                                        <?= htmlspecialchars(basename($prop['admin_document'])) ?>
-                                    </div>
+                                    <div class="doc-name"><?= htmlspecialchars(basename($prop['admin_document'])) ?></div>
                                     <div class="doc-meta">
                                         <i class="fas fa-server me-1"></i> On Server
                                         <?php if ($doc_exists): ?>
@@ -1021,20 +662,9 @@ include 'header.php';
                                         <?php endif; ?>
                                     </div>
                                 </div>
-                                <!-- 🔥 REMOVE BUTTON -->
-                                <input type="checkbox" name="remove_admin_document" value="1"
-                                       id="remove_admin_document" style="display:none;">
-                                <button type="button" class="doc-remove" 
-                                        onclick="toggleAdminDocRemove()" 
-                                        id="adminDocRemoveBtn"
-                                        title="Remove this document">
-                                    <i class="fas fa-trash"></i>
-                                </button>
+                                <input type="checkbox" name="remove_admin_document" value="1" id="remove_admin_document" style="display:none;">
+                                <button type="button" class="doc-remove" onclick="toggleAdminDocRemove()" id="adminDocRemoveBtn" title="Remove this document"><i class="fas fa-trash"></i></button>
                             </div>
-                            <small class="text-muted d-block mt-2" style="font-size:0.7rem;">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Trash icon दबाने पर submit के बाद document server से हट जाएगा
-                            </small>
                         <?php endif; ?>
                     </div>
 
@@ -1043,9 +673,7 @@ include 'header.php';
                         <textarea name="description" class="form-control" rows="3"><?= $edit_mode ? htmlspecialchars($prop['description'] ?? '') : '' ?></textarea>
                     </div>
                     <div class="col-12">
-                        <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill shadow">
-                            <i class="fas fa-save me-2"></i> <?= $edit_mode ? 'Update Property' : 'Add Property' ?>
-                        </button>
+                        <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill shadow"><i class="fas fa-save me-2"></i> <?= $edit_mode ? 'Update Property' : 'Add Property' ?></button>
                         <a href="properties.php" class="btn btn-outline-secondary w-100 mt-2 rounded-pill">Cancel</a>
                     </div>
                 </div>
@@ -1078,14 +706,10 @@ include 'header.php';
                 <input type="number" name="max_price" class="form-control form-control-sm" placeholder="Max ₹" value="<?= htmlspecialchars($max_price) ?>">
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="fas fa-search me-1"></i> Filter
-                </button>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search me-1"></i> Filter</button>
             </div>
             <div class="col-auto">
-                <a href="properties.php" class="btn btn-outline-secondary btn-sm">
-                    <i class="fas fa-undo"></i>
-                </a>
+                <a href="properties.php" class="btn btn-outline-secondary btn-sm"><i class="fas fa-undo"></i></a>
             </div>
         </form>
     </div>
@@ -1120,10 +744,7 @@ include 'header.php';
                             <td class="col-id"><?= htmlspecialchars($row['id'] ?? '') ?></td>
                             <td class="col-img">
                                 <?php if ($has_main_img): ?>
-                                    <img src="<?= htmlspecialchars($row['image_url']) ?>"
-                                         alt="img"
-                                         loading="lazy"
-                                         onclick="window.open(this.src, '_blank')">
+                                    <img src="<?= htmlspecialchars($row['image_url']) ?>" alt="img" loading="lazy" onclick="window.open(this.src, '_blank')">
                                 <?php else: ?>
                                     <div class="no-img">NO</div>
                                 <?php endif; ?>
@@ -1131,27 +752,15 @@ include 'header.php';
                                     <div style="font-size:0.6rem; color:#2563eb; margin-top:1px; font-weight:700; text-align:center;">+<?= $gallery_count ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td class="col-title">
-                                <span class="ellipsis" title="<?= htmlspecialchars($row['title'] ?? '') ?>">
-                                    <?= htmlspecialchars($row['title'] ?? '') ?>
-                                </span>
-                            </td>
+                            <td class="col-title"><span class="ellipsis" title="<?= htmlspecialchars($row['title'] ?? '') ?>"><?= htmlspecialchars($row['title'] ?? '') ?></span></td>
                             <td class="col-type">
                                 <?php if (!empty($row['type'])): ?>
                                     <span class="badge bg-info text-dark"><?= htmlspecialchars($row['type']) ?></span>
                                 <?php else: ?><span class="text-muted">—</span><?php endif; ?>
                             </td>
-                            <td class="col-bank">
-                                <span class="ellipsis" title="<?= htmlspecialchars($row['bank_name'] ?? '') ?>">
-                                    <?= htmlspecialchars($row['bank_name'] ?? '—') ?>
-                                </span>
-                            </td>
+                            <td class="col-bank"><span class="ellipsis" title="<?= htmlspecialchars($row['bank_name'] ?? '') ?>"><?= htmlspecialchars($row['bank_name'] ?? '—') ?></span></td>
                             <td class="col-city"><?= htmlspecialchars($row['city'] ?? '—') ?></td>
-                            <td class="col-locality">
-                                <span class="ellipsis" title="<?= htmlspecialchars($row['locality'] ?? '') ?>">
-                                    <?= htmlspecialchars($row['locality'] ?? '—') ?>
-                                </span>
-                            </td>
+                            <td class="col-locality"><span class="ellipsis" title="<?= htmlspecialchars($row['locality'] ?? '') ?>"><?= htmlspecialchars($row['locality'] ?? '—') ?></span></td>
                             <td class="col-price">₹<?= number_format($row['price'] ?? 0, 0) ?></td>
                             <td class="col-date">
                                 <?php if (!empty($row['auction_date'])): ?>
@@ -1167,24 +776,20 @@ include 'header.php';
                             </td>
                             <td class="col-doc">
                                 <?php if ($has_doc): ?>
-                                    <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" 
-                                       class="btn-xs btn-info" title="View Admin Document">
-                                        <i class="fas fa-file-pdf"></i>
-                                    </a>
+                                    <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" class="btn-xs btn-info" title="View Admin Document"><i class="fas fa-file-pdf"></i></a>
                                 <?php else: ?>
                                     <span style="font-size:0.65rem; color:#94a3b8;">—</span>
                                 <?php endif; ?>
                             </td>
+                            
+                            <!-- 🔥 6. Edit/Delete buttons sirf admin ko dikhenge -->
                             <td class="col-actions">
-                                <a href="properties.php?edit=<?= $row['id'] ?>" class="btn-xs btn-primary" title="Edit Property">
-                                    <i class="fas fa-edit"></i>
-                                </a>
                                 <?php if ($is_admin): ?>
-                                    <a href="properties.php?delete=<?= $row['id'] ?>" class="btn-xs btn-danger" 
-                                       onclick="return confirm('Delete this property?\n\nAll images and documents will also be deleted!')" 
-                                       title="Delete Property">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
+                                    <a href="properties.php?edit=<?= $row['id'] ?>" class="btn-xs btn-primary" title="Edit Property"><i class="fas fa-edit"></i></a>
+                                    <a href="properties.php?delete=<?= $row['id'] ?>" class="btn-xs btn-danger" onclick="return confirm('Delete this property?\n\nAll images and documents will also be deleted!')" title="Delete Property"><i class="fas fa-trash"></i></a>
+                                <?php else: ?>
+                                    <!-- Sales user ke liye sirf ek lock icon ya text dikhega -->
+                                    <span class="text-muted" style="font-size:0.65rem; font-weight:600;"><i class="fas fa-lock"></i> View</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -1197,9 +802,7 @@ include 'header.php';
         <?php if ($total_pages > 1): ?>
             <div class="compact-pagination">
                 <?php if ($page > 1): ?>
-                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>">
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
+                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>"><i class="fas fa-chevron-left"></i></a>
                 <?php else: ?>
                     <span class="disabled"><i class="fas fa-chevron-left"></i></span>
                 <?php endif; ?>
@@ -1227,9 +830,7 @@ include 'header.php';
                 <?php endif; ?>
 
                 <?php if ($page < $total_pages): ?>
-                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>">
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
+                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>"><i class="fas fa-chevron-right"></i></a>
                 <?php else: ?>
                     <span class="disabled"><i class="fas fa-chevron-right"></i></span>
                 <?php endif; ?>
@@ -1245,21 +846,16 @@ include 'header.php';
     <?php endif; ?>
 </div>
 
-<!-- 🔥 JAVASCRIPT -->
+<!-- 🔥 JAVASCRIPT (Same as before) -->
 <script>
-// ============================================================
-// MAIN IMAGE — Select + Preview + Remove
-// ============================================================
 function handleMainImageSelect(input) {
     const preview = document.getElementById('mainImagePreview');
     preview.innerHTML = '';
-
     if (input.files && input.files[0]) {
         const file = input.files[0];
         if (file.size > 5 * 1024 * 1024) {
             alert('❌ Image is too large. Max 5MB allowed.');
-            input.value = '';
-            return;
+            input.value = ''; return;
         }
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -1275,43 +871,32 @@ function handleMainImageSelect(input) {
         reader.readAsDataURL(file);
     }
 }
-
 function removeMainImage(event) {
     event.stopPropagation();
-    const input = document.getElementById('mainImageInput');
-    input.value = '';
+    document.getElementById('mainImageInput').value = '';
     document.getElementById('mainImagePreview').innerHTML = '';
 }
 
-// ============================================================
-// GALLERY — Multiple Select + Preview + Individual Remove
-// ============================================================
 let galleryFiles = [];
-
 function handleGallerySelect(input) {
     if (!input.files) return;
-
     const existingNames = galleryFiles.map(f => f.name + '_' + f.size);
     for (let i = 0; i < input.files.length; i++) {
         const f = input.files[i];
         if (f.size > 5 * 1024 * 1024) {
-            alert(`❌ "${f.name}" is too large (Max 5MB)`);
-            continue;
+            alert(`❌ "${f.name}" is too large (Max 5MB)`); continue;
         }
         const key = f.name + '_' + f.size;
         if (!existingNames.includes(key)) {
-            galleryFiles.push(f);
-            existingNames.push(key);
+            galleryFiles.push(f); existingNames.push(key);
         }
     }
     renderGalleryPreview();
     syncGalleryInput();
 }
-
 function renderGalleryPreview() {
     const preview = document.getElementById('galleryPreview');
     preview.innerHTML = '';
-
     if (galleryFiles.length > 0) {
         const label = document.createElement('div');
         label.className = 'preview-label';
@@ -1319,7 +904,6 @@ function renderGalleryPreview() {
         label.innerHTML = `<i class="fas fa-eye me-1"></i> New selection (${galleryFiles.length}) — not uploaded yet`;
         preview.appendChild(label);
     }
-
     galleryFiles.forEach((file, idx) => {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -1335,14 +919,12 @@ function renderGalleryPreview() {
         reader.readAsDataURL(file);
     });
 }
-
 function removeGalleryImage(event, idx) {
     event.stopPropagation();
     galleryFiles.splice(idx, 1);
     renderGalleryPreview();
     syncGalleryInput();
 }
-
 function syncGalleryInput() {
     const input = document.getElementById('galleryInput');
     const dt = new DataTransfer();
@@ -1350,23 +932,17 @@ function syncGalleryInput() {
     input.files = dt.files;
 }
 
-// ============================================================
-// 🔥 ADMIN DOCUMENT — Select + Preview + Remove
-// ============================================================
 function handleAdminDocSelect(input) {
     const preview = document.getElementById('adminDocPreview');
     preview.innerHTML = '';
-
     if (input.files && input.files[0]) {
         const file = input.files[0];
         if (file.size > 10 * 1024 * 1024) {
             alert('❌ Document is too large. Max 10MB allowed.');
-            input.value = '';
-            return;
+            input.value = ''; return;
         }
         const ext = file.name.split('.').pop().toLowerCase();
         const icon = (ext === 'pdf') ? 'fa-file-pdf' : 'fa-file-image';
-
         const card = document.createElement('div');
         card.className = 'doc-preview-card';
         card.id = 'newDocCard';
@@ -1374,44 +950,30 @@ function handleAdminDocSelect(input) {
             <div class="doc-icon"><i class="fas ${icon}"></i></div>
             <div class="doc-info">
                 <div class="doc-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
-                <div class="doc-meta">
-                    <i class="fas fa-cloud-upload-alt me-1"></i> New selection • 
-                    ${(file.size / 1024).toFixed(0)} KB
-                </div>
+                <div class="doc-meta"><i class="fas fa-cloud-upload-alt me-1"></i> New selection • ${(file.size / 1024).toFixed(0)} KB</div>
             </div>
-            <button type="button" class="doc-remove" onclick="removeNewAdminDoc(event)" title="Remove this document">
-                <i class="fas fa-trash"></i>
-            </button>
+            <button type="button" class="doc-remove" onclick="removeNewAdminDoc(event)" title="Remove this document"><i class="fas fa-trash"></i></button>
         `;
         preview.appendChild(card);
     }
 }
-
 function removeNewAdminDoc(event) {
     event.stopPropagation();
-    const input = document.getElementById('adminDocInput');
-    input.value = '';
+    document.getElementById('adminDocInput').value = '';
     document.getElementById('adminDocPreview').innerHTML = '';
 }
-
-// 🔥 Toggle remove state for EXISTING server document
 function toggleAdminDocRemove() {
     const checkbox = document.getElementById('remove_admin_document');
     const card = document.getElementById('serverDocCard');
     const btn = document.getElementById('adminDocRemoveBtn');
-
     if (checkbox.checked) {
-        // Unmark
         checkbox.checked = false;
         card.classList.remove('marked-remove');
         btn.innerHTML = '<i class="fas fa-trash"></i>';
         btn.title = 'Remove this document';
         btn.style.background = '#dc2626';
     } else {
-        // Mark for removal
-        if (!confirm('⚠️ क्या आप इस admin document को हटाना चाहते हैं?\n\nSubmit करते ही यह server से हट जाएगा।')) {
-            return;
-        }
+        if (!confirm('⚠️ क्या आप इस admin document को हटाना चाहते हैं?\n\nSubmit करते ही यह server से हट जाएगा।')) return;
         checkbox.checked = true;
         card.classList.add('marked-remove');
         btn.innerHTML = '<i class="fas fa-undo"></i>';
@@ -1419,44 +981,24 @@ function toggleAdminDocRemove() {
         btn.style.background = '#059669';
     }
 }
-
-// ============================================================
-// SERVER IMAGE REMOVAL — Visual feedback
-// ============================================================
 function toggleServerMainRemoval(checkbox) {
     const container = checkbox.closest('.p-3');
     const img = container.querySelector('img');
     if (checkbox.checked) {
-        img.style.opacity = '0.3';
-        img.style.filter = 'grayscale(1)';
-        container.style.background = '#fef2f2';
-        container.style.borderColor = '#fecaca';
+        img.style.opacity = '0.3'; img.style.filter = 'grayscale(1)';
+        container.style.background = '#fef2f2'; container.style.borderColor = '#fecaca';
     } else {
-        img.style.opacity = '1';
-        img.style.filter = 'none';
-        container.style.background = '#f0fdf4';
-        container.style.borderColor = '#86efac';
+        img.style.opacity = '1'; img.style.filter = 'none';
+        container.style.background = '#f0fdf4'; container.style.borderColor = '#86efac';
     }
 }
-
-// ============================================================
-// HELPERS
-// ============================================================
 function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-
 document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('form[enctype="multipart/form-data"]');
     forms.forEach(form => {
-        form.addEventListener('submit', function() {
-            syncGalleryInput();
-        });
+        form.addEventListener('submit', function() { syncGalleryInput(); });
     });
 });
 </script>
