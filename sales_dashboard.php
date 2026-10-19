@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📊 Sales CRM – Dashboard
+// 📊 Sales CRM – Dashboard (with WhatsApp direct button)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -179,6 +179,23 @@ include 'header.php';
         vertical-align: middle;
     }
     .leads-table tr:hover td { background: #f8fafc; }
+
+    .row-action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        text-decoration: none;
+        transition: all 0.2s;
+        margin-right: 4px;
+    }
+    .row-action-btn.view { background: #eff6ff; color: #1e40af; }
+    .row-action-btn.view:hover { background: #2563eb; color: #fff; }
+    .row-action-btn.wa { background: #dcfce7; color: #166534; }
+    .row-action-btn.wa:hover { background: #25d366; color: #fff; }
 </style>
 
 <div class="container-fluid py-4">
@@ -290,19 +307,41 @@ include 'header.php';
                                 <th>City</th>
                                 <th>Status</th>
                                 <th>Assigned</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($recent_leads)): ?>
-                                <tr><td colspan="5" class="text-center text-muted py-4">No leads yet. Add one!</td></tr>
+                                <tr><td colspan="6" class="text-center text-muted py-4">No leads yet. Add one!</td></tr>
                             <?php endif; ?>
-                            <?php foreach ($recent_leads as $l): ?>
+                            <?php foreach ($recent_leads as $l): 
+                                // Clean phone for WhatsApp
+                                $clean_phone = preg_replace('/[^0-9]/', '', $l['phone']);
+                                $clean_phone = ltrim($clean_phone, '0');
+                                if (strlen($clean_phone) == 10) {
+                                    $clean_phone = '91' . $clean_phone;
+                                }
+                                $wa_link = "https://wa.me/" . $clean_phone;
+                            ?>
                                 <tr style="cursor:pointer;" onclick="window.location='sales_lead_view.php?id=<?= $l['id'] ?>'">
                                     <td><strong><?= htmlspecialchars($l['name']) ?></strong></td>
                                     <td><?= htmlspecialchars($l['phone']) ?></td>
                                     <td><?= htmlspecialchars($l['city'] ?? '—') ?></td>
                                     <td><span class="status-pill st-<?= $l['status'] ?>"><?= ucfirst(str_replace('_', ' ', $l['status'])) ?></span></td>
                                     <td style="font-size:0.78rem;"><?= htmlspecialchars($l['assigned_name'] ?? 'Unassigned') ?></td>
+                                    <td style="white-space:nowrap;" onclick="event.stopPropagation();">
+                                        <a href="sales_lead_view.php?id=<?= $l['id'] ?>" 
+                                           class="row-action-btn view" 
+                                           title="View Lead">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="<?= $wa_link ?>" 
+                                           target="_blank" 
+                                           class="row-action-btn wa" 
+                                           title="WhatsApp par message bhejein">
+                                            <i class="fab fa-whatsapp"></i>
+                                        </a>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
