@@ -66,9 +66,7 @@ include 'header.php';
             response_type: 'code',
             override_default_response_type: true,
             extras: {
-                setup: {},
-                featureType: 'whatsapp_business_app_onboarding',
-                sessionInfoVersion: '3'
+                setup: {} // 🔥 Yahan change kiya gaya hai. Isse popup band nahi hoga aur QR aayega.
             }
         });
     });
