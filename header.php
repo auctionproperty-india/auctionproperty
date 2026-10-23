@@ -245,36 +245,18 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <button class="close-btn" id="closeSidebarBtn"><i class="fas fa-times"></i></button>
     </div>
     <ul class="nav-list">
-        <!-- Basic Links (Always Visible) -->
         <li><a href="index.php"><i class="fas fa-home"></i> Home</a></li>
         <li><a href="index.php?tab=auction"><i class="fas fa-gavel"></i> Auctions</a></li>
         <li><a href="index.php?tab=customer"><i class="fas fa-building"></i> Properties</a></li>
         <li><a href="index.php?tab=exchange"><i class="fas fa-exchange-alt"></i> Exchange</a></li>
         
-        <!-- Dynamic Pages (Adds below) -->
         <?php if (!empty($dynamic_pages)): ?>
             <li style="border-top:1px solid #eee; margin-top:10px; padding-top:10px;"><span style="font-size:12px; color:#888; padding-left:15px;">More Pages</span></li>
             <?php foreach ($dynamic_pages as $page): ?>
                 <li><a href="page.php?slug=<?= urlencode($page['slug']) ?>"><i class="fas <?= htmlspecialchars($page['icon']) ?>"></i> <?= htmlspecialchars($page['title']) ?></a></li>
             <?php endforeach; ?>
-        <?php elseif (!empty($nav_items)): ?>
-            <li style="border-top:1px solid #eee; margin-top:10px; padding-top:10px;"><span style="font-size:12px; color:#888; padding-left:15px;">More Links</span></li>
-            <?php foreach ($nav_items as $item): ?>
-                <li><a href="<?= htmlspecialchars($item['url']) ?>"><?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?> <?= htmlspecialchars($item['label']) ?></a></li>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <li><a href="page.php?slug=about"><i class="fas fa-info-circle"></i> About</a></li>
-            <li><a href="page.php?slug=faq"><i class="fas fa-question-circle"></i> FAQ</a></li>
-            <li><a href="page.php?slug=contact"><i class="fas fa-envelope"></i> Contact</a></li>
         <?php endif; ?>
     </ul>
-    
-    <?php if (!$is_logged_in): ?>
-    <div class="auth-links" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:15px;">
-        <a href="login.php" style="display:block; padding:10px; text-align:center; background:#f1f5f9; border-radius:8px; color:#1e3a8a; font-weight:bold; text-decoration:none; margin-bottom:8px;">Login</a>
-        <a href="register.php" style="display:block; padding:10px; text-align:center; background:#eef2ff; border-radius:8px; color:#1e3a8a; font-weight:bold; text-decoration:none;">Create Account</a>
-    </div>
-    <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -289,16 +271,17 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     <?php elseif ($role == 'sales'): ?>
         <a href="sales_dashboard.php" class="<?= $current_page == 'sales_dashboard.php' ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
     <?php else: ?>
-        <a href="user_dashboard.php" class="<?= ($current_page == 'user_dashboard.php' && empty($_GET['tab'])) ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <a href="user_dashboard.php" class="<?= ($current_page == 'user_dashboard.php' && !isset($_GET['view'])) ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         
-        <div class="nav-section <?= ($current_page == 'user_dashboard.php' && isset($_GET['tab'])) ? 'open' : '' ?>">
-            <div class="nav-section-title <?= ($current_page == 'user_dashboard.php' && isset($_GET['tab'])) ? 'active' : '' ?>" onclick="toggleSection(this)">
+        <div class="nav-section <?= ($current_page == 'user_dashboard.php' && isset($_GET['view'])) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= ($current_page == 'user_dashboard.php' && isset($_GET['view'])) ? 'active' : '' ?>" onclick="toggleSection(this)">
                 <i class="fas fa-building section-icon"></i><span>All Properties</span><i class="fas fa-chevron-right section-arrow"></i>
             </div>
             <div class="nav-section-items">
-                <a href="user_dashboard.php?tab=auction" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'auction') ? 'active' : '' ?>"><i class="fas fa-gavel"></i> <span>Auction Properties</span></a>
-                <a href="user_dashboard.php?tab=customer" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'customer') ? 'active' : '' ?>"><i class="fas fa-home"></i> <span>Customer Properties</span></a>
-                <a href="user_dashboard.php?tab=exchange" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'exchange') ? 'active' : '' ?>"><i class="fas fa-exchange-alt"></i> <span>Exchange Properties</span></a>
+                <!-- 🔥 Yahan view=all add kiya gaya hai -->
+                <a href="user_dashboard.php?view=all&tab=auction" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'auction') ? 'active' : '' ?>"><i class="fas fa-gavel"></i> <span>Auction Properties</span></a>
+                <a href="user_dashboard.php?view=all&tab=customer" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'customer') ? 'active' : '' ?>"><i class="fas fa-home"></i> <span>Customer Properties</span></a>
+                <a href="user_dashboard.php?view=all&tab=exchange" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'exchange') ? 'active' : '' ?>"><i class="fas fa-exchange-alt"></i> <span>Exchange Properties</span></a>
             </div>
         </div>
 
