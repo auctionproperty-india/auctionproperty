@@ -166,6 +166,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .sidebar-overlay-main { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1040; }
         .sidebar-overlay-main.show { display: block; }
         
+        /* Collapsible Sidebar Sections */
         .sidebar .nav-section { margin: 6px 0; }
         .sidebar .nav-section-title { display: flex; align-items: center; padding: 12px 20px; color: #334155; font-weight: 600; font-size: 14.5px; cursor: pointer; border-radius: 12px; transition: all 0.25s ease; user-select: none; border-left: 3px solid transparent; }
         .sidebar .nav-section-title:hover { background: #f1f5f9; color: #1e3a8a; }
@@ -237,7 +238,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     </div>
 </nav>
 
-<!-- 🔥 HAMBURGER SIDEBAR (Fixed) -->
+<!-- 🔥 HAMBURGER SIDEBAR -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="hamburger-sidebar" id="hamburgerSidebar">
     <div class="sidebar-header">
@@ -267,10 +268,149 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property</span></div>
     
     <?php if ($role == 'admin'): ?>
-        <a href="admin_dashboard.php" class="<?= $current_page == 'admin_dashboard.php' ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <!-- ============================================================ -->
+        <!-- ADMIN SIDEBAR (Restored completely) -->
+        <!-- ============================================================ -->
+        <a href="admin_dashboard.php" class="<?= $current_page == 'admin_dashboard.php' ? 'active' : '' ?>">
+            <i class="fas fa-th-large"></i> <span>Dashboard</span>
+        </a>
+
+        <!-- 🔷 1. PROPERTIES -->
+        <div class="nav-section <?= in_array($current_page, ['properties.php','bulk_upload_properties.php','admin_user_properties.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['properties.php','bulk_upload_properties.php','admin_user_properties.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-building section-icon"></i>
+                <span>Properties</span>
+                <i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <?php if (hasViewPermission('properties', $pdo)): ?>
+                    <a href="properties.php" class="<?= $current_page == 'properties.php' ? 'active' : '' ?>"><i class="fas fa-edit"></i> <span>Auction Properties</span></a>
+                    <a href="bulk_upload_properties.php" class="<?= $current_page == 'bulk_upload_properties.php' ? 'active' : '' ?>"><i class="fas fa-file-upload"></i> <span>Bulk Upload</span></a>
+                <?php endif; ?>
+                <a href="admin_user_properties.php" class="<?= $current_page == 'admin_user_properties.php' ? 'active' : '' ?>"><i class="fas fa-home"></i> <span>User Properties</span></a>
+                <a href="properties.php?filter_city=Dholera Smart City"><i class="fas fa-city"></i> <span>Dholera Properties</span></a>
+            </div>
+        </div>
+
+        <!-- 🔷 2. USERS & TEAM -->
+        <?php if ($is_super_admin): ?>
+        <div class="nav-section <?= in_array($current_page, ['users.php','admin_team.php','admin_permissions.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['users.php','admin_team.php','admin_permissions.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-users section-icon"></i><span>Users & Team</span><i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="users.php" class="<?= $current_page == 'users.php' ? 'active' : '' ?>"><i class="fas fa-users-cog"></i> <span>Manage Users</span></a>
+                <a href="admin_team.php" class="<?= $current_page == 'admin_team.php' ? 'active' : '' ?>"><i class="fas fa-sitemap"></i> <span>View Team</span></a>
+                <a href="admin_permissions.php" class="<?= $current_page == 'admin_permissions.php' ? 'active' : '' ?>"><i class="fas fa-user-shield"></i> <span>Sub-Admins</span></a>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- 🔷 3. PACKAGES & SUBSCRIPTIONS -->
+        <?php if (hasViewPermission('packages', $pdo) || hasViewPermission('subscriptions', $pdo)): ?>
+        <div class="nav-section <?= in_array($current_page, ['admin_packages.php','admin_subscriptions.php','admin_subscription_history.php','admin_give_package.php','admin_extend_subscriptions.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['admin_packages.php','admin_subscriptions.php','admin_subscription_history.php','admin_give_package.php','admin_extend_subscriptions.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-tags section-icon"></i><span>Packages</span><i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <?php if (hasViewPermission('packages', $pdo)): ?>
+                    <a href="admin_packages.php" class="<?= $current_page == 'admin_packages.php' ? 'active' : '' ?>"><i class="fas fa-tags"></i> <span>Manage Packages</span></a>
+                <?php endif; ?>
+                <?php if (hasViewPermission('subscriptions', $pdo)): ?>
+                    <a href="admin_subscriptions.php" class="<?= $current_page == 'admin_subscriptions.php' ? 'active' : '' ?>"><i class="fas fa-user-check"></i> <span>Pending Requests</span></a>
+                    <a href="admin_subscription_history.php" class="<?= $current_page == 'admin_subscription_history.php' ? 'active' : '' ?>"><i class="fas fa-history"></i> <span>Subscription History</span></a>
+                <?php endif; ?>
+                <a href="admin_give_package.php" class="<?= $current_page == 'admin_give_package.php' ? 'active' : '' ?>"><i class="fas fa-gift"></i> <span>Give Free Package</span></a>
+                <a href="admin_extend_subscriptions.php" class="<?= $current_page == 'admin_extend_subscriptions.php' ? 'active' : '' ?>"><i class="fas fa-calendar-plus"></i> <span>Extend Subscriptions</span></a>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- 🔷 4. INCOME & PAYOUTS -->
+        <?php if (hasViewPermission('referrals', $pdo) || hasViewPermission('accounting', $pdo)): ?>
+        <div class="nav-section <?= in_array($current_page, ['admin_referrals.php','admin_payout_preview.php','admin_payout_manager.php','admin_fix_subscription_amounts.php','admin_accounting.php','admin_deductions.php','admin_wallet_payout.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['admin_referrals.php','admin_payout_preview.php','admin_payout_manager.php','admin_fix_subscription_amounts.php','admin_accounting.php','admin_deductions.php','admin_wallet_payout.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-hand-holding-usd section-icon"></i><span>Income & Payouts</span><i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="admin_payout_preview.php" class="<?= $current_page == 'admin_payout_preview.php' ? 'active' : '' ?>"><i class="fas fa-file-invoice-dollar"></i> <span>Payout Preview</span></a>
+                <a href="admin_referrals.php" class="<?= $current_page == 'admin_referrals.php' ? 'active' : '' ?>"><i class="fas fa-hand-holding-usd"></i> <span>Release Payouts</span></a>
+                <a href="admin_payout_manager.php" class="<?= $current_page == 'admin_payout_manager.php' ? 'active' : '' ?>"><i class="fas fa-wallet"></i> <span>Payout Manager</span></a>
+                <a href="admin_wallet_payout.php" class="<?= $current_page == 'admin_wallet_payout.php' ? 'active' : '' ?>"><i class="fas fa-money-bill-wave"></i> <span>Wallet Payout</span></a>
+                <a href="admin_fix_subscription_amounts.php" class="<?= $current_page == 'admin_fix_subscription_amounts.php' ? 'active' : '' ?>"><i class="fas fa-tools"></i> <span>Fix Amounts</span></a>
+                <?php if (hasViewPermission('accounting', $pdo)): ?>
+                    <a href="admin_accounting.php" class="<?= $current_page == 'admin_accounting.php' ? 'active' : '' ?>"><i class="fas fa-wallet"></i> <span>Accounting</span></a>
+                <?php endif; ?>
+                <?php if (hasViewPermission('deductions', $pdo)): ?>
+                    <a href="admin_deductions.php" class="<?= $current_page == 'admin_deductions.php' ? 'active' : '' ?>"><i class="fas fa-percent"></i> <span>Deductions</span></a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- 🔷 5. SALES CRM -->
+        <div class="nav-section <?= in_array($current_page, ['admin_sales_crm.php','admin_sales_leads.php','admin_sales_users.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['admin_sales_crm.php','admin_sales_leads.php','admin_sales_users.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-chart-line section-icon"></i><span>Sales CRM</span><i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="admin_sales_crm.php" class="<?= $current_page == 'admin_sales_crm.php' ? 'active' : '' ?>"><i class="fas fa-chart-pie"></i> <span>CRM Dashboard</span></a>
+                <a href="admin_sales_leads.php" class="<?= $current_page == 'admin_sales_leads.php' ? 'active' : '' ?>"><i class="fas fa-list"></i> <span>All Leads</span></a>
+                <a href="admin_sales_users.php" class="<?= $current_page == 'admin_sales_users.php' ? 'active' : '' ?>"><i class="fas fa-user-tie"></i> <span>Sales Users</span></a>
+            </div>
+        </div>
+
+        <!-- 🔷 6. CONTENT & PAGES -->
+        <div class="nav-section <?= in_array($current_page, ['admin_pages.php','admin_navigation.php','admin_jobs.php','admin_social_links.php','admin_notification.php','admin_activity_logs.php','admin_kyc.php','support_admin.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['admin_pages.php','admin_navigation.php','admin_jobs.php','admin_social_links.php','admin_notification.php','admin_activity_logs.php','admin_kyc.php','support_admin.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-file-alt section-icon"></i><span>Content & Pages</span><i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="admin_pages.php" class="<?= $current_page == 'admin_pages.php' ? 'active' : '' ?>"><i class="fas fa-file-alt"></i> <span>Manage Pages</span></a>
+                <?php if ($is_super_admin): ?>
+                    <a href="admin_navigation.php" class="<?= $current_page == 'admin_navigation.php' ? 'active' : '' ?>"><i class="fas fa-bars"></i> <span>Navigation Manager</span></a>
+                <?php endif; ?>
+                <a href="admin_jobs.php" class="<?= $current_page == 'admin_jobs.php' ? 'active' : '' ?>"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
+                <a href="admin_social_links.php" class="<?= $current_page == 'admin_social_links.php' ? 'active' : '' ?>"><i class="fas fa-share-alt"></i> <span>Social Links</span></a>
+                <a href="admin_notification.php" class="<?= $current_page == 'admin_notification.php' ? 'active' : '' ?>"><i class="fas fa-bullhorn"></i> <span>Popup Notification</span><?php if (isset($notif_count) && $notif_count > 0): ?><span class="badge bg-danger ms-2"><?= $notif_count ?></span><?php endif; ?></a>
+                <?php if (hasViewPermission('activity_logs', $pdo)): ?>
+                    <a href="admin_activity_logs.php" class="<?= $current_page == 'admin_activity_logs.php' ? 'active' : '' ?>"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
+                <?php endif; ?>
+                <?php if (hasViewPermission('kyc', $pdo)): ?>
+                    <a href="admin_kyc.php" class="<?= $current_page == 'admin_kyc.php' ? 'active' : '' ?>"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
+                <?php endif; ?>
+                <?php if (hasViewPermission('support', $pdo)): ?>
+                    <a href="support_admin.php" class="<?= $current_page == 'support_admin.php' ? 'active' : '' ?>"><i class="fas fa-headset"></i> <span>Support Tickets</span></a>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- 🔷 7. SETTINGS -->
+        <?php if (hasViewPermission('settings', $pdo)): ?>
+        <div class="nav-section <?= in_array($current_page, ['settings.php','admin_spin_settings.php']) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= in_array($current_page, ['settings.php','admin_spin_settings.php']) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-cog section-icon"></i><span>Settings</span><i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="settings.php" class="<?= $current_page == 'settings.php' ? 'active' : '' ?>"><i class="fas fa-cog"></i> <span>General Settings</span></a>
+                <a href="admin_spin_settings.php" class="<?= $current_page == 'admin_spin_settings.php' ? 'active' : '' ?>"><i class="fas fa-dharmachakra"></i> <span>Spin Settings</span></a>
+            </div>
+        </div>
+        <?php endif; ?>
+
     <?php elseif ($role == 'sales'): ?>
+        <!-- SALES SIDEBAR -->
         <a href="sales_dashboard.php" class="<?= $current_page == 'sales_dashboard.php' ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <a href="sales_properties.php" class="<?= $current_page == 'sales_properties.php' ? 'active' : '' ?>"><i class="fas fa-building"></i> <span>All Properties</span></a>
+        <a href="sales_leads.php" class="<?= $current_page == 'sales_leads.php' ? 'active' : '' ?>"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
+        <a href="sales_lead_upload.php" class="<?= $current_page == 'sales_lead_upload.php' ? 'active' : '' ?>"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
+        <a href="sales_lead_add.php" class="<?= $current_page == 'sales_lead_add.php' ? 'active' : '' ?>"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
+        <a href="profile.php" class="<?= $current_page == 'profile.php' ? 'active' : '' ?>"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
+        <a href="change_password.php" class="<?= $current_page == 'change_password.php' ? 'active' : '' ?>"><i class="fas fa-key"></i> <span>Change Password</span></a>
+        <a href="support.php" class="<?= $current_page == 'support.php' ? 'active' : '' ?>"><i class="fas fa-headset"></i> <span>Support</span></a>
+
     <?php else: ?>
+        <!-- USER SIDEBAR -->
         <a href="user_dashboard.php" class="<?= ($current_page == 'user_dashboard.php' && !isset($_GET['view'])) ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         
         <div class="nav-section <?= ($current_page == 'user_dashboard.php' && isset($_GET['view'])) ? 'open' : '' ?>">
@@ -278,7 +418,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 <i class="fas fa-building section-icon"></i><span>All Properties</span><i class="fas fa-chevron-right section-arrow"></i>
             </div>
             <div class="nav-section-items">
-                <!-- 🔥 Yahan view=all add kiya gaya hai -->
                 <a href="user_dashboard.php?view=all&tab=auction" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'auction') ? 'active' : '' ?>"><i class="fas fa-gavel"></i> <span>Auction Properties</span></a>
                 <a href="user_dashboard.php?view=all&tab=customer" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'customer') ? 'active' : '' ?>"><i class="fas fa-home"></i> <span>Customer Properties</span></a>
                 <a href="user_dashboard.php?view=all&tab=exchange" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'exchange') ? 'active' : '' ?>"><i class="fas fa-exchange-alt"></i> <span>Exchange Properties</span></a>
@@ -294,9 +433,15 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <a href="profile.php" class="<?= $current_page == 'profile.php' ? 'active' : '' ?>"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
         <a href="support.php" class="<?= $current_page == 'support.php' ? 'active' : '' ?>"><i class="fas fa-headset"></i> <span>Support</span></a>
         <a href="user_properties.php" class="<?= $current_page == 'user_properties.php' ? 'active' : '' ?>"><i class="fas fa-home"></i> <span>My Properties</span></a>
+        <a href="change_password.php" class="<?= $current_page == 'change_password.php' ? 'active' : '' ?>"><i class="fas fa-key"></i> <span>Change Password</span></a>
+        <a href="user_jobs.php" class="<?= $current_page == 'user_jobs.php' ? 'active' : '' ?>"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
     <?php endif; ?>
 
-    <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+    <?php if ($is_impersonating): ?>
+        <a href="admin_exit_impersonation.php?imp_session=<?= htmlspecialchars($current_imp_session) ?>" class="logout-link" style="color:#d97706 !important;"><i class="fas fa-sign-out-alt" style="color:#d97706 !important;"></i> <span>Exit Impersonation</span></a>
+    <?php else: ?>
+        <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 
