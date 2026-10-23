@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – Search Bar + City Properties + Spin Modal
+// 👤 User Dashboard – Tabs + Search + Spin Modal
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -18,7 +18,8 @@ $user_stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
 $user_stmt->execute([$user_id]);
 $user_city = $user_stmt->fetchColumn() ?? '';
 
-// ---- Search Parameters (Default city = user's city) ----
+// ---- Tab & Search Parameters ----
+$tab              = $_GET['tab'] ?? 'auction';
 $search_city      = $_GET['city'] ?? $user_city; 
 $search_locality  = $_GET['locality'] ?? '';
 $search_types     = $_GET['type'] ?? [];
@@ -26,96 +27,110 @@ $search_min_price = $_GET['min_price'] ?? '';
 $search_max_price = $_GET['max_price'] ?? '';
 $search_date      = $_GET['date']  ?? '';
 
-// Fix array for types
 if (!is_array($search_types)) {
     $search_types = $search_types === '' ? [] : [$search_types];
 }
 $search_types = array_values(array_filter($search_types, function($t) { return $t !== ''; }));
 
-// ---- Build Query ----
-$where = "status = 'available'";
+// ---- Common Filters ----
+$common_where = "";
 $params = [];
 
 if(!empty($search_city)) {
-    $where .= " AND city ILIKE ?";
+    $common_where .= " AND city ILIKE ?";
     $params[] = '%' . $search_city . '%';
 }
 if(!empty($search_locality)) {
-    $where .= " AND locality ILIKE ?";
+    $common_where .= " AND locality ILIKE ?";
     $params[] = '%' . $search_locality . '%';
 }
 if(!empty($search_types)) {
     $ph = implode(',', array_fill(0, count($search_types), '?'));
-    $where .= " AND type IN ($ph)";
+    $common_where .= " AND type IN ($ph)";
     foreach ($search_types as $t) $params[] = $t;
 }
 if(!empty($search_min_price)) {
-    $where .= " AND price >= ?";
+    $common_where .= " AND price >= ?";
     $params[] = (float)$search_min_price;
 }
 if(!empty($search_max_price)) {
-    $where .= " AND price <= ?";
+    $common_where .= " AND price <= ?";
     $params[] = (float)$search_max_price;
 }
 
-// Fetch properties
-$sql = "SELECT * FROM properties WHERE $where ORDER BY id DESC LIMIT 12";
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-$display_props = $stmt->fetchAll();
+// ---- Fetch Based on Tab ----
+$display_props = [];
+if ($tab == 'auction') {
+    $sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY id DESC LIMIT 12";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $display_props = $stmt->fetchAll();
+} elseif ($tab == 'customer') {
+    $sql = "SELECT *, 'customer' as source FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where ORDER BY created_at DESC LIMIT 12";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $display_props = $stmt->fetchAll();
+} elseif ($tab == 'exchange') {
+    $sql = "SELECT *, 'exchange' as source FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where ORDER BY created_at DESC LIMIT 12";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $display_props = $stmt->fetchAll();
+}
 
-// ---- Fetch active notification for popup ----
+// Total counts for tabs
+$total_auction = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'available'")->fetchColumn();
+$total_customer = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL)")->fetchColumn();
+$total_exchange = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange'")->fetchColumn();
+
+// Fetch notification
 $notif_stmt = $pdo->query("SELECT * FROM admin_notifications WHERE is_active = true ORDER BY updated_at DESC LIMIT 1");
 $notification = $notif_stmt->fetch();
 
 $all_types = ['Flat','Plot','Shop','Land','House','Land & Building','Car/Vehicle','Commercial','Office','Row House','Bungalow','Other'];
 
 // ---- Render property card ----
-function renderDashboardCard($prop, $show_images = false) {
+function renderDashboardCard($prop, $tab) {
     $gradients = [
-        ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #4c1d95 0%, #8b5cf6 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #78350f 0%, #f59e0b 100%)', 'text' => 'white'],
-        ['bg' => 'linear-gradient(135deg, #172554 0%, #6366f1 100%)', 'text' => 'white'],
+        ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'],
+        ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%)'],
+        ['bg' => 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)'],
+        ['bg' => 'linear-gradient(135deg, #4c1d95 0%, #8b5cf6 100%)'],
+        ['bg' => 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)'],
+        ['bg' => 'linear-gradient(135deg, #78350f 0%, #f59e0b 100%)'],
     ];
     $g = $gradients[array_rand($gradients)];
     $text_color = '#ffffff';
-    $shadow = '0 15px 40px -10px rgba(0,0,0,0.3)';
     $border = 'rgba(255,255,255,0.15)';
-    $image_url = $prop['image_url'] ?? '';
-    $is_private_treaty = isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty';
+    $is_private_treaty = (isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty');
     ?>
     <div class="col-md-6 col-xl-4 mb-4">
-        <div class="card h-100" style="border-radius:20px; overflow:hidden; border:none; box-shadow:<?= $shadow ?>; transition:all 0.4s; background: <?= $g['bg'] ?>; color:<?= $text_color ?>; position:relative;">
+        <div class="card h-100" style="border-radius:20px; overflow:hidden; border:none; box-shadow:0 10px 25px rgba(0,0,0,0.15); background: <?= $g['bg'] ?>; color:<?= $text_color ?>; position:relative;">
             <?php if($is_private_treaty): ?>
-                <div style="position:absolute; top:15px; right:15px; z-index:10; background:#f59e0b; color:#000; padding:4px 14px; border-radius:30px; font-size:0.7rem; font-weight:700;">
-                    🔑 Private Treaty
-                </div>
+                <div style="position:absolute; top:15px; right:15px; z-index:10; background:#f59e0b; color:#000; padding:4px 14px; border-radius:30px; font-size:0.7rem; font-weight:700;">🔑 Private Treaty</div>
             <?php endif; ?>
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:rgba(255,255,255,0.15); padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">🏦 <?= htmlspecialchars($prop['bank_name'] ?? 'Bank') ?></span>
-                    <?php if(!empty($prop['auction_start_time']) && $prop['auction_start_time'] != 'Private Treaty'): ?>
-                        <span style="font-size:0.75rem; opacity:0.8; color:<?= $text_color ?>;"><i class="far fa-calendar-alt"></i> <?= htmlspecialchars($prop['auction_start_time']) ?></span>
+                    <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:rgba(255,255,255,0.15); padding:4px 14px; border-radius:30px; color:<?= $text_color ?>;">
+                        <?= $tab == 'auction' ? '🏦 ' . htmlspecialchars($prop['bank_name'] ?? 'Bank') : '👤 User' ?>
+                    </span>
+                    <?php if($tab == 'auction' && !empty($prop['auction_start_time']) && $prop['auction_start_time'] != 'Private Treaty'): ?>
+                        <span style="font-size:0.75rem; opacity:0.8;"><i class="far fa-calendar-alt"></i> <?= date('d M Y', strtotime($prop['auction_date'] ?? $prop['auction_start_time'])) ?></span>
                     <?php endif; ?>
                 </div>
                 <h5 class="fw-bold mt-2" style="color:<?= $text_color ?>;"><?= htmlspecialchars($prop['title']) ?></h5>
                 <div style="font-size:1.6rem; font-weight:800; color:<?= $text_color ?>;">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
                 <div style="font-size:0.85rem; opacity:0.8; color:<?= $text_color ?>;"><i class="fas fa-map-pin"></i> <?= htmlspecialchars($prop['city'] ?? '') ?></div>
-                <a href="property_detail.php?id=<?= $prop['id'] ?>&source=auction" style="display:block; margin-top:16px; background:rgba(255,255,255,0.15); backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
+                
+                <?php if($tab == 'exchange'): ?>
+                    <div style="background:rgba(255,255,255,0.1); border-radius:10px; padding:10px; margin-top:10px;">
+                        <small>⬇️ चाहता है: <strong><?= htmlspecialchars($prop['want_type'] ?? 'Any') ?></strong> - ₹<?= indianCurrencyFormat($prop['want_budget'] ?? 0) ?></small><br>
+                        <small>📍 <?= htmlspecialchars($prop['want_city'] ?? 'All India') ?></small>
+                    </div>
+                    <a href="exchange_interest.php?id=<?= $prop['id'] ?>" class="btn w-100 mt-3" style="background:#fbbf24; color:#000; font-weight:700;" onclick="return confirm('Owner को notification भेजें?')">🤝 I'm Interested</a>
+                <?php else: ?>
+                    <a href="property_detail.php?id=<?= $prop['id'] ?>&source=<?= $prop['source'] ?>" style="display:block; margin-top:16px; background:rgba(255,255,255,0.15); backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none;">View Details →</a>
+                <?php endif; ?>
             </div>
-            <?php if($show_images && !empty($image_url)): ?>
-                <img src="<?= htmlspecialchars($image_url) ?>" style="height:180px; width:100%; object-fit:cover; border-top:3px solid <?= $border ?>;" alt="<?= htmlspecialchars($prop['title']) ?>">
-            <?php else: ?>
-                <div style="height:150px; background:rgba(255,255,255,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px); border-top:3px solid <?= $border ?>; padding:10px;">
-                    <i class="fas fa-lock" style="font-size:1.8rem; opacity:0.7; color:<?= $text_color ?>;"></i>
-                    <span style="font-size:0.8rem; font-weight:600; margin-top:4px; color:<?= $text_color ?>;">🔒 Subscribe to unlock</span>
-                    <a href="user_packages.php" class="btn btn-sm btn-primary mt-2" style="border-radius:30px; font-weight:600; color:#ffffff; background:#2563eb; border:none;">Subscribe Now</a>
-                </div>
-            <?php endif; ?>
         </div>
     </div>
     <?php
@@ -125,14 +140,11 @@ include 'header.php';
 ?>
 
 <style>
-    /* Search Bar CSS */
-    .search-box { background:#ffffff; padding:20px 25px; border-radius:20px; box-shadow:0 10px 30px -10px rgba(0,0,0,0.08); border:1px solid #e2e8f0; margin-bottom:30px; }
+    .search-box { background:#ffffff; padding:20px 25px; border-radius:20px; box-shadow:0 10px 30px -10px rgba(0,0,0,0.08); border:1px solid #e2e8f0; margin-bottom:20px; }
     .search-box .form-control { border:none; background:#f1f5f9; border-radius:16px; padding:12px 20px; font-size:0.95rem; }
-    .search-box .form-control:focus { background:#e2e8f0; box-shadow:0 0 0 3px rgba(37,99,235,0.15); }
     .search-box .btn-primary { border-radius:20px; padding:12px 30px; background:linear-gradient(135deg, #1e3a8a, #2563eb); border:none; font-weight:600; }
     .search-box .btn-reset { border-radius:20px; padding:12px 20px; background:#f1f5f9; color:#475569; border:none; font-weight:600; }
     
-    /* Multi-Select Type */
     .type-selector-wrapper { position: relative; }
     .type-selector-btn { width: 100%; border: none; background: #f1f5f9; border-radius: 16px; padding: 12px 20px; font-size: 0.95rem; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; color: #1e293b; }
     .type-panel { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: #fff; border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; padding: 10px; z-index: 100; max-height: 300px; overflow-y: auto; min-width: 260px; }
@@ -140,10 +152,11 @@ include 'header.php';
     .type-checkbox-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; cursor: pointer; font-size: 0.88rem; }
     .type-checkbox-item.checked { background: #eff6ff; font-weight: 700; color: #1e40af; }
 
-    .section-title { font-weight: 800; color: #0f172a; margin-bottom: 20px; font-size: 1.2rem; }
-    .no-auction-msg { background: #f8fafc; border-radius: 20px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
+    .nav-tabs .nav-link { font-weight:600; color:#475569; border: none; padding:12px 20px; }
+    .nav-tabs .nav-link.active { background: transparent; border-bottom: 3px solid #2563eb; color: #2563eb; }
+    .nav-tabs .nav-link .badge-count { background: #e2e8f0; color: #1e293b; font-size: 0.7rem; padding: 2px 10px; border-radius: 30px; margin-left: 8px; font-weight: 700; }
+    .nav-tabs .nav-link.active .badge-count { background: #2563eb; color: #ffffff; }
     
-    /* Modals CSS */
     .premium-modal .modal-content { background: linear-gradient(145deg, #0b1120, #1a2332); border: 2px solid rgba(255, 215, 0, 0.3); border-radius: 32px; color: #fff; }
     .premium-modal .modal-title { font-size: 1.5rem; font-weight: 800; color: #fbbf24; }
     .premium-modal .btn-gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); border: none; color: #0f172a; font-weight: 700; padding: 10px 30px; border-radius: 50px; }
@@ -154,6 +167,7 @@ include 'header.php';
     <!-- SEARCH BOX -->
     <div class="search-box">
         <form method="GET" class="row g-3 align-items-center" id="searchForm">
+            <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
             <div class="col-md-3">
                 <input type="text" name="city" class="form-control" placeholder="🔍 Search by City..." value="<?= htmlspecialchars($search_city) ?>">
             </div>
@@ -193,29 +207,49 @@ include 'header.php';
                 <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i> Search</button>
             </div>
             <div class="col-md-2">
-                <a href="user_dashboard.php" class="btn btn-reset w-100"><i class="fas fa-redo"></i> Reset</a>
+                <a href="user_dashboard.php?tab=<?= $tab ?>" class="btn btn-reset w-100"><i class="fas fa-redo"></i> Reset</a>
             </div>
         </form>
     </div>
 
+    <!-- TABS (Auction, Customer, Exchange) -->
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?tab=auction&city=<?= urlencode($search_city) ?>">
+                <i class="fas fa-gavel me-2"></i>Auction
+                <span class="badge-count"><?= $total_auction ?></span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?tab=customer&city=<?= urlencode($search_city) ?>">
+                <i class="fas fa-home me-2"></i>Customer
+                <span class="badge-count"><?= $total_customer ?></span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= ($tab=='exchange')?'active':'' ?>" href="?tab=exchange&city=<?= urlencode($search_city) ?>">
+                <i class="fas fa-exchange-alt me-2"></i>Exchange (All India)
+                <span class="badge-count"><?= $total_exchange ?></span>
+            </a>
+        </li>
+    </ul>
+
     <!-- Properties Display -->
-    <div class="section-title">
-        <i class="fas fa-building" style="color:#2563eb;"></i> Properties <?= !empty($search_city) ? 'in ' . htmlspecialchars($search_city) : '' ?>
-        <span class="badge bg-primary rounded-pill ms-2"><?= count($display_props) ?></span>
+    <div class="section-title mb-3">
+        <h5 class="fw-bold m-0"><i class="fas fa-building text-primary"></i> <?= ucfirst($tab) ?> Properties <span class="badge bg-primary rounded-pill ms-2"><?= count($display_props) ?></span></h5>
     </div>
     
     <?php if (count($display_props) > 0): ?>
         <div class="row">
             <?php foreach ($display_props as $prop): ?>
-                <?php renderDashboardCard($prop, false); ?>
+                <?php renderDashboardCard($prop, $tab); ?>
             <?php endforeach; ?>
         </div>
     <?php else: ?>
-        <div class="no-auction-msg py-5">
+        <div class="alert alert-light border text-center py-5" style="border-radius:20px;">
             <i class="fas fa-search fa-3x text-muted mb-3"></i>
-            <h5 class="fw-bold">No properties found</h5>
+            <h5 class="fw-bold">No <?= $tab ?> properties found</h5>
             <p class="text-muted">Try adjusting your search filters or search in a different city.</p>
-            <a href="user_dashboard.php" class="btn btn-outline-primary mt-2">Clear Filters</a>
         </div>
     <?php endif; ?>
 
@@ -230,8 +264,6 @@ include 'header.php';
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center py-4">
-                
-                <!-- Visual Wheel -->
                 <div class="spin-wheel-container">
                     <div class="spin-pointer"></div>
                     <div class="spin-wheel" id="visualSpinWheel"></div>
@@ -249,7 +281,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- Property Result Modal -->
+<!-- Property Result Modal (Winning Property) -->
 <div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff;">
@@ -311,15 +343,12 @@ function startSpinAnimation() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Spinning...';
 
-    // Random rotation (5 to 10 full spins + random angle)
     const spins = Math.floor(Math.random() * 5) + 5; 
     const extraAngle = Math.floor(Math.random() * 360);
     currentRotation += (spins * 360) + extraAngle;
     
-    // Apply CSS rotation
     wheel.style.transform = `rotate(${currentRotation}deg)`;
 
-    // Fetch result from backend after animation completes (4 seconds)
     setTimeout(() => {
         fetch('spin_ajax.php')
             .then(res => res.json())
@@ -333,10 +362,21 @@ function startSpinAnimation() {
                         animateCoins(data.coins);
                     }
                     
+                    // Close Spin Modal
+                    const spinModalEl = document.getElementById('spinWheelModal');
+                    const spinModal = bootstrap.Modal.getInstance(spinModalEl);
+                    
                     if (data.show_property && data.property) {
-                        showPropertyWin(data.property);
+                        if (spinModal) spinModal.hide();
+                        // Wait for modal to close before showing property
+                        spinModalEl.addEventListener('hidden.bs.modal', function () {
+                            showPropertyWin(data.property);
+                        }, { once: true });
                     } else {
-                        alert(data.message || 'You won coins!');
+                        setTimeout(() => {
+                            if (spinModal) spinModal.hide();
+                            showToast(`🪙 +${data.coins} Coins Won!`, '#10b981');
+                        }, 1000);
                     }
                 } else {
                     alert('Error: ' + (data.message || 'Try again later.'));
@@ -348,10 +388,9 @@ function startSpinAnimation() {
                 isSpinning = false;
                 alert('Connection error. Try again.');
             });
-    }, 4200); // Wait for wheel animation to finish
+    }, 4200); 
 }
 
-// Coin counting animation
 function animateCoins(coinsToAdd) {
     const el = document.getElementById('headerCoinBalance');
     const modalEl = document.getElementById('modalCoinBalance');
@@ -375,7 +414,6 @@ function animateCoins(coinsToAdd) {
     window.requestAnimationFrame(step);
 }
 
-// Show Property Modal
 function showPropertyWin(prop) {
     const icon = (prop.type && prop.type.toLowerCase().includes('car')) ? '🚗' : '🏠';
     const imageHtml = prop.image_url ? `<img src="${prop.image_url}" style="width:100%; max-height:150px; object-fit:cover; border-radius:12px; margin-bottom:12px;">` : '';
@@ -388,15 +426,18 @@ function showPropertyWin(prop) {
     `;
     document.getElementById('viewPropertyLink').href = `property_detail.php?id=${prop.id}&source=auction`;
     
-    // Hide Spin Modal, Show Property Modal
-    const spinModalEl = document.getElementById('spinWheelModal');
-    const spinModal = bootstrap.Modal.getInstance(spinModalEl);
-    if (spinModal) spinModal.hide();
-
     new bootstrap.Modal(document.getElementById('propertyModal')).show();
 }
 
-// Multi-type selector toggle logic
+function showToast(msg, bgColor) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `position:fixed; bottom:20px; right:20px; background:${bgColor}; color:white; padding:16px 24px; border-radius:12px; font-weight:bold; box-shadow:0 10px 30px rgba(0,0,0,0.2); z-index:9999;`;
+    toast.innerHTML = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
+}
+
+// Multi-type selector
 function toggleTypePanel(e) {
     e.stopPropagation();
     const panel = document.getElementById('typePanel');
