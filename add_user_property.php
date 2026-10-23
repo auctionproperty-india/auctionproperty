@@ -2,6 +2,7 @@
 // ============================================================
 // 📝 Add User Property – Sale OR Exchange (Supabase Upload)
 // ============================================================
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -11,6 +12,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 }
 
 $user_id = $_SESSION['user_id'];
+$message = '';
 $error = '';
 
 function containsMobileNumber($text) {
@@ -30,7 +32,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
     $sqft = (float)($_POST['sqft'] ?? 0);
     $construction_sqft = (float)($_POST['construction_sqft'] ?? 0);
     
-    // Exchange Fields
+    // Exchange fields
     $want_type = trim($_POST['want_type'] ?? '');
     $want_budget = (float)($_POST['want_budget'] ?? 0);
     $want_city = trim($_POST['want_city'] ?? '');
@@ -46,7 +48,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
         $status = $has_mobile ? 'rejected' : 'approved';
         $admin_remarks = $has_mobile ? 'Mobile number not allowed in description.' : null;
 
-        // ☁️ Supabase Upload
+        // ☁️ Supabase Upload Code
         if(isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
             $result = uploadAnyFile($_FILES['image'], 'user_props');
             if (isset($result['url'])) {
@@ -60,27 +62,32 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
             $stmt = $pdo->prepare("INSERT INTO user_properties 
                 (user_id, title, description, price, city, state, type, sqft, construction_sqft, 
                  image_url, status, admin_remarks, listing_type, want_type, want_budget, want_city, want_state, want_locality, created_at) 
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())");
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
             $stmt->execute([
-                $user_id, $title, $description, $price, $city, $state, $type, $sqft, $construction_sqft,
+                $user_id, $title, $description, $price, $city, $state, $type, $sqft, $construction_sqft, 
                 $image_url, $status, $admin_remarks, $listing_type, $want_type, $want_budget, $want_city, $want_state, $want_locality
             ]);
             
-            header("Location: user_properties.php?msg=" . ($status=='approved' ? 'auto_approved' : 'auto_rejected'));
+            if ($status == 'approved') {
+                header("Location: user_properties.php?msg=auto_approved");
+            } else {
+                header("Location: user_properties.php?msg=auto_rejected");
+            }
             exit;
         }
     }
 }
+
 include 'header.php'; 
 ?>
 <div class="container-fluid">
     <h4><i class="fas fa-plus-circle me-2"></i>Add Your Property</h4>
     <?php if($error) echo "<div class='alert alert-danger'>$error</div>"; ?>
-
+    
     <div class="card p-4">
-        <form method="POST" enctype="multipart/form-data" id="propForm">
+        <form method="POST" enctype="multipart/form-data">
             
-            <!-- Listing Type -->
+            <!-- Listing Type (Sale / Exchange) -->
             <div class="mb-4 p-3" style="background:#f8fafc;border-radius:14px;">
                 <label class="form-label fw-bold">मैं क्या करना चाहता हूँ?</label>
                 <div class="d-flex gap-3">
@@ -95,8 +102,6 @@ include 'header.php';
                 </div>
             </div>
 
-            <!-- My Property (Give) -->
-            <h6 class="text-primary mb-3">⬆️ मैं क्या देना चाहता हूँ</h6>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Title *</label>
@@ -147,7 +152,7 @@ include 'header.php';
                 </div>
             </div>
 
-            <!-- Exchange Section (Hidden by default) -->
+            <!-- Exchange Section (Hidden by Default) -->
             <div id="exchangeSection" style="display:none; border-top: 2px dashed #ccc; margin-top:20px; padding-top:20px;">
                 <h6 class="text-success mb-3">⬇️ मैं क्या लेना चाहता हूँ (All India)</h6>
                 <div class="row g-3">
@@ -184,8 +189,8 @@ include 'header.php';
                 </div>
             </div>
 
-            <button type="submit" name="add_property" class="btn btn-primary mt-4 px-4">Submit Property</button>
-            <a href="user_properties.php" class="btn btn-secondary mt-4">Cancel</a>
+            <button type="submit" name="add_property" class="btn btn-primary mt-3">Submit Property</button>
+            <a href="user_properties.php" class="btn btn-secondary mt-3">Cancel</a>
         </form>
     </div>
 </div>
