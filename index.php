@@ -596,4 +596,58 @@ function buildTabUrl($tab, $city, $locality, $types, $min_price, $max_price, $da
                                     <div style="font-size:0.85rem;opacity:0.85;">📍 <?= htmlspecialchars($prop['want_city'] ?: 'All India') ?><?= $prop['want_state'] ? ', '.htmlspecialchars($prop['want_state']) : '' ?></div>
                                 </div>
                                 <?php if(isset($_SESSION['user_id'])): ?>
-                                    <a href="exchange_interest.php?id=<?= $prop['id'] ?>" class="btn w-100 mt-3" style="background:#fbbf24;color:#000;font-weight:700;border-radius:14px;" onclick
+                                    <a href="exchange_interest.php?id=<?= $prop['id'] ?>" class="btn w-100 mt-3" style="background:#fbbf24;color:#000;font-weight:700;border-radius:14px;" onclick="return confirm('Owner को notification भेजें? वो आपसे contact करेंगे।')">🤝 I'm Interested</a>
+                                <?php else: ?>
+                                    <a href="login.php" class="btn w-100 mt-3" style="background:#fbbf24;color:#000;font-weight:700;border-radius:14px;">Login to Contact</a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="no-auction-msg">
+                    <i class="fas fa-exchange-alt"></i>
+                    <p class="mt-2 fw-bold">🔄 No exchange properties found</p>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function toggleTypePanel(e) {
+        e.stopPropagation();
+        const panel = document.getElementById('typePanel');
+        panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
+    }
+    function onTypeChange(checkbox) {
+        const label = checkbox.closest('.type-checkbox-item');
+        if (checkbox.checked) label.classList.add('checked');
+        else label.classList.remove('checked');
+        updateTypeLabel();
+    }
+    function updateTypeLabel() {
+        const checked = document.querySelectorAll('#typePanel input[type="checkbox"]:checked');
+        const labelEl = document.getElementById('typeLabel');
+        if (checked.length === 0) labelEl.textContent = 'All Types';
+        else if (checked.length === 1) labelEl.textContent = checked[0].value;
+        else labelEl.textContent = checked[0].value + ' +' + (checked.length - 1) + ' more';
+    }
+    function clearAllTypes(e) {
+        e.stopPropagation();
+        document.querySelectorAll('#typePanel input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+            cb.closest('.type-checkbox-item').classList.remove('checked');
+        });
+        updateTypeLabel();
+    }
+    document.addEventListener('click', function(e) {
+        const panel = document.getElementById('typePanel');
+        const wrapper = document.querySelector('.type-selector-wrapper');
+        if (panel && wrapper && !wrapper.contains(e.target)) panel.style.display = 'none';
+    });
+    document.getElementById('typePanel').addEventListener('click', function(e) { e.stopPropagation(); });
+    updateTypeLabel();
+    </script>
+</body>
+</html>
