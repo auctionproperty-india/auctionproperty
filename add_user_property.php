@@ -84,36 +84,32 @@ include 'header.php';
     <h4><i class="fas fa-plus-circle me-2"></i>Add Your Property</h4>
     <?php if($error) echo "<div class='alert alert-danger'>$error</div>"; ?>
     
-    <div class="card p-4">
+    <div class="card p-4 shadow-sm" style="border-radius: 16px;">
         <form method="POST" enctype="multipart/form-data">
             
-            <!-- Listing Type (Sale / Exchange) -->
-            <div class="mb-4 p-3" style="background:#f8fafc;border-radius:14px;">
-                <label class="form-label fw-bold">मैं क्या करना चाहता हूँ?</label>
-                <div class="d-flex gap-3">
-                    <label class="listing-option w-50 cursor-pointer">
-                        <input type="radio" name="listing_type" value="sale" checked onchange="toggleExchange('sale')" class="d-none">
-                        <div class="opt-box p-3 border rounded text-center"><strong>Sale</strong><br>सिर्फ बेचना है</div>
-                    </label>
-                    <label class="listing-option w-50 cursor-pointer">
-                        <input type="radio" name="listing_type" value="exchange" onchange="toggleExchange('exchange')" class="d-none">
-                        <div class="opt-box p-3 border rounded text-center"><strong>Exchange</strong><br>बदलना है (All India)</div>
-                    </label>
-                </div>
+            <!-- 🔥 Compact Listing Type Dropdown -->
+            <div class="mb-4 p-3" style="background:#f8fafc; border-radius:12px; border: 1px solid #e2e8f0;">
+                <label class="form-label fw-bold text-dark mb-2">मैं क्या करना चाहता हूँ? *</label>
+                <select name="listing_type" id="listing_type" class="form-select form-select-lg" onchange="toggleExchange(this.value)" style="border-radius: 10px; font-weight: 600; color: #1e3a8a; cursor: pointer;">
+                    <option value="sale" selected>🏷️ Sale (सिर्फ बेचना है)</option>
+                    <option value="exchange">🔄 Exchange (बदलना है - All India)</option>
+                </select>
             </div>
 
+            <!-- My Property (Give) -->
+            <h6 class="text-primary mb-3 fw-bold"><i class="fas fa-arrow-up"></i> प्रॉपर्टी की जानकारी (जो आप देंगे)</h6>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Title *</label>
-                    <input type="text" name="title" class="form-control" required>
+                    <input type="text" name="title" class="form-control" required placeholder="जैसे: 3BHK Flat in Mumbai">
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Price (₹) *</label>
-                    <input type="number" step="0.01" name="price" class="form-control" required>
+                    <input type="number" step="0.01" name="price" class="form-control" required placeholder="e.g. 5000000">
                 </div>
                 <div class="col-md-12">
                     <label class="form-label">Description *</label>
-                    <textarea name="description" class="form-control" rows="3" required></textarea>
+                    <textarea name="description" class="form-control" rows="3" required placeholder="प्रॉपर्टी के बारे में बताएं..."></textarea>
                     <small class="text-danger">⚠️ Mobile numbers are not allowed in description.</small>
                 </div>
                 <div class="col-md-3">
@@ -145,16 +141,16 @@ include 'header.php';
                     <label class="form-label">Construction Area (Sq Ft)</label>
                     <input type="number" step="0.01" name="construction_sqft" class="form-control" placeholder="e.g. 800">
                 </div>
-                <div class="col-md-12">
-                    <label class="form-label">Upload Image / PDF</label>
+                <div class="col-md-12 mt-3">
+                    <label class="form-label fw-bold">Upload Image / PDF</label>
                     <input type="file" name="image" class="form-control" accept="image/*, .pdf">
                     <small class="text-muted">Max file size: 10MB.</small>
                 </div>
             </div>
 
-            <!-- Exchange Section (Hidden by Default) -->
-            <div id="exchangeSection" style="display:none; border-top: 2px dashed #ccc; margin-top:20px; padding-top:20px;">
-                <h6 class="text-success mb-3">⬇️ मैं क्या लेना चाहता हूँ (All India)</h6>
+            <!-- 🔥 Exchange Section (Hidden by Default) -->
+            <div id="exchangeSection" style="display:none; background: #eff6ff; border: 2px dashed #93c5fd; border-radius: 12px; padding: 20px; margin-top: 25px;">
+                <h6 class="text-success mb-3 fw-bold"><i class="fas fa-arrow-down"></i> मैं क्या लेना चाहता हूँ (All India Exchange)</h6>
                 <div class="row g-3">
                     <div class="col-md-4">
                         <label class="form-label">क्या लेना चाहता हूँ? (Type)</label>
@@ -172,7 +168,7 @@ include 'header.php';
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">किस Budget में लेना चाहता हूँ? (₹)</label>
-                        <input type="number" step="0.01" name="want_budget" class="form-control">
+                        <input type="number" step="0.01" name="want_budget" class="form-control" placeholder="e.g. 5000000">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">कहाँ लेना चाहता हूँ — City (All India)</label>
@@ -189,19 +185,27 @@ include 'header.php';
                 </div>
             </div>
 
-            <button type="submit" name="add_property" class="btn btn-primary mt-3">Submit Property</button>
-            <a href="user_properties.php" class="btn btn-secondary mt-3">Cancel</a>
+            <div class="mt-4 border-top pt-3">
+                <button type="submit" name="add_property" class="btn btn-primary px-5 py-2" style="border-radius: 10px;">
+                    <i class="fas fa-paper-plane me-1"></i> Submit Property
+                </button>
+                <a href="user_properties.php" class="btn btn-secondary px-4 py-2 ms-2" style="border-radius: 10px;">Cancel</a>
+            </div>
         </form>
     </div>
 </div>
 
-<style>
-.listing-option .opt-box { border: 2px solid #e2e8f0; transition: 0.2s; }
-.listing-option input:checked + .opt-box { border-color: #2563eb; background: #eff6ff; box-shadow: 0 4px 15px rgba(37,99,235,0.15); }
-</style>
 <script>
+// Dropdown change hone par Exchange section toggle karne ka function
 function toggleExchange(val) {
-    document.getElementById('exchangeSection').style.display = (val === 'exchange') ? 'block' : 'none';
+    var sec = document.getElementById('exchangeSection');
+    if (val === 'exchange') {
+        sec.style.display = 'block';
+        // Smooth scroll to exchange section
+        sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+        sec.style.display = 'none';
+    }
 }
 </script>
 <?php include 'footer.php'; ?>
