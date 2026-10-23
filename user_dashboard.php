@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – Compact Layout with Spin & City Props
+// 👤 User Dashboard – Clean Layout (Spin in Header)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -13,45 +13,10 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 
 $user_id = $_SESSION['user_id'];
 
-// ---- Get user stats ----
-$stmt = $pdo->prepare("
-    SELECT 
-        (SELECT COUNT(*) FROM user_properties WHERE user_id = ? AND status = 'approved') as total_properties,
-        (SELECT COUNT(*) FROM user_properties WHERE user_id = ? AND status = 'pending') as pending_properties,
-        (SELECT COUNT(*) FROM user_earnings WHERE user_id = ?) as total_referrals,
-        (SELECT COALESCE(SUM(amount), 0) FROM user_earnings WHERE user_id = ? AND status = 'paid') as total_earnings,
-        (SELECT COALESCE(SUM(amount), 0) FROM user_earnings WHERE user_id = ? AND status = 'pending') as pending_earnings,
-        coins,
-        wallet_balance
-    FROM users 
-    WHERE id = ?
-");
-$stmt->execute([$user_id, $user_id, $user_id, $user_id, $user_id, $user_id]);
-$stats = $stmt->fetch();
-
 // ---- Get user city for best deals ----
 $user_stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
 $user_stmt->execute([$user_id]);
 $user_city = $user_stmt->fetchColumn() ?? '';
-
-// ---- Get active subscription ----
-$sub_stmt = $pdo->prepare("
-    SELECT p.name as package_name, s.start_date, s.end_date
-    FROM subscriptions s
-    LEFT JOIN packages p ON s.package_id = p.id
-    WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
-    ORDER BY s.id DESC LIMIT 1
-");
-$sub_stmt->execute([$user_id]);
-$subscription = $sub_stmt->fetch();
-
-// ---- Get slot statuses for spin ----
-$slot_statuses = [];
-for ($slot = 1; $slot <= 3; $slot++) {
-    $slot_statuses[$slot] = getSlotStatus($pdo, $user_id, $slot);
-}
-$current_slot = getCurrentSlot();
-$current_slot_data = getUserSpinData($pdo, $user_id, $current_slot);
 
 // ---- Today's Auctions (including Private Treaty) ----
 $city_sql = "SELECT * FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date = CURRENT_DATE ORDER BY id DESC";
@@ -73,12 +38,12 @@ if (!empty($user_city)) {
     $best_sql .= " AND city ILIKE ?";
     $best_params[] = '%' . $user_city . '%';
 }
-$best_sql .= " ORDER BY price ASC LIMIT 6";
+$best_sql .= " ORDER BY price ASC LIMIT 8";
 $best_stmt = $pdo->prepare($best_sql);
 $best_stmt->execute($best_params);
 $best_props = $best_stmt->fetchAll();
 
-// ---- 🔥 NEW: Fetch active notification for popup ----
+// ---- Fetch active notification for popup ----
 $notif_stmt = $pdo->query("SELECT * FROM admin_notifications WHERE is_active = true ORDER BY updated_at DESC LIMIT 1");
 $notification = $notif_stmt->fetch();
 
@@ -138,15 +103,7 @@ include 'header.php';
 ?>
 
 <style>
-    /* स्पिन व्हील को कॉम्पैक्ट करने के लिए CSS */
-    .compact-spin-container {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-        border: 1px solid #e2e8f0;
-    }
-    .section-title { font-weight: 800; color: #0f172a; margin-bottom: 20px; font-size: 1.1rem; }
+    .section-title { font-weight: 800; color: #0f172a; margin-bottom: 20px; font-size: 1.2rem; }
     .section-title i { margin-right: 10px; }
     .no-auction-msg { background: #f8fafc; border-radius: 20px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
     .no-auction-msg i { font-size: 2.5rem; opacity:0.3; }
@@ -165,78 +122,60 @@ include 'header.php';
     .premium-modal .btn-gold:hover { transform: scale(1.05); box-shadow: 0 12px 40px rgba(251,191,36,0.6); color: #0f172a; }
     .premium-modal .btn-close-white { filter: invert(1) brightness(2); opacity: 0.7; }
     .premium-modal .btn-close-white:hover { opacity: 1; }
-    .star-sparkle-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 0; }
-    .star-sparkle { position: absolute; font-size: 24px; color: #fbbf24; text-shadow: 0 0 20px #fbbf24, 0 0 60px #f59e0b; animation: sparkleFloat var(--duration) ease-in-out infinite alternate; opacity: 0; }
-    @keyframes sparkleFloat { 0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translateY(-120px) scale(1.2) rotate(360deg); opacity: 0; } }
 </style>
 
 <div class="container-fluid mt-2">
     
-    <!-- 🔥 नया लेआउट: बाईं तरफ स्पिन व्हील, दाईं तरफ प्रॉपर्टी -->
-    <div class="row">
-        
-        <!-- Left Column: Compact Spin Wheel -->
-        <div class="col-lg-4 col-md-12 mb-4">
-            <div class="compact-spin-container">
-                <?php include __DIR__ . '/spin_widget.php'; ?>
-            </div>
-        </div>
-
-        <!-- Right Column: City Properties -->
-        <div class="col-lg-8 col-md-12">
-            
-            <!-- Today's Auctions -->
-            <?php 
-            $pt_count = 0;
-            foreach($today_props as $p) {
-                if(isset($p['auction_start_time']) && $p['auction_start_time'] == 'Private Treaty') $pt_count++;
-            }
-            ?>
-            <div class="section-title mt-1">
-                <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
-                <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
-                <?php if($pt_count > 0): ?>
-                    <span class="badge bg-warning text-dark rounded-pill ms-2">🔑 <?= $pt_count ?> Private Treaty</span>
-                <?php endif; ?>
-            </div>
-            
-            <?php if (count($today_props) > 0): ?>
-                <div class="row">
-                    <?php foreach ($today_props as $prop): ?>
-                        <?php renderDashboardCard($prop, false, true); ?>
-                    <?php endforeach; ?>
-                </div>
-            <?php else: ?>
-                <div class="no-auction-msg">
-                    <i class="fas fa-calendar-day"></i>
-                    <p class="mt-2 fw-bold">📭 No auction today</p>
-                </div>
-            <?php endif; ?>
-
-            <hr class="my-4">
-
-            <!-- Best Deals in City -->
-            <div class="section-title">
-                <i class="fas fa-fire" style="color:#f97316;"></i> Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?>
-                <span class="badge bg-primary rounded-pill ms-2"><?= count($best_props) ?></span>
-            </div>
-            
-            <?php if (count($best_props) > 0): ?>
-                <div class="row">
-                    <?php foreach ($best_props as $prop): ?>
-                        <?php renderDashboardCard($prop, false, false); ?>
-                    <?php endforeach; ?>
-                </div>
-            <?php else: ?>
-                <div class="text-center text-muted py-4 bg-white rounded-4 shadow-sm border">
-                    <i class="fas fa-search" style="font-size:2rem; opacity:0.3;"></i>
-                    <p class="mt-2">No properties available in your city. Explore all properties.</p>
-                    <a href="index.php" class="btn btn-outline-primary btn-sm">View All Properties</a>
-                </div>
-            <?php endif; ?>
-
-        </div>
+    <!-- Today's Auctions -->
+    <?php 
+    $pt_count = 0;
+    foreach($today_props as $p) {
+        if(isset($p['auction_start_time']) && $p['auction_start_time'] == 'Private Treaty') $pt_count++;
+    }
+    ?>
+    <div class="section-title mt-1">
+        <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
+        <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
+        <?php if($pt_count > 0): ?>
+            <span class="badge bg-warning text-dark rounded-pill ms-2">🔑 <?= $pt_count ?> Private Treaty</span>
+        <?php endif; ?>
     </div>
+    
+    <?php if (count($today_props) > 0): ?>
+        <div class="row">
+            <?php foreach ($today_props as $prop): ?>
+                <?php renderDashboardCard($prop, false, true); ?>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <div class="no-auction-msg">
+            <i class="fas fa-calendar-day"></i>
+            <p class="mt-2 fw-bold">📭 No auction today</p>
+        </div>
+    <?php endif; ?>
+
+    <hr class="my-4">
+
+    <!-- Best Deals in City -->
+    <div class="section-title">
+        <i class="fas fa-fire" style="color:#f97316;"></i> Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?>
+        <span class="badge bg-primary rounded-pill ms-2"><?= count($best_props) ?></span>
+    </div>
+    
+    <?php if (count($best_props) > 0): ?>
+        <div class="row">
+            <?php foreach ($best_props as $prop): ?>
+                <?php renderDashboardCard($prop, false, false); ?>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <div class="text-center text-muted py-4 bg-white rounded-4 shadow-sm border">
+            <i class="fas fa-search" style="font-size:2rem; opacity:0.3;"></i>
+            <p class="mt-2">No properties available in your city. Explore all properties.</p>
+            <a href="index.php" class="btn btn-outline-primary btn-sm">View All Properties</a>
+        </div>
+    <?php endif; ?>
+
 </div>
 
 <!-- Property Modal for Spin -->
@@ -251,19 +190,18 @@ include 'header.php';
                 <div id="propertyModalContent"></div>
             </div>
             <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal"><i class="fas fa-undo-alt me-2"></i>Back to Spin</button>
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal"><i class="fas fa-undo-alt me-2"></i>Close</button>
                 <a href="#" id="viewPropertyLink" class="btn btn-primary" target="_blank">View Details</a>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ====== 🔥 ADMIN NOTIFICATION POPUP ====== -->
+<!-- 🔥 ADMIN NOTIFICATION POPUP -->
 <?php if ($notification): ?>
 <div class="modal fade premium-modal" id="notificationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
-            <div class="star-sparkle-container" id="sparkleContainer"></div>
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-crown me-2" style="color: #fbbf24;"></i><?= htmlspecialchars($notification['title']) ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -280,33 +218,12 @@ include 'header.php';
         </div>
     </div>
 </div>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const modalElement = document.getElementById('notificationModal');
     if (modalElement) {
         const myModal = new bootstrap.Modal(modalElement, { backdrop: 'static', keyboard: false });
         myModal.show();
-        generateSparkles();
-    }
-    function generateSparkles() {
-        const container = document.getElementById('sparkleContainer');
-        if (!container) return;
-        container.innerHTML = '';
-        const count = 30;
-        const symbols = ['✦', '✧', '★', '☆', '✨'];
-        for (let i = 0; i < count; i++) {
-            const star = document.createElement('div');
-            star.className = 'star-sparkle';
-            star.textContent = symbols[Math.floor(Math.random() * symbols.length)];
-            const left = Math.random() * 100;
-            const top = Math.random() * 100;
-            const size = 14 + Math.random() * 24;
-            const duration = 2 + Math.random() * 4;
-            const delay = Math.random() * 3;
-            star.style.cssText = `left: ${left}%; top: ${top}%; font-size: ${size}px; --duration: ${duration}s; animation-delay: ${delay}s; animation-duration: ${duration}s;`;
-            container.appendChild(star);
-        }
     }
 });
 </script>
@@ -314,157 +231,113 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- ====== SPIN SCRIPT ====== -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const spinBtn = document.getElementById('spinBtn');
-    const wheel = document.getElementById('spinWheel');
-    const spinCount = document.getElementById('spinCount');
-    const spinMessage = document.getElementById('spinMessage');
-    const slotCoins = document.getElementById('slotCoins');
+function triggerHeaderSpin() {
+    const spinBtn = document.getElementById('miniSpinBtn');
+    const spinIcon = spinBtn.querySelector('i');
+    if (spinBtn.disabled) return;
 
-    if (!spinBtn) return;
+    spinBtn.disabled = true;
+    spinIcon.classList.add('fa-spin');
 
-    let currentRotation = 0;
-    let isSpinning = false;
+    fetch('spin_ajax.php')
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP error ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            spinIcon.classList.remove('fa-spin');
+            
+            if (data.success) {
+                // Animate Coin Balance
+                if (data.coins > 0) {
+                    animateCoinBalance(data.coins);
+                    showToast(`🪙 +${data.coins} coins won!`, '#10b981');
+                }
 
-    spinBtn.addEventListener('click', function() {
-        if (isSpinning) return;
-        isSpinning = true;
-        this.disabled = true;
-        spinMessage.innerHTML = '🔄 Spinning...';
-
-        const randomSegment = Math.floor(Math.random() * 5) * 72;
-        const extraSpin = Math.floor(Math.random() * 360);
-        const totalRotation = 360 * 5 + randomSegment + extraSpin;
-        currentRotation += totalRotation;
-
-        wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
-        wheel.style.transform = `rotate(${currentRotation}deg)`;
-        wheel.classList.add('pulse');
-
-        fetch('spin_ajax.php')
-            .then(response => {
-                if (!response.ok) throw new Error('HTTP error ' + response.status);
-                return response.json();
-            })
-            .then(data => {
-                wheel.classList.remove('pulse');
-                isSpinning = false;
-
-                if (data.success) {
-                    spinCount.textContent = data.spins_used || 0;
-                    slotCoins.textContent = data.total_coins_earned || 0;
-
-                    if (data.is_reward) {
-                        spinMessage.innerHTML = `🎉 +${data.coins} coins!`;
-                        showCoinAnimation(data.coins);
-                        launchStarShower();
-
-                        const coinSpan = document.querySelector('.stat-card .stat-number');
-                        if (coinSpan) {
-                            let current = parseInt(coinSpan.textContent.replace(/,/g, ''));
-                            if (!isNaN(current)) coinSpan.textContent = (current + data.coins).toLocaleString();
-                        }
-                        if (data.spins_used >= 5) {
-                            spinBtn.disabled = true;
-                            spinBtn.innerHTML = '<i class="fas fa-check"></i> Done';
-                        } else {
-                            spinBtn.disabled = false;
-                        }
-                    } else if (data.show_property && data.property) {
-                        const p = data.property;
-                        const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
-                        const icon = isCar ? '🚗' : '🏠';
-                        const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
+                // Show property modal
+                if (data.show_property && data.property) {
+                    const p = data.property;
+                    const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
+                    const icon = isCar ? '🚗' : '🏠';
+                    const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
+                    
+                    const modalContent = document.getElementById('propertyModalContent');
+                    if (modalContent) {
+                        modalContent.innerHTML = `
+                            ${imageHtml}
+                            <h5 class="fw-bold">${icon} ${p.title}</h5>
+                            <p class="text-muted">🏦 ${p.bank_name || 'Bank'}</p>
+                            <p class="text-warning fw-bold">₹ ${parseInt(p.price).toLocaleString('en-IN')}</p>
+                            <p><i class="fas fa-map-pin"></i> ${p.city || 'N/A'}</p>
+                            <p><small class="text-muted">Type: ${p.type || 'N/A'}</small></p>
+                            <div class="mt-2 p-2 bg-success bg-opacity-25 rounded-3">
+                                <i class="fas fa-coins text-warning"></i> You earned <strong>${data.coins}</strong> coins!
+                            </div>
+                        `;
+                        const viewLink = document.getElementById('viewPropertyLink');
+                        if (viewLink) viewLink.href = `property_detail.php?id=${p.id}&source=auction`;
                         
-                        const modalContent = document.getElementById('propertyModalContent');
-                        if (modalContent) {
-                            modalContent.innerHTML = `
-                                ${imageHtml}
-                                <h5 class="fw-bold">${icon} ${p.title}</h5>
-                                <p class="text-muted">🏦 ${p.bank_name || 'Bank'}</p>
-                                <p class="text-warning fw-bold">₹ ${parseInt(p.price).toLocaleString('en-IN')}</p>
-                                <p><i class="fas fa-map-pin"></i> ${p.city || 'N/A'}</p>
-                                <p><small class="text-muted">Type: ${p.type || 'N/A'}</small></p>
-                                <div class="mt-2 p-2 bg-success bg-opacity-25 rounded-3">
-                                    <i class="fas fa-coins text-warning"></i> You earned <strong>${data.coins}</strong> coins!
-                                </div>
-                            `;
-                            const viewLink = document.getElementById('viewPropertyLink');
-                            if (viewLink) viewLink.href = `property_detail.php?id=${p.id}&source=auction`;
-                            
-                            const propertyModal = new bootstrap.Modal(document.getElementById('propertyModal'));
-                            propertyModal.show();
-                            spinMessage.innerHTML = data.message || '🏠 Check out this property!';
-                            propertyModal._element.addEventListener('hidden.bs.modal', function () { spinBtn.disabled = false; });
-                        } else {
-                            spinMessage.innerHTML = data.message || 'Spin done!';
-                            spinBtn.disabled = false;
-                        }
-                    } else {
-                        spinMessage.innerHTML = data.message || 'Spin done!';
-                        spinBtn.disabled = false;
+                        const propertyModal = new bootstrap.Modal(document.getElementById('propertyModal'));
+                        propertyModal.show();
+                        
+                        propertyModal._element.addEventListener('hidden.bs.modal', function () { 
+                            spinBtn.disabled = false; 
+                        });
                     }
                 } else {
-                    spinMessage.innerHTML = `❌ ${data.message || 'Something went wrong'}`;
+                    // Just a coin reward
                     spinBtn.disabled = false;
                 }
-            })
-            .catch(error => {
-                wheel.classList.remove('pulse');
-                spinMessage.innerHTML = '❌ Error spinning. Please try again.';
+            } else {
+                showToast(`❌ ${data.message || 'Something went wrong'}`, '#dc2626');
                 spinBtn.disabled = false;
-                isSpinning = false;
-            });
-    });
+            }
+        })
+        .catch(error => {
+            spinIcon.classList.remove('fa-spin');
+            showToast('❌ Error spinning. Try again.', '#dc2626');
+            spinBtn.disabled = false;
+        });
+}
 
-    function showCoinAnimation(coins) {
-        const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#10b981; color:white; padding:16px 24px; border-radius:12px; font-weight:bold; box-shadow:0 10px 30px rgba(0,0,0,0.2); z-index:9999; animation: slideIn 0.5s ease;';
-        toast.innerHTML = `🪙 +${coins} coins!`;
-        document.body.appendChild(toast);
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transition = 'opacity 0.5s';
-            setTimeout(() => toast.remove(), 500);
-        }, 3000);
-    }
+// 🪙 Coin Counting Animation
+function animateCoinBalance(coinsToAdd) {
+    const el = document.getElementById('headerCoinBalance');
+    if (!el) return;
+    
+    let start = parseInt(el.textContent.replace(/,/g, '')) || 0;
+    let end = start + coinsToAdd;
+    let duration = 1000; // 1 second
+    let startTime = null;
 
-    function launchStarShower() {
-        const container = document.createElement('div');
-        container.className = 'star-shower-container';
-        container.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9999; overflow:hidden;';
-        document.body.appendChild(container);
-
-        const count = 130;
-        const colors = ['#fbbf24', '#f59e0b', '#fcd34d', '#fde68a', '#fef3c7', '#ffffff', '#ffd700', '#ffb700', '#ffaa00', '#ffcc66'];
-
-        for (let i = 0; i < count; i++) {
-            const star = document.createElement('div');
-            const size = 8 + Math.random() * 22;
-            const left = Math.random() * 100;
-            const duration = 1.5 + Math.random() * 2.8;
-            const delay = Math.random() * 1.6;
-            const rotation = Math.random() * 360;
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            const starChar = Math.random() > 0.4 ? '★' : '✦';
-            
-            star.style.cssText = `
-                position: absolute; top: -20px; pointer-events: none; animation: starFall ${duration}s ease-in ${delay}s forwards;
-                --color: ${color}; font-size: ${size}px; color: ${color}; left: ${left}%; transform: rotate(${rotation}deg);
-                text-shadow: 0 0 10px ${color}, 0 0 20px ${color};
-            `;
-            star.textContent = starChar;
-            container.appendChild(star);
+    function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        let progress = Math.min((timestamp - startTime) / duration, 1);
+        let current = Math.floor(progress * (end - start) + start);
+        el.textContent = current.toLocaleString();
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        } else {
+            el.textContent = end.toLocaleString();
         }
-
-        setTimeout(() => {
-            if (container.parentNode) container.parentNode.removeChild(container);
-        }, 4500);
     }
-});
+    window.requestAnimationFrame(step);
+}
+
+// Small Toast Notification
+function showToast(msg, bgColor) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `position:fixed; bottom:20px; right:20px; background:${bgColor}; color:white; padding:16px 24px; border-radius:12px; font-weight:bold; box-shadow:0 10px 30px rgba(0,0,0,0.2); z-index:9999; animation: slideIn 0.5s ease;`;
+    toast.innerHTML = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.5s';
+        setTimeout(() => toast.remove(), 500);
+    }, 3000);
+}
 </script>
 <style>
-@keyframes starFall { 0% { opacity: 0; transform: translateY(-20px) rotate(0deg) scale(0.5); } 10% { opacity: 1; transform: translateY(10vh) rotate(36deg) scale(1); } 90% { opacity: 1; transform: translateY(90vh) rotate(360deg) scale(1); } 100% { opacity: 0; transform: translateY(100vh) rotate(400deg) scale(0.3); } }
 @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 </style>
 
