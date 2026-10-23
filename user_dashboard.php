@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – 12 Lowest Price Properties + View All
+// 👤 User Dashboard – Upcoming Auctions + View All Logic
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -42,8 +42,12 @@ $total_customer = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status
 $total_exchange = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange'")->fetchColumn();
 
 if ($view == 'dashboard') {
-    // 🔥 DASHBOARD VIEW: Only 12 lowest price properties in user's city
-    $sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? ORDER BY price ASC LIMIT 12";
+    // 🔥 DASHBOARD VIEW: Only 12 lowest price UPCOMING properties in user's city
+    $sql = "SELECT *, 'auction' as source FROM properties 
+            WHERE status = 'available' 
+            AND city ILIKE ? 
+            AND (auction_date >= CURRENT_DATE OR auction_start_time = 'Private Treaty') 
+            ORDER BY price ASC LIMIT 12";
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['%' . $user_city . '%']);
     $display_props = $stmt->fetchAll();
@@ -75,7 +79,7 @@ if ($view == 'dashboard') {
     }
 
     if ($tab == 'auction') {
-        $sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY id DESC"; // No LIMIT
+        $sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY id DESC"; 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $display_props = $stmt->fetchAll();
@@ -250,9 +254,9 @@ include 'header.php';
     <!-- Title & More Properties Button -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold m-0">
-            <i class="fas fa-building text-primary"></i> 
+            <i class="fas fa-gavel text-danger"></i> 
             <?php if ($view == 'dashboard'): ?>
-                Best Deals in <?= htmlspecialchars($user_city ?: 'Your City') ?>
+                Upcoming Auctions in <?= htmlspecialchars($user_city ?: 'Your City') ?>
             <?php else: ?>
                 All <?= ucfirst($tab) ?> Properties
             <?php endif; ?>
