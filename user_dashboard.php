@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – Upcoming Auctions + View All Logic
+// 👤 User Dashboard – World-Class Property Cards
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -102,7 +102,7 @@ $notification = $notif_stmt->fetch();
 
 $all_types = ['Flat','Plot','Shop','Land','House','Land & Building','Car/Vehicle','Commercial','Office','Row House','Bungalow','Other'];
 
-// ---- 🔥 UPDATED Render property card (Beautiful & Systematic) ----
+// ---- 🔥 UPDATED Render property card (World-Class Look) ----
 function renderDashboardCard($prop, $tab = 'auction') {
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'],
@@ -118,52 +118,60 @@ function renderDashboardCard($prop, $tab = 'auction') {
     $is_private_treaty = (isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty');
     ?>
     <div class="col-md-6 col-xl-4 mb-4">
-        <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:0 10px 25px rgba(0,0,0,0.15); background: <?= $g['bg'] ?>; color:<?= $text_color ?>; position:relative;">
+        <div class="card h-100" style="border-radius:20px; overflow:hidden; border:none; box-shadow:0 10px 25px rgba(0,0,0,0.15); background: <?= $g['bg'] ?>; color:<?= $text_color ?>; position:relative;">
             
             <?php if($is_private_treaty): ?>
-                <div style="position:absolute; top:15px; right:15px; z-index:10; background:#f59e0b; color:#000; padding:4px 14px; border-radius:30px; font-size:0.75rem; font-weight:800; box-shadow:0 4px 10px rgba(0,0,0,0.2);">🔑 Private Treaty</div>
+                <div style="position:absolute; top:0; right:0; z-index:10; background:#fbbf24; color:#000; padding:6px 16px; border-radius:0 0 0 16px; font-size:0.7rem; font-weight:800; box-shadow:-2px 2px 10px rgba(0,0,0,0.2);">🔑 Private Treaty</div>
             <?php endif; ?>
             
             <div class="card-body p-4 d-flex flex-column">
                 
-                <!-- 1. Header: Bank & Date Box -->
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span style="font-size:0.75rem; font-weight:600; text-transform:uppercase; background:rgba(255,255,255,0.15); padding:5px 14px; border-radius:30px; color:<?= $text_color ?>; backdrop-filter:blur(4px);">
-                        🏦 <?= htmlspecialchars($prop['bank_name'] ?? ($tab == 'auction' ? 'Bank' : 'User')) ?>
-                    </span>
+                <!-- 1. Header: Bank Badge & Date Box -->
+                <div class="d-flex justify-content-between align-items-start mb-3 gap-2">
                     
+                    <!-- Bank Badge (Truncated if too long) -->
+                    <div style="flex: 1; min-width: 0;">
+                        <span class="d-inline-block text-truncate w-100" style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:rgba(255,255,255,0.15); padding:6px 12px; border-radius:8px; color:<?= $text_color ?>; backdrop-filter:blur(4px);">
+                            🏦 <?= htmlspecialchars($prop['bank_name'] ?? ($tab == 'auction' ? 'Bank' : 'User')) ?>
+                        </span>
+                    </div>
+                    
+                    <!-- Date Box -->
                     <?php if($tab == 'auction' && !empty($prop['auction_date']) && $prop['auction_start_time'] != 'Private Treaty'): ?>
-                        <div class="text-end" style="font-size:0.75rem; background:rgba(0,0,0,0.2); padding:4px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.1);">
-                            <div style="font-size:0.6rem; text-transform:uppercase; opacity:0.8; letter-spacing:0.5px;">Auction Date</div>
-                            <strong><i class="far fa-calendar-alt"></i> <?= date('d M Y', strtotime($prop['auction_date'])) ?></strong>
+                        <div style="flex-shrink: 0; text-align: center; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 4px 10px; min-width: 75px;">
+                            <div style="font-size:0.55rem; text-transform:uppercase; opacity:0.8; letter-spacing:0.5px; font-weight:700;">Auction Date</div>
+                            <div style="font-size:0.85rem; font-weight:800; margin-top:1px;"><i class="far fa-calendar-alt"></i> <?= date('d M Y', strtotime($prop['auction_date'])) ?></div>
                         </div>
                     <?php endif; ?>
                 </div>
 
                 <!-- 2. Title (Fixed height for uniform cards) -->
-                <h5 class="fw-bold mt-2 mb-3" style="color:<?= $text_color ?>; font-size:1.15rem; line-height:1.4; min-height:3.2em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;" title="<?= htmlspecialchars($prop['title']) ?>">
+                <h5 class="fw-bold mb-3" style="font-size:1.15rem; line-height:1.35; min-height:2.7em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;" title="<?= htmlspecialchars($prop['title']) ?>">
                     <?= htmlspecialchars($prop['title']) ?>
                 </h5>
 
-                <!-- 3. Price Section -->
-                <div class="mb-2">
-                    <div style="font-size:0.65rem; text-transform:uppercase; opacity:0.8; letter-spacing:1px; font-weight:600;">Reserve Price</div>
-                    <div style="font-size:1.8rem; font-weight:800; color:<?= $text_color ?>; line-height:1.1;">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
+                <div class="mt-auto"> <!-- Pushes content below to bottom if title is short -->
+                    <!-- 3. Price Section -->
+                    <div class="mb-2">
+                        <div style="font-size:0.65rem; text-transform:uppercase; opacity:0.75; letter-spacing:1px; font-weight:700;">Reserve Price</div>
+                        <div style="font-size:1.7rem; font-weight:900; letter-spacing:-0.5px;">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
+                    </div>
+                    
+                    <!-- 4. City Section -->
+                    <div class="mb-4 d-flex align-items-center gap-2" style="font-size:1.05rem; font-weight:700; opacity:0.95;">
+                        <i class="fas fa-map-marker-alt" style="color:#fbbf24; font-size:1.1rem;"></i> <?= htmlspecialchars($prop['city'] ?? '') ?>
+                    </div>
+                    
+                    <!-- 5. Action Button -->
+                    <div>
+                        <?php if($tab == 'exchange'): ?>
+                            <a href="exchange_interest.php?id=<?= $prop['id'] ?>" class="btn w-100" style="background:#fbbf24; color:#000; font-weight:800; border-radius:12px; padding:10px;" onclick="return confirm('Owner को notification भेजें?')">🤝 I'm Interested</a>
+                        <?php else: ?>
+                            <a href="property_detail.php?id=<?= $prop['id'] ?>&source=<?= $prop['source'] ?>" style="display:block; background:rgba(255,255,255,0.15); backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:11px; border-radius:12px; text-align:center; text-decoration:none; transition:all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">View Details →</a>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 
-                <!-- 4. City Section (Enlarged) -->
-                <div class="mb-4 d-flex align-items-center gap-2" style="font-size:1.05rem; font-weight:600; color:<?= $text_color ?>; opacity:0.95;">
-                    <i class="fas fa-map-marker-alt" style="color:#fbbf24;"></i> <?= htmlspecialchars($prop['city'] ?? '') ?>
-                </div>
-                
-                <!-- 5. Action Button -->
-                <div class="mt-auto">
-                    <?php if($tab == 'exchange'): ?>
-                        <a href="exchange_interest.php?id=<?= $prop['id'] ?>" class="btn w-100" style="background:#fbbf24; color:#000; font-weight:800; border-radius:14px; padding:10px;" onclick="return confirm('Owner को notification भेजें?')">🤝 I'm Interested</a>
-                    <?php else: ?>
-                        <a href="property_detail.php?id=<?= $prop['id'] ?>&source=<?= $prop['source'] ?>" style="display:block; background:rgba(255,255,255,0.15); backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:12px; border-radius:14px; text-align:center; text-decoration:none; transition:all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">View Details →</a>
-                    <?php endif; ?>
-                </div>
             </div>
         </div>
     </div>
