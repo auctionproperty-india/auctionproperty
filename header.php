@@ -18,7 +18,7 @@ if ($is_logged_in && ($display_name === 'User' || empty($display_name))) {
     $db_user = safeFetch($pdo, "SELECT name FROM users WHERE id = ?", [$_SESSION['user_id']]);
     if ($db_user && !empty($db_user['name'])) {
         $display_name = $db_user['name'];
-        $_SESSION['name'] = $db_user['name']; // Session me save kar do
+        $_SESSION['name'] = $db_user['name'];
     }
 }
 
@@ -129,6 +129,20 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .top-nav .nav-right .user-badge { color: rgba(255,255,255,0.9); font-size: 0.9rem; }
         .top-nav .nav-right .user-badge i { color: #fbbf24; }
 
+        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1050; }
+        .sidebar-overlay.show { display: block; }
+        .hamburger-sidebar { position: fixed; top: 0; left: -320px; width: 320px; height: 100%; background: #ffffff; z-index: 1060; transition: left 0.3s ease-in-out; box-shadow: 2px 0 20px rgba(0,0,0,0.15); padding: 25px 20px; overflow-y: auto; }
+        .hamburger-sidebar.open { left: 0; }
+        .hamburger-sidebar .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
+        .hamburger-sidebar .sidebar-header .close-btn { background: none; border: none; font-size: 1.8rem; color: #475569; cursor: pointer; }
+        .hamburger-sidebar .sidebar-header .brand-small { font-weight: 700; font-size: 1.2rem; color: #1e293b; }
+        .hamburger-sidebar .sidebar-header .brand-small i { color: #1e3a8a; }
+        .hamburger-sidebar .nav-list { list-style: none; padding: 0; margin: 0; }
+        .hamburger-sidebar .nav-list li { margin: 4px 0; }
+        .hamburger-sidebar .nav-list li a { display: block; padding: 12px 16px; color: #475569; text-decoration: none; border-radius: 10px; font-weight: 500; transition: all 0.2s; }
+        .hamburger-sidebar .nav-list li a:hover { background: #f1f5f9; color: #1e3a8a; }
+        .hamburger-sidebar .nav-list li a i { width: 28px; color: #94a3b8; margin-right: 10px; }
+
         .sidebar { height: 100vh; width: 280px; position: fixed; top: 0; left: 0; padding: 30px 15px; box-shadow: 2px 0 12px rgba(0,0,0,0.06); z-index: 1050; transition: transform 0.3s ease-in-out; overflow-y: auto; background: #ffffff; border-right: 1px solid #e2e8f0; color: #334155; }
         body:not(.top-nav-hidden) .sidebar { top: 70px; }
         body.top-nav-hidden .sidebar { top: 0; }
@@ -222,9 +236,49 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <?php endif; ?>
     </div>
 </nav>
+
+<!-- 🔥 HAMBURGER SIDEBAR (Fixed) -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="hamburger-sidebar" id="hamburgerSidebar">
+    <div class="sidebar-header">
+        <span class="brand-small"><i class="fas fa-building"></i> Prime Property</span>
+        <button class="close-btn" id="closeSidebarBtn"><i class="fas fa-times"></i></button>
+    </div>
+    <ul class="nav-list">
+        <!-- Basic Links (Always Visible) -->
+        <li><a href="index.php"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="index.php?tab=auction"><i class="fas fa-gavel"></i> Auctions</a></li>
+        <li><a href="index.php?tab=customer"><i class="fas fa-building"></i> Properties</a></li>
+        <li><a href="index.php?tab=exchange"><i class="fas fa-exchange-alt"></i> Exchange</a></li>
+        
+        <!-- Dynamic Pages (Adds below) -->
+        <?php if (!empty($dynamic_pages)): ?>
+            <li style="border-top:1px solid #eee; margin-top:10px; padding-top:10px;"><span style="font-size:12px; color:#888; padding-left:15px;">More Pages</span></li>
+            <?php foreach ($dynamic_pages as $page): ?>
+                <li><a href="page.php?slug=<?= urlencode($page['slug']) ?>"><i class="fas <?= htmlspecialchars($page['icon']) ?>"></i> <?= htmlspecialchars($page['title']) ?></a></li>
+            <?php endforeach; ?>
+        <?php elseif (!empty($nav_items)): ?>
+            <li style="border-top:1px solid #eee; margin-top:10px; padding-top:10px;"><span style="font-size:12px; color:#888; padding-left:15px;">More Links</span></li>
+            <?php foreach ($nav_items as $item): ?>
+                <li><a href="<?= htmlspecialchars($item['url']) ?>"><?php if ($item['icon']): ?><i class="<?= htmlspecialchars($item['icon']) ?>"></i><?php endif; ?> <?= htmlspecialchars($item['label']) ?></a></li>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <li><a href="page.php?slug=about"><i class="fas fa-info-circle"></i> About</a></li>
+            <li><a href="page.php?slug=faq"><i class="fas fa-question-circle"></i> FAQ</a></li>
+            <li><a href="page.php?slug=contact"><i class="fas fa-envelope"></i> Contact</a></li>
+        <?php endif; ?>
+    </ul>
+    
+    <?php if (!$is_logged_in): ?>
+    <div class="auth-links" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:15px;">
+        <a href="login.php" style="display:block; padding:10px; text-align:center; background:#f1f5f9; border-radius:8px; color:#1e3a8a; font-weight:bold; text-decoration:none; margin-bottom:8px;">Login</a>
+        <a href="register.php" style="display:block; padding:10px; text-align:center; background:#eef2ff; border-radius:8px; color:#1e3a8a; font-weight:bold; text-decoration:none;">Create Account</a>
+    </div>
+    <?php endif; ?>
+</div>
 <?php endif; ?>
 
-<!-- SIDEBAR -->
+<!-- EXISTING SIDEBAR (Logged in users) -->
 <?php if ($is_logged_in): ?>
 <div class="sidebar-overlay-main" id="sidebarOverlayMain" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
@@ -232,14 +286,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     
     <?php if ($role == 'admin'): ?>
         <a href="admin_dashboard.php" class="<?= $current_page == 'admin_dashboard.php' ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        <!-- Admin menu can be added here -->
     <?php elseif ($role == 'sales'): ?>
         <a href="sales_dashboard.php" class="<?= $current_page == 'sales_dashboard.php' ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
-        <!-- Sales menu can be added here -->
     <?php else: ?>
         <a href="user_dashboard.php" class="<?= ($current_page == 'user_dashboard.php' && empty($_GET['tab'])) ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         
-        <!-- 🔥 All Properties Section Added -->
         <div class="nav-section <?= ($current_page == 'user_dashboard.php' && isset($_GET['tab'])) ? 'open' : '' ?>">
             <div class="nav-section-title <?= ($current_page == 'user_dashboard.php' && isset($_GET['tab'])) ? 'active' : '' ?>" onclick="toggleSection(this)">
                 <i class="fas fa-building section-icon"></i><span>All Properties</span><i class="fas fa-chevron-right section-arrow"></i>
@@ -298,7 +349,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             </div>
         </div>
 
-        <!-- Center: Mini Spin Wheel & Coins -->
         <?php if ($current_page == 'user_dashboard.php' && $role == 'user'): ?>
         <div class="header-spin-area">
             <div class="coin-display" title="Total Coins">
@@ -312,7 +362,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         </div>
         <?php endif; ?>
 
-        <!-- Right Side: Notification Bell -->
         <?php if ($role == 'user'): ?>
             <a href="my_notifications.php" class="btn btn-light position-relative me-2" style="border-radius:50%; width:36px; height:36px; display:flex; align-items: center; justify-content: center;">
                 <i class="fas fa-bell" style="color:#1e293b; font-size:1.1rem;"></i>
@@ -337,6 +386,15 @@ function toggleSection(el) {
     if (!section) return;
     section.classList.toggle('open');
 }
+document.addEventListener('DOMContentLoaded', function() {
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const sidebar = document.getElementById('hamburgerSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const closeBtn = document.getElementById('closeSidebarBtn');
+    if (hamburgerBtn) hamburgerBtn.addEventListener('click', () => { if(sidebar) { sidebar.classList.add('open'); overlay.classList.add('show'); document.body.style.overflow = 'hidden'; }});
+    if (closeBtn) closeBtn.addEventListener('click', () => { if(sidebar) { sidebar.classList.remove('open'); overlay.classList.remove('show'); document.body.style.overflow = ''; }});
+    if (overlay) overlay.addEventListener('click', () => { if(sidebar) { sidebar.classList.remove('open'); overlay.classList.remove('show'); document.body.style.overflow = ''; }});
+});
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
