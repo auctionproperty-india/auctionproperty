@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – Tabs + Search + Spin Modal
+// 👤 User Dashboard – 12 Lowest Price Properties + View All
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -13,13 +13,16 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 
 $user_id = $_SESSION['user_id'];
 
-// ---- Get user city for default filter ----
+// ---- Get user city ----
 $user_stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
 $user_stmt->execute([$user_id]);
 $user_city = $user_stmt->fetchColumn() ?? '';
 
-// ---- Tab & Search Parameters ----
-$tab              = $_GET['tab'] ?? 'auction';
+// ---- Views and Tabs ----
+$view = $_GET['view'] ?? 'dashboard'; // 'dashboard' or 'all'
+$tab  = $_GET['tab'] ?? 'auction';
+
+// ---- Search Parameters ----
 $search_city      = $_GET['city'] ?? $user_city; 
 $search_locality  = $_GET['locality'] ?? '';
 $search_types     = $_GET['type'] ?? [];
@@ -32,55 +35,62 @@ if (!is_array($search_types)) {
 }
 $search_types = array_values(array_filter($search_types, function($t) { return $t !== ''; }));
 
-// ---- Common Filters ----
-$common_where = "";
-$params = [];
-
-if(!empty($search_city)) {
-    $common_where .= " AND city ILIKE ?";
-    $params[] = '%' . $search_city . '%';
-}
-if(!empty($search_locality)) {
-    $common_where .= " AND locality ILIKE ?";
-    $params[] = '%' . $search_locality . '%';
-}
-if(!empty($search_types)) {
-    $ph = implode(',', array_fill(0, count($search_types), '?'));
-    $common_where .= " AND type IN ($ph)";
-    foreach ($search_types as $t) $params[] = $t;
-}
-if(!empty($search_min_price)) {
-    $common_where .= " AND price >= ?";
-    $params[] = (float)$search_min_price;
-}
-if(!empty($search_max_price)) {
-    $common_where .= " AND price <= ?";
-    $params[] = (float)$search_max_price;
-}
-
-// ---- Fetch Based on Tab ----
+// ---- Fetch Property Data ----
 $display_props = [];
-if ($tab == 'auction') {
-    $sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY id DESC LIMIT 12";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $display_props = $stmt->fetchAll();
-} elseif ($tab == 'customer') {
-    $sql = "SELECT *, 'customer' as source FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where ORDER BY created_at DESC LIMIT 12";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $display_props = $stmt->fetchAll();
-} elseif ($tab == 'exchange') {
-    $sql = "SELECT *, 'exchange' as source FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where ORDER BY created_at DESC LIMIT 12";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $display_props = $stmt->fetchAll();
-}
-
-// Total counts for tabs
 $total_auction = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'available'")->fetchColumn();
 $total_customer = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL)")->fetchColumn();
 $total_exchange = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange'")->fetchColumn();
+
+if ($view == 'dashboard') {
+    // 🔥 DASHBOARD VIEW: Only 12 lowest price properties in user's city
+    $sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? ORDER BY price ASC LIMIT 12";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(['%' . $user_city . '%']);
+    $display_props = $stmt->fetchAll();
+} else {
+    // 🔥 ALL PROPERTIES VIEW: Show everything based on tab & filters
+    $common_where = "";
+    $params = [];
+
+    if(!empty($search_city)) {
+        $common_where .= " AND city ILIKE ?";
+        $params[] = '%' . $search_city . '%';
+    }
+    if(!empty($search_locality)) {
+        $common_where .= " AND locality ILIKE ?";
+        $params[] = '%' . $search_locality . '%';
+    }
+    if(!empty($search_types)) {
+        $ph = implode(',', array_fill(0, count($search_types), '?'));
+        $common_where .= " AND type IN ($ph)";
+        foreach ($search_types as $t) $params[] = $t;
+    }
+    if(!empty($search_min_price)) {
+        $common_where .= " AND price >= ?";
+        $params[] = (float)$search_min_price;
+    }
+    if(!empty($search_max_price)) {
+        $common_where .= " AND price <= ?";
+        $params[] = (float)$search_max_price;
+    }
+
+    if ($tab == 'auction') {
+        $sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY id DESC"; // No LIMIT
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $display_props = $stmt->fetchAll();
+    } elseif ($tab == 'customer') {
+        $sql = "SELECT *, 'customer' as source FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where ORDER BY created_at DESC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $display_props = $stmt->fetchAll();
+    } elseif ($tab == 'exchange') {
+        $sql = "SELECT *, 'exchange' as source FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where ORDER BY created_at DESC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $display_props = $stmt->fetchAll();
+    }
+}
 
 // Fetch notification
 $notif_stmt = $pdo->query("SELECT * FROM admin_notifications WHERE is_active = true ORDER BY updated_at DESC LIMIT 1");
@@ -89,7 +99,7 @@ $notification = $notif_stmt->fetch();
 $all_types = ['Flat','Plot','Shop','Land','House','Land & Building','Car/Vehicle','Commercial','Office','Row House','Bungalow','Other'];
 
 // ---- Render property card ----
-function renderDashboardCard($prop, $tab) {
+function renderDashboardCard($prop, $tab = 'auction') {
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'],
         ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%)'],
@@ -164,91 +174,114 @@ include 'header.php';
 
 <div class="container-fluid mt-2">
     
-    <!-- SEARCH BOX -->
-    <div class="search-box">
-        <form method="GET" class="row g-3 align-items-center" id="searchForm">
-            <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
-            <div class="col-md-3">
-                <input type="text" name="city" class="form-control" placeholder="🔍 Search by City..." value="<?= htmlspecialchars($search_city) ?>">
-            </div>
-            <div class="col-md-3">
-                <input type="text" name="locality" class="form-control" placeholder="📍 Search by Locality..." value="<?= htmlspecialchars($search_locality) ?>">
-            </div>
-            <div class="col-md-3">
-                <div class="type-selector-wrapper">
-                    <button type="button" class="type-selector-btn" onclick="toggleTypePanel(event)">
-                        <span id="typeLabel"><?= empty($search_types) ? 'All Types' : (count($search_types) === 1 ? htmlspecialchars($search_types[0]) : htmlspecialchars($search_types[0]) . ' +' . (count($search_types) - 1) . ' more') ?></span>
-                        <i class="fas fa-chevron-down" style="font-size:0.75rem;opacity:0.5;"></i>
-                    </button>
-                    <div class="type-panel" id="typePanel" style="display:none;">
-                        <div class="type-panel-header">
-                            <span>Select Property Type</span>
-                            <button type="button" onclick="clearAllTypes(event)" style="background:none;border:none;color:#2563eb;font-weight:bold;cursor:pointer;">Clear All</button>
+    <?php if ($view == 'all'): ?>
+        <!-- 🔥 SEARCH BOX (Only in 'All' view) -->
+        <div class="search-box">
+            <form method="GET" class="row g-3 align-items-center">
+                <input type="hidden" name="view" value="all">
+                <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
+                <div class="col-md-3">
+                    <input type="text" name="city" class="form-control" placeholder="🔍 Search by City..." value="<?= htmlspecialchars($search_city) ?>">
+                </div>
+                <div class="col-md-3">
+                    <input type="text" name="locality" class="form-control" placeholder="📍 Search by Locality..." value="<?= htmlspecialchars($search_locality) ?>">
+                </div>
+                <div class="col-md-3">
+                    <div class="type-selector-wrapper">
+                        <button type="button" class="type-selector-btn" onclick="toggleTypePanel(event)">
+                            <span id="typeLabel"><?= empty($search_types) ? 'All Types' : (count($search_types) === 1 ? htmlspecialchars($search_types[0]) : htmlspecialchars($search_types[0]) . ' +' . (count($search_types) - 1) . ' more') ?></span>
+                            <i class="fas fa-chevron-down" style="font-size:0.75rem;opacity:0.5;"></i>
+                        </button>
+                        <div class="type-panel" id="typePanel" style="display:none;">
+                            <div class="type-panel-header">
+                                <span>Select Property Type</span>
+                                <button type="button" onclick="clearAllTypes(event)" style="background:none;border:none;color:#2563eb;font-weight:bold;cursor:pointer;">Clear All</button>
+                            </div>
+                            <?php foreach ($all_types as $t): $is_checked = in_array($t, $search_types); ?>
+                                <label class="type-checkbox-item <?= $is_checked ? 'checked' : '' ?>" onclick="event.stopPropagation();">
+                                    <input type="checkbox" name="type[]" value="<?= htmlspecialchars($t) ?>" <?= $is_checked ? 'checked' : '' ?> onchange="onTypeChange(this)">
+                                    <span><?= htmlspecialchars($t) ?></span>
+                                </label>
+                            <?php endforeach; ?>
                         </div>
-                        <?php foreach ($all_types as $t): $is_checked = in_array($t, $search_types); ?>
-                            <label class="type-checkbox-item <?= $is_checked ? 'checked' : '' ?>" onclick="event.stopPropagation();">
-                                <input type="checkbox" name="type[]" value="<?= htmlspecialchars($t) ?>" <?= $is_checked ? 'checked' : '' ?> onchange="onTypeChange(this)">
-                                <span><?= htmlspecialchars($t) ?></span>
-                            </label>
-                        <?php endforeach; ?>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <input type="date" name="date" class="form-control" value="<?= htmlspecialchars($search_date) ?>">
-            </div>
-            <div class="col-md-3">
-                <input type="number" name="min_price" class="form-control" placeholder="💰 Min Price" value="<?= htmlspecialchars($search_min_price) ?>">
-            </div>
-            <div class="col-md-3">
-                <input type="number" name="max_price" class="form-control" placeholder="💰 Max Price" value="<?= htmlspecialchars($search_max_price) ?>">
-            </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i> Search</button>
-            </div>
-            <div class="col-md-2">
-                <a href="user_dashboard.php?tab=<?= $tab ?>" class="btn btn-reset w-100"><i class="fas fa-redo"></i> Reset</a>
-            </div>
-        </form>
-    </div>
+                <div class="col-md-3">
+                    <input type="date" name="date" class="form-control" value="<?= htmlspecialchars($search_date) ?>">
+                </div>
+                <div class="col-md-3">
+                    <input type="number" name="min_price" class="form-control" placeholder="💰 Min Price" value="<?= htmlspecialchars($search_min_price) ?>">
+                </div>
+                <div class="col-md-3">
+                    <input type="number" name="max_price" class="form-control" placeholder="💰 Max Price" value="<?= htmlspecialchars($search_max_price) ?>">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i> Search</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="user_dashboard.php?view=all&tab=<?= $tab ?>" class="btn btn-reset w-100"><i class="fas fa-redo"></i> Reset</a>
+                </div>
+            </form>
+        </div>
 
-    <!-- TABS (Auction, Customer, Exchange) -->
-    <ul class="nav nav-tabs mb-4">
-        <li class="nav-item">
-            <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?tab=auction&city=<?= urlencode($search_city) ?>">
-                <i class="fas fa-gavel me-2"></i>Auction
-                <span class="badge-count"><?= $total_auction ?></span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?tab=customer&city=<?= urlencode($search_city) ?>">
-                <i class="fas fa-home me-2"></i>Customer
-                <span class="badge-count"><?= $total_customer ?></span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link <?= ($tab=='exchange')?'active':'' ?>" href="?tab=exchange&city=<?= urlencode($search_city) ?>">
-                <i class="fas fa-exchange-alt me-2"></i>Exchange (All India)
-                <span class="badge-count"><?= $total_exchange ?></span>
-            </a>
-        </li>
-    </ul>
+        <!-- 🔥 TABS (Only in 'All' view) -->
+        <ul class="nav nav-tabs mb-4">
+            <li class="nav-item">
+                <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?view=all&tab=auction&city=<?= urlencode($search_city) ?>">
+                    <i class="fas fa-gavel me-2"></i>Auction
+                    <span class="badge-count"><?= $total_auction ?></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?view=all&tab=customer&city=<?= urlencode($search_city) ?>">
+                    <i class="fas fa-home me-2"></i>Customer
+                    <span class="badge-count"><?= $total_customer ?></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= ($tab=='exchange')?'active':'' ?>" href="?view=all&tab=exchange&city=<?= urlencode($search_city) ?>">
+                    <i class="fas fa-exchange-alt me-2"></i>Exchange (All India)
+                    <span class="badge-count"><?= $total_exchange ?></span>
+                </a>
+            </li>
+        </ul>
+    <?php endif; ?>
 
-    <!-- Properties Display -->
-    <div class="section-title mb-3">
-        <h5 class="fw-bold m-0"><i class="fas fa-building text-primary"></i> <?= ucfirst($tab) ?> Properties <span class="badge bg-primary rounded-pill ms-2"><?= count($display_props) ?></span></h5>
+    <!-- Title & More Properties Button -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold m-0">
+            <i class="fas fa-building text-primary"></i> 
+            <?php if ($view == 'dashboard'): ?>
+                Best Deals in <?= htmlspecialchars($user_city ?: 'Your City') ?>
+            <?php else: ?>
+                All <?= ucfirst($tab) ?> Properties
+            <?php endif; ?>
+            <span class="badge bg-primary rounded-pill ms-2"><?= count($display_props) ?></span>
+        </h5>
+        
+        <?php if ($view == 'dashboard'): ?>
+            <!-- 🔥 More Properties Button -->
+            <a href="user_dashboard.php?view=all&tab=auction" class="btn btn-outline-primary fw-bold" style="border-radius:20px;">
+                More Properties <i class="fas fa-arrow-right ms-1"></i>
+            </a>
+        <?php else: ?>
+            <a href="user_dashboard.php" class="btn btn-outline-secondary fw-bold" style="border-radius:20px;">
+                <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        <?php endif; ?>
     </div>
     
+    <!-- Property Grid -->
     <?php if (count($display_props) > 0): ?>
         <div class="row">
             <?php foreach ($display_props as $prop): ?>
-                <?php renderDashboardCard($prop, $tab); ?>
+                <?php renderDashboardCard($prop, $view == 'dashboard' ? 'auction' : $tab); ?>
             <?php endforeach; ?>
         </div>
     <?php else: ?>
         <div class="alert alert-light border text-center py-5" style="border-radius:20px;">
             <i class="fas fa-search fa-3x text-muted mb-3"></i>
-            <h5 class="fw-bold">No <?= $tab ?> properties found</h5>
+            <h5 class="fw-bold">No properties found</h5>
             <p class="text-muted">Try adjusting your search filters or search in a different city.</p>
         </div>
     <?php endif; ?>
@@ -270,7 +303,7 @@ include 'header.php';
                 </div>
 
                 <div class="mb-3">
-                    <span class="badge bg-light text-dark fs-6">Your Coins: <strong id="modalCoinBalance"><?= number_format($user_coins) ?></strong></span>
+                    <span class="badge bg-light text-dark fs-6">Your Coins: <strong id="modalCoinBalance"><?= number_format($user_coins ?? 0) ?></strong></span>
                 </div>
                 
                 <button type="button" class="btn btn-warning btn-lg w-100 fw-bold rounded-pill" id="spinBtn" onclick="startSpinAnimation()">
@@ -281,7 +314,7 @@ include 'header.php';
     </div>
 </div>
 
-<!-- Property Result Modal (Winning Property) -->
+<!-- Property Result Modal -->
 <div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff;">
@@ -362,13 +395,11 @@ function startSpinAnimation() {
                         animateCoins(data.coins);
                     }
                     
-                    // Close Spin Modal
                     const spinModalEl = document.getElementById('spinWheelModal');
                     const spinModal = bootstrap.Modal.getInstance(spinModalEl);
                     
                     if (data.show_property && data.property) {
                         if (spinModal) spinModal.hide();
-                        // Wait for modal to close before showing property
                         spinModalEl.addEventListener('hidden.bs.modal', function () {
                             showPropertyWin(data.property);
                         }, { once: true });
@@ -437,7 +468,6 @@ function showToast(msg, bgColor) {
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
 }
 
-// Multi-type selector
 function toggleTypePanel(e) {
     e.stopPropagation();
     const panel = document.getElementById('typePanel');
