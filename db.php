@@ -43,6 +43,7 @@ try {
 // ============================================================
 // SAFE QUERY HELPERS
 // ============================================================
+
 if (!function_exists('safeQuery')) {
     function safeQuery($pdo, $sql, $params = []) {
         $maxRetries = 3;
@@ -134,6 +135,7 @@ if (!function_exists('safeExecute')) {
 // ============================================================
 // SESSION HANDLER INTEGRATION (URL-based Impersonation)
 // ============================================================
+
 $sessionHandlerFile = __DIR__ . '/session_handler.php';
 
 if (file_exists($sessionHandlerFile)) {
@@ -142,7 +144,9 @@ if (file_exists($sessionHandlerFile)) {
     if (class_exists('DatabaseSessionHandler')) {
         try {
             if (session_status() == PHP_SESSION_NONE) {
+
                 $imp_session_id = null;
+
                 if (isset($_GET['imp_session']) && !empty($_GET['imp_session'])) {
                     $imp_session_id = preg_replace('/[^a-f0-9]/', '', $_GET['imp_session']);
                 } elseif (isset($_POST['imp_session']) && !empty($_POST['imp_session'])) {
@@ -180,6 +184,7 @@ if (file_exists($sessionHandlerFile)) {
                         'samesite' => 'Lax'
                     ]);
                 }
+
                 session_start();
             }
         } catch (Exception $e) {
