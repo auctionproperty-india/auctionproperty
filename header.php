@@ -12,6 +12,16 @@ $hide_top_nav = !in_array($current_page, ['index.php', 'login.php', 'register.ph
 $is_logged_in = isset($_SESSION['user_id']);
 $role = $is_logged_in ? ($_SESSION['role'] ?? 'user') : 'guest';
 
+// 🔥 User Name Fix
+$display_name = $_SESSION['name'] ?? $_SESSION['user_name'] ?? 'User';
+if ($is_logged_in && ($display_name === 'User' || empty($display_name))) {
+    $db_user = safeFetch($pdo, "SELECT name FROM users WHERE id = ?", [$_SESSION['user_id']]);
+    if ($db_user && !empty($db_user['name'])) {
+        $display_name = $db_user['name'];
+        $_SESSION['name'] = $db_user['name']; // Session me save kar do
+    }
+}
+
 // Super admin check
 $is_super_admin = false;
 if ($is_logged_in) {
@@ -94,32 +104,22 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* Global */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f4f7fc; overflow-x: hidden; user-select: none; padding-top: 70px; }
         input, textarea, select, [contenteditable="true"] { user-select: text !important; }
         body.top-nav-hidden { padding-top: 0; }
-        body.role-admin { background: #f8fafc; }
-        body.role-user { background: #f0f5fa; }
-        body.role-guest { background: #f8fafc; }
-        body.role-sales { background: #f0f5fa; }
-        body.page-login, body.page-register { background: url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed; background-size: cover; }
-
-        /* Impersonation */
-        .impersonate-banner { position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; padding: 12px 20px; text-align: center; z-index: 99999; box-shadow: 0 4px 20px rgba(0,0,0,0.3); font-size: 0.9rem; font-weight: 500; display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; }
-        .impersonate-banner b { color: #fff; }
-        .impersonate-banner .btn-exit { background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-decoration: none; transition: all 0.2s; }
+        
+        .impersonate-banner { position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; padding: 12px 20px; text-align: center; z-index: 99999; font-size: 0.9rem; font-weight: 500; display: flex; justify-content: center; align-items: center; gap: 14px; }
+        .impersonate-banner .btn-exit { background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-decoration: none; }
         body.impersonate-mode { padding-top: 120px !important; }
         body.impersonate-mode .sidebar { top: 50px !important; }
         body.impersonate-mode .top-nav { top: 50px !important; }
-        body.impersonate-mode .hamburger-sidebar { top: 50px !important; }
 
-        /* Top Nav */
         .top-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 1030; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.3); height: 70px; }
         body.top-nav-hidden .top-nav { display: none !important; }
         .top-nav .nav-brand { display: flex; align-items: center; gap: 12px; }
         .top-nav .nav-brand .brand-icon { color: #fbbf24; font-size: 1.8rem; }
-        .top-nav .nav-brand .brand-text { color: #ffffff; font-weight: 700; font-size: 1.4rem; letter-spacing: -0.5px; }
+        .top-nav .nav-brand .brand-text { color: #ffffff; font-weight: 700; font-size: 1.4rem; }
         .top-nav .nav-brand .brand-text span { color: #fbbf24; }
         .top-nav .hamburger { background: none; border: none; color: #fff; font-size: 2rem; cursor: pointer; padding: 0 8px; }
         .top-nav .nav-right { display: flex; align-items: center; gap: 10px; }
@@ -129,7 +129,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .top-nav .nav-right .user-badge { color: rgba(255,255,255,0.9); font-size: 0.9rem; }
         .top-nav .nav-right .user-badge i { color: #fbbf24; }
 
-        /* Sidebar */
         .sidebar { height: 100vh; width: 280px; position: fixed; top: 0; left: 0; padding: 30px 15px; box-shadow: 2px 0 12px rgba(0,0,0,0.06); z-index: 1050; transition: transform 0.3s ease-in-out; overflow-y: auto; background: #ffffff; border-right: 1px solid #e2e8f0; color: #334155; }
         body:not(.top-nav-hidden) .sidebar { top: 70px; }
         body.top-nav-hidden .sidebar { top: 0; }
@@ -140,7 +139,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         @media (min-width: 992px) {
             .sidebar { transform: translateX(0) !important; }
         }
-        .sidebar .brand { font-size: 24px; font-weight: 800; text-align: center; padding-bottom: 25px; border-bottom: 1px solid #e2e8f0; margin-bottom: 25px; letter-spacing: 1px; color: #1e293b; }
+        .sidebar .brand { font-size: 24px; font-weight: 800; text-align: center; padding-bottom: 25px; border-bottom: 1px solid #e2e8f0; margin-bottom: 25px; color: #1e293b; }
         .sidebar .brand i { color: #1e3a8a; }
         .sidebar a { display: flex; align-items: center; padding: 12px 20px; margin: 4px 0; text-decoration: none; border-radius: 12px; font-weight: 500; font-size: 15px; transition: all 0.3s ease; border-left: 3px solid transparent; color: #475569; }
         .sidebar a i { width: 28px; font-size: 18px; transition: all 0.3s; color: #94a3b8; }
@@ -168,13 +167,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .sidebar .nav-section-items a:hover { background: #f1f5f9; border-left-color: #cbd5e1; }
         .sidebar .nav-section-items a.active { background: #eef2ff; color: #1e3a8a; border-left-color: #1e3a8a; }
 
-        /* Main Content */
         .main-content { padding: 20px 25px; min-height: 100vh; transition: margin-left 0.3s; }
         body.role-admin .main-content, body.role-user .main-content, body.role-sales .main-content { margin-left: 280px; }
         body.role-guest .main-content { margin-left: 0 !important; }
         @media (max-width: 991px) { .main-content { margin-left: 0 !important; padding: 15px; } }
 
-        /* Top Bar */
         .top-bar { padding: 10px 15px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; background: #ffffff; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.03); color: #0f172a; min-height: 65px; }
         .top-bar .user-info { display: flex; align-items: center; gap: 12px; }
         .top-bar .user-info .name { font-weight: 700; font-size: 15px; color: #0f172a; }
@@ -184,7 +181,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .hamburger-btn { background: transparent; border: none; font-size: 24px; padding: 5px 10px; cursor: pointer; color: #1e293b; }
         @media (min-width: 992px) { .hamburger-btn { display: none !important; } }
         
-        /* Header Spin Area */
         .header-spin-area { background: #f8fafc; border: 1px solid #e2e8f0; padding: 5px 15px; border-radius: 30px; display: flex; align-items: center; gap: 15px; }
         .header-spin-area .coin-display { font-weight: 800; font-size: 16px; color: #d97706; display: flex; align-items: center; gap: 5px; }
         .header-spin-area .mini-spin-btn { background: linear-gradient(135deg, #fbbf24, #f59e0b); border: none; color: #0f172a; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(251, 191, 36, 0.4); transition: 0.3s; }
@@ -193,45 +189,17 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .btn { border-radius: 10px; font-weight: 600; padding: 8px 16px; font-size: 14px; }
         .badge-sales { background: #f59e0b; color: #000; }
         
-        /* Spin Wheel Modal */
-        .spin-wheel-container {
-            width: 250px;
-            height: 250px;
-            position: relative;
-            margin: 0 auto 20px auto;
-        }
-        .spin-wheel {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 8px solid #fbbf24;
-            box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
-            background: conic-gradient(
-                #ef4444 0deg 72deg, 
-                #3b82f6 72deg 144deg, 
-                #10b981 144deg 216deg, 
-                #f59e0b 216deg 288deg, 
-                #8b5cf6 288deg 360deg
-            );
-            transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
-            position: relative;
-        }
-        .spin-wheel::after {
-            content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 40px; height: 40px; background: #fff; border-radius: 50%; border: 4px solid #fbbf24;
-        }
-        .spin-pointer {
-            position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
-            width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent;
-            border-top: 25px solid #1e293b; z-index: 10;
-        }
+        .spin-wheel-container { width: 250px; height: 250px; position: relative; margin: 0 auto 20px auto; }
+        .spin-wheel { width: 100%; height: 100%; border-radius: 50%; border: 8px solid #fbbf24; box-shadow: 0 0 20px rgba(251, 191, 36, 0.5); background: conic-gradient(#ef4444 0deg 72deg, #3b82f6 72deg 144deg, #10b981 144deg 216deg, #f59e0b 216deg 288deg, #8b5cf6 288deg 360deg); transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99); position: relative; }
+        .spin-wheel::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: #fff; border-radius: 50%; border: 4px solid #fbbf24; }
+        .spin-pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #1e293b; z-index: 10; }
     </style>
 </head>
 <body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= $is_impersonating ? 'impersonate-mode' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>">
 
 <?php if ($is_impersonating): ?>
 <div class="impersonate-banner">
-    <span><i class="fas fa-user-secret"></i> Logged in as <b><?= htmlspecialchars($_SESSION['name'] ?? 'User') ?></b></span>
+    <span><i class="fas fa-user-secret"></i> Logged in as <b><?= htmlspecialchars($display_name) ?></b></span>
     <a href="admin_exit_impersonation.php?imp_session=<?= htmlspecialchars($current_imp_session) ?>" class="btn-exit"><i class="fas fa-sign-out-alt"></i> Return</a>
 </div>
 <?php endif; ?>
@@ -246,7 +214,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     </div>
     <div class="nav-right">
         <?php if ($is_logged_in): ?>
-            <span class="user-badge"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['name'] ?? 'User') ?></span>
+            <span class="user-badge"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($display_name) ?></span>
             <a href="logout.php" style="color:#fca5a5;"><i class="fas fa-sign-out-alt"></i> Logout</a>
         <?php else: ?>
             <a href="login.php" class="btn-login"><i class="fas fa-sign-in-alt"></i> Login</a>
@@ -261,12 +229,28 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 <div class="sidebar-overlay-main" id="sidebarOverlayMain" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property</span></div>
+    
     <?php if ($role == 'admin'): ?>
         <a href="admin_dashboard.php" class="<?= $current_page == 'admin_dashboard.php' ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <!-- Admin menu can be added here -->
     <?php elseif ($role == 'sales'): ?>
         <a href="sales_dashboard.php" class="<?= $current_page == 'sales_dashboard.php' ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <!-- Sales menu can be added here -->
     <?php else: ?>
-        <a href="user_dashboard.php" class="<?= $current_page == 'user_dashboard.php' ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        <a href="user_dashboard.php" class="<?= ($current_page == 'user_dashboard.php' && empty($_GET['tab'])) ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        
+        <!-- 🔥 All Properties Section Added -->
+        <div class="nav-section <?= ($current_page == 'user_dashboard.php' && isset($_GET['tab'])) ? 'open' : '' ?>">
+            <div class="nav-section-title <?= ($current_page == 'user_dashboard.php' && isset($_GET['tab'])) ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-building section-icon"></i><span>All Properties</span><i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="user_dashboard.php?tab=auction" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'auction') ? 'active' : '' ?>"><i class="fas fa-gavel"></i> <span>Auction Properties</span></a>
+                <a href="user_dashboard.php?tab=customer" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'customer') ? 'active' : '' ?>"><i class="fas fa-home"></i> <span>Customer Properties</span></a>
+                <a href="user_dashboard.php?tab=exchange" class="<?= (isset($_GET['tab']) && $_GET['tab'] == 'exchange') ? 'active' : '' ?>"><i class="fas fa-exchange-alt"></i> <span>Exchange Properties</span></a>
+            </div>
+        </div>
+
         <a href="user_packages.php" class="<?= $current_page == 'user_packages.php' ? 'active' : '' ?>"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
         <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>"><i class="fas fa-users"></i> <span>My Team</span></a>
         <a href="my_earnings.php" class="<?= $current_page == 'my_earnings.php' ? 'active' : '' ?>"><i class="fas fa-file-invoice-dollar"></i> <span>My Earnings</span></a>
@@ -277,6 +261,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <a href="support.php" class="<?= $current_page == 'support.php' ? 'active' : '' ?>"><i class="fas fa-headset"></i> <span>Support</span></a>
         <a href="user_properties.php" class="<?= $current_page == 'user_properties.php' ? 'active' : '' ?>"><i class="fas fa-home"></i> <span>My Properties</span></a>
     <?php endif; ?>
+
     <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
 <?php endif; ?>
@@ -291,7 +276,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 <i class="fas fa-user-circle" style="font-size:28px; <?= ($role=='admin')?'color:#1e3a8a;':(($role=='sales')?'color:#f59e0b;':'color:#10b981;') ?>"></i>
                 <div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <span class="name"><?= htmlspecialchars($_SESSION['name'] ?? 'User') ?></span>
+                        <span class="name"><?= htmlspecialchars($display_name) ?></span>
                         <span class="badge-role badge <?= ($role=='admin')?'bg-primary':(($role=='sales')?'badge-sales':'bg-success') ?>"><?= strtoupper($role) ?></span>
                         <?php if($role == 'user' && !empty($user_email)): ?>
                             <span class="text-muted" style="font-size:12px;"><i class="fas fa-envelope"></i> <?= htmlspecialchars($user_email) ?></span>
@@ -321,7 +306,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 <span id="headerCoinBalance"><?= number_format($user_coins) ?></span>
             </div>
             <div style="width:1px; height:20px; background:#cbd5e1;"></div>
-            <!-- Button triggers modal -->
             <button class="mini-spin-btn" data-bs-toggle="modal" data-bs-target="#spinWheelModal" title="Spin Now">
                 <i class="fas fa-sync-alt" style="font-size:14px;"></i>
             </button>
@@ -330,7 +314,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
         <!-- Right Side: Notification Bell -->
         <?php if ($role == 'user'): ?>
-            <a href="my_notifications.php" class="btn btn-light position-relative me-2" style="border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center;">
+            <a href="my_notifications.php" class="btn btn-light position-relative me-2" style="border-radius:50%; width:36px; height:36px; display:flex; align-items: center; justify-content: center;">
                 <i class="fas fa-bell" style="color:#1e293b; font-size:1.1rem;"></i>
                 <?php if($unread_exchange_count > 0): ?>
                     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.6rem;"><?= $unread_exchange_count ?></span>
