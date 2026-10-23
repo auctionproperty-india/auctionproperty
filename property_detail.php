@@ -120,9 +120,10 @@ if (!$has_subscription && $source == 'auction') {
         <div class="row justify-content-center">
             <div class="col-lg-9">
                 
-                <a href="javascript:history.back()" class="btn btn-outline-secondary rounded-pill mb-3">
+                <!-- 🔥 Updated Back Button -->
+                <button onclick="history.back()" class="btn btn-outline-secondary rounded-pill mb-3">
                     <i class="fas fa-arrow-left me-1"></i> Back
-                </a>
+                </button>
 
                 <div class="card border-0 shadow-lg" style="border-radius: 24px; overflow: hidden;">
                     <div class="card-header text-white text-center p-4" style="background: linear-gradient(135deg, #1e293b, #3b82f6);">
@@ -591,10 +592,10 @@ if ($source == 'auction') {
     <div class="row justify-content-center">
         <div class="col-lg-10">
 
-            <!-- Back Button -->
-            <a href="javascript:history.back()" class="btn btn-sb-outline mb-3">
+            <!-- 🔥 Updated Back Button (History Back) -->
+            <button onclick="history.back()" class="btn btn-sb-outline mb-3">
                 <i class="fas fa-arrow-left me-1"></i> Back
-            </a>
+            </button>
 
             <!-- Main Card -->
             <div class="sb-card">
