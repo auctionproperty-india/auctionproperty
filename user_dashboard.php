@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – Complete with Spin, Stats, Cards + Admin Notification Popup
+// 👤 User Dashboard – Compact Layout with Spin & City Props
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -101,8 +101,8 @@ function renderDashboardCard($prop, $show_images = false, $is_today = false) {
     $image_url = $prop['image_url'] ?? '';
     $is_private_treaty = isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty';
     ?>
-    <div class="col-md-4 mb-4">
-        <div class="card h-100" style="border-radius:24px; overflow:hidden; border:none; box-shadow:<?= $shadow ?>; transition:all 0.4s; background: <?= $g['bg'] ?>; color:<?= $text_color ?>; position:relative;">
+    <div class="col-md-6 col-xl-4 mb-4">
+        <div class="card h-100" style="border-radius:20px; overflow:hidden; border:none; box-shadow:<?= $shadow ?>; transition:all 0.4s; background: <?= $g['bg'] ?>; color:<?= $text_color ?>; position:relative;">
             <?php if($is_private_treaty): ?>
                 <div style="position:absolute; top:15px; right:15px; z-index:10; background:#f59e0b; color:#000; padding:4px 14px; border-radius:30px; font-size:0.7rem; font-weight:700;">
                     🔑 Private Treaty
@@ -121,7 +121,7 @@ function renderDashboardCard($prop, $show_images = false, $is_today = false) {
                 <a href="property_detail.php?id=<?= $prop['id'] ?>&source=auction" style="display:block; margin-top:16px; background:<?= ($g['text']=='white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' ?>; backdrop-filter:blur(4px); border:1px solid <?= $border ?>; color:<?= $text_color ?>; font-weight:700; padding:12px; border-radius:16px; text-align:center; text-decoration:none; transition:all 0.3s;">View Details →</a>
             </div>
             <?php if($show_images && !empty($image_url)): ?>
-                <img src="<?= htmlspecialchars($image_url) ?>" style="height:200px; width:100%; object-fit:cover; border-top:3px solid <?= $border ?>;" alt="<?= htmlspecialchars($prop['title']) ?>">
+                <img src="<?= htmlspecialchars($image_url) ?>" style="height:180px; width:100%; object-fit:cover; border-top:3px solid <?= $border ?>;" alt="<?= htmlspecialchars($prop['title']) ?>">
             <?php else: ?>
                 <div style="height:150px; background:rgba(255,255,255,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px); border-top:3px solid <?= $border ?>; padding:10px;">
                     <i class="fas fa-lock" style="font-size:1.8rem; opacity:0.7; color:<?= $text_color ?>;"></i>
@@ -138,353 +138,104 @@ include 'header.php';
 ?>
 
 <style>
-    .dashboard-stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-        gap: 18px;
-        margin-bottom: 30px;
-    }
-    .stat-card {
+    /* स्पिन व्हील को कॉम्पैक्ट करने के लिए CSS */
+    .compact-spin-container {
         background: #ffffff;
         border-radius: 16px;
-        padding: 18px 16px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        text-align: center;
-        transition: all 0.25s ease;
-    }
-    .stat-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 30px rgba(0,0,0,0.08);
-    }
-    .stat-card .stat-number {
-        font-size: 1.8rem;
-        font-weight: 800;
-        color: #0f172a;
-    }
-    .stat-card .stat-label {
-        font-size: 0.75rem;
-        color: #64748b;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-    }
-    .stat-card .stat-icon {
-        font-size: 1.8rem;
-        opacity: 0.6;
-        margin-bottom: 4px;
-    }
-    .welcome-banner {
-        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
-        border-radius: 20px;
-        padding: 30px;
-        color: white;
-        margin-bottom: 25px;
-        box-shadow: 0 10px 25px -5px rgba(37,99,235,0.3);
-    }
-    .welcome-banner h2 { font-weight: 700; }
-    .welcome-banner p { opacity: 0.8; }
-
-    .spin-card {
-        background: linear-gradient(135deg, #1e293b, #334155);
-        border-radius: 20px;
-        padding: 20px;
-        margin-bottom: 30px;
-        color: #fff;
-    }
-    .spin-card h4 { color: #fbbf24; }
-    .slot-card {
-        background: rgba(255,255,255,0.05);
-        border-radius: 16px;
         padding: 15px;
-        border: 1px solid rgba(255,255,255,0.1);
-        backdrop-filter: blur(4px);
-        margin-bottom: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        border: 1px solid #e2e8f0;
     }
-    .slot-card .slot-time { font-weight: 600; font-size: 1.1rem; }
-    .slot-card .slot-status { font-size: 0.9rem; margin-top: 4px; }
-    .slot-card .slot-status .badge { font-weight: 600; }
-    .slot-card.missed { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); }
-    .slot-card.claimed { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); }
-    .slot-card.current { background: rgba(37, 99, 235, 0.15); border-color: rgba(37, 99, 235, 0.3); }
-    .slot-card.upcoming { background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.05); }
-    .spin-wheel {
-        transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
-    }
-    .spin-wheel.pulse {
-        animation: spinPulse 1s infinite;
-    }
-    @keyframes spinPulse {
-        0% { box-shadow: 0 0 30px rgba(251,191,36,0.3); }
-        50% { box-shadow: 0 0 60px rgba(251,191,36,0.6); }
-        100% { box-shadow: 0 0 30px rgba(251,191,36,0.3); }
-    }
-    @keyframes slideIn {
-        from { transform: translateX(100px); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    .star-shower-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 9999;
-        overflow: hidden;
-    }
-    .star-shower {
-        position: absolute;
-        top: -20px;
-        pointer-events: none;
-        animation: starFall var(--duration) ease-in var(--delay) forwards;
-        text-shadow: 0 0 10px var(--color), 0 0 20px var(--color);
-    }
-    @keyframes starFall {
-        0% { opacity: 0; transform: translateY(-20px) rotate(0deg) scale(0.5); }
-        10% { opacity: 1; transform: translateY(10vh) rotate(36deg) scale(1); }
-        90% { opacity: 1; transform: translateY(90vh) rotate(360deg) scale(1); }
-        100% { opacity: 0; transform: translateY(100vh) rotate(400deg) scale(0.3); }
-    }
-    .section-title { font-weight: 800; color: #0f172a; margin-bottom: 20px; }
+    .section-title { font-weight: 800; color: #0f172a; margin-bottom: 20px; font-size: 1.1rem; }
     .section-title i { margin-right: 10px; }
-    .no-auction-msg { background: #f8fafc; border-radius: 30px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
+    .no-auction-msg { background: #f8fafc; border-radius: 20px; padding: 30px; text-align: center; border: 2px dashed #e2e8f0; }
     .no-auction-msg i { font-size: 2.5rem; opacity:0.3; }
 
-    /* ===== Premium Modal Styles ===== */
-    .premium-modal .modal-content {
-        background: linear-gradient(145deg, #0b1120, #1a2332);
-        border: 2px solid rgba(255, 215, 0, 0.3);
-        box-shadow: 0 30px 80px rgba(0,0,0,0.8), 0 0 40px rgba(255, 215, 0, 0.1);
-        border-radius: 32px;
-        color: #fff;
-        position: relative;
-        overflow: hidden;
-    }
-    .premium-modal .modal-content::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle at 30% 50%, rgba(255,215,0,0.08) 0%, transparent 60%);
-        pointer-events: none;
-        animation: shimmer 6s infinite linear;
-    }
-    @keyframes shimmer {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    .premium-modal .modal-header {
-        border-bottom: 1px solid rgba(255,215,0,0.2);
-        padding: 24px 30px 16px 30px;
-    }
-    .premium-modal .modal-title {
-        font-size: 1.8rem;
-        font-weight: 800;
-        background: linear-gradient(135deg, #fbbf24, #f59e0b, #fbbf24);
-        background-size: 200% auto;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        animation: goldShine 3s ease-in-out infinite;
-        letter-spacing: 1px;
-        text-shadow: 0 0 30px rgba(251,191,36,0.3);
-    }
-    @keyframes goldShine {
-        0% { background-position: 0% center; }
-        50% { background-position: 200% center; }
-        100% { background-position: 0% center; }
-    }
-    .premium-modal .modal-body {
-        padding: 30px 30px 20px 30px;
-        font-size: 1.15rem;
-        line-height: 1.8;
-        color: #e2e8f0;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-        position: relative;
-        z-index: 1;
-    }
-    .premium-modal .modal-body img {
-        border-radius: 20px;
-        box-shadow: 0 15px 40px rgba(0,0,0,0.6);
-        border: 1px solid rgba(255,215,0,0.15);
-        margin-bottom: 20px;
-        width: 100%;
-        max-height: 280px;
-        object-fit: contain;
-    }
-    .premium-modal .modal-footer {
-        border-top: 1px solid rgba(255,215,0,0.15);
-        padding: 16px 30px 24px 30px;
-        justify-content: center;
-    }
-    .premium-modal .btn-gold {
-        background: linear-gradient(135deg, #fbbf24, #f59e0b);
-        border: none;
-        color: #0f172a;
-        font-weight: 700;
-        padding: 12px 40px;
-        border-radius: 50px;
-        font-size: 1.1rem;
-        letter-spacing: 0.5px;
-        box-shadow: 0 8px 25px rgba(251,191,36,0.4);
-        transition: all 0.3s ease;
-    }
-    .premium-modal .btn-gold:hover {
-        transform: scale(1.05);
-        box-shadow: 0 12px 40px rgba(251,191,36,0.6);
-        color: #0f172a;
-    }
-    .premium-modal .btn-close-white {
-        filter: invert(1) brightness(2);
-        opacity: 0.7;
-    }
-    .premium-modal .btn-close-white:hover {
-        opacity: 1;
-    }
-    .star-sparkle-container {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        overflow: hidden;
-        z-index: 0;
-    }
-    .star-sparkle {
-        position: absolute;
-        font-size: 24px;
-        color: #fbbf24;
-        text-shadow: 0 0 20px #fbbf24, 0 0 60px #f59e0b;
-        animation: sparkleFloat var(--duration) ease-in-out infinite alternate;
-        opacity: 0;
-    }
-    @keyframes sparkleFloat {
-        0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity: 0; }
-        20% { opacity: 1; }
-        80% { opacity: 1; }
-        100% { transform: translateY(-120px) scale(1.2) rotate(360deg); opacity: 0; }
-    }
+    /* Modals CSS */
+    .premium-modal .modal-content { background: linear-gradient(145deg, #0b1120, #1a2332); border: 2px solid rgba(255, 215, 0, 0.3); box-shadow: 0 30px 80px rgba(0,0,0,0.8), 0 0 40px rgba(255, 215, 0, 0.1); border-radius: 32px; color: #fff; position: relative; overflow: hidden; }
+    .premium-modal .modal-content::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 30% 50%, rgba(255,215,0,0.08) 0%, transparent 60%); pointer-events: none; animation: shimmer 6s infinite linear; }
+    @keyframes shimmer { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .premium-modal .modal-header { border-bottom: 1px solid rgba(255,215,0,0.2); padding: 24px 30px 16px 30px; }
+    .premium-modal .modal-title { font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, #fbbf24, #f59e0b, #fbbf24); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: goldShine 3s ease-in-out infinite; letter-spacing: 1px; text-shadow: 0 0 30px rgba(251,191,36,0.3); }
+    @keyframes goldShine { 0% { background-position: 0% center; } 50% { background-position: 200% center; } 100% { background-position: 0% center; } }
+    .premium-modal .modal-body { padding: 30px 30px 20px 30px; font-size: 1.15rem; line-height: 1.8; color: #e2e8f0; text-shadow: 0 2px 10px rgba(0,0,0,0.5); position: relative; z-index: 1; }
+    .premium-modal .modal-body img { border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); border: 1px solid rgba(255,215,0,0.15); margin-bottom: 20px; width: 100%; max-height: 280px; object-fit: contain; }
+    .premium-modal .modal-footer { border-top: 1px solid rgba(255,215,0,0.15); padding: 16px 30px 24px 30px; justify-content: center; }
+    .premium-modal .btn-gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); border: none; color: #0f172a; font-weight: 700; padding: 12px 40px; border-radius: 50px; font-size: 1.1rem; letter-spacing: 0.5px; box-shadow: 0 8px 25px rgba(251,191,36,0.4); transition: all 0.3s ease; }
+    .premium-modal .btn-gold:hover { transform: scale(1.05); box-shadow: 0 12px 40px rgba(251,191,36,0.6); color: #0f172a; }
+    .premium-modal .btn-close-white { filter: invert(1) brightness(2); opacity: 0.7; }
+    .premium-modal .btn-close-white:hover { opacity: 1; }
+    .star-sparkle-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 0; }
+    .star-sparkle { position: absolute; font-size: 24px; color: #fbbf24; text-shadow: 0 0 20px #fbbf24, 0 0 60px #f59e0b; animation: sparkleFloat var(--duration) ease-in-out infinite alternate; opacity: 0; }
+    @keyframes sparkleFloat { 0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translateY(-120px) scale(1.2) rotate(360deg); opacity: 0; } }
 </style>
 
-<div class="container-fluid">
-    <!-- Welcome Banner -->
-    <div class="welcome-banner">
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <h2>🏡 Welcome, <?= htmlspecialchars($_SESSION['user_name']) ?>!</h2>
-                <p>Discover the most affordable properties in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'your city' ?></p>
-                <div class="d-flex flex-wrap gap-2 mt-2">
-                    <a href="index.php" class="btn btn-light btn-sm"><i class="fas fa-th-list"></i> View All Properties</a>
-                    <a href="user_properties.php" class="btn btn-light btn-sm"><i class="fas fa-list"></i> My Properties</a>
-                    <a href="user_packages.php" class="btn btn-warning btn-sm"><i class="fas fa-rocket"></i> Subscribe Now</a>
-                </div>
+<div class="container-fluid mt-2">
+    
+    <!-- 🔥 नया लेआउट: बाईं तरफ स्पिन व्हील, दाईं तरफ प्रॉपर्टी -->
+    <div class="row">
+        
+        <!-- Left Column: Compact Spin Wheel -->
+        <div class="col-lg-4 col-md-12 mb-4">
+            <div class="compact-spin-container">
+                <?php include __DIR__ . '/spin_widget.php'; ?>
             </div>
-            <div class="col-md-4 text-md-end mt-3 mt-md-0">
-                <?php if ($subscription): ?>
-                    <span class="badge bg-success fs-6">✅ Active Plan: <?= htmlspecialchars($subscription['package_name']) ?></span>
-                    <br>
-                    <span class="badge bg-info fs-6 mt-1">⏳ <?= date('d M Y', strtotime($subscription['end_date'])) ?></span>
-                <?php else: ?>
-                    <span class="badge bg-warning text-dark fs-6">❌ No Active Subscription</span>
-                    <br>
-                    <a href="user_packages.php" class="btn btn-light btn-sm mt-2">Buy Plan</a>
+        </div>
+
+        <!-- Right Column: City Properties -->
+        <div class="col-lg-8 col-md-12">
+            
+            <!-- Today's Auctions -->
+            <?php 
+            $pt_count = 0;
+            foreach($today_props as $p) {
+                if(isset($p['auction_start_time']) && $p['auction_start_time'] == 'Private Treaty') $pt_count++;
+            }
+            ?>
+            <div class="section-title mt-1">
+                <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
+                <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
+                <?php if($pt_count > 0): ?>
+                    <span class="badge bg-warning text-dark rounded-pill ms-2">🔑 <?= $pt_count ?> Private Treaty</span>
                 <?php endif; ?>
             </div>
-        </div>
-    </div>
+            
+            <?php if (count($today_props) > 0): ?>
+                <div class="row">
+                    <?php foreach ($today_props as $prop): ?>
+                        <?php renderDashboardCard($prop, false, true); ?>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="no-auction-msg">
+                    <i class="fas fa-calendar-day"></i>
+                    <p class="mt-2 fw-bold">📭 No auction today</p>
+                </div>
+            <?php endif; ?>
 
-    <!-- Stats Cards -->
-    <div class="dashboard-stats">
-        <div class="stat-card">
-            <div class="stat-icon">🏠</div>
-            <div class="stat-number"><?= number_format($stats['total_properties'] ?? 0) ?></div>
-            <div class="stat-label">My Properties</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">⏳</div>
-            <div class="stat-number"><?= number_format($stats['pending_properties'] ?? 0) ?></div>
-            <div class="stat-label">Pending Properties</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">👥</div>
-            <div class="stat-number"><?= number_format($stats['total_referrals'] ?? 0) ?></div>
-            <div class="stat-label">Referrals</div>
-        </div>
-        <!-- 🔥 UPDATED: Total Earnings Card (Clickable + Gross Amount) -->
-        <div class="stat-card" onclick="window.location.href='my_earnings.php';" style="cursor: pointer;" title="Click to view Income History">
-            <div class="stat-icon">💰</div>
-            <div class="stat-number">₹ <?= number_format($stats['total_earnings'] ?? 0, 2) ?></div>
-            <div class="stat-label">Total Earnings</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">⏳</div>
-            <div class="stat-number">₹ <?= number_format($stats['pending_earnings'] ?? 0, 2) ?></div>
-            <div class="stat-label">Pending Earnings</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">🪙</div>
-            <div class="stat-number"><?= number_format($stats['coins'] ?? 0) ?></div>
-            <div class="stat-label">My Coins</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">💳</div>
-            <div class="stat-number">₹ <?= number_format($stats['wallet_balance'] ?? 0, 2) ?></div>
-            <div class="stat-label">Wallet Balance</div>
-        </div>
-    </div>
+            <hr class="my-4">
 
-    <!-- ====== DAILY SPIN SYSTEM ====== -->
-    <?php include __DIR__ . '/spin_widget.php'; ?>
-
-    <!-- ====== TODAY'S AUCTIONS ====== -->
-    <?php 
-    $pt_count = 0;
-    foreach($today_props as $p) {
-        if(isset($p['auction_start_time']) && $p['auction_start_time'] == 'Private Treaty') $pt_count++;
-    }
-    ?>
-    <div class="section-title">
-        <i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions
-        <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span>
-        <?php if($pt_count > 0): ?>
-            <span class="badge bg-warning text-dark rounded-pill ms-2">🔑 <?= $pt_count ?> Private Treaty</span>
-        <?php endif; ?>
-    </div>
-    <?php if (count($today_props) > 0): ?>
-        <div class="row">
-            <?php foreach ($today_props as $prop): ?>
-                <?php renderDashboardCard($prop, false, true); ?>
-            <?php endforeach; ?>
-        </div>
-        <hr class="my-4">
-    <?php else: ?>
-        <div class="no-auction-msg">
-            <i class="fas fa-calendar-day"></i>
-            <p class="mt-2 fw-bold">📭 No auction today</p>
-        </div>
-        <hr class="my-4">
-    <?php endif; ?>
-
-    <!-- Best Deals -->
-    <div class="section-title">
-        <i class="fas fa-fire" style="color:#f97316;"></i> Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?>
-        <span class="badge bg-primary rounded-pill ms-2"><?= count($best_props) ?></span>
-    </div>
-    <div class="row">
-        <?php if (count($best_props) > 0): ?>
-            <?php foreach ($best_props as $prop): ?>
-                <?php renderDashboardCard($prop, false, false); ?>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="col-12 text-center text-muted py-4">
-                <i class="fas fa-search" style="font-size:2rem; opacity:0.3;"></i>
-                <p class="mt-2">No properties available in your city. Explore all properties.</p>
-                <a href="index.php" class="btn btn-outline-primary btn-sm">View All Properties</a>
+            <!-- Best Deals in City -->
+            <div class="section-title">
+                <i class="fas fa-fire" style="color:#f97316;"></i> Best Deals in <?= !empty($user_city) ? htmlspecialchars($user_city) : 'Your City' ?>
+                <span class="badge bg-primary rounded-pill ms-2"><?= count($best_props) ?></span>
             </div>
-        <?php endif; ?>
+            
+            <?php if (count($best_props) > 0): ?>
+                <div class="row">
+                    <?php foreach ($best_props as $prop): ?>
+                        <?php renderDashboardCard($prop, false, false); ?>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="text-center text-muted py-4 bg-white rounded-4 shadow-sm border">
+                    <i class="fas fa-search" style="font-size:2rem; opacity:0.3;"></i>
+                    <p class="mt-2">No properties available in your city. Explore all properties.</p>
+                    <a href="index.php" class="btn btn-outline-primary btn-sm">View All Properties</a>
+                </div>
+            <?php endif; ?>
+
+        </div>
     </div>
 </div>
 
@@ -497,9 +248,7 @@ include 'header.php';
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center p-4">
-                <div id="propertyModalContent">
-                    <!-- Dynamic content -->
-                </div>
+                <div id="propertyModalContent"></div>
             </div>
             <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal"><i class="fas fa-undo-alt me-2"></i>Back to Spin</button>
@@ -509,14 +258,12 @@ include 'header.php';
     </div>
 </div>
 
-<!-- ====== 🔥 ADMIN NOTIFICATION POPUP – PREMIUM STYLE ====== -->
+<!-- ====== 🔥 ADMIN NOTIFICATION POPUP ====== -->
 <?php if ($notification): ?>
 <div class="modal fade premium-modal" id="notificationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
-            <!-- Sparkle Stars Container -->
             <div class="star-sparkle-container" id="sparkleContainer"></div>
-
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-crown me-2" style="color: #fbbf24;"></i><?= htmlspecialchars($notification['title']) ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -536,19 +283,12 @@ include 'header.php';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto show modal
     const modalElement = document.getElementById('notificationModal');
     if (modalElement) {
-        const myModal = new bootstrap.Modal(modalElement, {
-            backdrop: 'static',
-            keyboard: false
-        });
+        const myModal = new bootstrap.Modal(modalElement, { backdrop: 'static', keyboard: false });
         myModal.show();
-
-        // Generate sparkle stars
         generateSparkles();
     }
-
     function generateSparkles() {
         const container = document.getElementById('sparkleContainer');
         if (!container) return;
@@ -564,14 +304,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const size = 14 + Math.random() * 24;
             const duration = 2 + Math.random() * 4;
             const delay = Math.random() * 3;
-            star.style.cssText = `
-                left: ${left}%;
-                top: ${top}%;
-                font-size: ${size}px;
-                --duration: ${duration}s;
-                animation-delay: ${delay}s;
-                animation-duration: ${duration}s;
-            `;
+            star.style.cssText = `left: ${left}%; top: ${top}%; font-size: ${size}px; --duration: ${duration}s; animation-delay: ${delay}s; animation-duration: ${duration}s;`;
             container.appendChild(star);
         }
     }
@@ -579,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <?php endif; ?>
 
-<!-- ====== SPIN SCRIPT (existing) ====== -->
+<!-- ====== SPIN SCRIPT ====== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const spinBtn = document.getElementById('spinBtn');
@@ -588,10 +321,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const spinMessage = document.getElementById('spinMessage');
     const slotCoins = document.getElementById('slotCoins');
 
-    if (!spinBtn) {
-        console.log('Spin button not found');
-        return;
-    }
+    if (!spinBtn) return;
 
     let currentRotation = 0;
     let isSpinning = false;
@@ -613,13 +343,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         fetch('spin_ajax.php')
             .then(response => {
-                if (!response.ok) {
-                    throw new Error('HTTP error ' + response.status);
-                }
+                if (!response.ok) throw new Error('HTTP error ' + response.status);
                 return response.json();
             })
             .then(data => {
-                console.log('Spin response:', data);
                 wheel.classList.remove('pulse');
                 isSpinning = false;
 
@@ -635,9 +362,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const coinSpan = document.querySelector('.stat-card .stat-number');
                         if (coinSpan) {
                             let current = parseInt(coinSpan.textContent.replace(/,/g, ''));
-                            if (!isNaN(current)) {
-                                coinSpan.textContent = (current + data.coins).toLocaleString();
-                            }
+                            if (!isNaN(current)) coinSpan.textContent = (current + data.coins).toLocaleString();
                         }
                         if (data.spins_used >= 5) {
                             spinBtn.disabled = true;
@@ -650,6 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const isCar = (p.type && (p.type.toLowerCase().includes('car') || p.type.toLowerCase().includes('vehicle')));
                         const icon = isCar ? '🚗' : '🏠';
                         const imageHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;" alt="${p.title}">` : `<div style="height:150px; background:#1e293b; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#94a3b8;"><i class="fas fa-image fa-2x"></i></div>`;
+                        
                         const modalContent = document.getElementById('propertyModalContent');
                         if (modalContent) {
                             modalContent.innerHTML = `
@@ -664,15 +390,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                             `;
                             const viewLink = document.getElementById('viewPropertyLink');
-                            if (viewLink) {
-                                viewLink.href = `property_detail.php?id=${p.id}&source=auction`;
-                            }
+                            if (viewLink) viewLink.href = `property_detail.php?id=${p.id}&source=auction`;
+                            
                             const propertyModal = new bootstrap.Modal(document.getElementById('propertyModal'));
                             propertyModal.show();
                             spinMessage.innerHTML = data.message || '🏠 Check out this property!';
-                            propertyModal._element.addEventListener('hidden.bs.modal', function () {
-                                spinBtn.disabled = false;
-                            });
+                            propertyModal._element.addEventListener('hidden.bs.modal', function () { spinBtn.disabled = false; });
                         } else {
                             spinMessage.innerHTML = data.message || 'Spin done!';
                             spinBtn.disabled = false;
@@ -687,7 +410,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
-                console.error('Spin error:', error);
                 wheel.classList.remove('pulse');
                 spinMessage.innerHTML = '❌ Error spinning. Please try again.';
                 spinBtn.disabled = false;
@@ -710,6 +432,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function launchStarShower() {
         const container = document.createElement('div');
         container.className = 'star-shower-container';
+        container.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9999; overflow:hidden;';
         document.body.appendChild(container);
 
         const count = 130;
@@ -717,7 +440,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         for (let i = 0; i < count; i++) {
             const star = document.createElement('div');
-            star.className = 'star-shower';
             const size = 8 + Math.random() * 22;
             const left = Math.random() * 100;
             const duration = 1.5 + Math.random() * 2.8;
@@ -727,26 +449,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const starChar = Math.random() > 0.4 ? '★' : '✦';
             
             star.style.cssText = `
-                --duration: ${duration}s;
-                --delay: ${delay}s;
-                --color: ${color};
-                font-size: ${size}px;
-                color: ${color};
-                left: ${left}%;
-                transform: rotate(${rotation}deg);
+                position: absolute; top: -20px; pointer-events: none; animation: starFall ${duration}s ease-in ${delay}s forwards;
+                --color: ${color}; font-size: ${size}px; color: ${color}; left: ${left}%; transform: rotate(${rotation}deg);
+                text-shadow: 0 0 10px ${color}, 0 0 20px ${color};
             `;
             star.textContent = starChar;
             container.appendChild(star);
         }
 
-        const maxDuration = 3.0 + 1.6;
         setTimeout(() => {
-            if (container.parentNode) {
-                container.parentNode.removeChild(container);
-            }
-        }, maxDuration * 1000 + 500);
+            if (container.parentNode) container.parentNode.removeChild(container);
+        }, 4500);
     }
 });
 </script>
+<style>
+@keyframes starFall { 0% { opacity: 0; transform: translateY(-20px) rotate(0deg) scale(0.5); } 10% { opacity: 1; transform: translateY(10vh) rotate(36deg) scale(1); } 90% { opacity: 1; transform: translateY(90vh) rotate(360deg) scale(1); } 100% { opacity: 0; transform: translateY(100vh) rotate(400deg) scale(0.3); } }
+@keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
 
 <?php include 'footer.php'; ?>
