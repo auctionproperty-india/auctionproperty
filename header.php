@@ -44,6 +44,16 @@ if ($is_logged_in) {
     }
 }
 
+// 🔥 EXCHANGE NOTIFICATION FETCH (Normal Users ke liye)
+$unread_exchange_count = 0;
+if ($is_logged_in && $role == 'user') {
+    try {
+        $ns = $pdo->prepare("SELECT COUNT(*) FROM exchange_notifications WHERE owner_user_id=? AND is_read=FALSE");
+        $ns->execute([$_SESSION['user_id']]);
+        $unread_exchange_count = $ns->fetchColumn();
+    } catch (Exception $e) {}
+}
+
 // ---- Fetch navigation items (Menu Links) ----
 $nav_items = safeFetchAll($pdo, "SELECT * FROM navigation_items WHERE is_active = TRUE ORDER BY display_order");
 
@@ -1129,6 +1139,16 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 <?php endif; ?>
             </ul>
         </div>
+        <?php endif; ?>
+
+        <!-- Exchange Notification Bell for Users -->
+        <?php if ($role == 'user'): ?>
+            <a href="my_notifications.php" class="btn btn-light position-relative me-2" style="border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+                <i class="fas fa-bell" style="color:#1e293b; font-size:1.2rem;"></i>
+                <?php if($unread_exchange_count > 0): ?>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.65rem;"><?= $unread_exchange_count ?></span>
+                <?php endif; ?>
+            </a>
         <?php endif; ?>
     </div>
     <?php endif; ?>
