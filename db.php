@@ -16,13 +16,11 @@ date_default_timezone_set('Asia/Kolkata');
 // ============================================================
 $lifetime = 86400 * 90; // 90 days in seconds
 
-// ✅ These ini_set MUST run before session_start()
-// 🔥 FIX: Safe-guard so warnings never appear
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.gc_maxlifetime', $lifetime);
     ini_set('session.cookie_lifetime', $lifetime);
     ini_set('session.gc_probability', 1);
-    ini_set('session.gc_divisor', 1000);  // Run GC only 0.1% of requests
+    ini_set('session.gc_divisor', 1000);
     ini_set('session.use_strict_mode', 0);
     ini_set('session.use_cookies', 1);
     ini_set('session.use_only_cookies', 1);
@@ -45,7 +43,6 @@ try {
 // ============================================================
 // SAFE QUERY HELPERS
 // ============================================================
-
 if (!function_exists('safeQuery')) {
     function safeQuery($pdo, $sql, $params = []) {
         $maxRetries = 3;
@@ -137,7 +134,6 @@ if (!function_exists('safeExecute')) {
 // ============================================================
 // SESSION HANDLER INTEGRATION (URL-based Impersonation)
 // ============================================================
-
 $sessionHandlerFile = __DIR__ . '/session_handler.php';
 
 if (file_exists($sessionHandlerFile)) {
@@ -146,9 +142,7 @@ if (file_exists($sessionHandlerFile)) {
     if (class_exists('DatabaseSessionHandler')) {
         try {
             if (session_status() == PHP_SESSION_NONE) {
-
                 $imp_session_id = null;
-
                 if (isset($_GET['imp_session']) && !empty($_GET['imp_session'])) {
                     $imp_session_id = preg_replace('/[^a-f0-9]/', '', $_GET['imp_session']);
                 } elseif (isset($_POST['imp_session']) && !empty($_POST['imp_session'])) {
@@ -186,7 +180,6 @@ if (file_exists($sessionHandlerFile)) {
                         'samesite' => 'Lax'
                     ]);
                 }
-
                 session_start();
             }
         } catch (Exception $e) {
@@ -203,6 +196,62 @@ if (file_exists($sessionHandlerFile)) {
 } else {
     if (session_status() == PHP_SESSION_NONE) {
         session_start();
+    }
+}
+
+// ============================================================
+// ☁️ SUPABASE STORAGE HELPERS (Permanent File Storage)
+// ============================================================
+define('SUPABASE_URL', getenv('SUPABASE_URL') ?: '');
+define('SUPABASE_SERVICE_KEY', getenv('SUPABASE_SERVICE_KEY') ?: '');
+define('BUCKET_IMAGES', 'property-images');
+define('BUCKET_DOCS', 'property-docs');
+
+if (!function_exists('uploadAnyFile')) {
+    function uploadAnyFile($fileArray, $folderPrefix = 'user_props') {
+        if (!isset($fileArray) || $fileArray['error'] !== 0) return false;
+
+        $tmp  = $fileArray['tmp_name'];
+        $ext  = strtolower(pathinfo($fileArray['name'], PATHINFO_EXTENSION));
+        $mime = mime_content_type($tmp) ?: 'application/octet-stream';
+
+        if ($fileArray['size'] > 10 * 1024 * 1024) return ['error' => 'File too large (max 10MB)'];
+
+        $allowed_img = ['jpg','jpeg','png','webp','gif'];
+        $allowed_doc = ['pdf','doc','docx'];
+
+        if (in_array($ext, $allowed_img)) {
+            $bucket = BUCKET_IMAGES;
+        } elseif (in_array($ext, $allowed_doc)) {
+            $bucket = BUCKET_DOCS;
+        } else {
+            return ['error' => 'Only JPG, PNG, WEBP, PDF allowed'];
+        }
+
+        $remotePath = $folderPrefix . '/' . uniqid() . '_' . time() . '.' . $ext;
+        $url = rtrim(SUPABASE_URL, '/') . '/storage/v1/object/' . $bucket . '/' . $remotePath;
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST  => 'POST',
+            CURLOPT_POSTFIELDS     => file_get_contents($tmp),
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . SUPABASE_SERVICE_KEY,
+                'apikey: ' . SUPABASE_SERVICE_KEY,
+                'Content-Type: ' . $mime,
+                'x-upsert: true',
+            ],
+            CURLOPT_TIMEOUT => 60,
+        ]);
+        $response = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code >= 200 && $code < 300) {
+            return ['url' => rtrim(SUPABASE_URL, '/') . '/storage/v1/object/public/' . $bucket . '/' . $remotePath];
+        }
+        return ['error' => 'Upload failed. Check Supabase keys.'];
     }
 }
 ?>
