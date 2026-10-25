@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (Multi-Select + City Filter)
+// 👥 User Management – Admin Panel (Multi-Filter: Search, City, Ref Name, Package)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -101,7 +101,8 @@ if (isset($_GET['toggle_free_income']) && is_numeric($_GET['toggle_free_income']
 // ---- Filters ----
 $search = trim($_GET['search'] ?? '');
 $referral_filter = trim($_GET['referral_filter'] ?? 'all');
-$city_filter = trim($_GET['city_filter'] ?? ''); // 🔥 New City Filter
+$city_filter = trim($_GET['city_filter'] ?? '');
+$referrer_name_filter = trim($_GET['referrer_name'] ?? ''); // 🔥 New Referrer Name Filter
 
 // 🔥 Multi-select package filter
 $package_filters = $_GET['package_filter'] ?? [];
@@ -131,12 +132,19 @@ if (!empty($search)) {
     $search_params[] = '%' . $search . '%';
 }
 
-// 🔥 City Filter Logic
+// 🔥 City Filter
 if (!empty($city_filter)) {
     $search_condition .= " AND u.city ILIKE ?";
     $search_params[] = '%' . $city_filter . '%';
 }
 
+// 🔥 Referrer Name Filter (New)
+if (!empty($referrer_name_filter)) {
+    $search_condition .= " AND ref.name ILIKE ?";
+    $search_params[] = '%' . $referrer_name_filter . '%';
+}
+
+// Referral Type Filter
 if ($referral_filter == 'with_referrer') {
     $search_condition .= " AND u.referred_by IS NOT NULL";
 } elseif ($referral_filter == 'without_referrer') {
@@ -151,7 +159,7 @@ if (!empty($package_filters)) {
     $pkg_ids_selected = array_filter($package_filters, 'is_numeric');
 
     if ($free_selected) {
-        $pkg_or_conditions[] = "s.user_id IS NULL"; // no active subscription => free user
+        $pkg_or_conditions[] = "s.user_id IS NULL";
     }
     if ($none_selected) {
         $pkg_or_conditions[] = "s.user_id IS NULL";
@@ -202,7 +210,8 @@ $all_packages = $pdo->query("SELECT id, name FROM packages ORDER BY name ASC")->
 // 🔥 Build preserve QS for toggle/delete links
 $preserve_params = [];
 if (!empty($search)) $preserve_params[] = 'search=' . urlencode($search);
-if (!empty($city_filter)) $preserve_params[] = 'city_filter=' . urlencode($city_filter); // Preserve City
+if (!empty($city_filter)) $preserve_params[] = 'city_filter=' . urlencode($city_filter);
+if (!empty($referrer_name_filter)) $preserve_params[] = 'referrer_name=' . urlencode($referrer_name_filter); // Added
 if ($referral_filter != 'all') $preserve_params[] = 'referral_filter=' . urlencode($referral_filter);
 foreach ($package_filters as $pf) {
     $preserve_params[] = 'package_filter[]=' . urlencode($pf);
@@ -303,7 +312,7 @@ include 'header.php';
         border-radius: 30px;
         padding: 8px 18px;
         border: 1px solid #e2e8f0;
-        min-width: 180px;
+        min-width: 150px;
         font-size: 0.85rem;
     }
     .search-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
@@ -313,7 +322,7 @@ include 'header.php';
         border: 1px solid #e2e8f0;
         background: #fff;
         font-size: 0.85rem;
-        min-width: 160px;
+        min-width: 140px;
     }
     .search-box select:focus { outline: none; border-color: #2563eb; }
     .filter-label {
@@ -439,8 +448,9 @@ include 'header.php';
         .user-table th { font-size: 0.62rem; padding: 8px 5px; }
         .user-table td { padding: 8px 5px; }
         .search-box input[type="text"],
-        .search-box select { min-width: 130px; font-size: 0.78rem; }
-        .multi-select-btn { min-width: 160px; font-size: 0.78rem; }
+        .search-box select { min-width: 100%; font-size: 0.78rem; }
+        .multi-select-btn { min-width: 100%; font-size: 0.78rem; }
+        .multi-select-wrap { width: 100%; }
     }
 </style>
 
@@ -455,15 +465,18 @@ include 'header.php';
         <form method="GET" class="d-flex gap-2 flex-wrap align-items-center w-100" id="filterForm">
             <input type="text" name="search" placeholder="🔍 Search name, email..." value="<?= htmlspecialchars($search ?? '') ?>">
             
-            <!-- 🔥 City Filter Added Here -->
             <span class="filter-label"><i class="fas fa-map-marker-alt"></i> City:</span>
             <input type="text" name="city_filter" placeholder="Enter City..." value="<?= htmlspecialchars($city_filter ?? '') ?>">
 
-            <span class="filter-label"><i class="fas fa-user-tag"></i> Referrer:</span>
+            <!-- 🔥 Referrer Name Filter (New) -->
+            <span class="filter-label"><i class="fas fa-user-friends"></i> Ref Name:</span>
+            <input type="text" name="referrer_name" placeholder="Referrer Name..." value="<?= htmlspecialchars($referrer_name_filter ?? '') ?>">
+
+            <span class="filter-label"><i class="fas fa-user-tag"></i> Type:</span>
             <select name="referral_filter">
                 <option value="all" <?= ($referral_filter == 'all') ? 'selected' : '' ?>>All Users</option>
                 <option value="with_referrer" <?= ($referral_filter == 'with_referrer') ? 'selected' : '' ?>>With Referrer</option>
-                <option value="without_referrer" <?= ($referral_filter == 'without_referrer') ? 'selected' : '' ?>>⚠️ Without Referrer</option>
+                <option value="without_referrer" <?= ($referral_filter == 'without_referrer') ? 'selected' : '' ?>>⚠️ Without</option>
             </select>
 
             <span class="filter-label"><i class="fas fa-box"></i> Packages:</span>
@@ -526,7 +539,7 @@ include 'header.php';
             </div>
 
             <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3"><i class="fas fa-search"></i> Apply</button>
-            <?php if (!empty($search) || $referral_filter != 'all' || !empty($package_filters) || !empty($city_filter)): ?>
+            <?php if (!empty($search) || $referral_filter != 'all' || !empty($package_filters) || !empty($city_filter) || !empty($referrer_name_filter)): ?>
                 <a href="users.php" class="btn btn-secondary btn-sm rounded-pill px-3"><i class="fas fa-times"></i> Clear</a>
             <?php endif; ?>
         </form>
@@ -547,7 +560,7 @@ include 'header.php';
                         <th>ID</th>
                         <th>User</th>
                         <th>Contact</th>
-                        <th>City</th> <!-- 🔥 New Column Added -->
+                        <th>City</th>
                         <th>Coins</th>
                         <th>Referrer</th>
                         <th>Dates</th>
@@ -560,7 +573,7 @@ include 'header.php';
                 </thead>
                 <tbody>
                     <?php if (empty($users)): ?>
-                        <tr><td colspan="12" class="text-center text-muted py-4">No users found.</td></tr> <!-- Colspan Updated to 12 -->
+                        <tr><td colspan="12" class="text-center text-muted py-4">No users found.</td></tr>
                     <?php endif; ?>
 
                     <?php foreach ($users as $user): ?>
@@ -582,7 +595,6 @@ include 'header.php';
                             </div>
                         </td>
 
-                        <!-- 🔥 City Data Added Here -->
                         <td>
                             <span class="badge bg-light text-dark border" style="font-size:0.75rem; padding: 4px 10px; border-radius: 20px;">
                                 <i class="fas fa-map-marker-alt text-danger"></i> <?= htmlspecialchars(cleanDisplayValue($user['city'] ?? '', 'N/A')) ?>
