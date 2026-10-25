@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – Today, Upcoming & Past (All Properties)
+// 👤 User Dashboard – Today, Upcoming & Past + Fixed Counts
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -36,12 +36,14 @@ if (!is_array($search_types)) {
 $search_types = array_values(array_filter($search_types, function($t) { return $t !== ''; }));
 
 // ============================================================
-// 🔥 COUNTERS (Restored Customer & Exchange Totals)
+// 🔥 COUNTERS & TOTALS (Fixed Logic)
 // ============================================================
 $count_city_str = '%' . $user_city . '%';
+
+// 1. User City Counts (For Dashboard)
 $total_city = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND city ILIKE ?");
 $total_city->execute([$count_city_str]);
-$count_total = $total_city->fetchColumn();
+$count_total_city = $total_city->fetchColumn();
 
 $total_today = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND city ILIKE ? AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty')");
 $total_today->execute([$count_city_str]);
@@ -51,9 +53,10 @@ $total_past = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'ava
 $total_past->execute([$count_city_str]);
 $count_past = $total_past->fetchColumn();
 
-// 🔥 Total Customer & Exchange Properties (Yeh Miss Ho Gaya Tha)
-$total_customer = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL)")->fetchColumn();
-$total_exchange = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange'")->fetchColumn();
+// 2. Global Counts (For All Properties View)
+$global_auction = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'available'")->fetchColumn();
+$global_customer = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL)")->fetchColumn();
+$global_exchange = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange'")->fetchColumn();
 
 // ---- Fetch Properties Lists ----
 $today_props = [];
@@ -62,23 +65,23 @@ $past_props = [];
 $all_props = [];
 
 if ($view == 'dashboard') {
-    // TODAY'S AUCTIONS
+    // TODAY'S AUCTIONS (No Limit)
     $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC");
     $stmt->execute([$count_city_str]);
     $today_props = $stmt->fetchAll();
 
-    // UPCOMING AUCTIONS
+    // UPCOMING AUCTIONS (No Limit)
     $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY price ASC");
     $stmt->execute([$count_city_str]);
     $upcoming_props = $stmt->fetchAll();
 
-    // PAST AUCTIONS
+    // PAST AUCTIONS (No Limit)
     $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC");
     $stmt->execute([$count_city_str]);
     $past_props = $stmt->fetchAll();
 
 } else {
-    // ALL PROPERTIES VIEW
+    // ALL PROPERTIES VIEW (Filtered by Search)
     $common_where = "";
     $params = [];
 
@@ -270,19 +273,19 @@ include 'header.php';
             <li class="nav-item">
                 <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?view=all&tab=auction&city=<?= urlencode($search_city) ?>">
                     <i class="fas fa-gavel me-2"></i>Auction
-                    <span class="badge-count"><?= $count_total ?></span>
+                    <span class="badge-count"><?= $global_auction ?></span> <!-- Global Count -->
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?view=all&tab=customer&city=<?= urlencode($search_city) ?>">
                     <i class="fas fa-home me-2"></i>Customer
-                    <span class="badge-count"><?= $total_customer ?></span>
+                    <span class="badge-count"><?= $global_customer ?></span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link <?= ($tab=='exchange')?'active':'' ?>" href="?view=all&tab=exchange&city=<?= urlencode($search_city) ?>">
                     <i class="fas fa-exchange-alt me-2"></i>Exchange
-                    <span class="badge-count"><?= $total_exchange ?></span>
+                    <span class="badge-count"><?= $global_exchange ?></span>
                 </a>
             </li>
         </ul>
@@ -323,7 +326,7 @@ include 'header.php';
                     <h5 class="mb-0 fw-bold text-dark"><?= htmlspecialchars($user_city ?: 'Your City') ?></h5>
                 </div>
                 <div class="d-flex gap-2 flex-wrap mt-2 mt-md-0">
-                    <span class="badge bg-primary fs-6 rounded-pill px-3 py-2">Total: <?= $count_total ?></span>
+                    <span class="badge bg-primary fs-6 rounded-pill px-3 py-2">Total: <?= $count_total_city ?></span>
                     <span class="badge bg-danger fs-6 rounded-pill px-3 py-2">Today: <?= $count_today ?></span>
                     <span class="badge bg-secondary fs-6 rounded-pill px-3 py-2">Past: <?= $count_past ?></span>
                     <a href="user_dashboard.php?view=all&tab=auction" class="btn btn-sm btn-outline-primary fw-bold ms-2" style="border-radius:20px;">More Properties <i class="fas fa-arrow-right ms-1"></i></a>
