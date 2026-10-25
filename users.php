@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 User Management – Admin Panel (Multi-Select Package Filter)
+// 👥 User Management – Admin Panel (Multi-Select + City Filter)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -101,6 +101,7 @@ if (isset($_GET['toggle_free_income']) && is_numeric($_GET['toggle_free_income']
 // ---- Filters ----
 $search = trim($_GET['search'] ?? '');
 $referral_filter = trim($_GET['referral_filter'] ?? 'all');
+$city_filter = trim($_GET['city_filter'] ?? ''); // 🔥 New City Filter
 
 // 🔥 Multi-select package filter
 $package_filters = $_GET['package_filter'] ?? [];
@@ -128,6 +129,12 @@ if (!empty($search)) {
     $search_params[] = '%' . $search . '%';
     $search_params[] = '%' . $search . '%';
     $search_params[] = '%' . $search . '%';
+}
+
+// 🔥 City Filter Logic
+if (!empty($city_filter)) {
+    $search_condition .= " AND u.city ILIKE ?";
+    $search_params[] = '%' . $city_filter . '%';
 }
 
 if ($referral_filter == 'with_referrer') {
@@ -195,6 +202,7 @@ $all_packages = $pdo->query("SELECT id, name FROM packages ORDER BY name ASC")->
 // 🔥 Build preserve QS for toggle/delete links
 $preserve_params = [];
 if (!empty($search)) $preserve_params[] = 'search=' . urlencode($search);
+if (!empty($city_filter)) $preserve_params[] = 'city_filter=' . urlencode($city_filter); // Preserve City
 if ($referral_filter != 'all') $preserve_params[] = 'referral_filter=' . urlencode($referral_filter);
 foreach ($package_filters as $pf) {
     $preserve_params[] = 'package_filter[]=' . urlencode($pf);
@@ -295,7 +303,7 @@ include 'header.php';
         border-radius: 30px;
         padding: 8px 18px;
         border: 1px solid #e2e8f0;
-        min-width: 200px;
+        min-width: 180px;
         font-size: 0.85rem;
     }
     .search-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
@@ -445,7 +453,11 @@ include 'header.php';
     <!-- 🔥 SEARCH + FILTERS -->
     <div class="search-box">
         <form method="GET" class="d-flex gap-2 flex-wrap align-items-center w-100" id="filterForm">
-            <input type="text" name="search" placeholder="🔍 Search name, email, phone..." value="<?= htmlspecialchars($search ?? '') ?>">
+            <input type="text" name="search" placeholder="🔍 Search name, email..." value="<?= htmlspecialchars($search ?? '') ?>">
+            
+            <!-- 🔥 City Filter Added Here -->
+            <span class="filter-label"><i class="fas fa-map-marker-alt"></i> City:</span>
+            <input type="text" name="city_filter" placeholder="Enter City..." value="<?= htmlspecialchars($city_filter ?? '') ?>">
 
             <span class="filter-label"><i class="fas fa-user-tag"></i> Referrer:</span>
             <select name="referral_filter">
@@ -514,7 +526,7 @@ include 'header.php';
             </div>
 
             <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3"><i class="fas fa-search"></i> Apply</button>
-            <?php if (!empty($search) || $referral_filter != 'all' || !empty($package_filters)): ?>
+            <?php if (!empty($search) || $referral_filter != 'all' || !empty($package_filters) || !empty($city_filter)): ?>
                 <a href="users.php" class="btn btn-secondary btn-sm rounded-pill px-3"><i class="fas fa-times"></i> Clear</a>
             <?php endif; ?>
         </form>
@@ -535,6 +547,7 @@ include 'header.php';
                         <th>ID</th>
                         <th>User</th>
                         <th>Contact</th>
+                        <th>City</th> <!-- 🔥 New Column Added -->
                         <th>Coins</th>
                         <th>Referrer</th>
                         <th>Dates</th>
@@ -547,7 +560,7 @@ include 'header.php';
                 </thead>
                 <tbody>
                     <?php if (empty($users)): ?>
-                        <tr><td colspan="11" class="text-center text-muted py-4">No users found.</td></tr>
+                        <tr><td colspan="12" class="text-center text-muted py-4">No users found.</td></tr> <!-- Colspan Updated to 12 -->
                     <?php endif; ?>
 
                     <?php foreach ($users as $user): ?>
@@ -567,6 +580,13 @@ include 'header.php';
                             <div style="font-size: 0.78rem;">
                                 <?= htmlspecialchars(cleanDisplayValue($user['phone'] ?? '', 'N/A')) ?>
                             </div>
+                        </td>
+
+                        <!-- 🔥 City Data Added Here -->
+                        <td>
+                            <span class="badge bg-light text-dark border" style="font-size:0.75rem; padding: 4px 10px; border-radius: 20px;">
+                                <i class="fas fa-map-marker-alt text-danger"></i> <?= htmlspecialchars(cleanDisplayValue($user['city'] ?? '', 'N/A')) ?>
+                            </span>
                         </td>
 
                         <td>
