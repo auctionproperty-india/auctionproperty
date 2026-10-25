@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – World-Class Property Cards
+// 👤 User Dashboard – Today, Upcoming & Past (All Properties)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -35,64 +35,74 @@ if (!is_array($search_types)) {
 }
 $search_types = array_values(array_filter($search_types, function($t) { return $t !== ''; }));
 
-// ---- Fetch Property Data ----
-$display_props = [];
-$total_auction = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'available'")->fetchColumn();
-$total_customer = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL)")->fetchColumn();
-$total_exchange = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange'")->fetchColumn();
+// ============================================================
+// 🔥 COUNTERS FOR USER CITY
+// ============================================================
+$count_city_str = '%' . $user_city . '%';
+$total_city = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND city ILIKE ?");
+$total_city->execute([$count_city_str]);
+$count_total = $total_city->fetchColumn();
+
+$total_today = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND city ILIKE ? AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty')");
+$total_today->execute([$count_city_str]);
+$count_today = $total_today->fetchColumn();
+
+$total_past = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty')");
+$total_past->execute([$count_city_str]);
+$count_past = $total_past->fetchColumn();
+
+// ---- Fetch Properties Lists ----
+$today_props = [];
+$upcoming_props = [];
+$past_props = [];
+$all_props = [];
 
 if ($view == 'dashboard') {
-    // 🔥 DASHBOARD VIEW: Only 12 lowest price UPCOMING properties in user's city
-    $sql = "SELECT *, 'auction' as source FROM properties 
-            WHERE status = 'available' 
-            AND city ILIKE ? 
-            AND (auction_date >= CURRENT_DATE OR auction_start_time = 'Private Treaty') 
-            ORDER BY price ASC LIMIT 12";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute(['%' . $user_city . '%']);
-    $display_props = $stmt->fetchAll();
+    // 🔥 TODAY'S AUCTIONS (All)
+    $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC");
+    $stmt->execute([$count_city_str]);
+    $today_props = $stmt->fetchAll();
+
+    // 🔥 UPCOMING AUCTIONS (All)
+    $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY price ASC");
+    $stmt->execute([$count_city_str]);
+    $upcoming_props = $stmt->fetchAll();
+
+    // 🔥 PAST AUCTIONS (All)
+    $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC");
+    $stmt->execute([$count_city_str]);
+    $past_props = $stmt->fetchAll();
+
 } else {
-    // 🔥 ALL PROPERTIES VIEW: Show everything based on tab & filters
+    // 🔥 ALL PROPERTIES VIEW
     $common_where = "";
     $params = [];
 
-    if(!empty($search_city)) {
-        $common_where .= " AND city ILIKE ?";
-        $params[] = '%' . $search_city . '%';
-    }
-    if(!empty($search_locality)) {
-        $common_where .= " AND locality ILIKE ?";
-        $params[] = '%' . $search_locality . '%';
-    }
+    if(!empty($search_city)) { $common_where .= " AND city ILIKE ?"; $params[] = '%' . $search_city . '%'; }
+    if(!empty($search_locality)) { $common_where .= " AND locality ILIKE ?"; $params[] = '%' . $search_locality . '%'; }
     if(!empty($search_types)) {
         $ph = implode(',', array_fill(0, count($search_types), '?'));
         $common_where .= " AND type IN ($ph)";
         foreach ($search_types as $t) $params[] = $t;
     }
-    if(!empty($search_min_price)) {
-        $common_where .= " AND price >= ?";
-        $params[] = (float)$search_min_price;
-    }
-    if(!empty($search_max_price)) {
-        $common_where .= " AND price <= ?";
-        $params[] = (float)$search_max_price;
-    }
+    if(!empty($search_min_price)) { $common_where .= " AND price >= ?"; $params[] = (float)$search_min_price; }
+    if(!empty($search_max_price)) { $common_where .= " AND price <= ?"; $params[] = (float)$search_max_price; }
 
     if ($tab == 'auction') {
         $sql = "SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY id DESC"; 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
-        $display_props = $stmt->fetchAll();
+        $all_props = $stmt->fetchAll();
     } elseif ($tab == 'customer') {
         $sql = "SELECT *, 'customer' as source FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where ORDER BY created_at DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
-        $display_props = $stmt->fetchAll();
+        $all_props = $stmt->fetchAll();
     } elseif ($tab == 'exchange') {
         $sql = "SELECT *, 'exchange' as source FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where ORDER BY created_at DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
-        $display_props = $stmt->fetchAll();
+        $all_props = $stmt->fetchAll();
     }
 }
 
@@ -102,7 +112,7 @@ $notification = $notif_stmt->fetch();
 
 $all_types = ['Flat','Plot','Shop','Land','House','Land & Building','Car/Vehicle','Commercial','Office','Row House','Bungalow','Other'];
 
-// ---- 🔥 UPDATED Render property card (World-Class Look) ----
+// ---- Render property card (World-Class Look) ----
 function renderDashboardCard($prop, $tab = 'auction') {
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'],
@@ -125,44 +135,39 @@ function renderDashboardCard($prop, $tab = 'auction') {
             <?php endif; ?>
             
             <div class="card-body p-4 d-flex flex-column">
-                
-                <!-- 1. Header: Bank Badge & Date Box -->
+                <!-- Header: Bank & Date -->
                 <div class="d-flex justify-content-between align-items-start mb-3 gap-2">
-                    
-                    <!-- Bank Badge (Truncated if too long) -->
                     <div style="flex: 1; min-width: 0;">
-                        <span class="d-inline-block text-truncate w-100" style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:rgba(255,255,255,0.15); padding:6px 12px; border-radius:8px; color:<?= $text_color ?>; backdrop-filter:blur(4px);">
+                        <span class="d-inline-block text-truncate w-100" style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:rgba(255,255,255,0.15); padding:6px 12px; border-radius:8px; color:<?= $text_color ?>;">
                             🏦 <?= htmlspecialchars($prop['bank_name'] ?? ($tab == 'auction' ? 'Bank' : 'User')) ?>
                         </span>
                     </div>
-                    
-                    <!-- Date Box -->
                     <?php if($tab == 'auction' && !empty($prop['auction_date']) && $prop['auction_start_time'] != 'Private Treaty'): ?>
                         <div style="flex-shrink: 0; text-align: center; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 4px 10px; min-width: 75px;">
-                            <div style="font-size:0.55rem; text-transform:uppercase; opacity:0.8; letter-spacing:0.5px; font-weight:700;">Auction Date</div>
+                            <div style="font-size:0.55rem; text-transform:uppercase; opacity:0.8; font-weight:700;">Auction Date</div>
                             <div style="font-size:0.85rem; font-weight:800; margin-top:1px;"><i class="far fa-calendar-alt"></i> <?= date('d M Y', strtotime($prop['auction_date'])) ?></div>
                         </div>
                     <?php endif; ?>
                 </div>
 
-                <!-- 2. Title (Fixed height for uniform cards) -->
+                <!-- Title -->
                 <h5 class="fw-bold mb-3" style="font-size:1.15rem; line-height:1.35; min-height:2.7em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;" title="<?= htmlspecialchars($prop['title']) ?>">
                     <?= htmlspecialchars($prop['title']) ?>
                 </h5>
 
-                <div class="mt-auto"> <!-- Pushes content below to bottom if title is short -->
-                    <!-- 3. Price Section -->
+                <div class="mt-auto">
+                    <!-- Price -->
                     <div class="mb-2">
                         <div style="font-size:0.65rem; text-transform:uppercase; opacity:0.75; letter-spacing:1px; font-weight:700;">Reserve Price</div>
                         <div style="font-size:1.7rem; font-weight:900; letter-spacing:-0.5px;">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
                     </div>
                     
-                    <!-- 4. City Section -->
+                    <!-- City -->
                     <div class="mb-4 d-flex align-items-center gap-2" style="font-size:1.05rem; font-weight:700; opacity:0.95;">
                         <i class="fas fa-map-marker-alt" style="color:#fbbf24; font-size:1.1rem;"></i> <?= htmlspecialchars($prop['city'] ?? '') ?>
                     </div>
                     
-                    <!-- 5. Action Button -->
+                    <!-- Button -->
                     <div>
                         <?php if($tab == 'exchange'): ?>
                             <a href="exchange_interest.php?id=<?= $prop['id'] ?>" class="btn w-100" style="background:#fbbf24; color:#000; font-weight:800; border-radius:12px; padding:10px;" onclick="return confirm('Owner को notification भेजें?')">🤝 I'm Interested</a>
@@ -207,7 +212,7 @@ include 'header.php';
 <div class="container-fluid mt-2">
     
     <?php if ($view == 'all'): ?>
-        <!-- 🔥 SEARCH BOX (Only in 'All' view) -->
+        <!-- SEARCH BOX (All View) -->
         <div class="search-box">
             <form method="GET" class="row g-3 align-items-center">
                 <input type="hidden" name="view" value="all">
@@ -256,12 +261,12 @@ include 'header.php';
             </form>
         </div>
 
-        <!-- 🔥 TABS (Only in 'All' view) -->
+        <!-- TABS (All View) -->
         <ul class="nav nav-tabs mb-4">
             <li class="nav-item">
                 <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?view=all&tab=auction&city=<?= urlencode($search_city) ?>">
                     <i class="fas fa-gavel me-2"></i>Auction
-                    <span class="badge-count"><?= $total_auction ?></span>
+                    <span class="badge-count"><?= $count_total ?></span>
                 </a>
             </li>
             <li class="nav-item">
@@ -272,50 +277,84 @@ include 'header.php';
             </li>
             <li class="nav-item">
                 <a class="nav-link <?= ($tab=='exchange')?'active':'' ?>" href="?view=all&tab=exchange&city=<?= urlencode($search_city) ?>">
-                    <i class="fas fa-exchange-alt me-2"></i>Exchange (All India)
+                    <i class="fas fa-exchange-alt me-2"></i>Exchange
                     <span class="badge-count"><?= $total_exchange ?></span>
                 </a>
             </li>
         </ul>
-    <?php endif; ?>
 
-    <!-- Title & More Properties Button -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold m-0">
-            <i class="fas fa-gavel text-danger"></i> 
-            <?php if ($view == 'dashboard'): ?>
-                Upcoming Auctions in <?= htmlspecialchars($user_city ?: 'Your City') ?>
-            <?php else: ?>
-                All <?= ucfirst($tab) ?> Properties
-            <?php endif; ?>
-            <span class="badge bg-primary rounded-pill ms-2"><?= count($display_props) ?></span>
-        </h5>
-        
-        <?php if ($view == 'dashboard'): ?>
-            <!-- 🔥 More Properties Button -->
-            <a href="user_dashboard.php?view=all&tab=auction" class="btn btn-outline-primary fw-bold" style="border-radius:20px;">
-                More Properties <i class="fas fa-arrow-right ms-1"></i>
-            </a>
-        <?php else: ?>
+        <!-- ALL PROPERTIES GRID -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold m-0">
+                <i class="fas fa-building text-primary"></i> All <?= ucfirst($tab) ?> Properties
+                <span class="badge bg-primary rounded-pill ms-2"><?= count($all_props) ?></span>
+            </h5>
             <a href="user_dashboard.php" class="btn btn-outline-secondary fw-bold" style="border-radius:20px;">
                 <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
             </a>
+        </div>
+        
+        <?php if (count($all_props) > 0): ?>
+            <div class="row">
+                <?php foreach ($all_props as $prop): ?>
+                    <?php renderDashboardCard($prop, $tab); ?>
+                <?php endforeach; ?>
+            </div>
+        <?php else: ?>
+            <div class="alert alert-light border text-center py-5" style="border-radius:20px;">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="fw-bold">No properties found</h5>
+                <p class="text-muted">Try adjusting your search filters or search in a different city.</p>
+            </div>
         <?php endif; ?>
-    </div>
-    
-    <!-- Property Grid -->
-    <?php if (count($display_props) > 0): ?>
-        <div class="row">
-            <?php foreach ($display_props as $prop): ?>
-                <?php renderDashboardCard($prop, $view == 'dashboard' ? 'auction' : $tab); ?>
-            <?php endforeach; ?>
-        </div>
+
     <?php else: ?>
-        <div class="alert alert-light border text-center py-5" style="border-radius:20px;">
-            <i class="fas fa-search fa-3x text-muted mb-3"></i>
-            <h5 class="fw-bold">No properties found</h5>
-            <p class="text-muted">Try adjusting your search filters or search in a different city.</p>
+        <!-- 🔥 DASHBOARD VIEW (Today, Upcoming, Past) -->
+        
+        <!-- COUNTERS ROW -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; background: #fff;">
+            <div class="card-body d-flex flex-wrap justify-content-between align-items-center py-3">
+                <div class="d-flex gap-2 align-items-center">
+                    <i class="fas fa-city text-primary fs-4"></i>
+                    <h5 class="mb-0 fw-bold text-dark"><?= htmlspecialchars($user_city ?: 'Your City') ?></h5>
+                </div>
+                <div class="d-flex gap-2 flex-wrap mt-2 mt-md-0">
+                    <span class="badge bg-primary fs-6 rounded-pill px-3 py-2">Total: <?= $count_total ?></span>
+                    <span class="badge bg-danger fs-6 rounded-pill px-3 py-2">Today: <?= $count_today ?></span>
+                    <span class="badge bg-secondary fs-6 rounded-pill px-3 py-2">Past: <?= $count_past ?></span>
+                    <a href="user_dashboard.php?view=all&tab=auction" class="btn btn-sm btn-outline-primary fw-bold ms-2" style="border-radius:20px;">More Properties <i class="fas fa-arrow-right ms-1"></i></a>
+                </div>
+            </div>
         </div>
+
+        <!-- 1. TODAY'S AUCTIONS -->
+        <div class="section-title"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span></div>
+        <?php if(count($today_props) > 0): ?>
+            <div class="row"><?php foreach($today_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
+        <?php else: ?>
+            <div class="alert alert-light border text-center py-4 mb-4" style="border-radius:20px;"><p class="mb-0 text-muted fw-bold">📭 No auction today</p></div>
+        <?php endif; ?>
+
+        <hr class="my-5">
+
+        <!-- 2. UPCOMING AUCTIONS -->
+        <div class="section-title"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span></div>
+        <?php if(count($upcoming_props) > 0): ?>
+            <div class="row"><?php foreach($upcoming_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
+        <?php else: ?>
+            <div class="alert alert-light border text-center py-4 mb-4" style="border-radius:20px;"><p class="mb-0 text-muted fw-bold">📅 No upcoming auctions</p></div>
+        <?php endif; ?>
+
+        <hr class="my-5">
+
+        <!-- 3. PAST AUCTIONS -->
+        <div class="section-title"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions <span class="badge bg-secondary rounded-pill ms-2"><?= count($past_props) ?></span></div>
+        <?php if(count($past_props) > 0): ?>
+            <div class="row"><?php foreach($past_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
+        <?php else: ?>
+            <div class="alert alert-light border text-center py-4" style="border-radius:20px;"><p class="mb-0 text-muted fw-bold">📭 No past auctions</p></div>
+        <?php endif; ?>
+
     <?php endif; ?>
 
 </div>
