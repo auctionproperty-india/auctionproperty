@@ -36,7 +36,7 @@ if (!is_array($search_types)) {
 $search_types = array_values(array_filter($search_types, function($t) { return $t !== ''; }));
 
 // ============================================================
-// 🔥 COUNTERS FOR USER CITY
+// 🔥 COUNTERS (Restored Customer & Exchange Totals)
 // ============================================================
 $count_city_str = '%' . $user_city . '%';
 $total_city = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND city ILIKE ?");
@@ -51,6 +51,10 @@ $total_past = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'ava
 $total_past->execute([$count_city_str]);
 $count_past = $total_past->fetchColumn();
 
+// 🔥 Total Customer & Exchange Properties (Yeh Miss Ho Gaya Tha)
+$total_customer = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL)")->fetchColumn();
+$total_exchange = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange'")->fetchColumn();
+
 // ---- Fetch Properties Lists ----
 $today_props = [];
 $upcoming_props = [];
@@ -58,23 +62,23 @@ $past_props = [];
 $all_props = [];
 
 if ($view == 'dashboard') {
-    // 🔥 TODAY'S AUCTIONS (All)
+    // TODAY'S AUCTIONS
     $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') ORDER BY id DESC");
     $stmt->execute([$count_city_str]);
     $today_props = $stmt->fetchAll();
 
-    // 🔥 UPCOMING AUCTIONS (All)
+    // UPCOMING AUCTIONS
     $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY price ASC");
     $stmt->execute([$count_city_str]);
     $upcoming_props = $stmt->fetchAll();
 
-    // 🔥 PAST AUCTIONS (All)
+    // PAST AUCTIONS
     $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND city ILIKE ? AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') ORDER BY id DESC");
     $stmt->execute([$count_city_str]);
     $past_props = $stmt->fetchAll();
 
 } else {
-    // 🔥 ALL PROPERTIES VIEW
+    // ALL PROPERTIES VIEW
     $common_where = "";
     $params = [];
 
@@ -112,7 +116,7 @@ $notification = $notif_stmt->fetch();
 
 $all_types = ['Flat','Plot','Shop','Land','House','Land & Building','Car/Vehicle','Commercial','Office','Row House','Bungalow','Other'];
 
-// ---- Render property card (World-Class Look) ----
+// ---- Render property card ----
 function renderDashboardCard($prop, $tab = 'auction') {
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'],
