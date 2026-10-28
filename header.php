@@ -6,6 +6,11 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
+// 🛡️ SECURITY: Block Bad Bots & Rate Limiting
+// यह पूरी वेबसाइट पर लागू होगा क्योंकि header हर पेज में शामिल होता है
+blockBadBots();
+checkRateLimit(60, 60); // 60 requests per 60 seconds (1 minute)
+
 $current_page = basename($_SERVER['PHP_SELF']);
 $hide_top_nav = !in_array($current_page, ['index.php', 'login.php', 'register.php']);
 
