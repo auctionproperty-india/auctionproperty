@@ -7,6 +7,10 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
+// 🛡️ SECURITY: Block Bad Bots & Rate Limiting
+blockBadBots();
+checkRateLimit(30, 60); // 30 requests per 60 seconds
+
 if(!isset($_SESSION['user_id'])) { 
     header("Location: login.php"); 
     exit; 
