@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// functions.php – Complete with Pending MLM Logic
+// functions.php – Complete with Pending MLM Logic & Security
 // ============================================================
 
 // ---- Currency ----
@@ -907,5 +907,47 @@ function getTeamTurnover($pdo, $user_id) {
         $total += getTeamTurnover($pdo, $downline_id);
     }
     return $total;
+}
+
+// ============================================================
+// 🛡️ SECURITY: BOT PROTECTION & RATE LIMITING
+// ============================================================
+
+/**
+ * Blocks known bad bots/scrapers based on User-Agent.
+ */
+function blockBadBots() {
+    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $badBots = ['SemrushBot', 'AhrefsBot', 'MJ12bot', 'DotBot', 'BLEXBot', 'DataForSeoBot', 'ZoominfoBot', 'Screaming Frog'];
+    foreach ($badBots as $bot) {
+        if (stripos($userAgent, $bot) !== false) {
+            http_response_code(403);
+            die("Access Denied. Bots are not allowed.");
+        }
+    }
+}
+
+/**
+ * Limits the number of requests from a single IP address within a timeframe.
+ */
+function checkRateLimit($limit = 30, $timeWindow = 60) {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    // Skip rate limiting for localhost to avoid issues in development
+    if ($ip === '127.0.0.1' || $ip === '::1') return;
+
+    $file = sys_get_temp_dir() . '/rl_' . md5($ip);
+    $data = file_exists($file) ? json_decode(file_get_contents($file), true) : ['count' => 0, 'start' => time()];
+
+    if (time() - $data['start'] > $timeWindow) {
+        $data = ['count' => 1, 'start' => time()];
+    } else {
+        $data['count']++;
+    }
+    file_put_contents($file, json_encode($data));
+
+    if ($data['count'] > $limit) {
+        http_response_code(429); // Too Many Requests
+        die("Too Many Requests. Please try again later.");
+    }
 }
 ?>
