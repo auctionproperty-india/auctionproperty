@@ -18,14 +18,15 @@ $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch();
 
-// Personal update
+// Personal update (Now only Phone can be updated)
 if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_personal'])) {
-    $name = trim($_POST['name']);
     $phone = trim($_POST['phone']);
-    $city = trim($_POST['city']);
-    $state = trim($_POST['state']);
-    $pdo->prepare("UPDATE users SET name = ?, phone = ?, city = ?, state = ? WHERE id = ?")->execute([$name, $phone, $city, $state, $user_id]);
-    $message = "✅ Personal details updated!";
+    
+    // 🔥 Only updating phone. Name, City, State are locked from registration.
+    $pdo->prepare("UPDATE users SET phone = ? WHERE id = ?")->execute([$phone, $user_id]);
+    $message = "✅ Phone number updated successfully!";
+    
+    // Refresh data
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $user = $stmt->fetch();
@@ -68,6 +69,7 @@ $kyc_docs = $kyc_docs->fetchAll();
 <style>
     .profile-section { background: white; border-radius: 24px; padding: 25px; margin-bottom: 25px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04); }
     .profile-section h5 { font-weight: 700; margin-bottom: 20px; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; }
+    .form-control[readonly] { background-color: #e9ecef; cursor: not-allowed; color: #64748b; }
 </style>
 <div class="container-fluid">
     <h4 class="mb-4"><i class="fas fa-user-circle me-2"></i>My Profile</h4>
@@ -79,13 +81,28 @@ $kyc_docs = $kyc_docs->fetchAll();
         <h5><i class="fas fa-user me-2"></i>Personal Details</h5>
         <form method="POST">
             <div class="row g-3">
-                <div class="col-md-6"><label class="form-label">Full Name</label><input type="text" name="name" class="form-control" value="<?= htmlspecialchars($user['name']) ?>" required></div>
-                <div class="col-md-6"><label class="form-label">Email (Read Only)</label><input type="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>" disabled></div>
-                <div class="col-md-4"><label class="form-label">Phone</label><input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($user['phone'] ?? '') ?>"></div>
-                <div class="col-md-4"><label class="form-label">City</label><input type="text" name="city" class="form-control" value="<?= htmlspecialchars($user['city'] ?? '') ?>"></div>
-                <div class="col-md-4"><label class="form-label">State</label><input type="text" name="state" class="form-control" value="<?= htmlspecialchars($user['state'] ?? '') ?>"></div>
+                <div class="col-md-6">
+                    <label class="form-label">Full Name <small class="text-muted">(Can't be changed)</small></label>
+                    <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($user['name']) ?>" readonly>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Email <small class="text-muted">(Can't be changed)</small></label>
+                    <input type="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>" readonly>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Phone (Editable)</label>
+                    <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($user['phone'] ?? '') ?>">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">City <small class="text-muted">(Can't be changed)</small></label>
+                    <input type="text" name="city" class="form-control" value="<?= htmlspecialchars($user['city'] ?? '') ?>" readonly>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">State <small class="text-muted">(Can't be changed)</small></label>
+                    <input type="text" name="state" class="form-control" value="<?= htmlspecialchars($user['state'] ?? '') ?>" readonly>
+                </div>
             </div>
-            <button type="submit" name="update_personal" class="btn btn-primary mt-3">Update Personal Details</button>
+            <button type="submit" name="update_personal" class="btn btn-primary mt-3">Update Phone Number</button>
         </form>
     </div>
 
