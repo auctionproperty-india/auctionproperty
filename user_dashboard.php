@@ -24,6 +24,21 @@ $user_data = $user_stmt->fetch();
 $user_city = $user_data['city'] ?? '';
 $ba_status = $user_data['ba_status'] ?? 'none';
 
+// 🔥 Check if user has active Paid Subscription (Auto BA)
+$sub_stmt = $pdo->prepare("SELECT p.price as plan_price, p.name as plan_name 
+                           FROM subscriptions s 
+                           LEFT JOIN packages p ON s.package_id = p.id 
+                           WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE 
+                           ORDER BY s.end_date DESC LIMIT 1");
+$sub_stmt->execute([$user_id]);
+$active_sub = $sub_stmt->fetch();
+
+if ($active_sub) {
+    if ((!empty($active_sub['plan_price']) && $active_sub['plan_price'] > 0) || (strtolower($active_sub['plan_name']) !== 'free' && $active_sub['plan_name'] !== 'No Plan')) {
+        $ba_status = 'active'; // Treat paid users as active BA
+    }
+}
+
 // ---- Views and Tabs ----
 $view = $_GET['view'] ?? 'dashboard'; // 'dashboard' or 'all'
 $tab  = $_GET['tab'] ?? 'auction';
@@ -224,7 +239,7 @@ include 'header.php';
 
 <div class="container-fluid mt-2">
     
-    <!-- 🔥 BA Apply Banner (Only for normal users) -->
+    <!-- 🔥 BA Apply Banner (Only for normal users without paid plan) -->
     <?php if ($ba_status == 'none'): ?>
     <div class="alert alert-warning border-0 shadow-sm mb-4 d-flex justify-content-between align-items-center flex-wrap" style="border-radius: 16px; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);">
         <div>
