@@ -2,7 +2,7 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// 🛡️ SECURITY
+// 🛡️ SECURITY: Block Bad Bots & Rate Limiting
 blockBadBots();
 checkRateLimit(30, 60);
 
@@ -24,17 +24,9 @@ if ($user['ba_status'] == 'active' || $user['ba_status'] == 'pending') {
     exit;
 }
 
-// Fetch available packages for BA (Using existing packages or fallback)
-$packages = $pdo->query("SELECT * FROM packages ORDER BY price ASC")->fetchAll();
-if(empty($packages)) {
-    // Fallback mock packages if DB is empty
-    $packages = [
-        ['id' => 1, 'name' => 'Silver (1 Month)', 'price' => 1000],
-        ['id' => 2, 'name' => 'Gold (3 Months)', 'price' => 2500],
-        ['id' => 3, 'name' => 'Platinum (6 Months)', 'price' => 4500],
-        ['id' => 4, 'name' => 'Diamond (12 Months)', 'price' => 8000],
-    ];
-}
+// 🔥 FETCH REAL PACKAGES FROM DATABASE (Same as Search Engine)
+// Agar aapke packages table me status column hai (jaise status = 'active'), to yahan filter laga sakte hain.
+$packages = $pdo->query("SELECT * FROM packages ORDER BY id ASC")->fetchAll();
 
 $step = isset($_GET['step']) ? (int)$_GET['step'] : 1;
 $selected_package_id = isset($_GET['package_id']) ? (int)$_GET['package_id'] : 0;
@@ -76,12 +68,19 @@ include 'header.php';
 <style>
     .ba-card { background: #fff; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.05); overflow: hidden; }
     .ba-header { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff; padding: 30px; text-align: center; }
-    .package-card { border: 2px solid #e2e8f0; border-radius: 16px; padding: 20px; cursor: pointer; transition: all 0.3s; height: 100%; position: relative; }
+    .package-card { border: 2px solid #e2e8f0; border-radius: 16px; padding: 20px; cursor: pointer; transition: all 0.3s; height: 100%; position: relative; background: #fff; }
     .package-card:hover { border-color: #2563eb; transform: translateY(-5px); box-shadow: 0 10px 20px rgba(37,99,235,0.1); }
     .package-card.selected { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 3px rgba(37,99,235,0.2); }
     .package-input { position: absolute; opacity: 0; }
     .custom-checkbox { width: 20px; height: 20px; cursor: pointer; }
     .bank-box { background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 12px; padding: 20px; text-align: center; }
+    
+    /* Icon Colors */
+    .icon-silver { color: #64748b; }
+    .icon-gold { color: #f59e0b; }
+    .icon-platinum { color: #0ea5e9; }
+    .icon-diamond { color: #3b82f6; }
+    .icon-default { color: #8b5cf6; }
 </style>
 
 <div class="container mt-4 mb-5">
@@ -117,28 +116,38 @@ include 'header.php';
                             <h5 class="fw-bold mb-4"><i class="fas fa-box"></i> Select Training Package</h5>
                             
                             <div class="row g-3 mb-4">
-                                <?php foreach ($packages as $index => $pkg): 
-                                    // Dummy mapping for visual design if names don't match
-                                    $pkg_name = strtolower($pkg['name']);
-                                    $color = 'primary';
-                                    $icon = 'fa-medal';
-                                    if (strpos($pkg_name, 'silver') !== false) { $color = 'secondary'; $icon = 'fa-award'; }
-                                    elseif (strpos($pkg_name, 'gold') !== false) { $color = 'warning'; $icon = 'fa-crown'; }
-                                    elseif (strpos($pkg_name, 'platinum') !== false) { $color = 'info'; $icon = 'fa-gem'; }
-                                    elseif (strpos($pkg_name, 'diamond') !== false) { $color = 'primary'; $icon = 'fa-diamond'; }
-                                ?>
-                                <div class="col-md-6 col-lg-3">
-                                    <label class="w-100 m-0">
-                                        <input type="radio" name="package_id" value="<?= $pkg['id'] ?>" class="package-input" required onchange="document.getElementById('pkg_id').value = this.value; document.querySelectorAll('.package-card').forEach(el => el.classList.remove('selected')); this.closest('.package-card').classList.add('selected');">
-                                        <div class="package-card text-center">
-                                            <i class="fas <?= $icon ?> fa-3x text-<?= $color ?> mb-3"></i>
-                                            <h6 class="fw-bold mb-1"><?= htmlspecialchars($pkg['name']) ?></h6>
-                                            <h5 class="fw-bold text-dark mt-2">₹ <?= indianCurrencyFormat($pkg['price']) ?></h5>
-                                            <p class="text-muted small mb-0 mt-2">Get Referral Link<br>+ Team Access</p>
-                                        </div>
-                                    </label>
-                                </div>
-                                <?php endforeach; ?>
+                                <?php if(count($packages) > 0): ?>
+                                    <?php foreach ($packages as $pkg): 
+                                        // Dynamic Icon based on Package Name
+                                        $pkg_name = strtolower($pkg['name']);
+                                        $icon_class = 'icon-default';
+                                        $icon_fa = 'fa-medal';
+                                        
+                                        if (strpos($pkg_name, 'silver') !== false) { $icon_class = 'icon-silver'; $icon_fa = 'fa-cog'; }
+                                        elseif (strpos($pkg_name, 'gold') !== false) { $icon_class = 'icon-gold'; $icon_fa = 'fa-crown'; }
+                                        elseif (strpos($pkg_name, 'platinum') !== false) { $icon_class = 'icon-platinum'; $icon_fa = 'fa-gem'; }
+                                        elseif (strpos($pkg_name, 'diamond') !== false) { $icon_class = 'icon-diamond'; $icon_fa = 'fa-diamond'; }
+                                        elseif (strpos($pkg_name, 'visit') !== false || strpos($pkg_name, 'combo') !== false) { $icon_class = 'icon-platinum'; $icon_fa = 'fa-star'; }
+                                    ?>
+                                    <div class="col-md-6 col-lg-4 col-xl-3">
+                                        <label class="w-100 m-0 h-100">
+                                            <input type="radio" name="package_id" value="<?= $pkg['id'] ?>" class="package-input" required onchange="document.getElementById('pkg_id').value = this.value; document.querySelectorAll('.package-card').forEach(el => el.classList.remove('selected')); this.closest('.package-card').classList.add('selected');">
+                                            <div class="package-card text-center d-flex flex-column justify-content-between">
+                                                <div>
+                                                    <i class="fas <?= $icon_fa ?> fa-3x <?= $icon_class ?> mb-3"></i>
+                                                    <h6 class="fw-bold mb-1"><?= htmlspecialchars($pkg['name']) ?></h6>
+                                                    <h5 class="fw-bold text-dark mt-2">₹ <?= indianCurrencyFormat($pkg['price']) ?></h5>
+                                                </div>
+                                                <p class="text-muted small mb-0 mt-3">Get Referral Link<br>+ Team Access</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <div class="col-12">
+                                        <div class="alert alert-warning">No packages found. Please contact admin.</div>
+                                    </div>
+                                <?php endif; ?>
                             </div>
 
                             <!-- 🔥 T&C SECTION -->
