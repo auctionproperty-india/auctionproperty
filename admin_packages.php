@@ -91,7 +91,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $duration = (int)($_POST['duration'] ?? 0);
         $display_order = (int)($_POST['display_order'] ?? 0);
         
-        // 🔥 Checkboxes for User / BA
         $is_user = isset($_POST['is_user_package']) ? 1 : 0;
         $is_ba = isset($_POST['is_ba_package']) ? 1 : 0;
 
@@ -131,7 +130,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $duration = (int)($_POST['duration'] ?? 0);
         $display_order = (int)($_POST['display_order'] ?? 0);
         
-        // 🔥 Checkboxes for User / BA
         $is_user = isset($_POST['is_user_package']) ? 1 : 0;
         $is_ba = isset($_POST['is_ba_package']) ? 1 : 0;
 
@@ -298,7 +296,7 @@ include 'header.php';
                     <div class="col-md-3"><label class="form-label fw-bold small">🔢 Sequence No.</label><input type="number" name="display_order" class="form-control" value="<?= $selectedPackage['display_order'] ?? 0 ?>"></div>
                 </div>
 
-                <!-- 🔥 CHECKBOXES: EDIT PACKAGE -->
+                <!-- CHECKBOXES: EDIT PACKAGE -->
                 <div class="row g-3 mb-4 p-3 rounded" style="background: #fffbeb; border: 1px solid #fde68a;">
                     <div class="col-md-6">
                         <div class="form-check form-switch">
@@ -359,7 +357,7 @@ include 'header.php';
                     <div class="col-md-3"><label class="form-label fw-bold small">🔢 Sequence No.</label><input type="number" name="display_order" class="form-control" placeholder="1, 2, 3..." value="0"></div>
                 </div>
 
-                <!-- 🔥 CHECKBOXES: ADD NEW PACKAGE -->
+                <!-- CHECKBOXES: ADD NEW PACKAGE -->
                 <div class="row g-3 mb-4 p-3 rounded" style="background: #fffbeb; border: 1px solid #fde68a;">
                     <div class="col-md-6">
                         <div class="form-check form-switch">
@@ -404,7 +402,6 @@ include 'header.php';
                             <td><strong>#<?= $p['id'] ?></strong></td>
                             <td><strong><?= htmlspecialchars($p['name']) ?></strong></td>
                             <td>
-                                <!-- 🔥 SHOW BADGES BASED ON CHECKBOXES -->
                                 <?php if (!isset($p['is_user_package']) || $p['is_user_package']): ?>
                                     <span class="badge bg-primary px-2 py-1 mb-1">User</span>
                                 <?php endif; ?>
