@@ -73,21 +73,25 @@ $days_left = 0;
 $plan_name = 'No Plan';
 $user_email = '';
 $user_coins = 0;
-$ba_status = 'none'; // 🔥 New BA Status Variable
+$ba_status = 'none'; // Default BA Status
 
 if ($is_logged_in && $role == 'user') {
     $user_id = $_SESSION['user_id'];
-    // Added ba_status to the SELECT query
+    
+    // Fetch user data including ba_status
     $user_sidebar = safeFetch($pdo, "SELECT name, email, created_at as reg_date, coins, ba_status FROM users WHERE id = ?", [$user_id]);
     $reg_date = !empty($user_sidebar['reg_date']) ? date('d M Y', strtotime($user_sidebar['reg_date'])) : 'N/A';
     $user_email = $user_sidebar['email'] ?? '';
     $user_coins = $user_sidebar['coins'] ?? 0;
     $ba_status = $user_sidebar['ba_status'] ?? 'none';
 
-    $sub_info = safeFetch($pdo, "SELECT s.start_date, s.end_date, p.name as plan_name 
+    // Fetch Active Subscription (Added p.price to check if it's a paid plan)
+    $sub_info = safeFetch($pdo, "SELECT s.start_date, s.end_date, p.name as plan_name, p.price as plan_price 
                                  FROM subscriptions s 
                                  LEFT JOIN packages p ON s.package_id = p.id 
                                  WHERE s.user_id = ? 
+                                 AND s.status = 'active'
+                                 AND s.end_date >= CURRENT_DATE
                                  ORDER BY s.end_date DESC LIMIT 1", [$user_id]);
     
     if ($sub_info) {
@@ -95,6 +99,11 @@ if ($is_logged_in && $role == 'user') {
         $expiry_date = $sub_info['end_date'];
         $days_left = (int) ((strtotime($expiry_date) - time()) / (60 * 60 * 24));
         $days_left = max(0, $days_left);
+
+        // 🔥 LOGIC: If user has a paid package, treat them as BA (Active)
+        if ((!empty($sub_info['plan_price']) && $sub_info['plan_price'] > 0) || (strtolower($plan_name) !== 'free' && $plan_name !== 'No Plan')) {
+            $ba_status = 'active';
+        }
     }
 }
 
@@ -418,7 +427,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
     <?php else: ?>
         <!-- ============================================================ -->
-        <!-- 🔥 USER SIDEBAR (BA Logic Added) -->
+        <!-- 🔥 USER SIDEBAR (Paid Package = Auto BA) -->
         <!-- ============================================================ -->
         <a href="user_dashboard.php" class="<?= ($current_page == 'user_dashboard.php' && !isset($_GET['view'])) ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         
@@ -437,12 +446,15 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         
         <!-- 🔥 BA LOGIC START -->
         <?php if ($ba_status == 'active'): ?>
+            <!-- Paid Package Users & Approved BA -->
             <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>"><i class="fas fa-users"></i> <span>My Team</span></a>
             <a href="my_earnings.php" class="<?= $current_page == 'my_earnings.php' ? 'active' : '' ?>"><i class="fas fa-file-invoice-dollar"></i> <span>My Earnings</span></a>
             <a href="user_referrals.php" class="<?= $current_page == 'user_referrals.php' ? 'active' : '' ?>"><i class="fas fa-link"></i> <span>Referrals</span></a>
         <?php elseif ($ba_status == 'pending'): ?>
+            <!-- Applied but not approved yet -->
             <a href="javascript:void(0);" class="text-warning" style="cursor: default;"><i class="fas fa-clock"></i> <span>BA Approval Pending</span></a>
         <?php else: ?>
+            <!-- Normal Free Users -->
             <a href="apply_ba.php" class="<?= $current_page == 'apply_ba.php' ? 'active' : '' ?>"><i class="fas fa-handshake"></i> <span>Apply for BA</span></a>
         <?php endif; ?>
         <!-- 🔥 BA LOGIC END -->
