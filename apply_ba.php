@@ -22,22 +22,37 @@ if ($user['ba_status'] == 'active' || $user['ba_status'] == 'pending') {
     exit;
 }
 
-// 🔥 SIRF BA PACKAGES FETCH KARENGE
+// 🔥 FETCH BA PACKAGES & DYNAMIC FIELDS
 $packages = $pdo->query("SELECT * FROM packages WHERE is_ba_package = TRUE ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
+
+$allFields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE ORDER BY display_order ASC, id ASC")->fetchAll();
+$fieldValues = [];
+$stmt = $pdo->query("SELECT * FROM package_field_values WHERE COALESCE(is_visible, TRUE) = TRUE");
+while ($row = $stmt->fetch()) {
+    $fieldValues[$row['package_id']][$row['field_id']] = $row['field_value'];
+}
+
+// Icon Helper Function
+function getFieldIcon($fieldKey) {
+    $icons = [
+        'validity' => 'fa-clock', 'property_search' => 'fa-search', 'company_support' => 'fa-headset',
+        'sales_team_support' => 'fa-users', 'self_refer_incentive' => 'fa-coins', 'team_refer_incentive' => 'fa-handshake',
+        'property_sale_incentive' => 'fa-percent', 'team_sale_incentive' => 'fa-percent', 'free_property_visit' => 'fa-building',
+        'property_registration' => 'fa-file-signature', 'car_registration' => 'fa-car', 'car_visit' => 'fa-car-side',
+        'free_parking' => 'fa-parking', 'furnished' => 'fa-couch', 'floor_number' => 'fa-layer-group',
+        'carpet_area' => 'fa-ruler-combined', 'possession' => 'fa-key',
+    ];
+    return $icons[$fieldKey] ?? 'fa-check-circle';
+}
 
 $step = isset($_GET['step']) ? (int)$_GET['step'] : 1;
 $selected_package_id = isset($_GET['package_id']) ? (int)$_GET['package_id'] : 0;
 
-// 🔥 FETCH DYNAMIC BANK DETAILS FOR PAYMENT PAGE (Settings Table)
+// 🔥 FETCH DYNAMIC BANK DETAILS
 $bank = [
-    'name' => 'JANA SMAL FINANCE BANK', // Fallback Default
-    'account' => '4553020001485256',
-    'ifsc' => 'JSFB0004553',
-    'branch' => 'Bhavarkua',
-    'contact' => 'Not set',
-    'qr_code' => '' 
+    'name' => 'JANA SMAL FINANCE BANK', 'account' => '4553020001485256', 'ifsc' => 'JSFB0004553',
+    'branch' => 'Bhavarkua', 'contact' => 'Not set', 'qr_code' => '' 
 ];
-
 try {
     $stmt_bank = $pdo->query("SELECT * FROM settings WHERE setting_key IN ('bank_name', 'account_number', 'ifsc_code', 'branch', 'contact', 'qr_code')");
     while ($row = $stmt_bank->fetch()) {
@@ -48,19 +63,13 @@ try {
         if ($row['setting_key'] == 'contact') $bank['contact'] = $row['setting_value'];
         if ($row['setting_key'] == 'qr_code') $bank['qr_code'] = $row['setting_value'];
     }
-} catch (Exception $e) {
-    // Settings table might not exist, using fallback
-}
+} catch (Exception $e) {}
 
 // Handle Payment Form Submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_payment'])) {
     $package_id = (int)$_POST['package_id'];
     $amount_paid = (float)$_POST['amount'];
     
-    $pkg_stmt = $pdo->prepare("SELECT * FROM packages WHERE id = ?");
-    $pkg_stmt->execute([$package_id]);
-    $selected_pkg = $pkg_stmt->fetch();
-
     $image_url = '';
     if (isset($_FILES['payment_slip']) && $_FILES['payment_slip']['error'] == 0) {
         $upload_dir = 'uploads/slips/';
@@ -83,23 +92,33 @@ include 'header.php';
 ?>
 
 <style>
-    /* Premium Card Styles */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+
     .premium-card { border-radius: 22px; overflow: hidden; box-shadow: 0 6px 25px rgba(0,0,0,0.06); transition: all 0.3s; height: 100%; display: flex; flex-direction: column; background: #ffffff; border: 2px solid #e2e8f0; cursor: pointer; }
     .premium-card:hover { transform: translateY(-5px); box-shadow: 0 20px 50px rgba(0,0,0,0.12); border-color: #93c5fd; }
     .premium-card.selected { border: 3px solid #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,0.2); transform: translateY(-5px); }
     
-    .premium-header { padding: 25px 18px; text-align: center; color: #fff; background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); }
-    .premium-body { padding: 16px 14px; flex: 1; }
-    .price-new { font-size: 1.9rem; font-weight: 900; color: #ffffff; }
-    
-    /* Payment Page Styles (Matching buy_subscription.php) */
+    .premium-header { padding: 22px 18px 18px; text-align: center; color: #fff; background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); position: relative; }
+    .premium-body { padding: 16px 14px 12px; flex: 1; display: flex; flex-direction: column; }
+    .price-new { font-size: 1.9rem; font-weight: 900; color: #ffffff; margin-top: 5px; }
+    .plan-duration { font-size: 0.7rem; font-weight: 600; opacity: 0.95; letter-spacing: 1px; text-transform: uppercase; margin-top: 5px; }
+
+    /* Dynamic Features Styles */
+    .features-grid-premium { display: flex; flex-direction: column; gap: 5px; }
+    .feature-row-premium { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: #f8fafc; border: 1.5px solid transparent; }
+    .feature-icon-box { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; }
+    .feature-text-box { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .feature-text-box .lbl { font-size: 0.6rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .feature-text-box .val { font-size: 0.82rem; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Payment Page Styles */
     .bank-card { border-radius: 16px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-    .bg-soft-info { background-color: #e0f2fe; color: #0284c7; }
 </style>
 
 <div class="container mt-4 mb-5">
     <div class="row justify-content-center">
-        <div class="col-lg-10">
+        <div class="col-lg-11">
             
             <div class="text-center mb-5">
                 <h2 class="fw-bold mb-2"><i class="fas fa-handshake text-primary"></i> Business Associate (BA) Program</h2>
@@ -120,19 +139,46 @@ include 'header.php';
                                 elseif (strpos($pkg_name, 'gold') !== false) $icon = 'fa-crown';
                                 elseif (strpos($pkg_name, 'platinum') !== false) $icon = 'fa-gem';
                                 elseif (strpos($pkg_name, 'diamond') !== false) $icon = 'fa-diamond';
+                                
+                                // 🔥 Get Dynamic Fields for this package
+                                $pkgFields = [];
+                                if (isset($fieldValues[$pkg['id']])) {
+                                    foreach ($allFields as $f) {
+                                        if (isset($fieldValues[$pkg['id']][$f['id']])) {
+                                            $value = trim($fieldValues[$pkg['id']][$f['id']] ?? '');
+                                            if ($value !== '' && $value !== null) {
+                                                $pkgFields[] = ['label' => $f['field_label'], 'key' => $f['field_key'], 'value' => $value];
+                                            }
+                                        }
+                                    }
+                                }
                             ?>
                             <div class="col-md-6 col-lg-4 col-xl-3">
-                                <!-- 🔥 Onclick JS to select package -->
                                 <div class="premium-card text-center" onclick="selectPackage(<?= $pkg['id'] ?>, this)">
                                     <div class="premium-header">
                                         <i class="fas <?= $icon ?> fa-3x mb-3 text-warning"></i>
                                         <h4 class="fw-bold mb-1"><?= htmlspecialchars($pkg['name']) ?></h4>
-                                        <div class="price-new mt-2">₹ <?= number_format($pkg['price'], 0) ?></div>
+                                        <div class="plan-duration"><?= htmlspecialchars($pkg['duration'] ?? 0) ?> Months Access</div>
+                                        <div class="price-new">₹ <?= number_format($pkg['price'], 0) ?></div>
                                     </div>
                                     <div class="premium-body text-start">
-                                        <div class="d-flex gap-2 mb-2 align-items-center"><i class="fas fa-check-circle text-success"></i> <span class="small fw-bold">Corporate Training</span></div>
-                                        <div class="d-flex gap-2 mb-2 align-items-center"><i class="fas fa-check-circle text-success"></i> <span class="small fw-bold">Referral Link</span></div>
-                                        <div class="d-flex gap-2 mb-2 align-items-center"><i class="fas fa-check-circle text-success"></i> <span class="small fw-bold">Team Access</span></div>
+                                        <?php if (!empty($pkgFields)): ?>
+                                            <div class="features-grid-premium">
+                                                <?php foreach ($pkgFields as $field): ?>
+                                                    <div class="feature-row-premium">
+                                                        <div class="feature-icon-box">
+                                                            <i class="fas <?= getFieldIcon($field['key']) ?>"></i>
+                                                        </div>
+                                                        <div class="feature-text-box">
+                                                            <span class="lbl"><?= htmlspecialchars($field['label']) ?></span>
+                                                            <span class="val"><?= htmlspecialchars($field['value']) ?></span>
+                                                        </div>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="text-center text-muted small py-3">No details available</div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -162,20 +208,13 @@ include 'header.php';
 
                 <script>
                     function selectPackage(id, card) {
-                        // Remove selected class from all
                         document.querySelectorAll('.premium-card').forEach(el => el.classList.remove('selected'));
-                        // Add selected class to clicked card
                         card.classList.add('selected');
-                        // Set hidden input value
                         document.getElementById('selected_package_id').value = id;
                     }
-
                     function checkPackageSelected() {
                         const selectedId = document.getElementById('selected_package_id').value;
-                        if (!selectedId) { 
-                            alert("Please select a package to continue."); 
-                            return false; 
-                        }
+                        if (!selectedId) { alert("Please select a package to continue."); return false; }
                         return true;
                     }
                 </script>
@@ -187,7 +226,6 @@ include 'header.php';
                 $pay_amount = ($selected_pkg['discount_price'] > 0) ? $selected_pkg['discount_price'] : $selected_pkg['price'];
             ?>
                 
-                <!-- 🔥 STEP 2: PAYMENT PAGE (Exact look like buy_subscription.php) -->
                 <h3 class="mb-2"><i class="fas fa-shopping-cart"></i> Buy Package: <?= htmlspecialchars($selected_pkg['name']) ?></h3>
                 <p class="text-muted mb-4">Fill the details below to request subscription.</p>
 
