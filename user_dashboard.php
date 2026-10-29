@@ -17,10 +17,12 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 
 $user_id = $_SESSION['user_id'];
 
-// ---- Get user city ----
-$user_stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
+// ---- 🔥 Get user city & BA Status ----
+$user_stmt = $pdo->prepare("SELECT city, ba_status FROM users WHERE id = ?");
 $user_stmt->execute([$user_id]);
-$user_city = $user_stmt->fetchColumn() ?? '';
+$user_data = $user_stmt->fetch();
+$user_city = $user_data['city'] ?? '';
+$ba_status = $user_data['ba_status'] ?? 'none';
 
 // ---- Views and Tabs ----
 $view = $_GET['view'] ?? 'dashboard'; // 'dashboard' or 'all'
@@ -221,6 +223,21 @@ include 'header.php';
 </style>
 
 <div class="container-fluid mt-2">
+    
+    <!-- 🔥 BA Apply Banner (Only for normal users) -->
+    <?php if ($ba_status == 'none'): ?>
+    <div class="alert alert-warning border-0 shadow-sm mb-4 d-flex justify-content-between align-items-center flex-wrap" style="border-radius: 16px; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);">
+        <div>
+            <h5 class="fw-bold text-dark mb-1"><i class="fas fa-handshake text-warning"></i> Become a Business Associate (BA)</h5>
+            <p class="text-muted mb-0" style="font-size:0.95rem;">Join our BA program to earn commissions, refer users, and grow your team.</p>
+        </div>
+        <a href="apply_ba.php" class="btn btn-warning fw-bold px-4 py-2 mt-2 mt-md-0" style="border-radius: 20px;">Apply Now <i class="fas fa-arrow-right ms-1"></i></a>
+    </div>
+    <?php elseif ($ba_status == 'pending'): ?>
+    <div class="alert alert-info border-0 shadow-sm mb-4" style="border-radius: 16px;">
+        <i class="fas fa-clock"></i> <strong>BA Application Pending:</strong> Your application to become a Business Associate is currently under review. We will notify you once approved.
+    </div>
+    <?php endif; ?>
     
     <!-- SEARCH BOX (Show only in All View) -->
     <?php if ($view == 'all'): ?>
