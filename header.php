@@ -7,9 +7,8 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
 // 🛡️ SECURITY: Block Bad Bots & Rate Limiting
-// यह पूरी वेबसाइट पर लागू होगा क्योंकि header हर पेज में शामिल होता है
 blockBadBots();
-checkRateLimit(60, 60); // 60 requests per 60 seconds (1 minute)
+checkRateLimit(60, 60); // 60 requests per 60 seconds
 
 $current_page = basename($_SERVER['PHP_SELF']);
 $hide_top_nav = !in_array($current_page, ['index.php', 'login.php', 'register.php']);
@@ -74,13 +73,16 @@ $days_left = 0;
 $plan_name = 'No Plan';
 $user_email = '';
 $user_coins = 0;
+$ba_status = 'none'; // 🔥 New BA Status Variable
 
 if ($is_logged_in && $role == 'user') {
     $user_id = $_SESSION['user_id'];
-    $user_sidebar = safeFetch($pdo, "SELECT name, email, created_at as reg_date, coins FROM users WHERE id = ?", [$user_id]);
+    // Added ba_status to the SELECT query
+    $user_sidebar = safeFetch($pdo, "SELECT name, email, created_at as reg_date, coins, ba_status FROM users WHERE id = ?", [$user_id]);
     $reg_date = !empty($user_sidebar['reg_date']) ? date('d M Y', strtotime($user_sidebar['reg_date'])) : 'N/A';
     $user_email = $user_sidebar['email'] ?? '';
     $user_coins = $user_sidebar['coins'] ?? 0;
+    $ba_status = $user_sidebar['ba_status'] ?? 'none';
 
     $sub_info = safeFetch($pdo, "SELECT s.start_date, s.end_date, p.name as plan_name 
                                  FROM subscriptions s 
@@ -274,7 +276,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
     
     <?php if ($role == 'admin'): ?>
         <!-- ============================================================ -->
-        <!-- ADMIN SIDEBAR (Restored completely) -->
+        <!-- ADMIN SIDEBAR -->
         <!-- ============================================================ -->
         <a href="admin_dashboard.php" class="<?= $current_page == 'admin_dashboard.php' ? 'active' : '' ?>">
             <i class="fas fa-th-large"></i> <span>Dashboard</span>
@@ -415,7 +417,9 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <a href="support.php" class="<?= $current_page == 'support.php' ? 'active' : '' ?>"><i class="fas fa-headset"></i> <span>Support</span></a>
 
     <?php else: ?>
-        <!-- USER SIDEBAR -->
+        <!-- ============================================================ -->
+        <!-- 🔥 USER SIDEBAR (BA Logic Added) -->
+        <!-- ============================================================ -->
         <a href="user_dashboard.php" class="<?= ($current_page == 'user_dashboard.php' && !isset($_GET['view'])) ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         
         <div class="nav-section <?= ($current_page == 'user_dashboard.php' && isset($_GET['view'])) ? 'open' : '' ?>">
@@ -430,11 +434,19 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         </div>
 
         <a href="user_packages.php" class="<?= $current_page == 'user_packages.php' ? 'active' : '' ?>"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
-        <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>"><i class="fas fa-users"></i> <span>My Team</span></a>
-        <a href="my_earnings.php" class="<?= $current_page == 'my_earnings.php' ? 'active' : '' ?>"><i class="fas fa-file-invoice-dollar"></i> <span>My Earnings</span></a>
-        <a href="user_wallet_history.php" class="<?= $current_page == 'user_wallet_history.php' ? 'active' : '' ?>"><i class="fas fa-receipt"></i> <span>Payment History</span></a>
-        <a href="user_subscription_history.php" class="<?= $current_page == 'user_subscription_history.php' ? 'active' : '' ?>"><i class="fas fa-history"></i> <span>Subscription History</span></a>
-        <a href="user_referrals.php" class="<?= $current_page == 'user_referrals.php' ? 'active' : '' ?>"><i class="fas fa-link"></i> <span>Referrals</span></a>
+        
+        <!-- 🔥 BA LOGIC START -->
+        <?php if ($ba_status == 'active'): ?>
+            <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>"><i class="fas fa-users"></i> <span>My Team</span></a>
+            <a href="my_earnings.php" class="<?= $current_page == 'my_earnings.php' ? 'active' : '' ?>"><i class="fas fa-file-invoice-dollar"></i> <span>My Earnings</span></a>
+            <a href="user_referrals.php" class="<?= $current_page == 'user_referrals.php' ? 'active' : '' ?>"><i class="fas fa-link"></i> <span>Referrals</span></a>
+        <?php elseif ($ba_status == 'pending'): ?>
+            <a href="javascript:void(0);" class="text-warning" style="cursor: default;"><i class="fas fa-clock"></i> <span>BA Approval Pending</span></a>
+        <?php else: ?>
+            <a href="apply_ba.php" class="<?= $current_page == 'apply_ba.php' ? 'active' : '' ?>"><i class="fas fa-handshake"></i> <span>Apply for BA</span></a>
+        <?php endif; ?>
+        <!-- 🔥 BA LOGIC END -->
+
         <a href="profile.php" class="<?= $current_page == 'profile.php' ? 'active' : '' ?>"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
         <a href="support.php" class="<?= $current_page == 'support.php' ? 'active' : '' ?>"><i class="fas fa-headset"></i> <span>Support</span></a>
         <a href="user_properties.php" class="<?= $current_page == 'user_properties.php' ? 'active' : '' ?>"><i class="fas fa-home"></i> <span>My Properties</span></a>
