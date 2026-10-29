@@ -48,7 +48,9 @@ $has_pending = $pending_check->rowCount() > 0;
 // ============================================================
 // 🔥 DYNAMIC FIELDS – Sorted by Sequence
 // ============================================================
-$packages = $pdo->query("SELECT * FROM packages ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
+// 🔥 YAHAN CHANGE KIYA GAYA HAI (Sirf User Packages Fetch Honge)
+$packages = $pdo->query("SELECT * FROM packages WHERE is_user_package = TRUE ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
+
 $allFields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE ORDER BY display_order ASC, id ASC")->fetchAll();
 
 $fieldValues = [];
@@ -421,10 +423,6 @@ function getFieldIcon($fieldKey) {
         display: block;
         margin-bottom: 8px;
     }
-
-    /* ============================================================ */
-    /* 📱 Responsive – 4 Cards → 2 Cards → 1 Card */
-    /* ============================================================ */
 
     @media (max-width: 1199px) {
         .premium-header .plan-name { font-size: 1.5rem; }
