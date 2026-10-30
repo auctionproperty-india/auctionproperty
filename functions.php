@@ -49,8 +49,10 @@ function getUserPermissions($user_id, $pdo) {
         $user = $stmt->fetch();
         if(!$user) return [];
 
+        // 🔥 UPDATED: Added missing modules (activity_logs, kyc, support)
+        $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting', 'activity_logs', 'kyc', 'support'];
+
         if(!empty($user['is_super_admin']) && $user['is_super_admin']) {
-            $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting'];
             $full = [];
             foreach($modules as $m) $full[$m] = ['view' => true, 'edit' => true];
             return $full;
@@ -58,7 +60,6 @@ function getUserPermissions($user_id, $pdo) {
 
         if(empty($user['permissions'])) {
             $default = [];
-            $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting'];
             foreach($modules as $m) $default[$m] = ['view' => false, 'edit' => false];
             return $default;
         }
@@ -66,7 +67,6 @@ function getUserPermissions($user_id, $pdo) {
         $perms = json_decode($user['permissions'], true);
         if(!is_array($perms)) $perms = [];
 
-        $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting'];
         $new_perms = [];
         foreach($modules as $mod) {
             if(isset($perms[$mod])) {
