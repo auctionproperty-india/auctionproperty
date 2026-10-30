@@ -1,11 +1,15 @@
 <?php
 // ============================================================
 // 📄 Property Detail – Full Detail for Paid / Basic for Free
-// (Updated: With Multi-Image Gallery & Local City Access Check)
+// (Updated: Fixed Free User vs Local City User Message)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
+
+// 🛡️ SECURITY
+blockBadBots();
+checkRateLimit(30, 60);
 
 if(!isset($_SESSION['user_id'])) { 
     header("Location: login.php"); 
@@ -37,22 +41,31 @@ if ($source == 'auction') {
 if(!$prop) { die("Property not found!"); }
 
 // ============================================================
-// 🔥 NEW LOGIC: Check Access (Local vs All India)
+// 🔥 LOGIC: Check Access (Free User vs Local City vs All India)
 // ============================================================
 $user_city_stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
 $user_city_stmt->execute([$user_id]);
 $user_city = $user_city_stmt->fetchColumn();
 
 $has_access = canUserViewProperty($pdo, $user_id, $prop['city'] ?? '');
+$has_any_package = userHasActiveSubscription($pdo, $user_id);
+
+$is_free_user = false;
 $is_city_mismatch = false;
 
-if (!$has_access && strtolower(trim($user_city)) != strtolower(trim($prop['city'] ?? ''))) {
-    $is_city_mismatch = true;
+if (!$has_access) {
+    if (!$has_any_package) {
+        // User has NO packages at all (Free User)
+        $is_free_user = true;
+    } elseif (strtolower(trim($user_city)) != strtolower(trim($prop['city'] ?? ''))) {
+        // User has a package, but it's a Local City package and city doesn't match
+        $is_city_mismatch = true;
+    }
 }
 
 // Subscription check overrides
 if ($source == 'auction') {
-    $has_subscription = $has_access; // Now depends on the new function
+    $has_subscription = $has_access; // Depends on the new function
 } else {
     $has_subscription = true; // customer properties are always visible
 }
@@ -195,8 +208,13 @@ if (!$has_subscription && $source == 'auction') {
                                 <h4 class="fw-bold text-dark mb-2">Unlock Full Property Details</h4>
                                 
                                 <?php if ($is_city_mismatch): ?>
+                                    <!-- Local City Package User, but looking at another city -->
                                     <p class="text-danger fw-bold mb-4 small">⚠️ You have a Local City Package. Kindly buy All India Access package to view properties outside <?= htmlspecialchars($user_city) ?>.</p>
+                                <?php elseif ($is_free_user): ?>
+                                    <!-- Free User -->
+                                    <p class="text-primary fw-bold mb-4 small">🔒 Kindly buy any package - Local City access or All India access, whichever you want now.</p>
                                 <?php else: ?>
+                                    <!-- Default Fallback -->
                                     <p class="text-muted mb-4 small">Get access to Area (Sq Ft), EMD, Contact Info, Address & more.</p>
                                 <?php endif; ?>
                                 
@@ -750,7 +768,9 @@ if ($source == 'auction') {
                     </div>
                     <?php endif; ?>
 
-                    <!-- Property Images -->
+                    <!-- ============================================================
+                    🔥 PROPERTY IMAGES (MAIN + GALLERY)
+                    ============================================================ -->
                     <div class="sb-section-title">
                         <i class="fas fa-image"></i> 
                         Property Images 
@@ -763,6 +783,7 @@ if ($source == 'auction') {
 
                     <?php if (count($all_images) > 0): ?>
 
+                        <!-- Main / Featured Image -->
                         <div class="sb-image-box">
                             <a href="<?= htmlspecialchars($all_images[0]) ?>" target="_blank" id="mainImageLink">
                                 <img src="<?= htmlspecialchars($all_images[0]) ?>" alt="Main Property Image" id="mainImageDisplay">
@@ -776,6 +797,7 @@ if ($source == 'auction') {
                             </div>
                         </div>
 
+                        <!-- Gallery Thumbnails -->
                         <?php if (count($all_images) > 1): ?>
                             <div class="mt-3">
                                 <small class="text-muted fw-bold d-block mb-2">
@@ -796,6 +818,7 @@ if ($source == 'auction') {
                         <?php endif; ?>
 
                     <?php else: ?>
+                        <!-- No Image -->
                         <div class="sb-image-box">
                             <div style="height:200px; display:flex; align-items:center; justify-content:center; background:#fafcfd; color:#94a3b8; font-weight:700;">
                                 <i class="fas fa-image fa-2x opacity-25 me-2"></i>
@@ -831,19 +854,22 @@ if ($source == 'auction') {
                     </div>
                     <?php endif; ?>
 
-                </div>
-            </div>
+                </div> <!-- card-body -->
+            </div> <!-- card -->
         </div>
     </div>
 </div>
 
+<!-- 🔥 Gallery JS: Click thumbnail to swap main image -->
 <script>
 function swapMainImage(url, elem) {
+    // Swap main image
     const mainImg = document.getElementById('mainImageDisplay');
     const mainLink = document.getElementById('mainImageLink');
     if (mainImg) mainImg.src = url;
     if (mainLink) mainLink.href = url;
 
+    // Highlight selected thumbnail
     document.querySelectorAll('.sb-gallery-item').forEach(el => {
         el.style.borderColor = '#e8edf4';
         el.style.boxShadow = 'none';
@@ -853,6 +879,7 @@ function swapMainImage(url, elem) {
         elem.style.boxShadow = '0 8px 22px rgba(37,99,235,0.3)';
     }
 
+    // Scroll to main image
     if (mainImg) {
         mainImg.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
