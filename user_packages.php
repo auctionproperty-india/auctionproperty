@@ -1,7 +1,6 @@
 <?php
 // ============================================================
-// 💎 User Packages – 4 Cards per Row (Comparison Friendly)
-// Green/Blue Premium Design + Dynamic Fields
+// 💎 User Packages – 4 Cards per Row + Access Type Filter
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -46,10 +45,18 @@ $pending_check->execute([$user_id]);
 $has_pending = $pending_check->rowCount() > 0;
 
 // ============================================================
-// 🔥 DYNAMIC FIELDS – Sorted by Sequence
+// 🔥 NEW: FILTER BY ACCESS TYPE
 // ============================================================
-// 🔥 YAHAN CHANGE KIYA GAYA HAI (Sirf User Packages Fetch Honge)
-$packages = $pdo->query("SELECT * FROM packages WHERE is_user_package = TRUE ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
+$access_filter = $_GET['access_filter'] ?? 'all';
+$where_clause = "is_user_package = TRUE";
+
+if ($access_filter == 'all_india') {
+    $where_clause .= " AND access_type = 'all_india'";
+} elseif ($access_filter == 'local_city') {
+    $where_clause .= " AND access_type = 'local_city'";
+}
+
+$packages = $pdo->query("SELECT * FROM packages WHERE $where_clause ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
 
 $allFields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE ORDER BY display_order ASC, id ASC")->fetchAll();
 
@@ -102,7 +109,7 @@ function getFieldIcon($fieldKey) {
     /* ---- Header ---- */
     .page-header {
         text-align: center;
-        margin-bottom: 35px;
+        margin-bottom: 25px;
     }
     .page-header .premium-title {
         font-size: 2.4rem;
@@ -125,6 +132,36 @@ function getFieldIcon($fieldKey) {
         background: linear-gradient(90deg, #2563eb, #10b981);
         margin: 14px auto 0;
         border-radius: 4px;
+    }
+
+    /* 🔥 NEW: Filter Buttons */
+    .filter-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+    }
+    .filter-btn {
+        padding: 8px 20px;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        text-decoration: none;
+        border: 2px solid #e2e8f0;
+        color: #475569;
+        background: #fff;
+        transition: all 0.3s;
+    }
+    .filter-btn:hover {
+        border-color: #2563eb;
+        color: #2563eb;
+    }
+    .filter-btn.active {
+        background: linear-gradient(135deg, #1e3a8a, #2563eb);
+        color: #fff;
+        border-color: transparent;
+        box-shadow: 0 4px 15px rgba(37,99,235,0.3);
     }
 
     /* ---- Premium Card ---- */
@@ -227,6 +264,29 @@ function getFieldIcon($fieldKey) {
         text-transform: uppercase;
         margin-bottom: 10px;
         position: relative;
+    }
+
+    /* 🔥 NEW: Access Type Badge */
+    .access-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.65rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        margin-top: 5px;
+        position: relative;
+        z-index: 2;
+    }
+    .access-badge.all-india {
+        background: #e0f2fe;
+        color: #0284c7;
+        border: 1px solid #7dd3fc;
+    }
+    .access-badge.local-city {
+        background: #fef3c7;
+        color: #d97706;
+        border: 1px solid #fcd34d;
     }
 
     .price-wrapper {
@@ -468,6 +528,19 @@ function getFieldIcon($fieldKey) {
             <div class="premium-divider"></div>
         </div>
 
+        <!-- 🔥 NEW: FILTER BUTTONS -->
+        <div class="filter-buttons">
+            <a href="?access_filter=all" class="filter-btn <?= ($access_filter == 'all') ? 'active' : '' ?>">
+                <i class="fas fa-th-large me-1"></i> All Packages
+            </a>
+            <a href="?access_filter=all_india" class="filter-btn <?= ($access_filter == 'all_india') ? 'active' : '' ?>">
+                <i class="fas fa-globe me-1"></i> All India Access
+            </a>
+            <a href="?access_filter=local_city" class="filter-btn <?= ($access_filter == 'local_city') ? 'active' : '' ?>">
+                <i class="fas fa-map-marker-alt me-1"></i> Local City Access
+            </a>
+        </div>
+
         <?php if ($has_pending): ?>
             <div class="alert alert-warning text-center mx-auto" style="max-width: 600px; background: #fffbeb; border-color: #f59e0b; color: #92400e; border-radius: 16px;">
                 <i class="fas fa-clock"></i> You have a pending request. Please wait for admin approval.
@@ -478,6 +551,9 @@ function getFieldIcon($fieldKey) {
         <div class="row g-3 g-lg-3 justify-content-center">
             <?php 
             $count = count($packages);
+            if ($count == 0) {
+                echo '<div class="col-12 text-center text-muted py-5"><h4>No packages found for this filter.</h4></div>';
+            }
             foreach ($packages as $index => $pkg):
                 $is_active = ($is_subscribed && $sub_info['package_id'] == $pkg['id']);
                 $discount_price = $pkg['discount_price'] ?? null;
@@ -487,6 +563,12 @@ function getFieldIcon($fieldKey) {
 
                 // 🔥 Alternate Colors: Green / Blue
                 $colorTheme = ($index % 2 == 0) ? 'blue' : 'green';
+
+                // 🔥 Get Access Type for Badge
+                $access_type = $pkg['access_type'] ?? 'all_india';
+                $access_badge = ($access_type == 'local_city') 
+                    ? '<span class="access-badge local-city"><i class="fas fa-map-marker-alt"></i> Local City Only</span>' 
+                    : '<span class="access-badge all-india"><i class="fas fa-globe"></i> All India Access</span>';
 
                 // 🔥 Fetch Dynamic Fields for THIS Package
                 $pkgFields = [];
@@ -519,6 +601,10 @@ function getFieldIcon($fieldKey) {
                             <div class="plan-duration">
                                 <?= htmlspecialchars($pkg['duration'] ?? 0) ?> Months Access
                             </div>
+                            
+                            <!-- 🔥 ACCESS TYPE BADGE -->
+                            <div class="mb-2"><?= $access_badge ?></div>
+
                             <div class="price-wrapper <?= $show_discount ? '' : 'no-discount' ?>">
                                 <?php if ($show_discount): ?>
                                     <span class="price-old">₹<?= number_format($regular_price, 0) ?></span>
