@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 💎 User Packages – 4 Cards per Row + Access Type Filter
+// 💎 User Packages – 4 Cards per Row + Sidebar Filter Logic
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -45,19 +45,25 @@ $pending_check->execute([$user_id]);
 $has_pending = $pending_check->rowCount() > 0;
 
 // ============================================================
-// 🔥 NEW: FILTER BY ACCESS TYPE
+// 🔥 FILTER BY ACCESS TYPE (From Sidebar)
 // ============================================================
 $access_filter = $_GET['access_filter'] ?? 'all';
 $where_clause = "is_user_package = TRUE";
 
+$title_text = 'Choose Your Plan';
+$subtitle_text = 'Select the perfect plan for your real estate journey';
+
 if ($access_filter == 'all_india') {
     $where_clause .= " AND access_type = 'all_india'";
+    $title_text = 'All India Packages';
+    $subtitle_text = 'Access properties across the entire country';
 } elseif ($access_filter == 'local_city') {
     $where_clause .= " AND access_type = 'local_city'";
+    $title_text = 'Local City Packages';
+    $subtitle_text = 'Access properties only in your registered city';
 }
 
 $packages = $pdo->query("SELECT * FROM packages WHERE $where_clause ORDER BY COALESCE(display_order, 999) ASC, id ASC")->fetchAll();
-
 $allFields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE ORDER BY display_order ASC, id ASC")->fetchAll();
 
 $fieldValues = [];
@@ -68,23 +74,12 @@ while ($row = $stmt->fetch()) {
 
 function getFieldIcon($fieldKey) {
     $icons = [
-        'validity' => 'fa-clock',
-        'property_search' => 'fa-search',
-        'company_support' => 'fa-headset',
-        'sales_team_support' => 'fa-users',
-        'self_refer_incentive' => 'fa-coins',
-        'team_refer_incentive' => 'fa-handshake',
-        'property_sale_incentive' => 'fa-percent',
-        'team_sale_incentive' => 'fa-percent',
-        'free_property_visit' => 'fa-building',
-        'property_registration' => 'fa-file-signature',
-        'car_registration' => 'fa-car',
-        'car_visit' => 'fa-car-side',
-        'free_parking' => 'fa-parking',
-        'furnished' => 'fa-couch',
-        'floor_number' => 'fa-layer-group',
-        'carpet_area' => 'fa-ruler-combined',
-        'possession' => 'fa-key',
+        'validity' => 'fa-clock', 'property_search' => 'fa-search', 'company_support' => 'fa-headset',
+        'sales_team_support' => 'fa-users', 'self_refer_incentive' => 'fa-coins', 'team_refer_incentive' => 'fa-handshake',
+        'property_sale_incentive' => 'fa-percent', 'team_sale_incentive' => 'fa-percent', 'free_property_visit' => 'fa-building',
+        'property_registration' => 'fa-file-signature', 'car_registration' => 'fa-car', 'car_visit' => 'fa-car-side',
+        'free_parking' => 'fa-parking', 'furnished' => 'fa-couch', 'floor_number' => 'fa-layer-group',
+        'carpet_area' => 'fa-ruler-combined', 'possession' => 'fa-key',
     ];
     return $icons[$fieldKey] ?? 'fa-check-circle';
 }
@@ -92,430 +87,75 @@ function getFieldIcon($fieldKey) {
 
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-
-    body {
-        font-family: 'Inter', sans-serif;
-    }
+    body { font-family: 'Inter', sans-serif; }
 
     .premium-section {
-        background: 
-            radial-gradient(circle at 15% 15%, rgba(37,99,235,0.05) 0%, transparent 45%),
-            radial-gradient(circle at 85% 85%, rgba(16,185,129,0.05) 0%, transparent 45%),
-            linear-gradient(180deg, #f8fafc 0%, #ffffff 50%, #f0fdf4 100%);
-        padding: 40px 0;
-        min-height: 100vh;
+        background: radial-gradient(circle at 15% 15%, rgba(37,99,235,0.05) 0%, transparent 45%), radial-gradient(circle at 85% 85%, rgba(16,185,129,0.05) 0%, transparent 45%), linear-gradient(180deg, #f8fafc 0%, #ffffff 50%, #f0fdf4 100%);
+        padding: 40px 0; min-height: 100vh;
     }
 
-    /* ---- Header ---- */
-    .page-header {
-        text-align: center;
-        margin-bottom: 25px;
-    }
-    .page-header .premium-title {
-        font-size: 2.4rem;
-        font-weight: 900;
-        letter-spacing: -1px;
-        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 40%, #10b981 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: 8px;
-    }
-    .page-header .premium-subtitle {
-        color: #64748b;
-        font-size: 1rem;
-        font-weight: 500;
-    }
-    .page-header .premium-divider {
-        width: 70px;
-        height: 4px;
-        background: linear-gradient(90deg, #2563eb, #10b981);
-        margin: 14px auto 0;
-        border-radius: 4px;
-    }
+    .page-header { text-align: center; margin-bottom: 35px; }
+    .page-header .premium-title { font-size: 2.4rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 40%, #10b981 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px; }
+    .page-header .premium-subtitle { color: #64748b; font-size: 1rem; font-weight: 500; }
+    .page-header .premium-divider { width: 70px; height: 4px; background: linear-gradient(90deg, #2563eb, #10b981); margin: 14px auto 0; border-radius: 4px; }
 
-    /* 🔥 NEW: Filter Buttons */
-    .filter-buttons {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        margin-bottom: 30px;
-        flex-wrap: wrap;
-    }
-    .filter-btn {
-        padding: 8px 20px;
-        border-radius: 30px;
-        font-size: 0.9rem;
-        font-weight: 700;
-        text-decoration: none;
-        border: 2px solid #e2e8f0;
-        color: #475569;
-        background: #fff;
-        transition: all 0.3s;
-    }
-    .filter-btn:hover {
-        border-color: #2563eb;
-        color: #2563eb;
-    }
-    .filter-btn.active {
-        background: linear-gradient(135deg, #1e3a8a, #2563eb);
-        color: #fff;
-        border-color: transparent;
-        box-shadow: 0 4px 15px rgba(37,99,235,0.3);
-    }
+    .premium-card { border-radius: 22px; overflow: hidden; box-shadow: 0 6px 25px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.03); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); height: 100%; display: flex; flex-direction: column; position: relative; background: #ffffff; border: 1.5px solid #e2e8f0; }
+    .premium-card:hover { transform: translateY(-8px); box-shadow: 0 20px 50px rgba(0,0,0,0.12), 0 4px 15px rgba(37,99,235,0.06); border-color: #93c5fd; }
+    .premium-card.recommended { border-color: #10b981; box-shadow: 0 8px 30px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.04); }
+    .premium-card.active-plan { border: 2.5px solid #10b981; box-shadow: 0 12px 40px rgba(16,185,129,0.25); }
 
-    /* ---- Premium Card ---- */
-    .premium-card {
-        border-radius: 22px;
-        overflow: hidden;
-        box-shadow: 0 6px 25px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.03);
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-        background: #ffffff;
-        border: 1.5px solid #e2e8f0;
-    }
-    .premium-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 20px 50px rgba(0,0,0,0.12), 0 4px 15px rgba(37,99,235,0.06);
-        border-color: #93c5fd;
-    }
-    .premium-card.recommended {
-        border-color: #10b981;
-        box-shadow: 0 8px 30px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.04);
-    }
-    .premium-card.active-plan {
-        border: 2.5px solid #10b981;
-        box-shadow: 0 12px 40px rgba(16,185,129,0.25);
-    }
+    .premium-recommended { position: absolute; top: 12px; right: 12px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; padding: 4px 12px; border-radius: 30px; font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; z-index: 10; box-shadow: 0 4px 15px rgba(16,185,129,0.45); animation: pulseGreen 2s infinite; }
+    @keyframes pulseGreen { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 
-    /* ---- Recommended Badge ---- */
-    .premium-recommended {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: #fff;
-        padding: 4px 12px;
-        border-radius: 30px;
-        font-size: 0.58rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-        z-index: 10;
-        box-shadow: 0 4px 15px rgba(16,185,129,0.45);
-        animation: pulseGreen 2s infinite;
-    }
-    @keyframes pulseGreen {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.06); }
-    }
+    .premium-header { padding: 22px 18px 18px; text-align: center; color: #fff; position: relative; overflow: hidden; }
+    .premium-header.blue { background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%); }
+    .premium-header.green { background: linear-gradient(135deg, #064e3b 0%, #059669 50%, #10b981 100%); }
+    .premium-header::before { content: ''; position: absolute; top: -60%; right: -60%; width: 220%; height: 220%; background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%); pointer-events: none; }
+    .premium-header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 25px; background: linear-gradient(180deg, transparent, rgba(0,0,0,0.08)); pointer-events: none; }
 
-    /* ---- Header Band ---- */
-    .premium-header {
-        padding: 22px 18px 18px;
-        text-align: center;
-        color: #fff;
-        position: relative;
-        overflow: hidden;
-    }
-    .premium-header.blue {
-        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
-    }
-    .premium-header.green {
-        background: linear-gradient(135deg, #064e3b 0%, #059669 50%, #10b981 100%);
-    }
-    .premium-header::before {
-        content: '';
-        position: absolute;
-        top: -60%;
-        right: -60%;
-        width: 220%;
-        height: 220%;
-        background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%);
-        pointer-events: none;
-    }
-    .premium-header::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 25px;
-        background: linear-gradient(180deg, transparent, rgba(0,0,0,0.08));
-        pointer-events: none;
-    }
+    .premium-header .plan-name { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 2px; text-shadow: 0 3px 12px rgba(0,0,0,0.2); position: relative; }
+    .premium-header .plan-duration { font-size: 0.7rem; font-weight: 600; opacity: 0.95; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; position: relative; }
 
-    .premium-header .plan-name {
-        font-size: 1.6rem;
-        font-weight: 900;
-        letter-spacing: -0.5px;
-        margin-bottom: 2px;
-        text-shadow: 0 3px 12px rgba(0,0,0,0.2);
-        position: relative;
-    }
-    .premium-header .plan-duration {
-        font-size: 0.7rem;
-        font-weight: 600;
-        opacity: 0.95;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        margin-bottom: 10px;
-        position: relative;
-    }
+    /* Access Badge */
+    .access-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-top: 5px; position: relative; z-index: 2; }
+    .access-badge.all-india { background: #e0f2fe; color: #0284c7; border: 1px solid #7dd3fc; }
+    .access-badge.local-city { background: #fef3c7; color: #d97706; border: 1px solid #fcd34d; }
 
-    /* 🔥 NEW: Access Type Badge */
-    .access-badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 0.65rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        margin-top: 5px;
-        position: relative;
-        z-index: 2;
-    }
-    .access-badge.all-india {
-        background: #e0f2fe;
-        color: #0284c7;
-        border: 1px solid #7dd3fc;
-    }
-    .access-badge.local-city {
-        background: #fef3c7;
-        color: #d97706;
-        border: 1px solid #fcd34d;
-    }
+    .price-wrapper { display: flex; align-items: baseline; justify-content: center; gap: 8px; flex-wrap: wrap; position: relative; }
+    .price-old { font-size: 1rem; font-weight: 700; color: rgba(255,255,255,0.6); text-decoration: line-through; text-decoration-thickness: 2px; }
+    .price-arrow { font-size: 1rem; font-weight: 300; color: rgba(255,255,255,0.8); }
+    .price-new { font-size: 1.9rem; font-weight: 900; color: #ffffff; letter-spacing: -1px; text-shadow: 0 4px 18px rgba(0,0,0,0.25); }
+    .save-pill { background: #ffffff; color: #059669; padding: 3px 12px; border-radius: 30px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-top: 6px; display: inline-block; }
+    .price-wrapper.no-discount .price-new { font-size: 2rem; }
 
-    .price-wrapper {
-        display: flex;
-        align-items: baseline;
-        justify-content: center;
-        gap: 8px;
-        flex-wrap: wrap;
-        position: relative;
-    }
-    .price-old {
-        font-size: 1rem;
-        font-weight: 700;
-        color: rgba(255,255,255,0.6);
-        text-decoration: line-through;
-        text-decoration-thickness: 2px;
-    }
-    .price-arrow {
-        font-size: 1rem;
-        font-weight: 300;
-        color: rgba(255,255,255,0.8);
-    }
-    .price-new {
-        font-size: 1.9rem;
-        font-weight: 900;
-        color: #ffffff;
-        letter-spacing: -1px;
-        text-shadow: 0 4px 18px rgba(0,0,0,0.25);
-    }
-    .save-pill {
-        background: #ffffff;
-        color: #059669;
-        padding: 3px 12px;
-        border-radius: 30px;
-        font-size: 0.65rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        margin-top: 6px;
-        display: inline-block;
-    }
-    .price-wrapper.no-discount .price-new {
-        font-size: 2rem;
-    }
+    .premium-body { padding: 16px 14px 12px; flex: 1; background: #ffffff; display: flex; flex-direction: column; }
+    .features-grid-premium { display: flex; flex-direction: column; gap: 5px; }
+    .feature-row-premium { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; transition: all 0.25s ease; background: #f8fafc; border: 1.5px solid transparent; }
+    .feature-row-premium:hover { background: #eff6ff; border-color: #bfdbfe; transform: translateX(3px); }
+    .feature-icon-box { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; }
+    .feature-icon-box.blue { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; }
+    .feature-icon-box.green { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #065f46; }
+    .feature-text-box { flex: 1; display: flex; flex-direction: column; gap: 0; min-width: 0; }
+    .feature-text-box .lbl { font-size: 0.6rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .feature-text-box .val { font-size: 0.82rem; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* ---- Body ---- */
-    .premium-body {
-        padding: 16px 14px 12px;
-        flex: 1;
-        background: #ffffff;
-        display: flex;
-        flex-direction: column;
-    }
+    .premium-footer { padding: 14px 14px 18px; text-align: center; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border-top: 1.5px solid #eef2f6; }
+    .btn-premium-buy { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff; border: none; padding: 11px 18px; border-radius: 50px; font-weight: 800; width: 100%; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-size: 0.85rem; letter-spacing: 0.3px; display: block; text-decoration: none; box-shadow: 0 4px 15px rgba(37,99,235,0.3); }
+    .btn-premium-buy:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(37,99,235,0.45); color: #fff; }
+    .btn-premium-buy.green { background: linear-gradient(135deg, #064e3b, #059669); box-shadow: 0 4px 15px rgba(16,185,129,0.3); }
+    .btn-premium-buy.green:hover { box-shadow: 0 8px 25px rgba(16,185,129,0.45); }
+    .btn-premium-buy:disabled { background: #cbd5e1 !important; color: #64748b !important; cursor: not-allowed; transform: none; box-shadow: none; }
 
-    .features-grid-premium {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
+    .active-status-pill { display: inline-block; padding: 7px 18px; border-radius: 50px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
+    .active-status-pill.active { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
+    .active-status-pill.pending { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; }
 
-    .feature-row-premium {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 8px 10px;
-        border-radius: 10px;
-        transition: all 0.25s ease;
-        background: #f8fafc;
-        border: 1.5px solid transparent;
-    }
-    .feature-row-premium:hover {
-        background: #eff6ff;
-        border-color: #bfdbfe;
-        transform: translateX(3px);
-    }
-    .feature-icon-box {
-        width: 30px;
-        height: 30px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.85rem;
-        flex-shrink: 0;
-    }
-    .feature-icon-box.blue {
-        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-        color: #1e40af;
-    }
-    .feature-icon-box.green {
-        background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-        color: #065f46;
-    }
-    .feature-text-box {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        min-width: 0;
-    }
-    .feature-text-box .lbl {
-        font-size: 0.6rem;
-        font-weight: 700;
-        color: #94a3b8;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .feature-text-box .val {
-        font-size: 0.82rem;
-        font-weight: 700;
-        color: #0f172a;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+    .empty-pkg { text-align: center; padding: 24px 12px; color: #94a3b8; font-size: 0.78rem; }
+    .empty-pkg i { font-size: 2rem; opacity: 0.3; display: block; margin-bottom: 8px; }
 
-    /* ---- Footer ---- */
-    .premium-footer {
-        padding: 14px 14px 18px;
-        text-align: center;
-        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-        border-top: 1.5px solid #eef2f6;
-    }
-
-    .btn-premium-buy {
-        background: linear-gradient(135deg, #1e3a8a, #2563eb);
-        color: #fff;
-        border: none;
-        padding: 11px 18px;
-        border-radius: 50px;
-        font-weight: 800;
-        width: 100%;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        font-size: 0.85rem;
-        letter-spacing: 0.3px;
-        display: block;
-        text-decoration: none;
-        box-shadow: 0 4px 15px rgba(37,99,235,0.3);
-    }
-    .btn-premium-buy:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(37,99,235,0.45);
-        color: #fff;
-    }
-    .btn-premium-buy.green {
-        background: linear-gradient(135deg, #064e3b, #059669);
-        box-shadow: 0 4px 15px rgba(16,185,129,0.3);
-    }
-    .btn-premium-buy.green:hover {
-        box-shadow: 0 8px 25px rgba(16,185,129,0.45);
-    }
-    .btn-premium-buy:disabled {
-        background: #cbd5e1 !important;
-        color: #64748b !important;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-    }
-
-    .active-status-pill {
-        display: inline-block;
-        padding: 7px 18px;
-        border-radius: 50px;
-        font-size: 0.7rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        margin-bottom: 8px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    }
-    .active-status-pill.active {
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: #fff;
-    }
-    .active-status-pill.pending {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        color: #fff;
-    }
-
-    /* ---- Empty State ---- */
-    .empty-pkg {
-        text-align: center;
-        padding: 24px 12px;
-        color: #94a3b8;
-        font-size: 0.78rem;
-    }
-    .empty-pkg i {
-        font-size: 2rem;
-        opacity: 0.3;
-        display: block;
-        margin-bottom: 8px;
-    }
-
-    @media (max-width: 1199px) {
-        .premium-header .plan-name { font-size: 1.5rem; }
-        .price-new { font-size: 1.75rem; }
-    }
-
-    @media (max-width: 991px) {
-        .page-header .premium-title { font-size: 2rem; }
-        .premium-header .plan-name { font-size: 1.8rem; }
-        .price-new { font-size: 2.2rem; }
-        .price-old { font-size: 1.2rem; }
-        .feature-icon-box {
-            width: 34px;
-            height: 34px;
-            font-size: 0.9rem;
-        }
-        .feature-text-box .lbl { font-size: 0.65rem; }
-        .feature-text-box .val { font-size: 0.88rem; }
-        .btn-premium-buy {
-            padding: 12px 22px;
-            font-size: 0.9rem;
-        }
-    }
-
-    @media (max-width: 576px) {
-        .page-header .premium-title { font-size: 1.7rem; }
-        .premium-header { padding: 22px 18px 18px; }
-        .premium-body { padding: 18px 16px 12px; }
-        .premium-footer { padding: 16px 18px 20px; }
-        .premium-header .plan-name { font-size: 1.7rem; }
-        .price-new { font-size: 2rem; }
-        .feature-text-box .val { font-size: 0.9rem; }
-    }
+    @media (max-width: 1199px) { .premium-header .plan-name { font-size: 1.5rem; } .price-new { font-size: 1.75rem; } }
+    @media (max-width: 991px) { .page-header .premium-title { font-size: 2rem; } .premium-header .plan-name { font-size: 1.8rem; } .price-new { font-size: 2.2rem; } .price-old { font-size: 1.2rem; } .feature-icon-box { width: 34px; height: 34px; font-size: 0.9rem; } .feature-text-box .lbl { font-size: 0.65rem; } .feature-text-box .val { font-size: 0.88rem; } .btn-premium-buy { padding: 12px 22px; font-size: 0.9rem; } }
+    @media (max-width: 576px) { .page-header .premium-title { font-size: 1.7rem; } .premium-header { padding: 22px 18px 18px; } .premium-body { padding: 18px 16px 12px; } .premium-footer { padding: 16px 18px 20px; } .premium-header .plan-name { font-size: 1.7rem; } .price-new { font-size: 2rem; } .feature-text-box .val { font-size: 0.9rem; } }
 </style>
 
 <div class="premium-section">
@@ -523,22 +163,9 @@ function getFieldIcon($fieldKey) {
 
         <!-- Header -->
         <div class="page-header">
-            <h1 class="premium-title">Choose Your Plan</h1>
-            <p class="premium-subtitle">Select the perfect plan for your real estate journey</p>
+            <h1 class="premium-title"><?= $title_text ?></h1>
+            <p class="premium-subtitle"><?= $subtitle_text ?></p>
             <div class="premium-divider"></div>
-        </div>
-
-        <!-- 🔥 NEW: FILTER BUTTONS -->
-        <div class="filter-buttons">
-            <a href="?access_filter=all" class="filter-btn <?= ($access_filter == 'all') ? 'active' : '' ?>">
-                <i class="fas fa-th-large me-1"></i> All Packages
-            </a>
-            <a href="?access_filter=all_india" class="filter-btn <?= ($access_filter == 'all_india') ? 'active' : '' ?>">
-                <i class="fas fa-globe me-1"></i> All India Access
-            </a>
-            <a href="?access_filter=local_city" class="filter-btn <?= ($access_filter == 'local_city') ? 'active' : '' ?>">
-                <i class="fas fa-map-marker-alt me-1"></i> Local City Access
-            </a>
         </div>
 
         <?php if ($has_pending): ?>
@@ -552,7 +179,7 @@ function getFieldIcon($fieldKey) {
             <?php 
             $count = count($packages);
             if ($count == 0) {
-                echo '<div class="col-12 text-center text-muted py-5"><h4>No packages found for this filter.</h4></div>';
+                echo '<div class="col-12 text-center text-muted py-5"><h4>No packages found in this category.</h4></div>';
             }
             foreach ($packages as $index => $pkg):
                 $is_active = ($is_subscribed && $sub_info['package_id'] == $pkg['id']);
@@ -570,7 +197,7 @@ function getFieldIcon($fieldKey) {
                     ? '<span class="access-badge local-city"><i class="fas fa-map-marker-alt"></i> Local City Only</span>' 
                     : '<span class="access-badge all-india"><i class="fas fa-globe"></i> All India Access</span>';
 
-                // 🔥 Fetch Dynamic Fields for THIS Package
+                // 🔥 Fetch Dynamic Fields
                 $pkgFields = [];
                 if (isset($fieldValues[$pkg['id']])) {
                     foreach ($allFields as $f) {
@@ -587,7 +214,6 @@ function getFieldIcon($fieldKey) {
                     }
                 }
             ?>
-                <!-- 🔥 4 Packages per Row on Desktop -->
                 <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 mb-3">
                     <div class="premium-card <?= $is_recommended ? 'recommended' : '' ?> <?= $is_active ? 'active-plan' : '' ?>">
                         
@@ -595,14 +221,12 @@ function getFieldIcon($fieldKey) {
                             <span class="premium-recommended">⭐ Recommended</span>
                         <?php endif; ?>
 
-                        <!-- HEADER BAND -->
                         <div class="premium-header <?= $colorTheme ?>">
                             <div class="plan-name"><?= htmlspecialchars($pkg['name']) ?></div>
                             <div class="plan-duration">
                                 <?= htmlspecialchars($pkg['duration'] ?? 0) ?> Months Access
                             </div>
                             
-                            <!-- 🔥 ACCESS TYPE BADGE -->
                             <div class="mb-2"><?= $access_badge ?></div>
 
                             <div class="price-wrapper <?= $show_discount ? '' : 'no-discount' ?>">
@@ -621,7 +245,6 @@ function getFieldIcon($fieldKey) {
                             <?php endif; ?>
                         </div>
 
-                        <!-- BODY - Dynamic Fields -->
                         <div class="premium-body">
                             <?php if (!empty($pkgFields)): ?>
                                 <div class="features-grid-premium">
@@ -645,7 +268,6 @@ function getFieldIcon($fieldKey) {
                             <?php endif; ?>
                         </div>
 
-                        <!-- FOOTER -->
                         <div class="premium-footer">
                             <?php if ($is_active): ?>
                                 <span class="active-status-pill active">✅ Active (<?= $days_left ?> days left)</span>
