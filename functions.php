@@ -932,7 +932,6 @@ function blockBadBots() {
  */
 function checkRateLimit($limit = 30, $timeWindow = 60) {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    // Skip rate limiting for localhost to avoid issues in development
     if ($ip === '127.0.0.1' || $ip === '::1') return;
 
     $file = sys_get_temp_dir() . '/rl_' . md5($ip);
@@ -949,5 +948,39 @@ function checkRateLimit($limit = 30, $timeWindow = 60) {
         http_response_code(429); // Too Many Requests
         die("Too Many Requests. Please try again later.");
     }
+}
+
+// ============================================================
+// 🔒 NEW: CHECK IF USER CAN VIEW PROPERTY (LOCAL vs ALL INDIA)
+// ============================================================
+function canUserViewProperty($pdo, $user_id, $property_city) {
+    if (!$user_id) return false;
+
+    // 1. Get User's City
+    $user_stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
+    $user_stmt->execute([$user_id]);
+    $user_city = $user_stmt->fetchColumn();
+
+    // 2. Get User's Active Packages
+    $stmt = $pdo->prepare("
+        SELECT p.access_type
+        FROM subscriptions s
+        JOIN packages p ON s.package_id = p.id
+        WHERE s.user_id = ? AND s.status = 'active' AND s.end_date >= CURRENT_DATE
+    ");
+    $stmt->execute([$user_id]);
+    $accesses = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    // 3. Check Access
+    if (in_array('all_india', $accesses)) {
+        return true; // Has All India Access
+    }
+    if (in_array('local_city', $accesses)) {
+        // Has Local Access - Check if city matches
+        if (strtolower(trim($user_city)) == strtolower(trim($property_city))) {
+            return true; 
+        }
+    }
+    return false;
 }
 ?>
