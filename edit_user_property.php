@@ -33,21 +33,12 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_property'])) {
     if(empty($title) || $price <= 0) {
         $error = "❌ Title and Price are required.";
     } else {
-        // Handle new image upload
         if(isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
-            $upload_dir = 'uploads/user_properties/';
-            if(!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
-            $filename = 'userprop_' . $user_id . '_' . time() . '.' . $ext;
-            $target_path = $upload_dir . $filename;
-            if(move_uploaded_file($_FILES['image']['tmp_name'], $target_path)) {
-                // Delete old image if exists
-                if($prop['image_url'] && file_exists($prop['image_url'])) {
-                    unlink($prop['image_url']);
-                }
-                $image_url = $target_path;
+            $uploaded = uploadFileToCloud($_FILES['image'], 'user_properties');
+            if ($uploaded) {
+                $image_url = $uploaded;
             } else {
-                $error = "❌ Failed to upload new image.";
+                $error = "❌ Failed to upload new image. Check SUPABASE_SERVICE_KEY.";
             }
         }
 
@@ -113,13 +104,13 @@ include 'header.php';
                 </div>
                 <div class="col-md-12">
                     <label class="form-label">Current Image</label><br>
-                    <?php if($prop['image_url'] && file_exists($prop['image_url'])): ?>
-                        <img src="<?= $prop['image_url'] ?>" style="max-height:150px; border-radius:10px; margin-bottom:10px;">
+                    <?php if(!empty($prop['image_url']) && cloudFileExists($prop['image_url'])): ?>
+                        <img src="<?= htmlspecialchars($prop['image_url']) ?>" style="max-height:150px; border-radius:10px; margin-bottom:10px;">
                     <?php else: ?>
                         <p class="text-muted">No image</p>
                     <?php endif; ?>
                     <input type="file" name="image" class="form-control" accept="image/*">
-                    <small>Leave empty to keep current image.</small>
+                    <small>Leave empty to keep current image. New uploads are saved to Cloud permanently.</small>
                 </div>
             </div>
             <button type="submit" name="update_property" class="btn btn-primary mt-3">Update Property</button>
