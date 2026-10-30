@@ -1,8 +1,4 @@
 <?php
-// ============================================================
-// 📝 Add User Property – Sale OR Exchange (Supabase Upload)
-// ============================================================
-
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -32,7 +28,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
     $sqft = (float)($_POST['sqft'] ?? 0);
     $construction_sqft = (float)($_POST['construction_sqft'] ?? 0);
     
-    // Exchange fields
     $want_type = trim($_POST['want_type'] ?? '');
     $want_budget = (float)($_POST['want_budget'] ?? 0);
     $want_city = trim($_POST['want_city'] ?? '');
@@ -48,7 +43,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_property'])) {
         $status = $has_mobile ? 'rejected' : 'approved';
         $admin_remarks = $has_mobile ? 'Mobile number not allowed in description.' : null;
 
-        // ☁️ Supabase Upload Code
         if(isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
             $result = uploadAnyFile($_FILES['image'], 'user_props');
             if (isset($result['url'])) {
@@ -87,7 +81,6 @@ include 'header.php';
     <div class="card p-4 shadow-sm" style="border-radius: 16px;">
         <form method="POST" enctype="multipart/form-data">
             
-            <!-- 🔥 Compact Listing Type Dropdown -->
             <div class="mb-4 p-3" style="background:#f8fafc; border-radius:12px; border: 1px solid #e2e8f0;">
                 <label class="form-label fw-bold text-dark mb-2">मैं क्या करना चाहता हूँ? *</label>
                 <select name="listing_type" id="listing_type" class="form-select form-select-lg" onchange="toggleExchange(this.value)" style="border-radius: 10px; font-weight: 600; color: #1e3a8a; cursor: pointer;">
@@ -96,7 +89,6 @@ include 'header.php';
                 </select>
             </div>
 
-            <!-- My Property (Give) -->
             <h6 class="text-primary mb-3 fw-bold"><i class="fas fa-arrow-up"></i> प्रॉपर्टी की जानकारी (जो आप देंगे)</h6>
             <div class="row g-3">
                 <div class="col-md-6">
@@ -144,11 +136,10 @@ include 'header.php';
                 <div class="col-md-12 mt-3">
                     <label class="form-label fw-bold">Upload Image / PDF</label>
                     <input type="file" name="image" class="form-control" accept="image/*, .pdf">
-                    <small class="text-muted">Max file size: 10MB.</small>
+                    <small class="text-muted">Max file size: 10MB. Saved permanently to cloud.</small>
                 </div>
             </div>
 
-            <!-- 🔥 Exchange Section (Hidden by Default) -->
             <div id="exchangeSection" style="display:none; background: #eff6ff; border: 2px dashed #93c5fd; border-radius: 12px; padding: 20px; margin-top: 25px;">
                 <h6 class="text-success mb-3 fw-bold"><i class="fas fa-arrow-down"></i> मैं क्या लेना चाहता हूँ (All India Exchange)</h6>
                 <div class="row g-3">
@@ -196,12 +187,10 @@ include 'header.php';
 </div>
 
 <script>
-// Dropdown change hone par Exchange section toggle karne ka function
 function toggleExchange(val) {
     var sec = document.getElementById('exchangeSection');
     if (val === 'exchange') {
         sec.style.display = 'block';
-        // Smooth scroll to exchange section
         sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
         sec.style.display = 'none';
