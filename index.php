@@ -288,6 +288,8 @@ if(!empty($search_locality) && empty($customer_props) && empty($today_props) && 
 
 // ---- Render Property Card ----
 function renderPropertyCard($prop, $show_images, $is_today = false) {
+    global $pdo, $user_id; // Access global variables for city check
+
     $gradients = [
         ['bg' => 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 'text' => 'white'],
         ['bg' => 'linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%)', 'text' => 'white'],
@@ -303,6 +305,9 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     $shadow = ($g['text'] == 'white') ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.05)';
     $border = ($g['text'] == 'white') ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
     $image_url = ($prop['source'] == 'auction') ? ($prop['image_url'] ?? '') : ($prop['image_url'] ?? '');
+    
+    // 🔥 NEW: Check city access for this specific property
+    $has_city_access = canUserViewProperty($pdo, $user_id, $prop['city'] ?? '');
     
     $is_private_treaty = ($prop['source'] == 'auction' && isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty');
     ?>
@@ -354,7 +359,8 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
                     <a href="login.php" class="btn btn-light w-100 mt-3" style="border-radius:16px; font-weight:600; color:#1e293b;">Login to View</a>
                 <?php endif; ?>
             </div>
-            <?php if($show_images && !empty($image_url)): ?>
+            <!-- 🔥 UPDATED LOGIC: Check both show_images (subscription) and has_city_access -->
+            <?php if($show_images && $has_city_access && !empty($image_url)): ?>
                 <img src="<?= htmlspecialchars($image_url) ?>" style="height:200px; width:100%; object-fit:cover; border-top:3px solid <?= $border ?>;" alt="<?= htmlspecialchars($prop['title']) ?>">
             <?php else: ?>
                 <div style="height:150px; background:rgba(255,255,255,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px); border-top:3px solid <?= $border ?>; padding:10px;">
