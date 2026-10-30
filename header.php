@@ -84,7 +84,6 @@ if ($is_logged_in && $role == 'user') {
     $user_coins = $user_sidebar['coins'] ?? 0;
     $ba_status = $user_sidebar['ba_status'] ?? 'none';
 
-    // Fetch Active Subscription and check if it's a paid plan (Auto BA logic)
     $sub_info = safeFetch($pdo, "SELECT s.start_date, s.end_date, p.name as plan_name, p.price as plan_price 
                                  FROM subscriptions s 
                                  LEFT JOIN packages p ON s.package_id = p.id 
@@ -99,7 +98,6 @@ if ($is_logged_in && $role == 'user') {
         $days_left = (int) ((strtotime($expiry_date) - time()) / (60 * 60 * 24));
         $days_left = max(0, $days_left);
 
-        // If user has a paid package, treat them as BA (Active)
         if ((!empty($sub_info['plan_price']) && $sub_info['plan_price'] > 0) || (strtolower($plan_name) !== 'free' && $plan_name !== 'No Plan')) {
             $ba_status = 'active';
         }
@@ -181,7 +179,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .sidebar-overlay-main { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1040; }
         .sidebar-overlay-main.show { display: block; }
         
-        /* Collapsible Sidebar Sections */
         .sidebar .nav-section { margin: 6px 0; }
         .sidebar .nav-section-title { display: flex; align-items: center; padding: 12px 20px; color: #334155; font-weight: 600; font-size: 14.5px; cursor: pointer; border-radius: 12px; transition: all 0.25s ease; user-select: none; border-left: 3px solid transparent; }
         .sidebar .nav-section-title:hover { background: #f1f5f9; color: #1e3a8a; }
@@ -388,9 +385,10 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 <a href="admin_jobs.php" class="<?= $current_page == 'admin_jobs.php' ? 'active' : '' ?>"><i class="fas fa-briefcase"></i> <span>Jobs / Interviews</span></a>
                 <a href="admin_social_links.php" class="<?= $current_page == 'admin_social_links.php' ? 'active' : '' ?>"><i class="fas fa-share-alt"></i> <span>Social Links</span></a>
                 <a href="admin_notification.php" class="<?= $current_page == 'admin_notification.php' ? 'active' : '' ?>"><i class="fas fa-bullhorn"></i> <span>Popup Notification</span><?php if (isset($notif_count) && $notif_count > 0): ?><span class="badge bg-danger ms-2"><?= $notif_count ?></span><?php endif; ?></a>
-                <?php if (hasViewPermission('activity_logs', $pdo)): ?>
-                    <a href="admin_activity_logs.php" class="<?= $current_page == 'admin_activity_logs.php' ? 'active' : '' ?>"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
-                <?php endif; ?>
+                
+                <!-- 🔥 FIXED: Activity Logs (Directly visible for Super Admin) -->
+                <a href="admin_activity_logs.php" class="<?= $current_page == 'admin_activity_logs.php' ? 'active' : '' ?>"><i class="fas fa-clock"></i> <span>Activity Logs</span></a>
+                
                 <?php if (hasViewPermission('kyc', $pdo)): ?>
                     <a href="admin_kyc.php" class="<?= $current_page == 'admin_kyc.php' ? 'active' : '' ?>"><i class="fas fa-id-card"></i> <span>KYC Verification</span></a>
                 <?php endif; ?>
@@ -441,7 +439,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             </div>
         </div>
 
-        <!-- 🔥 UPDATED: Buy Search Engine with Sub-menus -->
+        <!-- 🔥 Buy Search Engine Dropdown -->
         <div class="nav-section <?= ($current_page == 'user_packages.php') ? 'open' : '' ?>">
             <div class="nav-section-title <?= ($current_page == 'user_packages.php') ? 'active' : '' ?>" onclick="toggleSection(this)">
                 <i class="fas fa-search-dollar section-icon"></i><span>Buy Search Engine</span><i class="fas fa-chevron-right section-arrow"></i>
@@ -458,15 +456,12 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         
         <!-- BA LOGIC -->
         <?php if ($ba_status == 'active'): ?>
-            <!-- Paid Package Users & Approved BA -->
             <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>"><i class="fas fa-users"></i> <span>My Team</span></a>
             <a href="my_earnings.php" class="<?= $current_page == 'my_earnings.php' ? 'active' : '' ?>"><i class="fas fa-file-invoice-dollar"></i> <span>My Earnings</span></a>
             <a href="user_referrals.php" class="<?= $current_page == 'user_referrals.php' ? 'active' : '' ?>"><i class="fas fa-link"></i> <span>Referrals</span></a>
         <?php elseif ($ba_status == 'pending'): ?>
-            <!-- Applied but not approved yet -->
             <a href="javascript:void(0);" class="text-warning" style="cursor: default;"><i class="fas fa-clock"></i> <span>BA Approval Pending</span></a>
         <?php else: ?>
-            <!-- Normal Free Users -->
             <a href="apply_ba.php" class="<?= $current_page == 'apply_ba.php' ? 'active' : '' ?>"><i class="fas fa-handshake"></i> <span>Apply for BA</span></a>
         <?php endif; ?>
         <!-- BA LOGIC END -->
