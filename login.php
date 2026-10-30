@@ -2,6 +2,11 @@
 require_once __DIR__ . '/db.php';
 $error = '';
 
+// 🔥 SHOW MESSAGE IF LOGGED OUT FROM ANOTHER DEVICE
+if (isset($_GET['msg']) && $_GET['msg'] == 'logged_out_elsewhere') {
+    $error = 'You have been logged out because your account was accessed from another device.';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -14,11 +19,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password'])) {
+            // 🔥 Start New Session ID
+            session_regenerate_id(true);
+            
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['name'];
             $_SESSION['email'] = $user['email'];
             $_SESSION['role'] = $user['role'];
             $_SESSION['is_super_admin'] = !empty($user['is_super_admin']) ? true : false;
+
+            // 🔥 SAVE SESSION ID TO DB (Single Login Logic)
+            $pdo->prepare("UPDATE users SET active_session_id = ? WHERE id = ?")->execute([session_id(), $user['id']]);
 
             if ($user['role'] == 'admin' || $user['role'] == 'sub_admin') {
                 header("Location: admin_dashboard.php");
