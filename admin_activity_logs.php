@@ -1,4 +1,7 @@
 <?php
+// 🔥 TIMEZONE FIX: Set time to Indian Standard Time
+date_default_timezone_set('Asia/Kolkata');
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -107,11 +110,19 @@ $logs = $stmt->fetchAll();
 $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
 ?>
 
+<!-- 🔥 SEARCHABLE DROPDOWN (Select2) CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
 <style>
     .nav-tabs .nav-link { font-weight: 600; color: #475569; border: none; padding: 12px 20px; }
     .nav-tabs .nav-link.active { background: transparent; border-bottom: 3px solid #2563eb; color: #2563eb; }
     .live-dot { width: 10px; height: 10px; background-color: #10b981; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
     @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+    
+    /* Select2 Custom Styling to match Bootstrap */
+    .select2-container--bootstrap-5 .select2-selection--single { height: 38px !important; border-radius: 8px; border-color: #cbd5e1; }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered { line-height: 36px !important; }
 </style>
 
 <div class="card-premium">
@@ -243,10 +254,13 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <select name="filter_user" class="form-select">
+                    <!-- 🔥 SEARCHABLE DROPDOWN FIX -->
+                    <select name="filter_user" id="userSearchSelect" class="form-select">
                         <option value="">All Users</option>
                         <?php foreach($users as $u): ?>
-                            <option value="<?= $u['id'] ?>" <?= ($filter_user==$u['id'])?'selected':'' ?>><?= htmlspecialchars($u['name']) ?> (<?= $u['email'] ?>)</option>
+                            <option value="<?= $u['id'] ?>" <?= ($filter_user==$u['id'])?'selected':'' ?>>
+                                <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -266,7 +280,7 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
                             <th>Activity</th>
                             <th>Details</th>
                             <th>IP</th>
-                            <th>Time</th>
+                            <th>Time (IST)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -305,5 +319,20 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
 
     </div>
 </div>
+
+<!-- 🔥 SEARCHABLE DROPDOWN (Select2) JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // Initialize Select2 for the User dropdown
+        $('#userSearchSelect').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Search User by Name or Email...',
+            allowClear: true,
+            width: '100%'
+        });
+    });
+</script>
 
 <?php include 'footer.php'; ?>
