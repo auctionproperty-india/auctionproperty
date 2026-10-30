@@ -16,6 +16,19 @@ $hide_top_nav = !in_array($current_page, ['index.php', 'login.php', 'register.ph
 $is_logged_in = isset($_SESSION['user_id']);
 $role = $is_logged_in ? ($_SESSION['role'] ?? 'user') : 'guest';
 
+// 🔥 SINGLE LOGIN LOGIC (1 User 1 Login)
+if ($is_logged_in && $role != 'admin' && !isset($_SESSION['impersonate_admin_id'])) {
+    $db_session = safeFetch($pdo, "SELECT active_session_id FROM users WHERE id = ?", [$_SESSION['user_id']]);
+    if ($db_session && !empty($db_session['active_session_id'])) {
+        if ($db_session['active_session_id'] !== session_id()) {
+            // Kisi aur device se login hua hai, isko logout kar do
+            session_destroy();
+            header("Location: login.php?msg=logged_out_elsewhere");
+            exit;
+        }
+    }
+}
+
 // 🔥 User Name Fix
 $display_name = $_SESSION['name'] ?? $_SESSION['user_name'] ?? 'User';
 if ($is_logged_in && ($display_name === 'User' || empty($display_name))) {
