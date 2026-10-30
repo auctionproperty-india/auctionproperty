@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🎁 Admin Packages Manager – With Add/Edit Checkboxes
+// 🎁 Admin Packages Manager – With Add/Edit Checkboxes & Access Type
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -90,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $discount_price = !empty($_POST['discount_price']) ? (float)$_POST['discount_price'] : null;
         $duration = (int)($_POST['duration'] ?? 0);
         $display_order = (int)($_POST['display_order'] ?? 0);
+        $access_type = trim($_POST['access_type'] ?? 'all_india');
         
         $is_user = isset($_POST['is_user_package']) ? 1 : 0;
         $is_ba = isset($_POST['is_ba_package']) ? 1 : 0;
@@ -99,8 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $message_type = "danger";
         } else {
             try {
-                $stmt = $pdo->prepare("INSERT INTO packages (name, price, discount_price, duration, display_order, is_user_package, is_ba_package) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$name, $price, $discount_price, $duration, $display_order, $is_user, $is_ba]);
+                $stmt = $pdo->prepare("INSERT INTO packages (name, price, discount_price, duration, display_order, is_user_package, is_ba_package, access_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$name, $price, $discount_price, $duration, $display_order, $is_user, $is_ba, $access_type]);
                 $package_id = $pdo->lastInsertId();
 
                 $fields = $pdo->query("SELECT * FROM package_fields WHERE is_active = TRUE")->fetchAll();
@@ -129,13 +130,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $discount_price = !empty($_POST['discount_price']) ? (float)$_POST['discount_price'] : null;
         $duration = (int)($_POST['duration'] ?? 0);
         $display_order = (int)($_POST['display_order'] ?? 0);
+        $access_type = trim($_POST['access_type'] ?? 'all_india');
         
         $is_user = isset($_POST['is_user_package']) ? 1 : 0;
         $is_ba = isset($_POST['is_ba_package']) ? 1 : 0;
 
         try {
-            $stmt = $pdo->prepare("UPDATE packages SET name = ?, price = ?, discount_price = ?, duration = ?, display_order = ?, is_user_package = ?, is_ba_package = ? WHERE id = ?");
-            $stmt->execute([$name, $price, $discount_price, $duration, $display_order, $is_user, $is_ba, $id]);
+            $stmt = $pdo->prepare("UPDATE packages SET name = ?, price = ?, discount_price = ?, duration = ?, display_order = ?, is_user_package = ?, is_ba_package = ?, access_type = ? WHERE id = ?");
+            $stmt->execute([$name, $price, $discount_price, $duration, $display_order, $is_user, $is_ba, $access_type, $id]);
 
             $fields = $pdo->query("SELECT * FROM package_fields")->fetchAll();
             foreach ($fields as $f) {
@@ -296,18 +298,27 @@ include 'header.php';
                     <div class="col-md-3"><label class="form-label fw-bold small">🔢 Sequence No.</label><input type="number" name="display_order" class="form-control" value="<?= $selectedPackage['display_order'] ?? 0 ?>"></div>
                 </div>
 
-                <!-- CHECKBOXES: EDIT PACKAGE -->
-                <div class="row g-3 mb-4 p-3 rounded" style="background: #fffbeb; border: 1px solid #fde68a;">
-                    <div class="col-md-6">
-                        <div class="form-check form-switch">
+                <!-- 🔥 ACCESS TYPE DROPDOWN (EDIT) -->
+                <div class="row g-3 mb-4 p-3 rounded" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-success small">🌍 Property Access Type</label>
+                        <select name="access_type" class="form-control border-success">
+                            <option value="all_india" <?= (!isset($selectedPackage['access_type']) || $selectedPackage['access_type'] == 'all_india') ? 'selected' : '' ?>>All India (Full Access)</option>
+                            <option value="local_city" <?= (isset($selectedPackage['access_type']) && $selectedPackage['access_type'] == 'local_city') ? 'selected' : '' ?>>Local City Only</option>
+                        </select>
+                        <small class="text-muted" style="font-size: 0.7rem;">Local City = User can only see properties in their registered city.</small>
+                    </div>
+                    
+                    <div class="col-md-4 border-start">
+                        <div class="form-check form-switch mt-3">
                             <input class="form-check-input" type="checkbox" name="is_user_package" id="edit_is_user" value="1" <?= (!isset($selectedPackage['is_user_package']) || $selectedPackage['is_user_package']) ? 'checked' : '' ?>>
                             <label class="form-check-label fw-bold" for="edit_is_user">Show in User Packages (Search Engine)</label>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="form-check form-switch">
+                    <div class="col-md-4 border-start">
+                        <div class="form-check form-switch mt-3">
                             <input class="form-check-input" type="checkbox" name="is_ba_package" id="edit_is_ba" value="1" <?= (isset($selectedPackage['is_ba_package']) && $selectedPackage['is_ba_package']) ? 'checked' : '' ?>>
-                            <label class="form-check-label fw-bold text-success" for="edit_is_ba">Show in BA Packages (Training)</label>
+                            <label class="form-check-label fw-bold text-primary" for="edit_is_ba">Show in BA Packages (Training)</label>
                         </div>
                     </div>
                 </div>
@@ -357,18 +368,26 @@ include 'header.php';
                     <div class="col-md-3"><label class="form-label fw-bold small">🔢 Sequence No.</label><input type="number" name="display_order" class="form-control" placeholder="1, 2, 3..." value="0"></div>
                 </div>
 
-                <!-- CHECKBOXES: ADD NEW PACKAGE -->
-                <div class="row g-3 mb-4 p-3 rounded" style="background: #fffbeb; border: 1px solid #fde68a;">
-                    <div class="col-md-6">
-                        <div class="form-check form-switch">
+                <!-- 🔥 ACCESS TYPE DROPDOWN (ADD NEW) -->
+                <div class="row g-3 mb-4 p-3 rounded" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-success small">🌍 Property Access Type</label>
+                        <select name="access_type" class="form-control border-success">
+                            <option value="all_india">All India (Full Access)</option>
+                            <option value="local_city">Local City Only</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-4 border-start">
+                        <div class="form-check form-switch mt-3">
                             <input class="form-check-input" type="checkbox" name="is_user_package" id="add_is_user" value="1" checked>
                             <label class="form-check-label fw-bold" for="add_is_user">Show in User Packages (Search Engine)</label>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="form-check form-switch">
+                    <div class="col-md-4 border-start">
+                        <div class="form-check form-switch mt-3">
                             <input class="form-check-input" type="checkbox" name="is_ba_package" id="add_is_ba" value="1">
-                            <label class="form-check-label fw-bold text-success" for="add_is_ba">Show in BA Packages (Training)</label>
+                            <label class="form-check-label fw-bold text-primary" for="add_is_ba">Show in BA Packages (Training)</label>
                         </div>
                     </div>
                 </div>
@@ -390,7 +409,8 @@ include 'header.php';
                     <tr>
                         <th>ID</th>
                         <th>Name</th>
-                        <th>Type (Visibility)</th>
+                        <th>Type</th>
+                        <th>Access</th>
                         <th>Price</th>
                         <th>Duration</th>
                         <th style="text-align:right;">Actions</th>
@@ -409,8 +429,15 @@ include 'header.php';
                                     <span class="badge bg-success px-2 py-1 mb-1">BA</span>
                                 <?php endif; ?>
                             </td>
+                            <td>
+                                <?php if (isset($p['access_type']) && $p['access_type'] == 'local_city'): ?>
+                                    <span class="badge bg-warning text-dark"><i class="fas fa-map-marker-alt"></i> Local</span>
+                                <?php else: ?>
+                                    <span class="badge bg-info"><i class="fas fa-globe"></i> All India</span>
+                                <?php endif; ?>
+                            </td>
                             <td>₹ <?= number_format($p['price'] ?? 0) ?></td>
-                            <td><span class="badge bg-info"><?= htmlspecialchars($p['duration'] ?? 0) ?> mo</span></td>
+                            <td><span class="badge bg-secondary"><?= htmlspecialchars($p['duration'] ?? 0) ?> mo</span></td>
                             <td style="text-align:right;">
                                 <a href="?pkg=<?= $p['id'] ?>" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></a>
                                 <form method="POST" style="display:inline;" onsubmit="return confirm('⚠️ Delete this package?');">
