@@ -85,7 +85,9 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     }
 }
 
-// Handle Delete Property
+// ============================================================
+// Handle Delete Property (admin only) — deletes files from Supabase too
+// ============================================================
 if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     $delete_id = (int)$_GET['delete'];
     $stmt = $pdo->prepare("SELECT admin_document, image_url FROM properties WHERE id = ?");
@@ -93,20 +95,17 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete']) && $is_admin) {
     $row_to_del = $stmt->fetch();
     if ($row_to_del) {
         if (!empty($row_to_del['admin_document'])) {
-            $f = __DIR__ . '/' . ltrim($row_to_del['admin_document'], '/');
-            if (file_exists($f)) @unlink($f);
+            deleteCloudFileByUrl($row_to_del['admin_document']);
         }
         if (!empty($row_to_del['image_url'])) {
-            $f = __DIR__ . '/' . ltrim($row_to_del['image_url'], '/');
-            if (file_exists($f)) @unlink($f);
+            deleteCloudFileByUrl($row_to_del['image_url']);
         }
     }
     try {
         $imgs = $pdo->prepare("SELECT image_url FROM property_images WHERE property_id = ?");
         $imgs->execute([$delete_id]);
         foreach ($imgs->fetchAll() as $im) {
-            $f = __DIR__ . '/' . ltrim($im['image_url'], '/');
-            if (file_exists($f)) @unlink($f);
+            deleteCloudFileByUrl($im['image_url']);
         }
         $pdo->prepare("DELETE FROM property_images WHERE property_id = ?")->execute([$delete_id]);
     } catch (Exception $e) {}
@@ -213,67 +212,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $auction_end_parsed = parseDateTimeFlexible($auction_end_time);
 
     // ============================================================
-    // 📄 ADMIN DOCUMENT UPLOAD + REMOVE
+    // 📄 ADMIN DOCUMENT UPLOAD (Cloud) + REMOVE
     // ============================================================
     $admin_document_path = $edit_mode ? ($prop['admin_document'] ?? null) : null;
     $upload_error = '';
 
-    // Handle new upload
     if (isset($_FILES['admin_document']) && $_FILES['admin_document']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = __DIR__ . '/uploads/admin_documents/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $file_tmp = $_FILES['admin_document']['tmp_name'];
         $file_ext = strtolower(pathinfo(basename($_FILES['admin_document']['name']), PATHINFO_EXTENSION));
         if (in_array($file_ext, ['pdf','jpg','jpeg','png'])) {
-            $new_name = uniqid('admin_doc_') . '.' . $file_ext;
-            if (move_uploaded_file($file_tmp, $upload_dir . $new_name)) {
-                if ($edit_mode && !empty($prop['admin_document'])) {
-                    $old = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
-                    if (file_exists($old)) @unlink($old);
-                }
-                $admin_document_path = 'uploads/admin_documents/' . $new_name;
+            $uploaded = uploadFileToCloud($_FILES['admin_document'], 'admin_documents');
+            if ($uploaded) {
+                $admin_document_path = $uploaded;
             } else {
-                $upload_error = "Failed to move uploaded document.";
+                $upload_error = "Failed to upload document to cloud. Check SUPABASE_SERVICE_KEY on Render.";
             }
         } else {
             $upload_error = "Invalid document type.";
         }
     }
 
-    // 🔥 Handle REMOVE existing admin document
+    // Explicit remove admin document (only when user checks the checkbox)
     if (isset($_POST['remove_admin_document']) && $_POST['remove_admin_document'] == '1') {
         if ($edit_mode && !empty($prop['admin_document'])) {
-            $old = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
-            if (file_exists($old)) @unlink($old);
+            deleteCloudFileByUrl($prop['admin_document']);
         }
         $admin_document_path = null;
     }
 
     // ============================================================
-    // 🖼️ MAIN IMAGE UPLOAD + REMOVE
+    // 🖼️ MAIN IMAGE UPLOAD (Cloud) + REMOVE
     // ============================================================
     $image_url_path = $edit_mode ? ($prop['image_url'] ?? null) : null;
     if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-        $img_dir = __DIR__ . '/uploads/property_images/';
-        if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
-        $img_tmp = $_FILES['image']['tmp_name'];
         $img_ext = strtolower(pathinfo(basename($_FILES['image']['name']), PATHINFO_EXTENSION));
         if (in_array($img_ext, ['jpg','jpeg','png','webp','gif'])) {
-            $new_img_name = uniqid('prop_img_') . '.' . $img_ext;
-            if (move_uploaded_file($img_tmp, $img_dir . $new_img_name)) {
-                if ($edit_mode && !empty($prop['image_url'])) {
-                    $old = __DIR__ . '/' . ltrim($prop['image_url'], '/');
-                    if (file_exists($old)) @unlink($old);
-                }
-                $image_url_path = 'uploads/property_images/' . $new_img_name;
+            $uploaded = uploadFileToCloud($_FILES['image'], 'property_images');
+            if ($uploaded) {
+                $image_url_path = $uploaded;
+            } else {
+                $upload_error = $upload_error ?: "Failed to upload image to cloud.";
             }
         }
     }
 
+    // Explicit remove image
     if (isset($_POST['remove_image']) && $_POST['remove_image'] == '1') {
         if ($edit_mode && !empty($prop['image_url'])) {
-            $old = __DIR__ . '/' . ltrim($prop['image_url'], '/');
-            if (file_exists($old)) @unlink($old);
+            deleteCloudFileByUrl($prop['image_url']);
         }
         $image_url_path = null;
     }
@@ -326,10 +311,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
+// ============================================================
+// Save Gallery Images (Cloud)
+// ============================================================
 function saveGalleryImages($pdo, $property_id, $main_image = null) {
     if (empty($_FILES['images']['name'][0])) return;
-    $img_dir = __DIR__ . '/uploads/property_images/';
-    if (!is_dir($img_dir)) mkdir($img_dir, 0755, true);
     $maxOrder = 0;
     try {
         $stmt = $pdo->prepare("SELECT COALESCE(MAX(display_order), 0) FROM property_images WHERE property_id = ?");
@@ -339,12 +325,18 @@ function saveGalleryImages($pdo, $property_id, $main_image = null) {
     $first_uploaded = null;
     foreach ($_FILES['images']['name'] as $i => $name) {
         if ($_FILES['images']['error'][$i] !== UPLOAD_ERR_OK) continue;
-        $tmp = $_FILES['images']['tmp_name'][$i];
         $ext = strtolower(pathinfo(basename($name), PATHINFO_EXTENSION));
         if (!in_array($ext, ['jpg','jpeg','png','webp','gif'])) continue;
-        $new_name = uniqid('gallery_') . '.' . $ext;
-        if (move_uploaded_file($tmp, $img_dir . $new_name)) {
-            $url = 'uploads/property_images/' . $new_name;
+
+        $single = [
+            'name'     => $_FILES['images']['name'][$i],
+            'type'     => $_FILES['images']['type'][$i],
+            'tmp_name' => $_FILES['images']['tmp_name'][$i],
+            'error'    => $_FILES['images']['error'][$i],
+            'size'     => $_FILES['images']['size'][$i],
+        ];
+        $url = uploadFileToCloud($single, 'property_images');
+        if ($url) {
             $pdo->prepare("INSERT INTO property_images (property_id, image_url, display_order, created_at) VALUES (?, ?, ?, NOW())")
                 ->execute([$property_id, $url, ++$maxOrder]);
             if ($first_uploaded === null) $first_uploaded = $url;
@@ -359,7 +351,9 @@ function saveGalleryImages($pdo, $property_id, $main_image = null) {
 include 'header.php';
 ?>
 
-<!-- 🔥 ALL STYLES -->
+<!-- ============================================================ -->
+<!-- 🔥 ALL STYLES                                                 -->
+<!-- ============================================================ -->
 <style>
     .compact-table-wrapper {
         background: #fff;
@@ -771,7 +765,16 @@ include 'header.php';
         </div>
     <?php endif; ?>
 
-    <!-- ADD/EDIT FORM -->
+    <?php if (!empty($upload_error)): ?>
+        <div class="alert alert-warning alert-dismissible fade show py-2 px-3" style="font-size:0.85rem;">
+            ⚠️ <?= htmlspecialchars($upload_error) ?>
+            <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
+    <!-- ============================================================ -->
+    <!-- ADD / EDIT FORM                                              -->
+    <!-- ============================================================ -->
     <?php if (isset($_GET['add']) || $edit_mode): ?>
     <div class="card shadow-lg rounded-4 mb-4 border-0">
         <div class="card-header bg-primary text-white p-3 rounded-top-4">
@@ -892,9 +895,9 @@ include 'header.php';
                         </select>
                     </div>
 
-                    <!-- ============================================================
-                         MAIN / COVER IMAGE
-                         ============================================================ -->
+                    <!-- ============================================================ -->
+                    <!-- MAIN / COVER IMAGE                                           -->
+                    <!-- ============================================================ -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-primary">
                             <i class="fas fa-image me-1"></i> Main / Cover Image
@@ -903,7 +906,7 @@ include 'header.php';
                         <div class="custom-upload-box" onclick="document.getElementById('mainImageInput').click();">
                             <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
                             <div class="upload-text">Click to select image</div>
-                            <div class="upload-hint">JPG, PNG, WEBP, GIF • Max 5MB</div>
+                            <div class="upload-hint">JPG, PNG, WEBP, GIF • Max 5MB • Saved to Cloud</div>
                             <input type="file" name="image" id="mainImageInput" accept="image/*"
                                    onchange="handleMainImageSelect(this)">
                         </div>
@@ -934,9 +937,9 @@ include 'header.php';
                         <?php endif; ?>
                     </div>
 
-                    <!-- ============================================================
-                         GALLERY IMAGES
-                         ============================================================ -->
+                    <!-- ============================================================ -->
+                    <!-- GALLERY IMAGES                                               -->
+                    <!-- ============================================================ -->
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-success">
                             <i class="fas fa-images me-1"></i> Gallery Images (Multiple)
@@ -945,7 +948,7 @@ include 'header.php';
                         <div class="custom-upload-box" onclick="document.getElementById('galleryInput').click();">
                             <div class="upload-icon"><i class="fas fa-images"></i></div>
                             <div class="upload-text">Click to select multiple images</div>
-                            <div class="upload-hint">एक साथ कई images select करें</div>
+                            <div class="upload-hint">एक साथ कई images select करें • Cloud</div>
                             <input type="file" name="images[]" id="galleryInput" accept="image/*" multiple
                                    onchange="handleGallerySelect(this)">
                         </div>
@@ -964,7 +967,7 @@ include 'header.php';
                                                  alt="Gallery"
                                                  style="width:65px; height:65px; object-fit:cover; border-radius:8px; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
                                             <a href="delete_property_image.php?id=<?= $img['id'] ?>&prop=<?= $prop['id'] ?>"
-                                               onclick="return confirm('Delete this image from server?')"
+                                               onclick="return confirm('Delete this image from cloud?')"
                                                style="position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:#dc2626; color:#fff; font-size:11px; text-align:center; line-height:22px; text-decoration:none; font-weight:bold; box-shadow:0 2px 6px rgba(220,38,38,0.4);"
                                                title="Delete from server">
                                                 ×
@@ -976,33 +979,30 @@ include 'header.php';
                         <?php endif; ?>
                     </div>
 
-                    <!-- ============================================================
-                         🔥 ADMIN DOCUMENT — With Remove Option
-                         ============================================================ -->
+                    <!-- ============================================================ -->
+                    <!-- 🔥 ADMIN DOCUMENT                                            -->
+                    <!-- ============================================================ -->
                     <div class="col-12">
                         <label class="form-label fw-bold text-danger">
                             <i class="fas fa-file-pdf me-1"></i> Admin Document (PDF/JPG/PNG - Only for Admins)
                         </label>
 
-                        <!-- Custom upload box -->
                         <div class="custom-upload-box danger" onclick="document.getElementById('adminDocInput').click();">
                             <div class="upload-icon"><i class="fas fa-file-upload"></i></div>
                             <div class="upload-text">Click to select document</div>
-                            <div class="upload-hint">PDF, JPG, JPEG, PNG • Max 10MB</div>
+                            <div class="upload-hint">PDF, JPG, JPEG, PNG • Max 10MB • Saved to Cloud</div>
                             <input type="file" name="admin_document" id="adminDocInput" 
                                    accept=".pdf,.jpg,.jpeg,.png"
                                    onchange="handleAdminDocSelect(this)">
                         </div>
 
-                        <!-- 🔥 New selection preview -->
                         <div id="adminDocPreview"></div>
 
-                        <!-- 🔥 Existing admin document + remove (Edit mode) -->
                         <?php if ($edit_mode && !empty($prop['admin_document'])): 
-                            $doc_check = __DIR__ . '/' . ltrim($prop['admin_document'], '/');
-                            $doc_exists = file_exists($doc_check);
+                            $doc_exists = cloudFileExists($prop['admin_document']);
                             $doc_ext = strtolower(pathinfo($prop['admin_document'], PATHINFO_EXTENSION));
                             $doc_icon = ($doc_ext === 'pdf') ? 'fa-file-pdf' : 'fa-file-image';
+                            $doc_name = basename(parse_url($prop['admin_document'], PHP_URL_PATH));
                         ?>
                             <div class="doc-preview-card" id="serverDocCard">
                                 <div class="doc-icon">
@@ -1010,18 +1010,17 @@ include 'header.php';
                                 </div>
                                 <div class="doc-info">
                                     <div class="doc-name">
-                                        <?= htmlspecialchars(basename($prop['admin_document'])) ?>
+                                        <?= htmlspecialchars($doc_name) ?>
                                     </div>
                                     <div class="doc-meta">
-                                        <i class="fas fa-server me-1"></i> On Server
+                                        <i class="fas fa-cloud me-1"></i> On Cloud
                                         <?php if ($doc_exists): ?>
-                                            • <a href="view_document.php?id=<?= $prop['id'] ?>" target="_blank" style="color:#2563eb; font-weight:600;">View</a>
+                                            • <a href="<?= htmlspecialchars($prop['admin_document']) ?>" target="_blank" style="color:#2563eb; font-weight:600;">View</a>
                                         <?php else: ?>
                                             • <span style="color:#dc2626;">File Missing</span>
                                         <?php endif; ?>
                                     </div>
                                 </div>
-                                <!-- 🔥 REMOVE BUTTON -->
                                 <input type="checkbox" name="remove_admin_document" value="1"
                                        id="remove_admin_document" style="display:none;">
                                 <button type="button" class="doc-remove" 
@@ -1033,7 +1032,7 @@ include 'header.php';
                             </div>
                             <small class="text-muted d-block mt-2" style="font-size:0.7rem;">
                                 <i class="fas fa-info-circle me-1"></i>
-                                Trash icon दबाने पर submit के बाद document server से हट जाएगा
+                                Trash icon दबाने पर submit के बाद document cloud से हट जाएगा
                             </small>
                         <?php endif; ?>
                     </div>
@@ -1054,7 +1053,9 @@ include 'header.php';
     </div>
     <?php endif; ?>
 
-    <!-- FILTER BAR -->
+    <!-- ============================================================ -->
+    <!-- FILTER BAR                                                    -->
+    <!-- ============================================================ -->
     <div class="filter-bar-compact">
         <form method="GET" class="row g-2 align-items-center">
             <div class="col-auto" style="min-width:140px;">
@@ -1090,7 +1091,9 @@ include 'header.php';
         </form>
     </div>
 
-    <!-- COMPACT TABLE -->
+    <!-- ============================================================ -->
+    <!-- COMPACT TABLE                                                 -->
+    <!-- ============================================================ -->
     <?php if (count($properties) > 0): ?>
         <div class="compact-table-wrapper">
             <table class="compact-table">
@@ -1167,7 +1170,7 @@ include 'header.php';
                             </td>
                             <td class="col-doc">
                                 <?php if ($has_doc): ?>
-                                    <a href="view_document.php?id=<?= $row['id'] ?>" target="_blank" 
+                                    <a href="<?= htmlspecialchars($row['admin_document']) ?>" target="_blank" 
                                        class="btn-xs btn-info" title="View Admin Document">
                                         <i class="fas fa-file-pdf"></i>
                                     </a>
@@ -1181,7 +1184,7 @@ include 'header.php';
                                 </a>
                                 <?php if ($is_admin): ?>
                                     <a href="properties.php?delete=<?= $row['id'] ?>" class="btn-xs btn-danger" 
-                                       onclick="return confirm('Delete this property?\n\nAll images and documents will also be deleted!')" 
+                                       onclick="return confirm('Delete this property?\n\nAll images and documents will be deleted from cloud too!')" 
                                        title="Delete Property">
                                         <i class="fas fa-trash"></i>
                                     </a>
@@ -1245,7 +1248,9 @@ include 'header.php';
     <?php endif; ?>
 </div>
 
-<!-- 🔥 JAVASCRIPT -->
+<!-- ============================================================ -->
+<!-- 🔥 JAVASCRIPT                                                -->
+<!-- ============================================================ -->
 <script>
 // ============================================================
 // MAIN IMAGE — Select + Preview + Remove
@@ -1401,15 +1406,13 @@ function toggleAdminDocRemove() {
     const btn = document.getElementById('adminDocRemoveBtn');
 
     if (checkbox.checked) {
-        // Unmark
         checkbox.checked = false;
         card.classList.remove('marked-remove');
         btn.innerHTML = '<i class="fas fa-trash"></i>';
         btn.title = 'Remove this document';
         btn.style.background = '#dc2626';
     } else {
-        // Mark for removal
-        if (!confirm('⚠️ क्या आप इस admin document को हटाना चाहते हैं?\n\nSubmit करते ही यह server से हट जाएगा।')) {
+        if (!confirm('⚠️ क्या आप इस admin document को cloud से हटाना चाहते हैं?\n\nSubmit करते ही यह cloud storage से हट जाएगा।')) {
             return;
         }
         checkbox.checked = true;
