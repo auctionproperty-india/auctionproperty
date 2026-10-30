@@ -49,7 +49,6 @@ function getUserPermissions($user_id, $pdo) {
         $user = $stmt->fetch();
         if(!$user) return [];
 
-        // 🔥 UPDATED: Added missing modules (activity_logs, kyc, support)
         $modules = ['properties', 'users', 'packages', 'subscriptions', 'settings', 'referrals', 'accounting', 'activity_logs', 'kyc', 'support'];
 
         if(!empty($user['is_super_admin']) && $user['is_super_admin']) {
@@ -163,7 +162,6 @@ function addAccountEntry($pdo, $type, $amount, $description, $category, $entry_d
     );
     return $pdo->exec($sql) !== false;
 }
-
 function getAccountBalance($pdo) {
     $income = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM account_entries WHERE type = 'income'")->fetchColumn();
     $expense = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM account_entries WHERE type = 'expense'")->fetchColumn();
@@ -180,7 +178,6 @@ function getUserWalletBalance($pdo, $user_id) {
     $stmt->execute([$user_id]);
     return (float) $stmt->fetchColumn();
 }
-
 function creditWallet($pdo, $user_id, $amount, $description, $reference_id = null, $batch_id = null) {
     if($amount <= 0) return false;
     $stmt = $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?");
@@ -188,7 +185,6 @@ function creditWallet($pdo, $user_id, $amount, $description, $reference_id = nul
     $stmt = $pdo->prepare("INSERT INTO wallet_transactions (user_id, amount, type, description, reference_id, batch_id) VALUES (?, ?, 'credit', ?, ?, ?)");
     return $stmt->execute([$user_id, $amount, $description, $reference_id, $batch_id]);
 }
-
 function debitWallet($pdo, $user_id, $amount, $description, $reference_id = null) {
     if($amount <= 0) return false;
     $balance = getUserWalletBalance($pdo, $user_id);
@@ -442,7 +438,6 @@ function getCurrentSlot() {
     if ($hour >= 8 && $hour < 14) return 2;
     return 3;
 }
-
 function getSlotTimeRange($slot) {
     switch($slot) {
         case 1: return '12 AM – 8 AM';
@@ -451,7 +446,6 @@ function getSlotTimeRange($slot) {
         default: return 'Unknown';
     }
 }
-
 function getUserSpinData($pdo, $user_id, $slot = null) {
     if ($slot === null) $slot = getCurrentSlot();
     $today = date('Y-m-d');
@@ -471,14 +465,12 @@ function getUserSpinData($pdo, $user_id, $slot = null) {
         'id' => $data['id']
     ];
 }
-
 function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
     $sql = "SELECT id, title, price, city, image_url, bank_name, type, auction_date 
             FROM properties 
             WHERE status = 'available' 
             AND auction_date IS NOT NULL 
             AND auction_date >= CURRENT_DATE"; 
-
     if ($type) {
         if ($type == 'car') {
             $sql .= " AND (type ILIKE '%Car%' OR type ILIKE '%Vehicle%')";
@@ -522,13 +514,11 @@ function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
     }
     return $available[array_rand($available)];
 }
-
 function getSpinCoinSettings($pdo) {
     $min = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='spin_min_coins'")->fetchColumn();
     $max = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='spin_max_coins'")->fetchColumn();
     return ['min' => (float)$min ?: 3, 'max' => (float)$max ?: 7];
 }
-
 function performSpin($pdo, $user_id) {
     $today = date('Y-m-d');
     $slot = getCurrentSlot();
@@ -549,33 +539,26 @@ function performSpin($pdo, $user_id) {
     if ($spins_used >= 5) {
         return ['success' => false, 'message' => 'You have already used all spins for this slot.'];
     }
-
     $coin_settings = getSpinCoinSettings($pdo);
     $min_coin = $coin_settings['min'];
     $max_coin = $coin_settings['max'];
     $cap_per_slot = 22;
-
     $coin_amount = rand((int)$min_coin, (int)$max_coin);
     if ($coins_earned + $coin_amount > $cap_per_slot) {
         $coin_amount = $cap_per_slot - $coins_earned;
         if ($coin_amount < 1) $coin_amount = 0;
     }
-
     $new_spins = $spins_used + 1;
     $new_coins_earned = $coins_earned + $coin_amount;
-
     $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = CURRENT_TIMESTAMP WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
     $stmt->execute([$new_spins, $new_coins_earned, $user_id, $today, $slot]);
-
     if ($coin_amount > 0) {
         $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
     }
-
     $is_reward = ($new_spins == 5);
     if ($is_reward) {
         $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
     }
-
     $show_property = true;
     if ($show_property) {
         if (!isset($_SESSION['shown_properties'])) {
@@ -623,10 +606,8 @@ function performSpin($pdo, $user_id) {
             'total_coins_earned' => $new_coins_earned
         ];
     }
-
     return $response;
 }
-
 function getSlotStatus($pdo, $user_id, $slot) {
     $data = getUserSpinData($pdo, $user_id, $slot);
     $spins = $data['spins_used'];
@@ -677,62 +658,140 @@ function logActivity($pdo, $user_id, $activity_type, $details = null) {
 }
 
 // ============================================================
-// 🔥 Supabase Storage Functions
+// 🔥 Supabase Storage Functions (PERMANENT - Service Key)
 // ============================================================
 
-function uploadToSupabase($file, $folder = 'slip', $bucket_name = 'payment_screenshots') {
-    $supabase_url = getenv('SUPABASE_URL') ?: 'https://bqspzgwpqimjyhispwtp.supabase.co';
-    $supabase_key = getenv('SUPABASE_ANON_KEY') ?: '';
-    if (empty($supabase_key)) return null;
-    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
-    $filepath = $folder . '/' . $filename;
-    $file_content = file_get_contents($file['tmp_name']);
-    if ($file_content === false) return null;
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $supabase_url . '/storage/v1/object/public/' . $bucket_name . '/' . $filepath);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: ' . $file['type']
-    ]);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $file_content);
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    if ($http_code === 200 || $http_code === 201 || $http_code === 204) {
-        return $supabase_url . '/storage/v1/object/public/' . $bucket_name . '/' . $filepath;
+if (!function_exists('getSupabaseConfig')) {
+    function getSupabaseConfig() {
+        return [
+            'url'    => getenv('SUPABASE_URL') ?: 'https://bqspzgwpqimjyhispwtp.supabase.co',
+            'key'    => getenv('SUPABASE_SERVICE_KEY') ?: '',
+            'bucket' => 'property-images',
+        ];
     }
-    return null;
 }
 
-function deleteFromSupabase($file_url, $bucket_name = 'payment_screenshots') {
-    $supabase_url = getenv('SUPABASE_URL') ?: 'https://bqspzgwpqimjyhispwtp.supabase.co';
-    $supabase_key = getenv('SUPABASE_ANON_KEY') ?: '';
-    if (empty($supabase_key)) return false;
-    $path = str_replace($supabase_url . '/storage/v1/object/public/' . $bucket_name . '/', '', $file_url);
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $supabase_url . '/storage/v1/object/public/' . $bucket_name . '/' . $path);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $supabase_key
-    ]);
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    return ($http_code === 200 || $http_code === 204);
+if (!function_exists('uploadFileToCloud')) {
+    function uploadFileToCloud($file, $folder = 'general') {
+        $cfg = getSupabaseConfig();
+        if (empty($cfg['key'])) {
+            error_log("uploadFileToCloud: SUPABASE_SERVICE_KEY missing");
+            return false;
+        }
+        if (!isset($file['tmp_name']) || $file['error'] !== UPLOAD_ERR_OK) {
+            return false;
+        }
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allowed = ['jpg','jpeg','png','webp','gif','pdf','doc','docx'];
+        if (!in_array($ext, $allowed)) {
+            error_log("uploadFileToCloud: invalid extension $ext");
+            return false;
+        }
+        $filename = time() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+        $filepath = trim($folder, '/') . '/' . $filename;
+        $content  = file_get_contents($file['tmp_name']);
+        if ($content === false) return false;
+        $mime = $file['type'] ?: 'application/octet-stream';
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $cfg['url'] . '/storage/v1/object/' . $cfg['bucket'] . '/' . $filepath);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $cfg['key'],
+            'apikey: ' . $cfg['key'],
+            'Content-Type: ' . $mime,
+            'x-upsert: true'
+        ]);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $content);
+        $response = curl_exec($ch);
+        $code     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if (in_array($code, [200, 201, 204])) {
+            return $cfg['url'] . '/storage/v1/object/public/' . $cfg['bucket'] . '/' . $filepath;
+        }
+        error_log("uploadFileToCloud FAILED: HTTP $code - $response");
+        return false;
+    }
 }
 
-function uploadFile($file, $target_dir = 'uploads/') {
-    if (!is_dir($target_dir)) mkdir($target_dir, 0777, true);
-    $filename = time() . '_' . basename($file['name']);
-    $target_file = $target_dir . $filename;
-    if (move_uploaded_file($file['tmp_name'], $target_file)) {
-        return $target_file;
+if (!function_exists('uploadAnyFile')) {
+    function uploadAnyFile($file, $folder = 'general') {
+        $url = uploadFileToCloud($file, $folder);
+        if ($url) return ['url' => $url];
+        return ['error' => 'Cloud upload failed. Check SUPABASE_SERVICE_KEY on Render.'];
     }
-    return null;
+}
+
+// Backward-compat wrappers (old code uses these)
+if (!function_exists('uploadToSupabase')) {
+    function uploadToSupabase($file, $folder = 'slip', $bucket_name = null) {
+        $url = uploadFileToCloud($file, $folder);
+        return $url ?: null;
+    }
+}
+
+if (!function_exists('deleteFromSupabase')) {
+    function deleteFromSupabase($file_url, $bucket_name = null) {
+        if (empty($file_url) || strpos($file_url, 'http') !== 0) return false;
+        $cfg = getSupabaseConfig();
+        if (empty($cfg['key'])) return false;
+        $bucket = $bucket_name ?: $cfg['bucket'];
+
+        $needle = '/storage/v1/object/public/' . $bucket . '/';
+        $pos = strpos($file_url, $needle);
+        if ($pos === false) return false;
+        $object_path = substr($file_url, $pos + strlen($needle));
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $cfg['url'] . '/storage/v1/object/' . $bucket . '/' . $object_path);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $cfg['key'],
+            'apikey: ' . $cfg['key'],
+        ]);
+        $res = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        return in_array($code, [200, 204]);
+    }
+}
+
+if (!function_exists('deleteCloudFileByUrl')) {
+    function deleteCloudFileByUrl($file_url) {
+        if (empty($file_url)) return false;
+        if (strpos($file_url, 'http') === 0) {
+            return deleteFromSupabase($file_url);
+        }
+        $local = __DIR__ . '/' . ltrim($file_url, '/');
+        if (file_exists($local)) {
+            return @unlink($local);
+        }
+        return false;
+    }
+}
+
+if (!function_exists('cloudFileExists')) {
+    function cloudFileExists($file_url) {
+        if (empty($file_url)) return false;
+        if (strpos($file_url, 'http') === 0) return true;
+        return file_exists(__DIR__ . '/' . ltrim($file_url, '/'));
+    }
+}
+
+// Legacy local upload (kept for backward compatibility)
+if (!function_exists('uploadFile')) {
+    function uploadFile($file, $target_dir = 'uploads/') {
+        if (!is_dir($target_dir)) mkdir($target_dir, 0777, true);
+        $filename = time() . '_' . basename($file['name']);
+        $target_file = $target_dir . $filename;
+        if (move_uploaded_file($file['tmp_name'], $target_file)) {
+            return $target_file;
+        }
+        return null;
+    }
 }
 
 // ---- Safe Date Formatter ----
@@ -747,14 +806,8 @@ if (!function_exists('safeDateFormat')) {
 
 // ============================================================
 // 💰 MLM INCOME DISTRIBUTION (PENDING MODE)
-// Creates pending entries in user_earnings. NO wallet credit.
-// Admin must release via admin_referrals.php
 // ============================================================
-
 function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = null) {
-    // ============================================================
-    // STEP 1: PREFETCH ALL DATA
-    // ============================================================
     $all_users = [];
     $stmt = $pdo->query("SELECT id, name, referred_by, free_user_income_enabled FROM users");
     while ($row = $stmt->fetch()) {
@@ -785,9 +838,6 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = nul
 
     $team_slabs = $pdo->query("SELECT min_turnover, max_turnover, percentage FROM income_settings WHERE income_type = 'team_turnover' AND status = 1 ORDER BY min_turnover ASC")->fetchAll();
 
-    // ============================================================
-    // STEP 2: BUILD CHILDREN MAP & TEAM TURNOVER CACHE
-    // ============================================================
     $children_map = [];
     foreach ($all_users as $uid => $u) {
         $parent = $u['referred_by'];
@@ -813,9 +863,6 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = nul
         $computeTurnover($uid);
     }
 
-    // ============================================================
-    // STEP 3: HELPER FUNCTIONS
-    // ============================================================
     $getDirectPct = function($user_id) use (&$all_users, &$user_active_pkg, $free_user_pct) {
         if (isset($user_active_pkg[$user_id])) {
             return (float)($user_active_pkg[$user_id]['direct_income_percent'] ?? 0);
@@ -840,9 +887,6 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = nul
         return $matched_pct;
     };
 
-    // ============================================================
-    // STEP 4: WALK UPLINE CHAIN & CREATE PENDING ENTRIES
-    // ============================================================
     $current_user_id = $buyer_id;
     $last_direct_pct = 0;
     $last_team_pct = 0;
@@ -853,7 +897,6 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = nul
         $sponsor_id = $all_users[$current_user_id]['referred_by'] ?? null;
         if (!$sponsor_id || !isset($all_users[$sponsor_id])) break;
 
-        // ---- DIRECT INCOME ----
         $direct_pct = $getDirectPct($sponsor_id);
         if ($direct_pct > $last_direct_pct) {
             $diff_pct = $direct_pct - $last_direct_pct;
@@ -869,7 +912,6 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = nul
             $last_direct_pct = $direct_pct;
         }
 
-        // ---- TEAM TURNOVER INCOME ----
         $team_pct = $getTeamPct($sponsor_id);
         if ($team_pct > $last_team_pct) {
             $diff_pct = $team_pct - $last_team_pct;
@@ -891,9 +933,6 @@ function distributeIncome($pdo, $buyer_id, $amount, $package_id, $batch_id = nul
     }
 }
 
-/**
- * Legacy function - kept for backward compatibility.
- */
 function getTeamTurnover($pdo, $user_id) {
     $total = 0;
     $stmt = $pdo->prepare("SELECT id FROM users WHERE referred_by = ?");
@@ -912,10 +951,6 @@ function getTeamTurnover($pdo, $user_id) {
 // ============================================================
 // 🛡️ SECURITY: BOT PROTECTION & RATE LIMITING
 // ============================================================
-
-/**
- * Blocks known bad bots/scrapers based on User-Agent.
- */
 function blockBadBots() {
     $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
     $badBots = ['SemrushBot', 'AhrefsBot', 'MJ12bot', 'DotBot', 'BLEXBot', 'DataForSeoBot', 'ZoominfoBot', 'Screaming Frog'];
@@ -927,9 +962,6 @@ function blockBadBots() {
     }
 }
 
-/**
- * Limits the number of requests from a single IP address within a timeframe.
- */
 function checkRateLimit($limit = 30, $timeWindow = 60) {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     if ($ip === '127.0.0.1' || $ip === '::1') return;
@@ -945,23 +977,21 @@ function checkRateLimit($limit = 30, $timeWindow = 60) {
     file_put_contents($file, json_encode($data));
 
     if ($data['count'] > $limit) {
-        http_response_code(429); // Too Many Requests
+        http_response_code(429);
         die("Too Many Requests. Please try again later.");
     }
 }
 
 // ============================================================
-// 🔒 NEW: CHECK IF USER CAN VIEW PROPERTY (LOCAL vs ALL INDIA)
+// 🔒 CHECK IF USER CAN VIEW PROPERTY (LOCAL vs ALL INDIA)
 // ============================================================
 function canUserViewProperty($pdo, $user_id, $property_city) {
     if (!$user_id) return false;
 
-    // 1. Get User's City
     $user_stmt = $pdo->prepare("SELECT city FROM users WHERE id = ?");
     $user_stmt->execute([$user_id]);
     $user_city = $user_stmt->fetchColumn();
 
-    // 2. Get User's Active Packages
     $stmt = $pdo->prepare("
         SELECT p.access_type
         FROM subscriptions s
@@ -971,12 +1001,10 @@ function canUserViewProperty($pdo, $user_id, $property_city) {
     $stmt->execute([$user_id]);
     $accesses = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-    // 3. Check Access
     if (in_array('all_india', $accesses)) {
-        return true; // Has All India Access
+        return true;
     }
     if (in_array('local_city', $accesses)) {
-        // Has Local Access - Check if city matches
         if (strtolower(trim($user_city)) == strtolower(trim($property_city))) {
             return true; 
         }
