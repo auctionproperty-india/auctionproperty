@@ -73,19 +73,18 @@ $days_left = 0;
 $plan_name = 'No Plan';
 $user_email = '';
 $user_coins = 0;
-$ba_status = 'none'; // Default BA Status
+$ba_status = 'none';
 
 if ($is_logged_in && $role == 'user') {
     $user_id = $_SESSION['user_id'];
     
-    // Fetch user data including ba_status
     $user_sidebar = safeFetch($pdo, "SELECT name, email, created_at as reg_date, coins, ba_status FROM users WHERE id = ?", [$user_id]);
     $reg_date = !empty($user_sidebar['reg_date']) ? date('d M Y', strtotime($user_sidebar['reg_date'])) : 'N/A';
     $user_email = $user_sidebar['email'] ?? '';
     $user_coins = $user_sidebar['coins'] ?? 0;
     $ba_status = $user_sidebar['ba_status'] ?? 'none';
 
-    // Fetch Active Subscription (Added p.price to check if it's a paid plan)
+    // Fetch Active Subscription and check if it's a paid plan (Auto BA logic)
     $sub_info = safeFetch($pdo, "SELECT s.start_date, s.end_date, p.name as plan_name, p.price as plan_price 
                                  FROM subscriptions s 
                                  LEFT JOIN packages p ON s.package_id = p.id 
@@ -100,7 +99,7 @@ if ($is_logged_in && $role == 'user') {
         $days_left = (int) ((strtotime($expiry_date) - time()) / (60 * 60 * 24));
         $days_left = max(0, $days_left);
 
-        // 🔥 LOGIC: If user has a paid package, treat them as BA (Active)
+        // If user has a paid package, treat them as BA (Active)
         if ((!empty($sub_info['plan_price']) && $sub_info['plan_price'] > 0) || (strtolower($plan_name) !== 'free' && $plan_name !== 'No Plan')) {
             $ba_status = 'active';
         }
@@ -427,7 +426,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
     <?php else: ?>
         <!-- ============================================================ -->
-        <!-- 🔥 USER SIDEBAR (Paid Package = Auto BA) -->
+        <!-- 🔥 USER SIDEBAR -->
         <!-- ============================================================ -->
         <a href="user_dashboard.php" class="<?= ($current_page == 'user_dashboard.php' && !isset($_GET['view'])) ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
         
@@ -442,9 +441,22 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             </div>
         </div>
 
-        <a href="user_packages.php" class="<?= $current_page == 'user_packages.php' ? 'active' : '' ?>"><i class="fas fa-search-dollar"></i> <span>Buy Search Engine</span></a>
+        <!-- 🔥 UPDATED: Buy Search Engine with Sub-menus -->
+        <div class="nav-section <?= ($current_page == 'user_packages.php') ? 'open' : '' ?>">
+            <div class="nav-section-title <?= ($current_page == 'user_packages.php') ? 'active' : '' ?>" onclick="toggleSection(this)">
+                <i class="fas fa-search-dollar section-icon"></i><span>Buy Search Engine</span><i class="fas fa-chevron-right section-arrow"></i>
+            </div>
+            <div class="nav-section-items">
+                <a href="user_packages.php?access_filter=local_city" class="<?= (isset($_GET['access_filter']) && $_GET['access_filter'] == 'local_city') ? 'active' : '' ?>">
+                    <i class="fas fa-map-marker-alt"></i> <span>Local City</span>
+                </a>
+                <a href="user_packages.php?access_filter=all_india" class="<?= (isset($_GET['access_filter']) && $_GET['access_filter'] == 'all_india') ? 'active' : '' ?>">
+                    <i class="fas fa-globe"></i> <span>All India</span>
+                </a>
+            </div>
+        </div>
         
-        <!-- 🔥 BA LOGIC START -->
+        <!-- BA LOGIC -->
         <?php if ($ba_status == 'active'): ?>
             <!-- Paid Package Users & Approved BA -->
             <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>"><i class="fas fa-users"></i> <span>My Team</span></a>
@@ -457,7 +469,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             <!-- Normal Free Users -->
             <a href="apply_ba.php" class="<?= $current_page == 'apply_ba.php' ? 'active' : '' ?>"><i class="fas fa-handshake"></i> <span>Apply for BA</span></a>
         <?php endif; ?>
-        <!-- 🔥 BA LOGIC END -->
+        <!-- BA LOGIC END -->
 
         <a href="profile.php" class="<?= $current_page == 'profile.php' ? 'active' : '' ?>"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
         <a href="support.php" class="<?= $current_page == 'support.php' ? 'active' : '' ?>"><i class="fas fa-headset"></i> <span>Support</span></a>
