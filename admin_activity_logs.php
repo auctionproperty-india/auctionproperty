@@ -1,5 +1,5 @@
 <?php
-// 🔥 TIMEZONE FIX: Set time to Indian Standard Time
+// 🔥 TIMEZONE FIX
 date_default_timezone_set('Asia/Kolkata');
 
 require_once __DIR__ . '/db.php';
@@ -120,7 +120,6 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
     .live-dot { width: 10px; height: 10px; background-color: #10b981; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
     @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
     
-    /* Select2 Custom Styling to match Bootstrap */
     .select2-container--bootstrap-5 .select2-selection--single { height: 38px !important; border-radius: 8px; border-color: #cbd5e1; }
     .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered { line-height: 36px !important; }
 </style>
@@ -128,7 +127,7 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
 <div class="card-premium">
     <h4 class="mb-4"><i class="fas fa-shield-alt me-2 text-primary"></i>Security & Activity Dashboard</h4>
 
-    <!-- 🔥 TABS -->
+    <!-- TABS -->
     <ul class="nav nav-tabs mb-4" id="activityTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="live-tab" data-bs-toggle="tab" data-bs-target="#live" type="button" role="tab">
@@ -149,7 +148,7 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
 
     <div class="tab-content" id="activityTabsContent">
         
-        <!-- 🔥 TAB 1: LIVE USERS -->
+        <!-- TAB 1: LIVE USERS -->
         <div class="tab-pane fade show active" id="live" role="tabpanel">
             <div class="alert alert-info border-0 shadow-sm mb-3">
                 <i class="fas fa-info-circle me-2"></i> ये यूज़र पिछले 15 मिनट में एक्टिव रहे हैं। अगर कोई संदिग्ध यूज़र लगातार लाइव दिख रहा है, तो उसका IP चेक करें।
@@ -166,7 +165,10 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if(count($live_users) > 0): foreach($live_users as $lu): ?>
+                        <?php if(count($live_users) > 0): foreach($live_users as $lu): 
+                            // 🔥 TIMEZONE FIX: Added . ' UTC'
+                            $last_seen_ist = date('h:i A', strtotime($lu['last_seen'] . ' UTC'));
+                        ?>
                             <tr>
                                 <td><span class="live-dot"></span> Live</td>
                                 <td>
@@ -180,7 +182,7 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
                                         <span class="badge bg-secondary">Free User</span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?= date('h:i A', strtotime($lu['last_seen'])) ?></td>
+                                <td><?= $last_seen_ist ?></td>
                                 <td><code><?= htmlspecialchars($lu['ip_address']) ?></code></td>
                             </tr>
                         <?php endforeach; else: ?>
@@ -191,10 +193,10 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
             </div>
         </div>
 
-        <!-- 🔥 TAB 2: PAID USERS LOGIN STATS -->
+        <!-- TAB 2: PAID USERS LOGIN STATS -->
         <div class="tab-pane fade" id="paid" role="tabpanel">
             <div class="alert alert-warning border-0 shadow-sm mb-3">
-                <i class="fas fa-exclamation-triangle me-2"></i> यहाँ सिर्फ <strong>पेड यूज़र्स</strong> की लॉगिन काउंट और आज का एक्टिव टाइम दिख रहा है। अगर किसी का टाइम बहुत ज्यादा है, तो उसका डेटा चेक करें।
+                <i class="fas fa-exclamation-triangle me-2"></i> यहाँ सिर्फ <strong>पेड यूज़र्स</strong> की लॉगिन काउंट और आज का एक्टिव टाइम दिख रहा है।
             </div>
             <div class="table-responsive">
                 <table class="table table-bordered table-hover">
@@ -210,9 +212,10 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
                     </thead>
                     <tbody>
                         <?php if(count($paid_stats) > 0): foreach($paid_stats as $ps): 
-                            // Calculate approximate time spent today
-                            $first = strtotime($ps['first_login_today']);
-                            $last = strtotime($ps['last_activity_today']);
+                            // 🔥 TIMEZONE FIX: Added . ' UTC' to both
+                            $first = strtotime($ps['first_login_today'] . ' UTC');
+                            $last = strtotime($ps['last_activity_today'] . ' UTC');
+                            
                             $diff_mins = round(abs($last - $first) / 60);
                             $time_spent = ($diff_mins > 60) ? floor($diff_mins/60)." hrs ".($diff_mins%60)." mins" : $diff_mins." mins";
                         ?>
@@ -241,7 +244,7 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
             </div>
         </div>
 
-        <!-- 🔥 TAB 3: EXISTING FULL LOGS -->
+        <!-- TAB 3: EXISTING FULL LOGS -->
         <div class="tab-pane fade" id="logs" role="tabpanel">
             <form method="GET" class="row g-2 mb-3">
                 <div class="col-md-3">
@@ -254,7 +257,7 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <!-- 🔥 SEARCHABLE DROPDOWN FIX -->
+                    <!-- SEARCHABLE DROPDOWN -->
                     <select name="filter_user" id="userSearchSelect" class="form-select">
                         <option value="">All Users</option>
                         <?php foreach($users as $u): ?>
@@ -291,13 +294,16 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
                             'property_view' => '🏠 Property View',
                             'copy_data' => '📋 Copy Data'
                         ][$log['activity_type']] ?? $log['activity_type'];
+                        
+                        // 🔥 TIMEZONE FIX: Added . ' UTC'
+                        $log_time_ist = date('d M Y, h:i A', strtotime($log['created_at'] . ' UTC'));
                     ?>
                         <tr>
                             <td><?= htmlspecialchars($log['user_name']) ?><br><small><?= $log['user_email'] ?></small></td>
                             <td><?= $type_label ?></td>
                             <td><?= nl2br(htmlspecialchars($log['details'] ?? '')) ?></td>
                             <td><code><?= $log['ip_address'] ?></code></td>
-                            <td><?= date('d M Y, h:i A', strtotime($log['created_at'])) ?></td>
+                            <td><?= $log_time_ist ?></td>
                         </tr>
                     <?php endforeach; else: ?>
                         <tr><td colspan="5" class="text-center">No logs found.</td></tr>
@@ -320,12 +326,11 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
     </div>
 </div>
 
-<!-- 🔥 SEARCHABLE DROPDOWN (Select2) JS -->
+<!-- SEARCHABLE DROPDOWN JS -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     $(document).ready(function() {
-        // Initialize Select2 for the User dropdown
         $('#userSearchSelect').select2({
             theme: 'bootstrap-5',
             placeholder: 'Search User by Name or Email...',
