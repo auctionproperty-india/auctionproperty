@@ -22,11 +22,17 @@ $live_users_sql = "
         u.email, 
         MAX(l.created_at) as last_seen, 
         l.ip_address,
-        (SELECT p.name FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.user_id = u.id AND s.status = 'active' AND s.end_date >= CURRENT_DATE AND p.price > 0 LIMIT 1) as paid_package
+        pk.name as paid_package
     FROM user_activity_log l
     JOIN users u ON l.user_id = u.id
+    LEFT JOIN (
+        SELECT s.user_id, p.name, ROW_NUMBER() OVER(PARTITION BY s.user_id ORDER BY s.id DESC) as rn
+        FROM subscriptions s 
+        JOIN packages p ON s.package_id = p.id 
+        WHERE s.status = 'active' AND s.end_date >= CURRENT_DATE AND p.price > 0
+    ) pk ON pk.user_id = u.id AND pk.rn = 1
     WHERE l.created_at >= NOW() - INTERVAL '15 minutes'
-    GROUP BY l.user_id, u.name, u.email, l.ip_address
+    GROUP BY l.user_id, u.id, u.name, u.email, l.ip_address, pk.name
     ORDER BY last_seen DESC
 ";
 $live_users_stmt = $pdo->query($live_users_sql);
@@ -43,12 +49,18 @@ $paid_stats_sql = "
         COUNT(l.id) as login_count,
         MIN(l.created_at) as first_login_today,
         MAX(l.created_at) as last_activity_today,
-        (SELECT p.name FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.user_id = u.id AND s.status = 'active' AND s.end_date >= CURRENT_DATE AND p.price > 0 LIMIT 1) as paid_package
+        pk.name as paid_package
     FROM user_activity_log l
     JOIN users u ON l.user_id = u.id
+    LEFT JOIN (
+        SELECT s.user_id, p.name, ROW_NUMBER() OVER(PARTITION BY s.user_id ORDER BY s.id DESC) as rn
+        FROM subscriptions s 
+        JOIN packages p ON s.package_id = p.id 
+        WHERE s.status = 'active' AND s.end_date >= CURRENT_DATE AND p.price > 0
+    ) pk ON pk.user_id = u.id AND pk.rn = 1
     WHERE l.activity_type = 'login' 
     AND DATE(l.created_at) = CURRENT_DATE
-    GROUP BY u.id, u.name, u.email
+    GROUP BY u.id, u.name, u.email, pk.name
     HAVING COUNT(l.id) > 0
     ORDER BY login_count DESC, last_activity_today DESC
 ";
@@ -105,7 +117,7 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
 <div class="card-premium">
     <h4 class="mb-4"><i class="fas fa-shield-alt me-2 text-primary"></i>Security & Activity Dashboard</h4>
 
-    <!-- 🔥 NEW TABS -->
+    <!-- 🔥 TABS -->
     <ul class="nav nav-tabs mb-4" id="activityTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="live-tab" data-bs-toggle="tab" data-bs-target="#live" type="button" role="tab">
