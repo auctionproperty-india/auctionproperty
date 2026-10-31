@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✅ Referrals Page – With Safe Date Formatting
+// ✅ Referrals Page – With Role Check (Sales = Team Only)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -12,6 +12,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 }
 
 $user_id = $_SESSION['user_id'];
+$role = $_SESSION['role']; // 🔥 Check Role Here
 include 'header.php';
 
 // ---- Helper function to safely format date ----
@@ -202,10 +203,11 @@ $referral_link = $base_url . '/register.php?ref=' . $referral_code;
 
 <div class="container-fluid">
     <div class="referral-container">
-        <h4><i class="fas fa-link me-2"></i>Referrals</h4>
+        <h4><i class="fas fa-link me-2"></i> <?= ($role == 'sales') ? 'Referral Link & My Team' : 'Referrals & Earnings' ?></h4>
 
-        <!-- Stats -->
-        <div class="referral-stats">
+        <!-- 🔥 Stats (Only for normal users, NOT for Sales) -->
+        <?php if ($role != 'sales'): ?>
+        <div class="referral-stats mt-3">
             <div class="stat-card">
                 <div class="stat-icon">👥</div>
                 <h3><?= number_format($earnings['total_referrals'] ?? 0) ?></h3>
@@ -227,12 +229,13 @@ $referral_link = $base_url . '/register.php?ref=' . $referral_code;
                 <p>Pending</p>
             </div>
         </div>
+        <?php endif; ?>
 
-        <!-- Referral Link -->
-        <div class="referral-link-box">
+        <!-- Referral Link (Shown to everyone) -->
+        <div class="referral-link-box mt-4">
             <i class="fas fa-share-alt" style="color:#64748b;"></i>
             <input type="text" id="referralLink" value="<?= htmlspecialchars($referral_link) ?>" readonly>
-            <button class="btn-copy" onclick="copyReferralLink()"><i class="fas fa-copy"></i> Copy</button>
+            <button class="btn-copy" onclick="copyReferralLink()"><i class="fas fa-copy"></i> Copy Link</button>
         </div>
 
         <!-- Referrals Table -->
@@ -248,20 +251,19 @@ $referral_link = $base_url . '/register.php?ref=' . $referral_code;
                             <th>Activation Date</th>
                             <th>Package</th>
                             <th>Status</th>
-                            <th>Earning</th>
+                            <?php if ($role != 'sales'): ?>
+                                <th>Earning</th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($referrals as $row): 
-                            // ✅ Safe date formatting – no warnings
                             $registered_on = safeDateFormat($row['created_at']);
                             $activation_date = safeDateFormat($row['activation_date']);
                             
-                            // Package badge
                             $pkg = strtolower($row['package_name'] ?? '');
                             $pkgBadge = $pkg ? '<span class="badge-package ' . $pkg . '">' . htmlspecialchars($row['package_name']) . '</span>' : '<span class="badge-package" style="background:#f1f5f9;color:#94a3b8;">Free</span>';
                             
-                            // Status badge
                             $status = $row['sub_status'] ?? 'inactive';
                             $statusBadge = '';
                             if ($status == 'active' || $status == 'paid') {
@@ -272,7 +274,6 @@ $referral_link = $base_url . '/register.php?ref=' . $referral_code;
                                 $statusBadge = '<span class="badge-status inactive">Inactive</span>';
                             }
                             
-                            // Earning
                             $earning = $row['referral_net'] ?? 0;
                             $earningDisplay = $earning > 0 ? '₹ ' . number_format($earning, 2) : '—';
                         ?>
@@ -284,7 +285,9 @@ $referral_link = $base_url . '/register.php?ref=' . $referral_code;
                             <td><?= $activation_date ?></td>
                             <td><?= $pkgBadge ?></td>
                             <td><?= $statusBadge ?></td>
-                            <td><?= $earningDisplay ?></td>
+                            <?php if ($role != 'sales'): ?>
+                                <td><?= $earningDisplay ?></td>
+                            <?php endif; ?>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -297,7 +300,7 @@ $referral_link = $base_url . '/register.php?ref=' . $referral_code;
             <div class="alert alert-info text-center py-4">
                 <i class="fas fa-user-plus" style="font-size:2rem; opacity:0.5;"></i>
                 <p class="mt-2">You haven't referred anyone yet.</p>
-                <p class="text-muted small">Share your referral link and earn rewards!</p>
+                <p class="text-muted small">Share your referral link and build your team!</p>
             </div>
         <?php endif; ?>
     </div>
@@ -314,7 +317,6 @@ function copyReferralLink() {
         btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
         setTimeout(() => { btn.innerHTML = originalText; }, 2000);
     }).catch(() => {
-        // Fallback
         document.execCommand('copy');
         alert('Referral link copied!');
     });
