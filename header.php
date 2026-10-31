@@ -52,29 +52,32 @@ if ($is_logged_in) {
     }
 }
 
-// 🔥 NEW: SALES TARGET LOGIC
+// 🔥 NEW: SALES TARGET (Amount Based) LOGIC
 $target_goal = 0;
 $target_achieved = 0;
 $target_percentage = 0;
 
 if ($is_logged_in && $role == 'sales') {
     try {
-        // Fetch Sales Target
+        // Target Amount set by Admin (Default 1 Lakh if not set)
         $target_query = $pdo->prepare("SELECT sales_target FROM users WHERE id = ?");
         $target_query->execute([$_SESSION['user_id']]);
-        $target_goal = (int)$target_query->fetchColumn() ?: 10; // Default 10 if null
+        $target_goal = (float)$target_query->fetchColumn() ?: 100000; 
 
-        // Count Converted Leads
-        $achieved_query = $pdo->prepare("SELECT COUNT(*) FROM sales_leads WHERE assigned_to = ? AND status = 'converted'");
+        // Sum of Subscription Amounts from Users referred by this Sales person
+        $achieved_query = $pdo->prepare("
+            SELECT COALESCE(SUM(s.amount), 0) 
+            FROM subscriptions s 
+            JOIN users u ON s.user_id = u.id 
+            WHERE u.referred_by = ? AND s.status IN ('active', 'paid')
+        ");
         $achieved_query->execute([$_SESSION['user_id']]);
-        $target_achieved = (int)$achieved_query->fetchColumn();
+        $target_achieved = (float)$achieved_query->fetchColumn();
 
         if($target_goal > 0) {
             $target_percentage = round(($target_achieved / $target_goal) * 100);
         }
-    } catch(Exception $e) {
-        // Ignore db errors for target
-    }
+    } catch(Exception $e) {}
 }
 
 // NOTIFICATIONS FETCH
@@ -460,15 +463,15 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <a href="sales_lead_upload.php" class="<?= $current_page == 'sales_lead_upload.php' ? 'active' : '' ?>"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
         <a href="sales_lead_add.php" class="<?= $current_page == 'sales_lead_add.php' ? 'active' : '' ?>"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
         
-        <!-- 🔥 UPDATED: Referral Link & My Team -->
+        <!-- 🔥 NEW: Referral Link & My Team -->
         <a href="user_referrals.php" class="<?= $current_page == 'user_referrals.php' ? 'active' : '' ?>">
-            <i class="fas fa-link text-primary"></i> <span>Referral Link & Earnings</span>
+            <i class="fas fa-link text-primary"></i> <span>Referral Link</span>
         </a>
         <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>">
             <i class="fas fa-user-friends text-info"></i> <span>My Team</span>
         </a>
 
-        <!-- 🔥 NEW: Sales Target Box -->
+        <!-- 🔥 NEW: Sales Target Box (Amount Based) -->
         <div class="target-box shadow-sm">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span style="font-size:12px; font-weight:800; color:#475569;"><i class="fas fa-bullseye text-danger"></i> Target</span>
@@ -478,12 +481,12 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 <div style="background:<?= $target_percentage >= 100 ? '#10b981' : 'linear-gradient(90deg, #3b82f6, #6366f1)' ?>; height:100%; width:<?= min(100, $target_percentage) ?>%;"></div>
             </div>
             <div style="font-size:11px; color:#64748b; font-weight:600;">
-                Achieved: <?= $target_achieved ?> / <?= $target_goal ?>
+                ₹<?= number_format($target_achieved) ?> / ₹<?= number_format($target_goal) ?>
             </div>
             <?php if($target_achieved >= $target_goal && $target_goal > 0): ?>
                 <div style="font-size:10px; color:#10b981; font-weight:bold; margin-top:4px;"><i class="fas fa-check-circle"></i> Target Achieved!</div>
             <?php else: ?>
-                <div style="font-size:10px; color:#dc2626; font-weight:bold; margin-top:4px;"><i class="fas fa-hourglass-half"></i> <?= max(0, $target_goal - $target_achieved) ?> more to go</div>
+                <div style="font-size:10px; color:#dc2626; font-weight:bold; margin-top:4px;"><i class="fas fa-hourglass-half"></i> ₹<?= number_format(max(0, $target_goal - $target_achieved)) ?> left</div>
             <?php endif; ?>
         </div>
 
