@@ -52,15 +52,12 @@ if ($is_logged_in) {
     }
 }
 
-// 🔥 NEW: SALES TARGET & REFERRAL LOGIC
-$sales_referral_link = '';
+// 🔥 NEW: SALES TARGET LOGIC
 $target_goal = 0;
 $target_achieved = 0;
 $target_percentage = 0;
 
 if ($is_logged_in && $role == 'sales') {
-    $sales_referral_link = getReferralLink($_SESSION['user_id']);
-
     try {
         // Fetch Sales Target
         $target_query = $pdo->prepare("SELECT sales_target FROM users WHERE id = ?");
@@ -463,11 +460,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <a href="sales_lead_upload.php" class="<?= $current_page == 'sales_lead_upload.php' ? 'active' : '' ?>"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
         <a href="sales_lead_add.php" class="<?= $current_page == 'sales_lead_add.php' ? 'active' : '' ?>"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
         
-        <!-- 🔥 NEW: Registration Link & My Team -->
-        <a href="<?= htmlspecialchars($sales_referral_link) ?>" target="_blank" title="Click to copy and share">
-            <i class="fas fa-link text-primary"></i> <span>Registration Link</span>
+        <!-- 🔥 UPDATED: Referral Link & My Team -->
+        <a href="user_referrals.php" class="<?= $current_page == 'user_referrals.php' ? 'active' : '' ?>">
+            <i class="fas fa-link text-primary"></i> <span>Referral Link & Earnings</span>
         </a>
-        <a href="my_team.php" class="<?= $current_page == 'my_team.php' ? 'active' : '' ?>">
+        <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>">
             <i class="fas fa-user-friends text-info"></i> <span>My Team</span>
         </a>
 
