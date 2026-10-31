@@ -13,8 +13,7 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['sales', 'admi
 $user_id = $_SESSION['user_id'];
 $is_admin = ($_SESSION['role'] == 'admin');
 
-// 🔥 Target & Referral Logic
-$reg_link = getReferralLink($user_id);
+// 🔥 Target Logic
 $target_goal = 0;
 $target_achieved = 0;
 $target_percentage = 0;
@@ -176,17 +175,17 @@ include 'header.php';
             </div>
         </a>
         
-        <!-- User Registration Link -->
-        <a href="<?= htmlspecialchars($reg_link) ?>" target="_blank" class="qa-btn purple">
+        <!-- 🔥 UPDATED: Referral Link -->
+        <a href="user_referrals.php" class="qa-btn purple">
             <div class="qa-icon"><i class="fas fa-link"></i></div>
             <div>
-                <div>Registration Link</div>
-                <small style="font-weight:500; opacity:0.7;">Click to copy & share</small>
+                <div>Referral Link</div>
+                <small style="font-weight:500; opacity:0.7;">Copy link & view earnings</small>
             </div>
         </a>
 
-        <!-- My Team -->
-        <a href="my_team.php" class="qa-btn sky">
+        <!-- 🔥 UPDATED: My Team -->
+        <a href="user_team.php" class="qa-btn sky">
             <div class="qa-icon"><i class="fas fa-user-friends"></i></div>
             <div>
                 <div>My Team</div>
