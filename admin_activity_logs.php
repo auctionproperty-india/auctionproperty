@@ -110,6 +110,9 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $logs = $stmt->fetchAll();
 $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
+
+// 🔥 PROPERTY VIEW COUNT CACHE (To avoid multiple queries in loop)
+$view_counts_cache = [];
 ?>
 
 <!-- SEARCHABLE DROPDOWN -->
@@ -153,7 +156,6 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
                 <i class="fas fa-crown text-warning me-1"></i> Paid Users
             </button>
         </li>
-        <!-- 🔥 NEW FREE USERS TAB -->
         <li class="nav-item">
             <button class="nav-link" id="free-tab" data-bs-toggle="tab" data-bs-target="#free" type="button">
                 <i class="fas fa-gift text-info me-1"></i> Free Packages <span class="badge bg-info rounded-pill ms-1"><?= count($free_users) ?></span>
@@ -230,7 +232,7 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
             </div>
         </div>
 
-        <!-- 🔥 TAB 3: FREE USERS -->
+        <!-- TAB 3: FREE USERS -->
         <div class="tab-pane fade" id="free" role="tabpanel">
             <div class="alert alert-info border-0 shadow-sm mb-3">
                 <i class="fas fa-info-circle me-2"></i> These users are using a <strong>Free Package</strong> (Price = 0 or Gifted by Admin).
@@ -282,32 +284,60 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
             <div class="table-responsive">
                 <table class="table table-bordered table-hover">
                     <thead class="table-dark">
-                        <tr><th>User</th><th>Activity</th><th>Details</th><th>IP</th><th>Time (IST)</th></tr>
+                        <tr>
+                            <th>User</th>
+                            <th>Activity</th>
+                            <th>Details</th>
+                            <th>Views</th> <!-- 🔥 NEW COLUMN -->
+                            <th>IP</th>
+                            <th>Time (IST)</th>
+                        </tr>
                     </thead>
                     <tbody>
                     <?php if(count($logs)>0): foreach($logs as $log): 
                         $type_label = ['login' => '🔑 Login', 'spin' => '🔄 Spin', 'property_view' => '🏠 Property View'][$log['activity_type']] ?? $log['activity_type'];
                         $log_time_ist = date('d M Y, h:i A', strtotime($log['created_at'] . ' UTC'));
                         
-                        // 🔥 PROPERTY LINK LOGIC
                         $details_text = htmlspecialchars($log['details'] ?? '');
-                        
-                        // अगर डिटेल्स में "Property ID: 1234" जैसा कुछ है तो उसे लिंक बना दें
+                        $prop_id = null;
+                        $total_views = '-';
+                        $view_badge = '-';
+
+                        // 🔥 PROPERTY LINK & COUNT LOGIC
                         if (preg_match('/Property ID:\s*(\d+)/i', $details_text, $matches)) {
                             $prop_id = $matches[1];
                             $link = "<a href='admin_view_property_popup.php?id={$prop_id}' target='_blank' style='font-weight:bold; color:#2563eb; text-decoration:underline;' title='Click to view property details'>{$prop_id}</a>";
                             $details_text = preg_replace('/Property ID:\s*'.$prop_id.'/i', "Property ID: {$link}", $details_text);
+
+                            // Calculate View Count (Using Cache to avoid multiple DB queries)
+                            $cache_key = $log['user_id'] . '_' . $prop_id;
+                            if (!isset($view_counts_cache[$cache_key])) {
+                                $cnt_stmt = $pdo->prepare("SELECT COUNT(*) FROM user_activity_log WHERE user_id = ? AND activity_type = 'property_view' AND details LIKE ?");
+                                $cnt_stmt->execute([$log['user_id'], '%Property ID: ' . $prop_id . '%']);
+                                $view_counts_cache[$cache_key] = $cnt_stmt->fetchColumn();
+                            }
+                            $total_views = $view_counts_cache[$cache_key];
+
+                            // Badge HTML
+                            if ($total_views > 1) {
+                                // Agar 1 se zyada baar dekha hai, to red color ka clickable badge
+                                $view_badge = "<a href='admin_view_history_popup.php?user_id={$log['user_id']}&prop_id={$prop_id}&name=".urlencode($log['user_name'])."' target='_blank' class='badge bg-danger text-decoration-none' style='font-size:0.8rem; padding:5px 8px;' title='Click to see full history'><i class='fas fa-eye'></i> {$total_views} times</a>";
+                            } elseif ($total_views == 1) {
+                                // Sirf 1 baar dekha hai
+                                $view_badge = "<span class='badge bg-secondary' style='font-size:0.8rem;'>1 time</span>";
+                            }
                         }
                     ?>
                         <tr>
                             <td><?= htmlspecialchars($log['user_name']) ?><br><small><?= $log['user_email'] ?></small></td>
                             <td><?= $type_label ?></td>
                             <td><?= nl2br($details_text) ?></td>
+                            <td class="text-center"><?= $view_badge ?></td> <!-- 🔥 SHOW BADGE -->
                             <td><code><?= $log['ip_address'] ?></code></td>
                             <td><?= $log_time_ist ?></td>
                         </tr>
                     <?php endforeach; else: ?>
-                        <tr><td colspan="5" class="text-center">No logs found.</td></tr>
+                        <tr><td colspan="6" class="text-center">No logs found.</td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
