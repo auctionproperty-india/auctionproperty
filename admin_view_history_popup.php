@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🏠 Admin - View History Popup (Timestamps)
+// 🏠 Admin - View History Popup (With User Details)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -12,11 +12,19 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 
 $user_id = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
 $prop_id = isset($_GET['prop_id']) ? (int)$_GET['prop_id'] : 0;
-$user_name = isset($_GET['name']) ? htmlspecialchars($_GET['name']) : 'User';
 
 if (!$user_id || !$prop_id) {
     die("<h3 style='text-align:center; margin-top:50px;'>Invalid Request.</h3>");
 }
+
+// 🔥 FETCH USER DETAILS (Name, Email, Phone)
+$user_stmt = $pdo->prepare("SELECT name, email, phone FROM users WHERE id = ?");
+$user_stmt->execute([$user_id]);
+$user_info = $user_stmt->fetch();
+
+$user_name = $user_info['name'] ?? 'Unknown User';
+$user_email = $user_info['email'] ?? 'No Email';
+$user_phone = $user_info['phone'] ?? 'No Phone';
 
 // उस यूजर द्वारा उस प्रॉपर्टी को देखने की पूरी हिस्ट्री निकालें
 $stmt = $pdo->prepare("
@@ -42,7 +50,8 @@ date_default_timezone_set('Asia/Kolkata');
     <style>
         body { background: #f4f7fc; font-family: 'Inter', sans-serif; padding: 20px; }
         .history-card { background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: none; overflow: hidden; }
-        .history-header { background: #1e293b; color: #fff; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .history-header { background: #1e293b; color: #fff; padding: 15px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .user-details-box { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 15px; margin-top: 10px; border-left: 3px solid #3b82f6; }
         .timeline { list-style: none; padding: 20px; margin: 0; position: relative; }
         .timeline::before { content: ''; position: absolute; top: 20px; bottom: 20px; left: 32px; width: 2px; background: #e2e8f0; }
         .timeline-item { position: relative; padding-left: 40px; margin-bottom: 20px; }
@@ -56,19 +65,31 @@ date_default_timezone_set('Asia/Kolkata');
 </head>
 <body>
 
-    <div class="container" style="max-width: 500px;">
+    <div class="container" style="max-width: 550px;">
         <div class="history-card">
-            <!-- हेडर -->
+            <!-- हेडर (अब इसमें ईमेल और मोबाइल भी है) -->
             <div class="history-header">
-                <div>
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-history me-2"></i> View History</h5>
-                    <small class="text-white-50"><?= $user_name ?> (ID: <?= $user_id ?>)</small>
+                <div class="w-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-history me-2"></i> View History</h5>
+                        <button onclick="window.close()" class="btn btn-sm btn-danger rounded-circle" title="Close Window"><i class="fas fa-times"></i></button>
+                    </div>
+                    
+                    <!-- User Info Box -->
+                    <div class="user-details-box mt-3">
+                        <div class="fw-bold text-white mb-1" style="font-size: 1.1rem;">
+                            <i class="fas fa-user-circle me-1"></i> <?= htmlspecialchars($user_name) ?> <span class="text-white-50" style="font-size:0.85rem;">(ID: <?= $user_id ?>)</span>
+                        </div>
+                        <div class="small text-light">
+                            <div><i class="fas fa-envelope me-2"></i> <?= htmlspecialchars($user_email) ?></div>
+                            <div><i class="fas fa-phone me-2"></i> <?= htmlspecialchars($user_phone) ?></div>
+                        </div>
+                    </div>
                 </div>
-                <button onclick="window.close()" class="btn btn-sm btn-danger rounded-circle" title="Close Window"><i class="fas fa-times"></i></button>
             </div>
 
             <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
-                <span class="fw-bold text-dark">Property ID: #<?= $prop_id ?></span>
+                <span class="fw-bold text-dark"><i class="fas fa-building text-primary me-1"></i> Property ID: #<?= $prop_id ?></span>
                 <a href="admin_view_property_popup.php?id=<?= $prop_id ?>" target="_blank" class="btn btn-sm btn-outline-primary py-1" style="font-size: 0.8rem;">
                     <i class="fas fa-external-link-alt"></i> View Property
                 </a>
