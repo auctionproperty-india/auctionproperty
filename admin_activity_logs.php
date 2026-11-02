@@ -288,11 +288,21 @@ $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAl
                     <?php if(count($logs)>0): foreach($logs as $log): 
                         $type_label = ['login' => '🔑 Login', 'spin' => '🔄 Spin', 'property_view' => '🏠 Property View'][$log['activity_type']] ?? $log['activity_type'];
                         $log_time_ist = date('d M Y, h:i A', strtotime($log['created_at'] . ' UTC'));
+                        
+                        // 🔥 PROPERTY LINK LOGIC
+                        $details_text = htmlspecialchars($log['details'] ?? '');
+                        
+                        // अगर डिटेल्स में "Property ID: 1234" जैसा कुछ है तो उसे लिंक बना दें
+                        if (preg_match('/Property ID:\s*(\d+)/i', $details_text, $matches)) {
+                            $prop_id = $matches[1];
+                            $link = "<a href='admin_view_property_popup.php?id={$prop_id}' target='_blank' style='font-weight:bold; color:#2563eb; text-decoration:underline;' title='Click to view property details'>{$prop_id}</a>";
+                            $details_text = preg_replace('/Property ID:\s*'.$prop_id.'/i', "Property ID: {$link}", $details_text);
+                        }
                     ?>
                         <tr>
                             <td><?= htmlspecialchars($log['user_name']) ?><br><small><?= $log['user_email'] ?></small></td>
                             <td><?= $type_label ?></td>
-                            <td><?= nl2br(htmlspecialchars($log['details'] ?? '')) ?></td>
+                            <td><?= nl2br($details_text) ?></td>
                             <td><code><?= $log['ip_address'] ?></code></td>
                             <td><?= $log_time_ist ?></td>
                         </tr>
