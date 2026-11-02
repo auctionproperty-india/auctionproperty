@@ -52,19 +52,23 @@ if ($is_logged_in) {
     }
 }
 
-// 🔥 NEW: SALES TARGET (Amount Based) LOGIC
+// 🔥 NEW: SALES TARGET & LOG PERMISSIONS
 $target_goal = 0;
 $target_achieved = 0;
 $target_percentage = 0;
+$can_view_activity_logs = false;
 
 if ($is_logged_in && $role == 'sales') {
     try {
-        // Target Amount set by Admin (Default 1 Lakh if not set)
-        $target_query = $pdo->prepare("SELECT sales_target FROM users WHERE id = ?");
+        // Target Amount
+        $target_query = $pdo->prepare("SELECT sales_target, can_view_activity_logs FROM users WHERE id = ?");
         $target_query->execute([$_SESSION['user_id']]);
-        $target_goal = (float)$target_query->fetchColumn() ?: 100000; 
+        $sales_data = $target_query->fetch();
+        
+        $target_goal = (float)($sales_data['sales_target'] ?? 0) ?: 100000; 
+        $can_view_activity_logs = !empty($sales_data['can_view_activity_logs']);
 
-        // Sum of Subscription Amounts from Users referred by this Sales person
+        // Sum of Subscription Amounts
         $achieved_query = $pdo->prepare("
             SELECT COALESCE(SUM(s.amount), 0) 
             FROM subscriptions s 
@@ -463,7 +467,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <a href="sales_lead_upload.php" class="<?= $current_page == 'sales_lead_upload.php' ? 'active' : '' ?>"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
         <a href="sales_lead_add.php" class="<?= $current_page == 'sales_lead_add.php' ? 'active' : '' ?>"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
         
-        <!-- 🔥 NEW: Referral Link & My Team -->
+        <!-- Referral Link & My Team -->
         <a href="user_referrals.php" class="<?= $current_page == 'user_referrals.php' ? 'active' : '' ?>">
             <i class="fas fa-link text-primary"></i> <span>Referral Link</span>
         </a>
@@ -471,7 +475,14 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             <i class="fas fa-user-friends text-info"></i> <span>My Team</span>
         </a>
 
-        <!-- 🔥 NEW: Sales Target Box (Amount Based) -->
+        <!-- 🔥 CONDITIONAL: Activity Logs (Only if Admin allowed) -->
+        <?php if (!empty($can_view_activity_logs)): ?>
+            <a href="admin_activity_logs.php" class="<?= $current_page == 'admin_activity_logs.php' ? 'active' : '' ?>">
+                <i class="fas fa-shield-alt text-danger"></i> <span>Activity Logs</span>
+            </a>
+        <?php endif; ?>
+
+        <!-- Sales Target Box -->
         <div class="target-box shadow-sm">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span style="font-size:12px; font-weight:800; color:#475569;"><i class="fas fa-bullseye text-danger"></i> Target</span>
