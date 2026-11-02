@@ -5,11 +5,27 @@ date_default_timezone_set('Asia/Kolkata');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') { 
-    header("Location: dashboard.php"); 
+// 🔥 ALLOW ADMIN + SALES WITH PERMISSION
+if(!isset($_SESSION['user_id'])) { 
+    header("Location: login.php"); 
     exit; 
 }
-if(!hasViewPermission('users', $pdo)) {
+
+$is_admin = ($_SESSION['role'] == 'admin');
+$can_view_logs = false;
+
+if (!$is_admin && $_SESSION['role'] == 'sales') {
+    $perm_check = $pdo->prepare("SELECT can_view_activity_logs FROM users WHERE id = ?");
+    $perm_check->execute([$_SESSION['user_id']]);
+    $can_view_logs = $perm_check->fetchColumn();
+}
+
+if (!$is_admin && !$can_view_logs) {
+    die("<div class='alert alert-danger m-5'>❌ You do not have permission to view Activity Logs.</div>");
+}
+
+// Admin permission check (if sub-admin)
+if ($is_admin && !hasViewPermission('users', $pdo)) {
     die("<div class='alert alert-danger m-5'>❌ Permission denied.</div>");
 }
 
@@ -288,7 +304,7 @@ $view_counts_cache = [];
                             <th>User</th>
                             <th>Activity</th>
                             <th>Details</th>
-                            <th>Views</th>
+                            <th>Views</th> <!-- 🔥 COLUMN FOR VIEW COUNT -->
                             <th>IP</th>
                             <th>Time (IST)</th>
                         </tr>
