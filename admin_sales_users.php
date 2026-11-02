@@ -24,6 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_sales'])) {
     $phone = trim($_POST['phone'] ?? '');
     $password = $_POST['password'] ?? '';
     $target = (float)($_POST['sales_target'] ?? 0);
+    // 🔥 Checkbox Logic
+    $can_view_logs = isset($_POST['can_view_activity_logs']) ? 1 : 0;
 
     if (empty($name) || empty($email) || empty($password)) {
         $message = "❌ Name, Email, Password required!";
@@ -42,10 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_sales'])) {
                 $hashed = password_hash($password, PASSWORD_DEFAULT);
                 $ref_code = strtoupper(substr(md5(uniqid()), 0, 8));
                 $stmt = $pdo->prepare("
-                    INSERT INTO users (name, email, phone, password, role, status, referral_code, sales_target, activation_date) 
-                    VALUES (?, ?, ?, ?, 'sales', 'active', ?, ?, CURRENT_DATE)
+                    INSERT INTO users (name, email, phone, password, role, status, referral_code, sales_target, activation_date, can_view_activity_logs) 
+                    VALUES (?, ?, ?, ?, 'sales', 'active', ?, ?, CURRENT_DATE, ?)
                 ");
-                $stmt->execute([$name, $email, $phone, $hashed, $ref_code, $target]);
+                $stmt->execute([$name, $email, $phone, $hashed, $ref_code, $target, $can_view_logs]);
                 $message = "✅ Sales user '<b>" . htmlspecialchars($name) . "</b>' created successfully!";
                 $message_type = "success";
             } catch (Exception $e) {
@@ -65,10 +67,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_sales'])) {
     $target = (float)($_POST['sales_target'] ?? 0);
     $status = $_POST['status'] ?? 'active';
     $new_password = trim($_POST['new_password'] ?? '');
+    // 🔥 Checkbox Logic
+    $can_view_logs = isset($_POST['can_view_activity_logs']) ? 1 : 0;
 
     try {
-        $stmt = $pdo->prepare("UPDATE users SET name=?, email=?, phone=?, sales_target=?, status=? WHERE id=? AND role='sales'");
-        $stmt->execute([$name, $email, $phone, $target, $status, $uid]);
+        $stmt = $pdo->prepare("UPDATE users SET name=?, email=?, phone=?, sales_target=?, status=?, can_view_activity_logs=? WHERE id=? AND role='sales'");
+        $stmt->execute([$name, $email, $phone, $target, $status, $can_view_logs, $uid]);
 
         if (!empty($new_password) && strlen($new_password) >= 6) {
             $hashed = password_hash($new_password, PASSWORD_DEFAULT);
@@ -99,7 +103,7 @@ if (isset($_GET['toggle']) && is_numeric($_GET['toggle'])) {
 // ---- Fetch Sales Users with Stats ----
 $sales_users = $pdo->query("
     SELECT u.id, u.name, u.email, u.phone, u.status, u.created_at, 
-           u.sales_target, COALESCE(u.sales_active, TRUE) as is_active,
+           u.sales_target, COALESCE(u.sales_active, TRUE) as is_active, u.can_view_activity_logs,
            (SELECT COUNT(*) FROM sales_leads WHERE assigned_to = u.id) as total_leads,
            (SELECT COUNT(*) FROM sales_leads WHERE assigned_to = u.id AND status = 'converted') as converted_leads,
            (SELECT COUNT(*) FROM sales_leads WHERE assigned_to = u.id AND status NOT IN ('converted','closed','not_interested') AND follow_up_date = CURRENT_DATE) as today_followups,
@@ -235,6 +239,13 @@ include 'header.php';
                     <input type="number" name="sales_target" class="form-control" value="0">
                 </div>
             </div>
+            <!-- 🔥 NEW CHECKBOX FOR CREATE -->
+            <div class="form-check mt-3 bg-light p-2 rounded border">
+                <input class="form-check-input ms-1" type="checkbox" name="can_view_activity_logs" id="create_can_view_logs" value="1">
+                <label class="form-check-label ms-2 fw-bold text-dark" for="create_can_view_logs">
+                    <i class="fas fa-shield-alt text-primary"></i> Allow Activity Logs Access (Admin Dashboard)
+                </label>
+            </div>
             <div class="mt-3">
                 <button type="submit" class="btn btn-success rounded-pill px-4">
                     <i class="fas fa-save me-1"></i> Create Sales User
@@ -355,6 +366,14 @@ include 'header.php';
                                 <div class="mb-2">
                                     <label class="small fw-bold">New Password (leave blank to keep current)</label>
                                     <input type="text" name="new_password" class="form-control" placeholder="Min 6 characters">
+                                </div>
+                                
+                                <!-- 🔥 NEW CHECKBOX FOR EDIT -->
+                                <div class="form-check mt-3 bg-light p-2 rounded border">
+                                    <input class="form-check-input ms-1" type="checkbox" name="can_view_activity_logs" id="edit_can_view_logs_<?= $s['id'] ?>" value="1" <?= !empty($s['can_view_activity_logs']) ? 'checked' : '' ?>>
+                                    <label class="form-check-label ms-2 fw-bold text-dark" for="edit_can_view_logs_<?= $s['id'] ?>">
+                                        <i class="fas fa-shield-alt text-primary"></i> Allow Activity Logs Access
+                                    </label>
                                 </div>
                             </div>
                             <div class="modal-footer">
