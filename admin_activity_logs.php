@@ -288,7 +288,7 @@ $view_counts_cache = [];
                             <th>User</th>
                             <th>Activity</th>
                             <th>Details</th>
-                            <th>Views</th> <!-- 🔥 NEW COLUMN -->
+                            <th>Views</th>
                             <th>IP</th>
                             <th>Time (IST)</th>
                         </tr>
@@ -303,13 +303,11 @@ $view_counts_cache = [];
                         $total_views = '-';
                         $view_badge = '-';
 
-                        // 🔥 PROPERTY LINK & COUNT LOGIC
                         if (preg_match('/Property ID:\s*(\d+)/i', $details_text, $matches)) {
                             $prop_id = $matches[1];
                             $link = "<a href='admin_view_property_popup.php?id={$prop_id}' target='_blank' style='font-weight:bold; color:#2563eb; text-decoration:underline;' title='Click to view property details'>{$prop_id}</a>";
                             $details_text = preg_replace('/Property ID:\s*'.$prop_id.'/i', "Property ID: {$link}", $details_text);
 
-                            // Calculate View Count (Using Cache to avoid multiple DB queries)
                             $cache_key = $log['user_id'] . '_' . $prop_id;
                             if (!isset($view_counts_cache[$cache_key])) {
                                 $cnt_stmt = $pdo->prepare("SELECT COUNT(*) FROM user_activity_log WHERE user_id = ? AND activity_type = 'property_view' AND details LIKE ?");
@@ -318,12 +316,14 @@ $view_counts_cache = [];
                             }
                             $total_views = $view_counts_cache[$cache_key];
 
-                            // Badge HTML
-                            if ($total_views > 1) {
-                                // Agar 1 se zyada baar dekha hai, to red color ka clickable badge
-                                $view_badge = "<a href='admin_view_history_popup.php?user_id={$log['user_id']}&prop_id={$prop_id}&name=".urlencode($log['user_name'])."' target='_blank' class='badge bg-danger text-decoration-none' style='font-size:0.8rem; padding:5px 8px;' title='Click to see full history'><i class='fas fa-eye'></i> {$total_views} times</a>";
+                            // 🔥 BADGE COLOR LOGIC (Green for >=3, Blue for ==2, Grey for ==1)
+                            $popup_url = "admin_view_history_popup.php?user_id={$log['user_id']}&prop_id={$prop_id}";
+                            
+                            if ($total_views >= 3) {
+                                $view_badge = "<a href='{$popup_url}' target='_blank' class='badge bg-success text-decoration-none' style='font-size:0.8rem; padding:5px 8px;' title='Click to see full history'><i class='fas fa-eye'></i> {$total_views} times</a>";
+                            } elseif ($total_views == 2) {
+                                $view_badge = "<a href='{$popup_url}' target='_blank' class='badge bg-primary text-decoration-none' style='font-size:0.8rem; padding:5px 8px;' title='Click to see full history'><i class='fas fa-eye'></i> {$total_views} times</a>";
                             } elseif ($total_views == 1) {
-                                // Sirf 1 baar dekha hai
                                 $view_badge = "<span class='badge bg-secondary' style='font-size:0.8rem;'>1 time</span>";
                             }
                         }
@@ -332,7 +332,7 @@ $view_counts_cache = [];
                             <td><?= htmlspecialchars($log['user_name']) ?><br><small><?= $log['user_email'] ?></small></td>
                             <td><?= $type_label ?></td>
                             <td><?= nl2br($details_text) ?></td>
-                            <td class="text-center"><?= $view_badge ?></td> <!-- 🔥 SHOW BADGE -->
+                            <td class="text-center"><?= $view_badge ?></td>
                             <td><code><?= $log['ip_address'] ?></code></td>
                             <td><?= $log_time_ist ?></td>
                         </tr>
