@@ -139,7 +139,6 @@ include 'header.php';
     .badge-status { padding: 3px 10px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; }
     .bs-active { background: #dcfce7; color: #166534; } .bs-inactive { background: #fee2e2; color: #991b1b; } .bs-blocked { background: #fef3c7; color: #92400e; }
     .btn-xs { padding: 4px 10px; font-size: 0.72rem; border-radius: 8px; font-weight: 600; }
-    
     .perm-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 15px; }
     .perm-box label { font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer; }
 </style>
@@ -172,7 +171,6 @@ include 'header.php';
                 <div class="col-md-2"><label class="small fw-bold">Target (₹)</label><input type="number" name="sales_target" class="form-control" value="0"></div>
             </div>
             
-            <!-- 🔥 NEW CHECKBOXES FOR CREATE -->
             <div class="perm-box">
                 <div class="row g-2">
                     <div class="col-md-3 form-check ms-2">
@@ -215,6 +213,7 @@ include 'header.php';
         <?php foreach ($sales_users as $s): 
             $initials = strtoupper(substr($s['name'], 0, 2));
             $conversion_rate = $s['total_leads'] > 0 ? round(($s['converted_leads'] / $s['total_leads']) * 100) : 0;
+            $is_active = !empty($s['sales_active']); // 🔥 FIXED: is_active ki jagah sales_active
         ?>
             <div class="col-lg-3 col-md-6">
                 <div class="sales-user-card">
@@ -224,7 +223,7 @@ include 'header.php';
                             <div class="su-name"><?= htmlspecialchars($s['name']) ?></div>
                             <div class="su-email" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?= htmlspecialchars($s['email']) ?></div>
                         </div>
-                        <?php if ($s['is_active'] && $s['status'] == 'active'): ?><span class="badge-status bs-active">Active</span>
+                        <?php if ($is_active && $s['status'] == 'active'): ?><span class="badge-status bs-active">Active</span>
                         <?php elseif ($s['status'] == 'blocked'): ?><span class="badge-status bs-blocked">Blocked</span>
                         <?php else: ?><span class="badge-status bs-inactive">Inactive</span><?php endif; ?>
                     </div>
@@ -240,14 +239,14 @@ include 'header.php';
                         <a href="admin_sales_leads.php?assigned=<?= $s['id'] ?>" class="btn btn-outline-primary btn-xs"><i class="fas fa-list"></i> Leads</a>
                         <a href="admin_sales_crm.php?user=<?= $s['id'] ?>" class="btn btn-outline-info btn-xs"><i class="fas fa-chart-line"></i> Stats</a>
                         <button class="btn btn-outline-warning btn-xs" data-bs-toggle="modal" data-bs-target="#editModal<?= $s['id'] ?>"><i class="fas fa-edit"></i> Edit</button>
-                        <a href="?toggle=<?= $s['id'] ?>" class="btn btn-xs <?= $s['is_active'] ? 'btn-outline-danger' : 'btn-outline-success' ?>" onclick="return confirm('Toggle status?');"><i class="fas fa-<?= $s['is_active'] ? 'pause' : 'play' ?>"></i></a>
+                        <a href="?toggle=<?= $s['id'] ?>" class="btn btn-xs <?= $is_active ? 'btn-outline-danger' : 'btn-outline-success' ?>" onclick="return confirm('Toggle status?');"><i class="fas fa-<?= $is_active ? 'pause' : 'play' ?>"></i></a>
                     </div>
                 </div>
             </div>
 
             <!-- Edit Modal -->
             <div class="modal fade" id="editModal<?= $s['id'] ?>" tabindex="-1">
-                <div class="modal-dialog modal-lg"> <!-- Made wider for checkboxes -->
+                <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header bg-primary text-white">
                             <h5 class="modal-title">Edit: <?= htmlspecialchars($s['name']) ?></h5>
