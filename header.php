@@ -60,15 +60,22 @@ $can_view_activity_logs = false;
 
 if ($is_logged_in && $role == 'sales') {
     try {
-        // Target Amount
-        $target_query = $pdo->prepare("SELECT sales_target, can_view_activity_logs FROM users WHERE id = ?");
+        // Fetch Sales Target & Permissions
+        $target_query = $pdo->prepare("SELECT sales_target, can_view_live_users, can_view_paid_users, can_view_free_users, can_view_full_logs FROM users WHERE id = ?");
         $target_query->execute([$_SESSION['user_id']]);
         $sales_data = $target_query->fetch();
         
         $target_goal = (float)($sales_data['sales_target'] ?? 0) ?: 100000; 
-        $can_view_activity_logs = !empty($sales_data['can_view_activity_logs']);
+        
+        // 🔥 Activity Logs Link Condition (Show if ANY of the 4 permissions is true)
+        $can_view_activity_logs = (
+            !empty($sales_data['can_view_live_users']) || 
+            !empty($sales_data['can_view_paid_users']) || 
+            !empty($sales_data['can_view_free_users']) || 
+            !empty($sales_data['can_view_full_logs'])
+        );
 
-        // Sum of Subscription Amounts
+        // Sum of Subscription Amounts from Users referred by this Sales person
         $achieved_query = $pdo->prepare("
             SELECT COALESCE(SUM(s.amount), 0) 
             FROM subscriptions s 
@@ -475,7 +482,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             <i class="fas fa-user-friends text-info"></i> <span>My Team</span>
         </a>
 
-        <!-- 🔥 CONDITIONAL: Activity Logs (Only if Admin allowed) -->
+        <!-- 🔥 CONDITIONAL: Activity Logs (Only if Admin allowed ANY of the 4) -->
         <?php if (!empty($can_view_activity_logs)): ?>
             <a href="admin_activity_logs.php" class="<?= $current_page == 'admin_activity_logs.php' ? 'active' : '' ?>">
                 <i class="fas fa-shield-alt text-danger"></i> <span>Activity Logs</span>
