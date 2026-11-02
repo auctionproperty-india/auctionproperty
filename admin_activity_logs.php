@@ -10,7 +10,7 @@ if(!isset($_SESSION['user_id'])) {
     exit; 
 }
 
-$is_admin = ($_SESSION['role'] == 'admin');
+$is_admin = (isset($_SESSION['role']) && $_SESSION['role'] == 'admin');
 $perm_live = $is_admin; $perm_paid = $is_admin; $perm_free = $is_admin; $perm_logs = $is_admin;
 $view_company_logs = $is_admin;
 
@@ -20,14 +20,16 @@ if (!$is_admin && $_SESSION['role'] == 'sales') {
     $perm_check->execute([$_SESSION['user_id']]);
     $perms = $perm_check->fetch();
     
-    $perm_live = !empty($perms['can_view_live_users']);
-    $perm_paid = !empty($perms['can_view_paid_users']);
-    $perm_free = !empty($perms['can_view_free_users']);
-    $perm_logs = !empty($perms['can_view_full_logs']);
-    $view_company_logs = !empty($perms['can_view_company_logs']);
+    if ($perms) {
+        $perm_live = !empty($perms['can_view_live_users']);
+        $perm_paid = !empty($perms['can_view_paid_users']);
+        $perm_free = !empty($perms['can_view_free_users']);
+        $perm_logs = !empty($perms['can_view_full_logs']);
+        $view_company_logs = !empty($perms['can_view_company_logs']);
+    }
 
     if (!$perm_live && !$perm_paid && !$perm_free && !$perm_logs) {
-        die("<div class='alert alert-danger m-5'>❌ You do not have permission to view any Activity Logs.</div>");
+        die("<div class='alert alert-danger m-5 text-center'>❌ You do not have permission to view any Activity Logs. <br><br> <a href='sales_dashboard.php' class='btn btn-primary btn-sm'>Go Back to Dashboard</a></div>");
     }
 }
 
@@ -200,7 +202,16 @@ if ($is_admin || $perm_logs) {
     $stmt->execute($params);
     $logs = $stmt->fetchAll();
 }
-$users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
+
+// 🔥 FETCH USERS FOR DROPDOWN (Only Team Members if not company logs)
+if (!$view_company_logs) {
+    $users_q = $pdo->prepare("SELECT id, name, email FROM users WHERE id IN (" . implode(',', array_fill(0, count($team_user_ids), '?')) . ") ORDER BY name");
+    $users_q->execute($team_user_ids);
+    $users = $users_q->fetchAll();
+} else {
+    $users = $pdo->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
+}
+
 $view_counts_cache = [];
 ?>
 
