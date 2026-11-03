@@ -181,7 +181,8 @@ function generateEmailLink($member) {
     $body .= "Team\n";
     $body .= "Prime Property India";
     
-    return "mailto:{$member['email']}?subject=" . urlencode($subject) . "&body=" . urlencode($body);
+    // 🔥 FIX 3: rawurlencode is used instead of urlencode to fix the '+' signs in mobile email apps. And added target blank via HTML link.
+    return "mailto:{$member['email']}?subject=" . rawurlencode($subject) . "&body=" . rawurlencode($body);
 }
 
 function renderTree($nodes, $level = 0) {
@@ -226,7 +227,7 @@ function renderTree($nodes, $level = 0) {
             $html .= '<button type="button" onclick=\'shareProfile("'.$wa_data['phone'].'", '.$msg_js.', this)\' class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
         }
         if($email_link) {
-            $html .= '<a href="'.$email_link.'" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
+            $html .= '<a href="'.$email_link.'" target="_blank" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
         }
         $html .= '</div>';
 
@@ -323,7 +324,8 @@ if (!empty($selected_city)) {
                                             <button type="button" onclick='shareProfile("<?= $wa_data['phone'] ?>", <?= $msg_js ?>, this)' class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
                                         <?php endif; ?>
                                         <?php if($email_link): ?>
-                                            <a href="<?= $email_link ?>" class="btn btn-primary btn-sm"><i class="fas fa-envelope"></i></a>
+                                            <!-- 🔥 FIX 3: Added target="_blank" so it opens on desktop too -->
+                                            <a href="<?= $email_link ?>" target="_blank" class="btn btn-primary btn-sm" title="Send Email"><i class="fas fa-envelope"></i></a>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -455,14 +457,15 @@ if (!empty($selected_city)) {
 async function shareProfile(phone, text, btnElement) {
     const banner = document.getElementById('share-banner');
     const encodedText = encodeURIComponent(text);
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    // Better mobile detection
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
 
     // Button Loading State
     const originalBtnHTML = btnElement.innerHTML;
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wait...';
     btnElement.disabled = true;
 
-    // Move banner to visible area but behind everything (z-index: -1)
+    // Move banner to visible area but behind everything
     banner.style.left = '0';
     banner.style.top = '0';
     banner.style.zIndex = '-1';
@@ -473,12 +476,16 @@ async function shareProfile(phone, text, btnElement) {
         canvas = await html2canvas(banner, {
             scale: 1,
             useCORS: true,
-            backgroundColor: '#0f172a', // Ensure solid background
+            backgroundColor: '#0f172a',
             logging: false
         });
     } catch (err) {
         banner.style.left = '-9999px';
-        alert("Error creating banner. Please try again.");
+        alert("Error creating banner. Opening WhatsApp with text only.");
+        // Fallback to text only
+        if (isMobile) window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+        else window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+        
         btnElement.innerHTML = originalBtnHTML;
         btnElement.disabled = false;
         return;
@@ -491,28 +498,35 @@ async function shareProfile(phone, text, btnElement) {
         const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
         
         // ==========================================
-        // 📱 MOBILE LOGIC (Native Share)
+        // 📱 MOBILE LOGIC
         // ==========================================
-        if (isMobile && navigator.share && navigator.canShare) {
-            try {
-                if (navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Prime Property India',
-                        text: text
-                    });
-                    btnElement.innerHTML = '<i class="fas fa-check"></i> Shared';
-                    setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 2000);
-                    return; // Success!
+        if (isMobile) {
+            if (navigator.share && navigator.canShare) {
+                try {
+                    if (navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: 'Prime Property India',
+                            text: text
+                        });
+                        btnElement.innerHTML = '<i class="fas fa-check"></i> Shared';
+                        setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 2000);
+                        return; // Success!
+                    }
+                } catch (err) {
+                    console.log("Mobile native share failed", err);
                 }
-            } catch (err) {
-                console.log("Mobile native share failed", err);
-                // Proceed to fallback if it fails
             }
+            
+            // 🔥 FIX 1: Mobile Fallback (Direct App Open with Text only if image share fails)
+            window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+            btnElement.innerHTML = originalBtnHTML;
+            btnElement.disabled = false;
+            return;
         }
 
         // ==========================================
-        // 💻 DESKTOP LOGIC (Copy to Clipboard -> Then Open WA)
+        // 💻 DESKTOP LOGIC
         // ==========================================
         try {
             // 1. Copy to clipboard FIRST
@@ -527,14 +541,11 @@ async function shareProfile(phone, text, btnElement) {
             alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
             
         } catch (err) {
-            // If clipboard completely fails
             btnElement.innerHTML = '<i class="fas fa-times"></i> Failed';
             alert("Your browser blocked automatic image copying. Please take a screenshot of the banner image behind this window and paste it manually.");
-            // Open WA anyway
             window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
         }
         
-        // Reset button
         setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 3000);
         
     }, 'image/png');
