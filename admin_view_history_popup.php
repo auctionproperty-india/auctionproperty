@@ -1,13 +1,13 @@
 <?php
 // ============================================================
-// 🏠 Admin - View History Popup (With User Details)
+// 🏠 Admin/Sales - View History Popup (With User Details)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// चेक करें कि एडमिन लॉगिन है या नहीं
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    die("<h3 style='color:red; text-align:center; margin-top:50px;'>Access Denied. Please login as Admin.</h3>");
+// 🔥 FIX: Allow Admin AND Sales
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'sales'])) {
+    die("<h3 style='color:red; text-align:center; margin-top:50px;'>Access Denied. Please login as Admin or Sales.</h3>");
 }
 
 $user_id = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
