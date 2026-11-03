@@ -129,14 +129,13 @@ function getWhatsAppData($member) {
     if(empty($member['phone'])) return null;
     
     $name = htmlspecialchars($member['name']);
-    $email = htmlspecialchars($member['email']); // 🔥 Email Added
+    $email = htmlspecialchars($member['email']);
     $reg_date = safeDateFormat($member['created_at']);
     $site_url = "https://primepropertyindia.onrender.com";
 
     $clean_phone = preg_replace('/[^0-9]/', '', $member['phone']);
     if (strlen($clean_phone) == 10) $clean_phone = '91' . $clean_phone;
     
-    // 🔥 Ultimate Professional Message with Login & New Features
     $msg = "नमस्ते *{$name}* जी 🙏,\n\n";
     $msg .= "Prime Property परिवार में आपका स्वागत है! आपने *{$reg_date}* को हमारे पोर्टल से जुड़कर हमें अपना भरोसा दिया, इसके लिए धन्यवाद।\n\n";
     
@@ -150,8 +149,10 @@ function getWhatsAppData($member) {
     $msg .= "अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
     $msg .= "🌐 *वेबसाइट:* {$site_url}\n\n";
     $msg .= "🤝 कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक इस मैसेज का रिप्लाई करें।\n\n";
-    $msg .= "शुभकामनाएं,\n";
-    $msg .= "*Prime Property Team* ✨";
+    
+    // 🔥 UPDATED SIGN-OFF HERE
+    $msg .= "*Team* 🏢\n";
+    $msg .= "*Prime Property India* 🇮🇳✨";
 
     return ['phone' => $clean_phone, 'msg' => $msg];
 }
@@ -177,7 +178,10 @@ function generateEmailLink($member) {
     $body .= "अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
     $body .= "वेबसाइट: {$site_url}\n\n";
     $body .= "कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक हमें रिप्लाई करें।\n\n";
-    $body .= "शुभकामनाएं,\nPrime Property Team";
+    
+    // 🔥 UPDATED EMAIL SIGN-OFF HERE
+    $body .= "Team\n";
+    $body .= "Prime Property India";
     
     return "mailto:{$member['email']}?subject=" . urlencode($subject) . "&body=" . urlencode($body);
 }
@@ -204,7 +208,6 @@ function renderTree($nodes, $level = 0) {
         
         $searchData = 'data-name="' . strtolower(htmlspecialchars($node['name'])) . '" data-email="' . strtolower(htmlspecialchars($node['email'])) . '" data-city="' . strtolower(htmlspecialchars($node['city_normalized'] ?? '')) . '"';
         
-        // 🔥 Get Links
         $wa_data = getWhatsAppData($node);
         $email_link = generateEmailLink($node);
 
@@ -219,7 +222,6 @@ function renderTree($nodes, $level = 0) {
         }
         $html .= ' <span class="badge bg-light text-dark" style="font-weight:400;"><i class="fas fa-map-pin"></i> ' . $cityDisplay . '</span>';
         
-        // 🔥 ACTION BUTTONS
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
             $msg_js = json_encode($wa_data['msg']);
@@ -415,10 +417,8 @@ function openWhatsApp(phone, text) {
     const encodedText = encodeURIComponent(text);
     
     if (isMobile) {
-        // On Mobile: Directly open the app
         window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
     } else {
-        // On Desktop: Directly open WhatsApp Web in a new tab (bypasses the "Continue" screen)
         window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
     }
 }
