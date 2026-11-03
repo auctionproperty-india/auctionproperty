@@ -222,8 +222,9 @@ function renderTree($nodes, $level = 0) {
         
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
-            // 🔥 FIX: Using data-attributes to prevent JS breakage
-            $html .= '<button type="button" data-phone="'.$wa_data['phone'].'" data-msg="'.htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8').'" onclick="shareProfile(this)" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
+            // 🔥 FIX: Using urlencode for data-msg to prevent ANY attribute breaking
+            $safe_msg = urlencode($wa_data['msg']);
+            $html .= '<button type="button" data-phone="'.$wa_data['phone'].'" data-msg="'.$safe_msg.'" onclick="shareProfile(this)" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
         }
         if($email_link) {
             $html .= '<a href="'.$email_link.'" target="_blank" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
@@ -317,9 +318,10 @@ if (!empty($selected_city)) {
                                 <td><?= safeDateFormat($m['created_at']) ?></td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <?php if($wa_data): ?>
-                                            <!-- 🔥 FIX: Same data-attributes here -->
-                                            <button type="button" data-phone="<?= $wa_data['phone'] ?>" data-msg="<?= htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8') ?>" onclick="shareProfile(this)" class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
+                                        <?php if($wa_data): 
+                                            $safe_msg = urlencode($wa_data['msg']);
+                                        ?>
+                                            <button type="button" data-phone="<?= $wa_data['phone'] ?>" data-msg="<?= $safe_msg ?>" onclick="shareProfile(this)" class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
                                         <?php endif; ?>
                                         <?php if($email_link): ?>
                                             <a href="<?= $email_link ?>" target="_blank" class="btn btn-primary btn-sm" title="Send Email"><i class="fas fa-envelope"></i></a>
@@ -450,121 +452,96 @@ if (!empty($selected_city)) {
 
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
-// 🔥 SMART SHARE FUNCTION (Image + Text)
+// 🔥 SMART SHARE FUNCTION (Exactly like Property Popup)
 async function shareProfile(btnElement) {
-    // Read data from attributes to prevent ANY JS string breakage
     const phone = btnElement.getAttribute('data-phone');
-    const text = btnElement.getAttribute('data-msg');
+    const safeMsg = btnElement.getAttribute('data-msg');
+    const text = decodeURIComponent(safeMsg); // Decode the urlencoded string
+    const encodedText = encodeURIComponent(text);
     
     const banner = document.getElementById('share-banner');
-    const encodedText = encodeURIComponent(text);
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
 
     // Button Loading State
     const originalBtnHTML = btnElement.innerHTML;
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wait...';
+    btnElement.disabled = true;
     btnElement.style.pointerEvents = 'none';
 
-    // 🔥 DESKTOP FIX: Open blank window SYNCHRONOUSLY to prevent Popup Blocker
-    let waWindow = null;
-    if (!isMobile) {
-        waWindow = window.open('about:blank', '_blank');
-        if (waWindow) {
-            waWindow.document.write("<h2 style='text-align:center; margin-top:50px; font-family:sans-serif; color:#2563eb;'>⏳ Generating Banner...<br><br><small style='color:#64748b;'>Please wait, you will be redirected to WhatsApp shortly.</small></h2>");
-        }
-    }
-
-    // Show banner for capture
+    // Make banner visible temporarily for capture (Use fixed positioning)
     banner.style.left = '0';
     banner.style.top = '0';
     banner.style.zIndex = '-1';
 
     try {
         const canvas = await html2canvas(banner, {
-            scale: 1,
+            scale: 1, 
             useCORS: true,
-            backgroundColor: '#0f172a',
+            backgroundColor: null,
             logging: false
         });
+        
         banner.style.left = '-9999px';
-
+        
         canvas.toBlob(async function(blob) {
             const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
-
+            
             // ==========================================
             // 📱 MOBILE LOGIC
             // ==========================================
-            if (isMobile) {
-                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try {
-                        await navigator.share({
-                            files: [file],
-                            title: 'Prime Property India',
-                            text: text
-                        });
-                        btnElement.innerHTML = '<i class="fas fa-check"></i> Shared';
-                    } catch (err) {
-                        console.log("Share cancelled/failed", err);
-                        // Fallback: Direct app open (text only)
-                        window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-                        btnElement.innerHTML = originalBtnHTML;
-                    }
-                } else {
-                    // Fallback: Direct app open (text only)
-                    window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+            if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Prime Property Details',
+                        text: text
+                    });
+                    btnElement.innerHTML = '<i class="fas fa-check"></i> Shared!';
+                } catch (err) {
                     btnElement.innerHTML = originalBtnHTML;
+                    window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
                 }
-                setTimeout(() => { btnElement.style.pointerEvents = 'auto'; }, 2000);
-                return;
-            }
-
-            // ==========================================
-            // 💻 DESKTOP LOGIC
-            // ==========================================
-            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
-            
-            try {
-                // 1. Try to copy to clipboard
-                const item = new ClipboardItem({ 'image/png': blob });
-                await navigator.clipboard.write([item]);
-                btnElement.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                
-                // 2. Redirect to WhatsApp Web
-                if (waWindow) {
-                    waWindow.location.href = waUrl;
-                } else {
-                    window.open(waUrl, '_blank');
+            } else {
+                // ==========================================
+                // 💻 DESKTOP LOGIC
+                // ==========================================
+                try {
+                    const item = new ClipboardItem({ 'image/png': blob });
+                    await navigator.clipboard.write([item]);
+                    
+                    // Open WhatsApp Web directly
+                    window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+                    
+                    alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V inside the chat box to paste the banner.");
+                    btnElement.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                } catch (err) {
+                    // Fallback if clipboard fails
+                    const link = document.createElement('a');
+                    link.download = 'PrimeProperty_Banner.png';
+                    link.href = URL.createObjectURL(blob);
+                    link.click();
+                    
+                    window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+                    
+                    alert("Banner downloaded! WhatsApp Web is opening. Please attach the downloaded image manually.");
+                    btnElement.innerHTML = '<i class="fas fa-check"></i> Downloaded!';
                 }
-                
-                alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
-            } catch (err) {
-                // 🔥 FALLBACK: If clipboard is blocked, DOWNLOAD image and open WA
-                const link = document.createElement('a');
-                link.download = 'PrimeProperty_Banner.png';
-                link.href = URL.createObjectURL(blob);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                if (waWindow) {
-                    waWindow.location.href = waUrl;
-                } else {
-                    window.open(waUrl, '_blank');
-                }
-                
-                btnElement.innerHTML = '<i class="fas fa-download"></i> Downloaded';
-                alert("Your browser blocked automatic image copying.\n\n✅ Banner Downloaded!\nWhatsApp Web is opening. Please attach the downloaded image (PrimeProperty_Banner.png) manually in the chat.");
             }
             
-            setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.style.pointerEvents = 'auto'; }, 3000);
-
+            setTimeout(() => {
+                btnElement.innerHTML = originalBtnHTML;
+                btnElement.disabled = false;
+                btnElement.style.pointerEvents = 'auto';
+            }, 3000);
+            
         }, 'image/png');
+        
     } catch (err) {
         banner.style.left = '-9999px';
-        if (waWindow) waWindow.close();
+        alert("Error generating banner.");
         btnElement.innerHTML = originalBtnHTML;
+        btnElement.disabled = false;
         btnElement.style.pointerEvents = 'auto';
-        alert("Error creating banner. Please try again.");
     }
 }
 
