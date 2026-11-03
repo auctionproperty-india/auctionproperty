@@ -52,7 +52,9 @@ function displayCityName($city) {
     return ucwords($city);
 }
 
-// ---- Fetch the entire referral tree ----
+// ============================================================
+// FETCH TEAM TREE
+// ============================================================
 $sql = "
 WITH RECURSIVE team_tree AS (
     SELECT u.id, u.name, u.email, u.phone, u.created_at, u.referred_by, u.city, 0 as level, ARRAY[u.id] as path,
@@ -223,24 +225,85 @@ if (!empty($selected_city)) {
     $city_display = displayCityName($selected_city_normalized);
     ?>
     <style>
-        .city-detail-container { background: white; border-radius: 24px; padding: 25px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04); }
-        .city-detail-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-        .city-detail-header h4 { font-weight: 700; margin: 0; }
-        .city-detail-header h4 i { color: #2563eb; }
-        .back-btn { background: #e2e8f0; border: none; border-radius: 30px; padding: 8px 20px; font-weight: 600; color: #1e293b; text-decoration: none; transition: 0.2s; }
-        .back-btn:hover { background: #cbd5e1; text-decoration: none; color: #0f172a; }
-        .city-member-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        .city-member-table th { background: #f1f5f9; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; padding: 10px 12px; text-align: left; }
-        .city-member-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-        .city-member-table tr:hover td { background: #f8fafc; }
-        .no-members-msg { padding: 30px; text-align: center; color: #94a3b8; }
-        @media (max-width: 768px) { .city-member-table { font-size: 0.75rem; } .city-member-table th, .city-member-table td { padding: 6px 8px; } .city-detail-header { flex-direction: column; align-items: flex-start; } }
+        .city-detail-container {
+            background: white;
+            border-radius: 24px;
+            padding: 25px;
+            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
+        }
+        .city-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .city-detail-header h4 {
+            font-weight: 700;
+            margin: 0;
+        }
+        .city-detail-header h4 i {
+            color: #2563eb;
+        }
+        .back-btn {
+            background: #e2e8f0;
+            border: none;
+            border-radius: 30px;
+            padding: 8px 20px;
+            font-weight: 600;
+            color: #1e293b;
+            text-decoration: none;
+            transition: 0.2s;
+        }
+        .back-btn:hover {
+            background: #cbd5e1;
+            text-decoration: none;
+            color: #0f172a;
+        }
+        .city-member-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .city-member-table th {
+            background: #f1f5f9;
+            font-weight: 600;
+            color: #475569;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            padding: 10px 12px;
+            text-align: left;
+        }
+        .city-member-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+        .city-member-table tr:hover td {
+            background: #f8fafc;
+        }
+        .no-members-msg {
+            padding: 30px;
+            text-align: center;
+            color: #94a3b8;
+        }
+        @media (max-width: 768px) {
+            .city-member-table { font-size: 0.75rem; }
+            .city-member-table th, .city-member-table td { padding: 6px 8px; }
+            .city-detail-header { flex-direction: column; align-items: flex-start; }
+        }
     </style>
     <div class="container-fluid">
         <div class="city-detail-container">
             <div class="city-detail-header">
                 <h4><i class="fas fa-map-pin"></i> <?= htmlspecialchars($city_display) ?> (<?= $city_count ?> members)</h4>
-                <div><a href="user_team.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to My Team</a></div>
+                <div>
+                    <a href="user_team.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to My Team</a>
+                </div>
             </div>
             <?php if ($city_count > 0): ?>
                 <div class="table-responsive">
@@ -285,8 +348,12 @@ if (!empty($selected_city)) {
                                 <!-- 🔥 ACTION BUTTONS ADDED HERE -->
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <?php if($wa_link): ?><a href="<?= $wa_link ?>" target="_blank" class="btn btn-success btn-sm"><i class="fab fa-whatsapp"></i></a><?php endif; ?>
-                                        <?php if($email_link): ?><a href="<?= $email_link ?>" class="btn btn-primary btn-sm"><i class="fas fa-envelope"></i></a><?php endif; ?>
+                                        <?php if($wa_link): ?>
+                                            <a href="<?= $wa_link ?>" target="_blank" class="btn btn-success btn-sm" title="Send WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                                        <?php endif; ?>
+                                        <?php if($email_link): ?>
+                                            <a href="<?= $email_link ?>" class="btn btn-primary btn-sm" title="Send Email"><i class="fas fa-envelope"></i></a>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
@@ -309,26 +376,99 @@ if (!empty($selected_city)) {
 <!-- DEFAULT VIEW (Tree + City Dashboard) -->
 <!-- ============================================================ -->
 <style>
-    .team-container { background: white; border-radius: 24px; padding: 25px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04); }
-    .team-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f1f5f9; flex-wrap: wrap; gap: 10px; }
+    .team-container {
+        background: white;
+        border-radius: 24px;
+        padding: 25px;
+        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
+    }
+    .team-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f1f5f9;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
     .team-header h4 { font-weight: 700; margin: 0; }
     .team-search { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .team-search input { border-radius: 30px; padding: 6px 16px; border: 1px solid #e2e8f0; font-size: 0.9rem; min-width: 200px; }
-    .team-search input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .team-search input {
+        border-radius: 30px;
+        padding: 6px 16px;
+        border: 1px solid #e2e8f0;
+        font-size: 0.9rem;
+        min-width: 200px;
+    }
+    .team-search input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
     .team-tree { padding: 10px 0; }
     .team-tree ul { margin: 0; }
     .team-tree li { transition: all 0.2s; cursor: default; }
     .team-tree li:hover > div { background: #f8fafc; }
     .team-tree li.hidden-item { display: none !important; }
 
-    .city-dashboard { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
-    .city-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; transition: 0.2s; cursor: default; }
+    .city-dashboard {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding: 10px 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .city-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: 0.2s;
+        cursor: default;
+    }
     .city-card:hover { background: #eef2ff; border-color: #2563eb; }
     .city-card .city-name { font-weight: 600; color: #0f172a; }
-    .city-card .city-count { background: #2563eb; color: white; border-radius: 30px; padding: 2px 10px; font-size: 0.8rem; font-weight: 700; }
-    .city-card .view-all-btn { background: transparent; border: none; color: #2563eb; font-weight: 600; font-size: 0.8rem; cursor: pointer; padding: 2px 8px; border-radius: 20px; transition: 0.2s; text-decoration: none; }
-    .city-card .view-all-btn:hover { background: #2563eb; color: white; text-decoration: none; }
-    .clear-filter-btn { background: #e2e8f0; border: none; border-radius: 30px; padding: 4px 16px; font-size: 0.8rem; cursor: pointer; color: #475569; font-weight: 600; display: none; }
+    .city-card .city-count {
+        background: #2563eb;
+        color: white;
+        border-radius: 30px;
+        padding: 2px 10px;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+    .city-card .view-all-btn {
+        background: transparent;
+        border: none;
+        color: #2563eb;
+        font-weight: 600;
+        font-size: 0.8rem;
+        cursor: pointer;
+        padding: 2px 8px;
+        border-radius: 20px;
+        transition: 0.2s;
+        text-decoration: none;
+    }
+    .city-card .view-all-btn:hover {
+        background: #2563eb;
+        color: white;
+        text-decoration: none;
+    }
+    .clear-filter-btn {
+        background: #e2e8f0;
+        border: none;
+        border-radius: 30px;
+        padding: 4px 16px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        color: #475569;
+        font-weight: 600;
+        display: none;
+    }
     .clear-filter-btn:hover { background: #cbd5e1; }
     .clear-filter-btn.show { display: inline-block; }
 </style>
@@ -344,11 +484,15 @@ if (!empty($selected_city)) {
             </div>
         </div>
 
+        <!-- City Dashboard (now normalized) -->
         <?php if (!empty($city_counts)): ?>
         <div class="city-dashboard">
             <?php foreach ($city_counts as $city => $count): ?>
                 <div class="city-card">
-                    <span class="city-name"><i class="fas fa-map-pin" style="color:#2563eb;"></i> <?= htmlspecialchars(displayCityName($city)) ?></span>
+                    <span class="city-name">
+                        <i class="fas fa-map-pin" style="color:#2563eb;"></i> 
+                        <?= htmlspecialchars(displayCityName($city)) ?>
+                    </span>
                     <span class="city-count"><?= $count ?></span>
                     <a href="?city=<?= urlencode($city) ?>" class="view-all-btn">View All</a>
                 </div>
@@ -392,10 +536,16 @@ function filterTeam(searchText) {
             el.classList.add('hidden-item');
         }
     });
-    if (matched) { clearBtn.classList.add('show'); } else { clearBtn.classList.remove('show'); }
+    if (matched) {
+        clearBtn.classList.add('show');
+    } else {
+        clearBtn.classList.remove('show');
+    }
 }
+
 function clearFilter() {
-    document.getElementById('teamSearch').value = '';
+    const searchInput = document.getElementById('teamSearch');
+    searchInput.value = '';
     filterTeam('');
 }
 </script>
