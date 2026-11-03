@@ -1,13 +1,13 @@
 <?php
 // ============================================================
-// 🏠 Admin - View Property Details (Popup Window)
+// 🏠 Admin/Sales - View Property Details (Popup Window)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// चेक करें कि एडमिन लॉगिन है या नहीं
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    die("<h3 style='color:red; text-align:center; margin-top:50px;'>Access Denied. Please login as Admin.</h3>");
+// 🔥 FIX: Allow Admin AND Sales
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'sales'])) {
+    die("<h3 style='color:red; text-align:center; margin-top:50px;'>Access Denied. Please login as Admin or Sales.</h3>");
 }
 
 $prop_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -25,7 +25,7 @@ if (!$prop) {
 }
 
 // मुख्य इमेज का URL
-$img_url = !empty($prop['image_url']) ? htmlspecialchars($prop['image_url']) : 'assets/img/no-image.png'; // अगर इमेज न हो तो कोई डिफ़ॉल्ट इमेज डाल सकते हैं
+$img_url = !empty($prop['image_url']) ? htmlspecialchars($prop['image_url']) : 'assets/img/no-image.png'; 
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -112,11 +112,13 @@ $img_url = !empty($prop['image_url']) ? htmlspecialchars($prop['image_url']) : '
                 <p class="text-muted" style="font-size: 0.9rem;"><?= nl2br(htmlspecialchars($prop['description'] ?? 'No description available.')) ?></p>
 
                 <!-- एडमिन एक्शन बटन -->
+                <?php if ($_SESSION['role'] == 'admin'): ?>
                 <div class="text-end mt-4 border-top pt-3">
                     <a href="properties.php?edit=<?= $prop['id'] ?>" target="_blank" class="btn btn-primary rounded-pill px-4">
                         <i class="fas fa-edit me-1"></i> Edit This Property
                     </a>
                 </div>
+                <?php endif; ?>
 
             </div>
         </div>
