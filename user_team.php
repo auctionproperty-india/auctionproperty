@@ -124,32 +124,44 @@ function safeDateFormat($dateStr) {
     return date('d M Y', strtotime($dateStr));
 }
 
-// 🔥 HELPER FUNCTION TO GENERATE WHATSAPP/EMAIL LINKS
-function generateContactLinks($member, $type = 'whatsapp') {
+// 🔥 HELPER FUNCTIONS FOR CONTACT
+function getWhatsAppData($member) {
+    if(empty($member['phone'])) return null;
+    
     $name = htmlspecialchars($member['name']);
     $reg_date = safeDateFormat($member['created_at']);
     $site_url = "https://primepropertyindia.onrender.com";
 
-    if ($type == 'whatsapp') {
-        if(empty($member['phone'])) return '';
-        $clean_phone = preg_replace('/[^0-9]/', '', $member['phone']);
-        if (strlen($clean_phone) == 10) $clean_phone = '91' . $clean_phone;
-        
-        $msg = "Namaste *{$name}* 👋,\n\n";
-        $msg .= "You joined our Prime Property system on *{$reg_date}*.\n\n";
-        $msg .= "We noticed you haven't visited any properties on our portal yet! Discover exclusive bank auction properties at great prices.\n\n";
-        $msg .= "🌐 Please visit our website to explore: {$site_url}\n\n";
-        $msg .= "Let us know if you need any assistance. ✨\n";
-        $msg .= "📞 *Prime Property Team*";
-        
-        return "https://wa.me/{$clean_phone}?text=" . urlencode($msg);
-    } 
-    elseif ($type == 'email') {
-        if(empty($member['email'])) return '';
-        $subject = "Explore Bank Auction Properties - Prime Property";
-        $body = "Namaste {$name},\n\nYou joined our Prime Property system on {$reg_date}.\n\nWe noticed you haven't visited any properties on our portal yet! Discover exclusive bank auction properties at great prices.\n\nPlease visit our website to explore: {$site_url}\n\nLet us know if you need any assistance.\n\nRegards,\nPrime Property Team";
-        return "mailto:{$member['email']}?subject=" . urlencode($subject) . "&body=" . urlencode($body);
-    }
+    $clean_phone = preg_replace('/[^0-9]/', '', $member['phone']);
+    if (strlen($clean_phone) == 10) $clean_phone = '91' . $clean_phone;
+    
+    // 🔥 Professional Hindi Message
+    $msg = "नमस्ते *{$name}* 🙏,\n\n";
+    $msg .= "आपने *{$reg_date}* को हमारे Prime Property सिस्टम से जुड़ा था।\n\n";
+    $msg .= "हमने देखा है कि आपने अभी तक हमारे पोर्टल पर कोई भी प्रॉपर्टी नहीं देखी है! बैंक ऑक्शन की शानदार प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें।\n\n";
+    $msg .= "🌐 *वेबसाइट:* {$site_url}\n\n";
+    $msg .= "अगर आपको किसी भी तरह की सहायता चाहिए, तो हमें बताएं। ✨\n\n";
+    $msg .= "धन्यवाद,\n";
+    $msg .= "*Prime Property Team*";
+
+    return ['phone' => $clean_phone, 'msg' => $msg];
+}
+
+function generateEmailLink($member) {
+    if(empty($member['email'])) return '';
+    $name = htmlspecialchars($member['name']);
+    $reg_date = safeDateFormat($member['created_at']);
+    $site_url = "https://primepropertyindia.onrender.com";
+
+    $subject = "Prime Property - आपकी प्रॉपर्टी सर्च शुरू करें";
+    $body = "नमस्ते {$name},\n\n";
+    $body .= "आपने {$reg_date} को हमारे Prime Property सिस्टम से जुड़ा था।\n\n";
+    $body .= "हमने देखा है कि आपने अभी तक हमारे पोर्टल पर कोई भी प्रॉपर्टी नहीं देखी है! बैंक ऑक्शन की शानदार प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें।\n\n";
+    $body .= "वेबसाइट: {$site_url}\n\n";
+    $body .= "अगर आपको किसी भी तरह की सहायता चाहिए, तो हमें बताएं।\n\n";
+    $body .= "धन्यवाद,\nPrime Property Team";
+    
+    return "mailto:{$member['email']}?subject=" . urlencode($subject) . "&body=" . urlencode($body);
 }
 
 function renderTree($nodes, $level = 0) {
@@ -174,9 +186,9 @@ function renderTree($nodes, $level = 0) {
         
         $searchData = 'data-name="' . strtolower(htmlspecialchars($node['name'])) . '" data-email="' . strtolower(htmlspecialchars($node['email'])) . '" data-city="' . strtolower(htmlspecialchars($node['city_normalized'] ?? '')) . '"';
         
-        // 🔥 Generate Links
-        $wa_link = generateContactLinks($node, 'whatsapp');
-        $email_link = generateContactLinks($node, 'email');
+        // 🔥 Get Links
+        $wa_data = getWhatsAppData($node);
+        $email_link = generateEmailLink($node);
 
         $html .= '<li style="margin-bottom:8px; border-left:2px solid #e2e8f0; padding-left:12px;" ' . $searchData . '>';
         $html .= '<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:'.($level==0?'#f1f5f9':'transparent').'; border-radius:8px; flex-wrap:wrap;">';
@@ -189,10 +201,12 @@ function renderTree($nodes, $level = 0) {
         }
         $html .= ' <span class="badge bg-light text-dark" style="font-weight:400;"><i class="fas fa-map-pin"></i> ' . $cityDisplay . '</span>';
         
-        // 🔥 ACTION BUTTONS ADDED HERE
+        // 🔥 ACTION BUTTONS
         $html .= '<div class="ms-auto d-flex gap-1">';
-        if($wa_link) {
-            $html .= '<a href="'.$wa_link.'" target="_blank" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send WhatsApp"><i class="fab fa-whatsapp"></i></a>';
+        if($wa_data) {
+            // JS safely handle message
+            $msg_js = addslashes(str_replace(array("\r\n", "\r", "\n"), "\\n", $wa_data['msg']));
+            $html .= '<button type="button" onclick="openWhatsApp(\''.$wa_data['phone'].'\', \''.$msg_js.'\')" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send WhatsApp"><i class="fab fa-whatsapp"></i></button>';
         }
         if($email_link) {
             $html .= '<a href="'.$email_link.'" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
@@ -225,85 +239,24 @@ if (!empty($selected_city)) {
     $city_display = displayCityName($selected_city_normalized);
     ?>
     <style>
-        .city-detail-container {
-            background: white;
-            border-radius: 24px;
-            padding: 25px;
-            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
-        }
-        .city-detail-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .city-detail-header h4 {
-            font-weight: 700;
-            margin: 0;
-        }
-        .city-detail-header h4 i {
-            color: #2563eb;
-        }
-        .back-btn {
-            background: #e2e8f0;
-            border: none;
-            border-radius: 30px;
-            padding: 8px 20px;
-            font-weight: 600;
-            color: #1e293b;
-            text-decoration: none;
-            transition: 0.2s;
-        }
-        .back-btn:hover {
-            background: #cbd5e1;
-            text-decoration: none;
-            color: #0f172a;
-        }
-        .city-member-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-        .city-member-table th {
-            background: #f1f5f9;
-            font-weight: 600;
-            color: #475569;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.5px;
-            padding: 10px 12px;
-            text-align: left;
-        }
-        .city-member-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-        }
-        .city-member-table tr:hover td {
-            background: #f8fafc;
-        }
-        .no-members-msg {
-            padding: 30px;
-            text-align: center;
-            color: #94a3b8;
-        }
-        @media (max-width: 768px) {
-            .city-member-table { font-size: 0.75rem; }
-            .city-member-table th, .city-member-table td { padding: 6px 8px; }
-            .city-detail-header { flex-direction: column; align-items: flex-start; }
-        }
+        .city-detail-container { background: white; border-radius: 24px; padding: 25px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04); }
+        .city-detail-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .city-detail-header h4 { font-weight: 700; margin: 0; }
+        .city-detail-header h4 i { color: #2563eb; }
+        .back-btn { background: #e2e8f0; border: none; border-radius: 30px; padding: 8px 20px; font-weight: 600; color: #1e293b; text-decoration: none; transition: 0.2s; }
+        .back-btn:hover { background: #cbd5e1; text-decoration: none; color: #0f172a; }
+        .city-member-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .city-member-table th { background: #f1f5f9; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; padding: 10px 12px; text-align: left; }
+        .city-member-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .city-member-table tr:hover td { background: #f8fafc; }
+        .no-members-msg { padding: 30px; text-align: center; color: #94a3b8; }
+        @media (max-width: 768px) { .city-member-table { font-size: 0.75rem; } .city-member-table th, .city-member-table td { padding: 6px 8px; } .city-detail-header { flex-direction: column; align-items: flex-start; } }
     </style>
     <div class="container-fluid">
         <div class="city-detail-container">
             <div class="city-detail-header">
                 <h4><i class="fas fa-map-pin"></i> <?= htmlspecialchars($city_display) ?> (<?= $city_count ?> members)</h4>
-                <div>
-                    <a href="user_team.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to My Team</a>
-                </div>
+                <div><a href="user_team.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to My Team</a></div>
             </div>
             <?php if ($city_count > 0): ?>
                 <div class="table-responsive">
@@ -317,13 +270,13 @@ if (!empty($selected_city)) {
                                 <th>Package</th>
                                 <th>Status</th>
                                 <th>Joined</th>
-                                <th>Action</th> <!-- 🔥 New Column -->
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($city_members as $m): 
-                                $wa_link = generateContactLinks($m, 'whatsapp');
-                                $email_link = generateContactLinks($m, 'email');
+                                $wa_data = getWhatsAppData($m);
+                                $email_link = generateEmailLink($m);
                             ?>
                             <tr>
                                 <td><strong><?= htmlspecialchars($m['name']) ?></strong></td>
@@ -345,14 +298,15 @@ if (!empty($selected_city)) {
                                     <?php endif; ?>
                                 </td>
                                 <td><?= safeDateFormat($m['created_at']) ?></td>
-                                <!-- 🔥 ACTION BUTTONS ADDED HERE -->
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <?php if($wa_link): ?>
-                                            <a href="<?= $wa_link ?>" target="_blank" class="btn btn-success btn-sm" title="Send WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                                        <?php if($wa_data): 
+                                            $msg_js = addslashes(str_replace(array("\r\n", "\r", "\n"), "\\n", $wa_data['msg']));
+                                        ?>
+                                            <button type="button" onclick="openWhatsApp('<?= $wa_data['phone'] ?>', '<?= $msg_js ?>')" class="btn btn-success btn-sm"><i class="fab fa-whatsapp"></i></button>
                                         <?php endif; ?>
                                         <?php if($email_link): ?>
-                                            <a href="<?= $email_link ?>" class="btn btn-primary btn-sm" title="Send Email"><i class="fas fa-envelope"></i></a>
+                                            <a href="<?= $email_link ?>" class="btn btn-primary btn-sm"><i class="fas fa-envelope"></i></a>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -376,99 +330,26 @@ if (!empty($selected_city)) {
 <!-- DEFAULT VIEW (Tree + City Dashboard) -->
 <!-- ============================================================ -->
 <style>
-    .team-container {
-        background: white;
-        border-radius: 24px;
-        padding: 25px;
-        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
-    }
-    .team-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        padding-bottom: 15px;
-        border-bottom: 2px solid #f1f5f9;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
+    .team-container { background: white; border-radius: 24px; padding: 25px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04); }
+    .team-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f1f5f9; flex-wrap: wrap; gap: 10px; }
     .team-header h4 { font-weight: 700; margin: 0; }
     .team-search { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .team-search input {
-        border-radius: 30px;
-        padding: 6px 16px;
-        border: 1px solid #e2e8f0;
-        font-size: 0.9rem;
-        min-width: 200px;
-    }
-    .team-search input:focus {
-        outline: none;
-        border-color: #2563eb;
-        box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-    }
+    .team-search input { border-radius: 30px; padding: 6px 16px; border: 1px solid #e2e8f0; font-size: 0.9rem; min-width: 200px; }
+    .team-search input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
     .team-tree { padding: 10px 0; }
     .team-tree ul { margin: 0; }
     .team-tree li { transition: all 0.2s; cursor: default; }
     .team-tree li:hover > div { background: #f8fafc; }
     .team-tree li.hidden-item { display: none !important; }
 
-    .city-dashboard {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-bottom: 20px;
-        padding: 10px 0;
-        border-bottom: 1px solid #e2e8f0;
-    }
-    .city-card {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 10px 16px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        transition: 0.2s;
-        cursor: default;
-    }
+    .city-dashboard { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+    .city-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; transition: 0.2s; cursor: default; }
     .city-card:hover { background: #eef2ff; border-color: #2563eb; }
     .city-card .city-name { font-weight: 600; color: #0f172a; }
-    .city-card .city-count {
-        background: #2563eb;
-        color: white;
-        border-radius: 30px;
-        padding: 2px 10px;
-        font-size: 0.8rem;
-        font-weight: 700;
-    }
-    .city-card .view-all-btn {
-        background: transparent;
-        border: none;
-        color: #2563eb;
-        font-weight: 600;
-        font-size: 0.8rem;
-        cursor: pointer;
-        padding: 2px 8px;
-        border-radius: 20px;
-        transition: 0.2s;
-        text-decoration: none;
-    }
-    .city-card .view-all-btn:hover {
-        background: #2563eb;
-        color: white;
-        text-decoration: none;
-    }
-    .clear-filter-btn {
-        background: #e2e8f0;
-        border: none;
-        border-radius: 30px;
-        padding: 4px 16px;
-        font-size: 0.8rem;
-        cursor: pointer;
-        color: #475569;
-        font-weight: 600;
-        display: none;
-    }
+    .city-card .city-count { background: #2563eb; color: white; border-radius: 30px; padding: 2px 10px; font-size: 0.8rem; font-weight: 700; }
+    .city-card .view-all-btn { background: transparent; border: none; color: #2563eb; font-weight: 600; font-size: 0.8rem; cursor: pointer; padding: 2px 8px; border-radius: 20px; transition: 0.2s; text-decoration: none; }
+    .city-card .view-all-btn:hover { background: #2563eb; color: white; text-decoration: none; }
+    .clear-filter-btn { background: #e2e8f0; border: none; border-radius: 30px; padding: 4px 16px; font-size: 0.8rem; cursor: pointer; color: #475569; font-weight: 600; display: none; }
     .clear-filter-btn:hover { background: #cbd5e1; }
     .clear-filter-btn.show { display: inline-block; }
 </style>
@@ -484,15 +365,11 @@ if (!empty($selected_city)) {
             </div>
         </div>
 
-        <!-- City Dashboard (now normalized) -->
         <?php if (!empty($city_counts)): ?>
         <div class="city-dashboard">
             <?php foreach ($city_counts as $city => $count): ?>
                 <div class="city-card">
-                    <span class="city-name">
-                        <i class="fas fa-map-pin" style="color:#2563eb;"></i> 
-                        <?= htmlspecialchars(displayCityName($city)) ?>
-                    </span>
+                    <span class="city-name"><i class="fas fa-map-pin" style="color:#2563eb;"></i> <?= htmlspecialchars(displayCityName($city)) ?></span>
                     <span class="city-count"><?= $count ?></span>
                     <a href="?city=<?= urlencode($city) ?>" class="view-all-btn">View All</a>
                 </div>
@@ -515,6 +392,20 @@ if (!empty($selected_city)) {
 </div>
 
 <script>
+// 🔥 SMART WHATSAPP OPENER FUNCTION
+function openWhatsApp(phone, text) {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const encodedText = encodeURIComponent(text);
+    
+    if (isMobile) {
+        // On Mobile: Directly open the app
+        window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+    } else {
+        // On Desktop: Directly open WhatsApp Web in a new tab (bypasses the "Continue" screen)
+        window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+    }
+}
+
 function filterTeam(searchText) {
     const query = searchText.toLowerCase().trim();
     const items = document.querySelectorAll('#teamTree li');
@@ -536,16 +427,10 @@ function filterTeam(searchText) {
             el.classList.add('hidden-item');
         }
     });
-    if (matched) {
-        clearBtn.classList.add('show');
-    } else {
-        clearBtn.classList.remove('show');
-    }
+    if (matched) { clearBtn.classList.add('show'); } else { clearBtn.classList.remove('show'); }
 }
-
 function clearFilter() {
-    const searchInput = document.getElementById('teamSearch');
-    searchInput.value = '';
+    document.getElementById('teamSearch').value = '';
     filterTeam('');
 }
 </script>
