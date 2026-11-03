@@ -457,111 +457,89 @@ async function shareProfile(phone, text, btnElement) {
     const encodedText = encodeURIComponent(text);
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-    // ==========================================
-    // 📱 MOBILE LOGIC (Native Share)
-    // ==========================================
-    if (isMobile) {
-        const originalBtnHTML = btnElement.innerHTML;
-        btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        btnElement.disabled = true;
-
-        try {
-            banner.style.left = '0';
-            banner.style.top = '0';
-            banner.style.zIndex = '-1';
-
-            const canvas = await html2canvas(banner, {
-                scale: 1,
-                useCORS: true,
-                backgroundColor: null,
-                logging: false
-            });
-            
-            banner.style.left = '-9999px';
-
-            canvas.toBlob(async function(blob) {
-                const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
-                
-                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try {
-                        await navigator.share({
-                            files: [file],
-                            title: 'Prime Property India',
-                            text: text
-                        });
-                    } catch (err) {
-                        if (err.name !== 'AbortError') {
-                            // Fallback to direct app link if share fails
-                            window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-                        }
-                    }
-                } else {
-                    window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-                }
-                
-                btnElement.innerHTML = originalBtnHTML;
-                btnElement.disabled = false;
-            }, 'image/png');
-        } catch (err) {
-            banner.style.left = '-9999px';
-            window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-            btnElement.innerHTML = originalBtnHTML;
-            btnElement.disabled = false;
-        }
-        return;
-    }
-
-    // ==========================================
-    // 💻 DESKTOP LOGIC (Strict Popup Blocker Fix)
-    // ==========================================
-    
-    // 1. IMMEDIATELY open WhatsApp Web synchronously (Bypasses Popup Blocker)
-    const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
-    const newWindow = window.open(waUrl, '_blank');
-    
-    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-        alert("WhatsApp Popup was blocked by your browser. Please allow popups for this website.");
-        return;
-    }
-
-    // 2. Now generate image and copy to clipboard
+    // Button Loading State
     const originalBtnHTML = btnElement.innerHTML;
-    btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Copying...';
+    btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wait...';
     btnElement.disabled = true;
 
-    try {
-        banner.style.left = '0';
-        banner.style.top = '0';
-        banner.style.zIndex = '-1';
+    // Make banner visible temporarily for capture (Use fixed positioning)
+    banner.style.position = 'fixed';
+    banner.style.left = '0';
+    banner.style.top = '0';
+    banner.style.zIndex = '-1';
+    banner.style.opacity = '0.01'; // Keep it almost invisible to user but visible to canvas
 
-        const canvas = await html2canvas(banner, {
+    // 1. Generate the image blob
+    let canvas;
+    try {
+        canvas = await html2canvas(banner, {
             scale: 1,
             useCORS: true,
-            backgroundColor: null,
+            backgroundColor: '#0f172a', // Ensure solid background
             logging: false
         });
-
-        banner.style.left = '-9999px';
-
-        canvas.toBlob(async function(blob) {
-            try {
-                const item = new ClipboardItem({ 'image/png': blob });
-                await navigator.clipboard.write([item]);
-                btnElement.innerHTML = '<i class="fas fa-check"></i> Copied';
-                alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
-            } catch (err) {
-                btnElement.innerHTML = '<i class="fas fa-times"></i> Blocked';
-                alert("WhatsApp Web is opening, but your browser blocked image copying.\n\nPlease take a screenshot of the banner image behind this window and paste it manually.");
-            }
-            setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 3000);
-        }, 'image/png');
-
     } catch (err) {
         banner.style.left = '-9999px';
+        alert("Error creating banner. Please try again.");
         btnElement.innerHTML = originalBtnHTML;
         btnElement.disabled = false;
-        alert("Image generation failed, but WhatsApp Web is open.");
+        return;
     }
+
+    // Hide it back
+    banner.style.left = '-9999px';
+
+    canvas.toBlob(async function(blob) {
+        const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
+        
+        // ==========================================
+        // 📱 MOBILE LOGIC (Native Share)
+        // ==========================================
+        if (isMobile && navigator.share && navigator.canShare) {
+            try {
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Prime Property India',
+                        text: text
+                    });
+                    btnElement.innerHTML = '<i class="fas fa-check"></i> Shared';
+                    setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 2000);
+                    return; // Success!
+                }
+            } catch (err) {
+                console.log("Mobile native share failed", err);
+                // Proceed to fallback if it fails
+            }
+        }
+
+        // ==========================================
+        // 💻 DESKTOP LOGIC (Copy to Clipboard -> Then Open WA)
+        // ==========================================
+        try {
+            // 1. Copy to clipboard FIRST
+            const item = new ClipboardItem({ 'image/png': blob });
+            await navigator.clipboard.write([item]);
+            
+            // 2. Then open WhatsApp Web
+            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+            window.open(waUrl, '_blank');
+            
+            btnElement.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
+            
+        } catch (err) {
+            // If clipboard completely fails
+            btnElement.innerHTML = '<i class="fas fa-times"></i> Failed';
+            alert("Your browser blocked automatic image copying. Please take a screenshot of the banner image behind this window and paste it manually.");
+            // Open WA anyway
+            window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+        }
+        
+        // Reset button
+        setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 3000);
+        
+    }, 'image/png');
 }
 
 function filterTeam(searchText) {
