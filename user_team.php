@@ -462,12 +462,10 @@ async function shareProfile(phone, text, btnElement) {
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wait...';
     btnElement.disabled = true;
 
-    // Make banner visible temporarily for capture (Use fixed positioning)
-    banner.style.position = 'fixed';
+    // Move banner to visible area but behind everything (z-index: -1)
     banner.style.left = '0';
     banner.style.top = '0';
     banner.style.zIndex = '-1';
-    banner.style.opacity = '0.01'; // Keep it almost invisible to user but visible to canvas
 
     // 1. Generate the image blob
     let canvas;
