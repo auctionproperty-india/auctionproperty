@@ -37,7 +37,7 @@ if ($user_id) {
 // मुख्य इमेज (CORS safe)
 $img_url = !empty($prop['image_url']) ? htmlspecialchars($prop['image_url']) : 'https://via.placeholder.com/1080x600/1e293b/fbbf24?text=Prime+Property+India';
 
-// 🔥 WhatsApp मैसेज तैयार करें (Professional Greeting + Area)
+// 🔥 WhatsApp मैसेज तैयार करें
 $wa_phone = '';
 $wa_message = '';
 $email_link = '';
@@ -50,14 +50,13 @@ if ($user_info && !empty($user_info['phone'])) {
     $client_name = !empty($user_info['name']) ? $user_info['name'] : 'Valuable Client';
     $sqft_display = !empty($prop['sqft']) ? $prop['sqft'] . ' Sq Ft' : 'N/A';
     
-    // 🔥 Luxury & Professional Format
     $wa_message = "👑 *PRIME PROPERTY INDIA* 👑\n";
     $wa_message .= "_Your Trusted Auction Partner_\n\n";
     $wa_message .= "Namaste *" . $client_name . "* 👋,\n\n";
     $wa_message .= "We noticed you recently showed interest in this premium property on our website. We are here to assist you in securing your dream investment!\n\n";
     $wa_message .= "🏢 *Property:* " . $prop['title'] . "\n";
     $wa_message .= "📍 *Location:* " . $prop['city'] . ", " . $prop['state'] . "\n";
-    $wa_message .= "📏 *Area:* " . $sqft_display . "\n"; // 🔥 Added Area
+    $wa_message .= "📏 *Area:* " . $sqft_display . "\n";
     $wa_message .= "💰 *Reserve Price:* ₹" . number_format($prop['price']) . "\n";
     $wa_message .= "🏦 *Bank:* " . $prop['bank_name'] . "\n";
     $wa_message .= "📅 *Auction Date:* " . (!empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'TBA') . "\n\n";
@@ -115,18 +114,18 @@ if ($user_info && !empty($user_info['email'])) {
                     <?php if($wa_phone): ?>
                         <!-- 🔥 Hidden Data for JS -->
                         <div id="wa-data" data-phone="<?= $wa_phone ?>" data-msg="<?= htmlspecialchars($wa_message) ?>" style="display:none;"></div>
-                        <button onclick="openWhatsApp()" class="btn btn-success btn-sm rounded-pill px-3">
-                            <i class="fab fa-whatsapp"></i> WhatsApp
+                        
+                        <!-- 🔥 Combined Share Button -->
+                        <button onclick="shareOnWhatsApp()" id="share-btn" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                            <i class="fab fa-whatsapp me-1"></i> Share on WhatsApp
                         </button>
                     <?php endif; ?>
+                    
                     <?php if($email_link): ?>
-                        <a href="<?= $email_link ?>" class="btn btn-primary btn-sm rounded-pill px-3">
+                        <a href="<?= $email_link ?>" class="btn btn-outline-primary rounded-pill px-3">
                             <i class="fas fa-envelope"></i> Email
                         </a>
                     <?php endif; ?>
-                    <button onclick="downloadPoster()" class="btn btn-warning btn-sm rounded-pill px-3 fw-bold">
-                        <i class="fas fa-camera"></i> Download Banner
-                    </button>
                 </div>
             </div>
         </div>
@@ -172,7 +171,6 @@ if ($user_info && !empty($user_info['email'])) {
                         <div class="detail-label">Bank Name</div>
                         <div class="detail-value"><?= htmlspecialchars($prop['bank_name'] ?? 'N/A') ?></div>
                     </div>
-                    <!-- 🔥 Area Added here in on-screen view too -->
                     <div class="col-md-4 col-6">
                         <div class="detail-label">Area (Sq Ft)</div>
                         <div class="detail-value"><?= htmlspecialchars($prop['sqft'] ?? 'N/A') ?></div>
@@ -194,7 +192,7 @@ if ($user_info && !empty($user_info['email'])) {
     </div>
 
     <!-- ============================================================ -->
-    <!-- 🔥 HIDDEN PREMIUM POSTER TEMPLATE (For Download) -->
+    <!-- 🔥 HIDDEN PREMIUM POSTER TEMPLATE (For Canvas) -->
     <!-- ============================================================ -->
     <div id="poster-template" style="position: absolute; left: -9999px; top: 0; width: 1080px; height: 1350px; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); font-family: 'Poppins', sans-serif; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; color: #fff;">
         
@@ -253,7 +251,6 @@ if ($user_info && !empty($user_info['email'])) {
                 </div>
             </div>
 
-            <!-- 🔥 Area Box Added to Grid -->
             <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 15px;">
                 <div style="background: #fbbf24; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #0f172a;"><i class="fas fa-ruler-combined"></i></div>
                 <div>
@@ -287,53 +284,100 @@ if ($user_info && !empty($user_info['email'])) {
     </div>
 
     <!-- ============================================================ -->
-    <!-- JAVASCRIPT -->
+    <!-- JAVASCRIPT (SMART SHARE LOGIC) -->
     <!-- ============================================================ -->
     <script>
-    // 🔥 Smart WhatsApp Opener (Mobile vs Desktop)
-    function openWhatsApp() {
+    async function shareOnWhatsApp() {
         const dataDiv = document.getElementById('wa-data');
         if (!dataDiv) return;
 
         const phone = dataDiv.getAttribute('data-phone');
         const rawMsg = dataDiv.getAttribute('data-msg');
-        const encodedText = encodeURIComponent(rawMsg);
+        const btn = document.getElementById('share-btn');
         
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        if (isMobile) {
-            window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-        } else {
-            window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
-        }
-    }
+        // Show Loading State
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Banner...';
+        btn.disabled = true;
 
-    // 🔥 Poster Download Script (Targets the Hidden Luxury Template)
-    function downloadPoster() {
         const poster = document.getElementById('poster-template');
         
-        // Temporarily make it visible but behind everything to allow canvas to render it properly
+        // Render canvas
         poster.style.left = '0';
         poster.style.top = '0';
         poster.style.zIndex = '-1';
 
-        html2canvas(poster, {
-            scale: 1, // 1080x1350 is already high res. Scale 1 is fine.
-            useCORS: true,
-            backgroundColor: null,
-            logging: false
-        }).then(canvas => {
-            let link = document.createElement('a');
-            link.download = 'PrimeProperty_<?= $prop_id ?>_Banner.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+        try {
+            const canvas = await html2canvas(poster, {
+                scale: 1, 
+                useCORS: true,
+                backgroundColor: null,
+                logging: false
+            });
             
-            // Hide it back
             poster.style.left = '-9999px';
-        }).catch(err => {
-            alert("Banner download failed. Please try again.");
+            
+            // Convert canvas to Blob
+            canvas.toBlob(async function(blob) {
+                const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
+                
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    // 🔥 MOBILE LOGIC: Share directly to WhatsApp (or any app)
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: 'Prime Property Details',
+                            text: rawMsg
+                        });
+                        btn.innerHTML = '<i class="fas fa-check"></i> Shared!';
+                    } catch (err) {
+                        // If user cancels share, reset button
+                        btn.innerHTML = originalText;
+                    }
+                } else {
+                    // 🔥 DESKTOP LOGIC: Copy to Clipboard & Open WA Web
+                    try {
+                        const item = new ClipboardItem({ 'image/png': blob });
+                        await navigator.clipboard.write([item]);
+                        
+                        // Open WhatsApp Web
+                        const encodedText = encodeURIComponent(rawMsg);
+                        window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+                        
+                        // Alert user
+                        alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to attach the banner, then hit Send.");
+                        btn.innerHTML = '<i class="fas fa-check"></i> Image Copied!';
+                    } catch (err) {
+                        // Fallback if clipboard fails
+                        const link = document.createElement('a');
+                        link.download = 'PrimeProperty_Banner.png';
+                        link.href = URL.createObjectURL(blob);
+                        link.click();
+                        
+                        const encodedText = encodeURIComponent(rawMsg);
+                        window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+                        
+                        alert("Banner downloaded! WhatsApp Web is opening. Please attach the downloaded image manually.");
+                        btn.innerHTML = '<i class="fas fa-check"></i> Downloaded!';
+                    }
+                }
+                
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }, 3000);
+                
+            }, 'image/png');
+            
+        } catch (err) {
             poster.style.left = '-9999px';
-        });
+            alert("Error generating banner.");
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     }
     </script>
     
