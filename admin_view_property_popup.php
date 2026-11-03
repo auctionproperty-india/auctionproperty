@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🏠 Admin/Sales - View Property Details (With Privacy Settings)
+// 🏠 Admin/Sales - View Property Details (With Smart WhatsApp)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -38,29 +38,32 @@ if ($user_id) {
 // मुख्य इमेज का URL
 $img_url = !empty($prop['image_url']) ? htmlspecialchars($prop['image_url']) : 'https://via.placeholder.com/800x400?text=No+Image';
 
-// 🔥 WhatsApp मैसेज तैयार करें (छुपी हुई जानकारी के साथ)
-$wa_link = '';
+// 🔥 WhatsApp मैसेज तैयार करें (Dear Valuable Client के साथ)
+$wa_phone = '';
+$wa_message = '';
 $email_link = '';
+
 if ($user_info && !empty($user_info['phone'])) {
     $clean_phone = preg_replace('/[^0-9]/', '', $user_info['phone']);
     if (strlen($clean_phone) == 10) $clean_phone = '91' . $clean_phone;
+    $wa_phone = $clean_phone;
     
-    $wa_message = "Hello " . $user_info['name'] . ",\n\n";
+    // अगर नाम है तो "Hello Name", नहीं तो "Dear Valuable Client"
+    $client_name = !empty($user_info['name']) ? $user_info['name'] : 'Valuable Client';
+    
+    $wa_message = "Hello *" . $client_name . "*,\n\n";
     $wa_message .= "मैंने देखा कि आपने हमारी वेबसाइट पर यह प्रॉपर्टी देखी थी:\n\n";
     $wa_message .= "🏠 *" . $prop['title'] . "*\n";
-    $wa_message .= "📍 City: " . $prop['city'] . ", " . $prop['state'] . "\n"; // 🔥 सिर्फ सिटी और स्टेट
+    $wa_message .= "📍 City: " . $prop['city'] . ", " . $prop['state'] . "\n";
     $wa_message .= "💰 Price: ₹" . number_format($prop['price']) . "\n";
     $wa_message .= "🏦 Bank: " . $prop['bank_name'] . "\n\n";
-    // 🔥 एरिया और बोरोअर का नाम यहाँ से हटा दिया गया है
     $wa_message .= "क्या आप अभी भी इसमें इंटरेस्टेड हैं? अगर हाँ, तो मैं आपको और डिटेल्स भेज सकता हूँ या आपकी कॉल का इंतज़ार कर रहा हूँ।\n\n";
     $wa_message .= "Regards,\nPrime Property Team";
-    
-    $wa_link = "https://wa.me/" . $clean_phone . "?text=" . urlencode($wa_message);
 }
 
 if ($user_info && !empty($user_info['email'])) {
     $subject = "Regarding Property: " . $prop['title'];
-    $body = "Hello " . $user_info['name'] . ",\n\nI noticed you viewed this property on our website. Let me know if you need more details.\n\nProperty: " . $prop['title'] . "\nCity: " . $prop['city'] . "\nPrice: ₹" . number_format($prop['price']) . "\n\nRegards,\nPrime Property Team";
+    $body = "Hello " . (!empty($user_info['name']) ? $user_info['name'] : 'Valuable Client') . ",\n\nI noticed you viewed this property on our website. Let me know if you need more details.\n\nProperty: " . $prop['title'] . "\nCity: " . $prop['city'] . "\nPrice: ₹" . number_format($prop['price']) . "\n\nRegards,\nPrime Property Team";
     $email_link = "mailto:" . $user_info['email'] . "?subject=" . urlencode($subject) . "&body=" . urlencode($body);
 }
 ?>
@@ -81,7 +84,6 @@ if ($user_info && !empty($user_info['email'])) {
         .detail-value { font-size: 1rem; color: #1e293b; font-weight: 600; margin-bottom: 12px; }
         .price-badge { background: #d1fae5; color: #065f46; padding: 5px 15px; border-radius: 20px; font-size: 1.2rem; font-weight: 800; display: inline-block; margin-bottom: 15px; }
         
-        /* HIDE BUTTONS IN POSTER */
         .no-print { display: block; }
         .watermark { text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 15px; }
     </style>
@@ -96,7 +98,7 @@ if ($user_info && !empty($user_info['email'])) {
             <button onclick="window.close()" class="btn btn-sm btn-danger rounded-pill px-3"><i class="fas fa-times"></i> Close</button>
         </div>
 
-        <!-- 🔥 ACTION BUTTONS (Only if User Info Exists) -->
+        <!-- 🔥 ACTION BUTTONS -->
         <?php if($user_info): ?>
         <div class="card border-0 shadow-sm mb-3 p-3 no-print bg-light">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -105,10 +107,11 @@ if ($user_info && !empty($user_info['email'])) {
                     <small class="text-muted"><?= htmlspecialchars($user_info['phone']) ?> | <?= htmlspecialchars($user_info['email']) ?></small>
                 </div>
                 <div class="d-flex gap-2">
-                    <?php if($wa_link): ?>
-                        <a href="<?= $wa_link ?>" target="_blank" class="btn btn-success btn-sm rounded-pill px-3">
+                    <?php if($wa_phone): ?>
+                        <!-- 🔥 JS Function Call for WhatsApp -->
+                        <button onclick="openWhatsApp('<?= $wa_phone ?>', `<?= addslashes(str_replace(array("\r", "\n"), array('', '\\n'), $wa_message)) ?>`)" class="btn btn-success btn-sm rounded-pill px-3">
                             <i class="fab fa-whatsapp"></i> WhatsApp
-                        </a>
+                        </button>
                     <?php endif; ?>
                     <?php if($email_link): ?>
                         <a href="<?= $email_link ?>" class="btn btn-primary btn-sm rounded-pill px-3">
@@ -123,7 +126,7 @@ if ($user_info && !empty($user_info['email'])) {
         </div>
         <?php endif; ?>
 
-        <!-- 🔥 PROPERTY CARD (This will be downloaded as image) -->
+        <!-- 🔥 PROPERTY CARD -->
         <div class="card prop-card" id="poster-area">
             <img src="<?= $img_url ?>" class="prop-img" alt="Property Image" crossorigin="anonymous">
             
@@ -131,7 +134,6 @@ if ($user_info && !empty($user_info['email'])) {
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h3 class="fw-bold mb-1 text-dark"><?= htmlspecialchars($prop['title'] ?? 'No Title') ?></h3>
-                        <!-- 🔥 सिर्फ सिटी और स्टेट दिखेगा, फुल एड्रेस नहीं -->
                         <p class="text-muted mb-2"><i class="fas fa-map-marker-alt text-danger"></i> <?= htmlspecialchars($prop['city'] ?? '') ?>, <?= htmlspecialchars($prop['state'] ?? '') ?></p>
                     </div>
                     <div class="price-badge"><i class="fas fa-tag me-1"></i> ₹ <?= number_format($prop['price'] ?? 0) ?></div>
@@ -139,7 +141,6 @@ if ($user_info && !empty($user_info['email'])) {
 
                 <hr>
 
-                <!-- ग्रिड डिटेल्स -->
                 <div class="row g-3 mt-2">
                     <div class="col-md-4 col-6">
                         <div class="detail-label">Property ID</div>
@@ -167,8 +168,6 @@ if ($user_info && !empty($user_info['email'])) {
                         <div class="detail-value"><?= htmlspecialchars($prop['bank_name'] ?? 'N/A') ?></div>
                     </div>
 
-                    <!-- 🔥 Area (Sq Ft) और Borrower Name यहाँ से हटा दिया गया है -->
-
                     <div class="col-md-4 col-6">
                         <div class="detail-label">Auction Date</div>
                         <div class="detail-value"><?= !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A' ?></div>
@@ -177,7 +176,6 @@ if ($user_info && !empty($user_info['email'])) {
 
                 <hr class="my-4">
 
-                <!-- 🔥 डिस्क्रिप्शन (सिर्फ एडमिन को दिखेगा, क्योंकि इसमें फुल एड्रेस हो सकता है) -->
                 <?php if($is_admin): ?>
                     <div class="detail-label">Description (Admin Only)</div>
                     <p class="text-muted" style="font-size: 0.9rem;"><?= nl2br(htmlspecialchars($prop['description'] ?? 'No description available.')) ?></p>
@@ -186,7 +184,6 @@ if ($user_info && !empty($user_info['email'])) {
                     <p class="text-muted" style="font-size: 0.9rem;">Property details available upon request. Please contact the assigned sales representative.</p>
                 <?php endif; ?>
 
-                <!-- Watermark (Shows in downloaded image) -->
                 <div class="watermark mt-4 pt-3 border-top">
                     <b>Prime Property India</b> | www.primepropertyindia.onrender.com
                 </div>
@@ -195,18 +192,31 @@ if ($user_info && !empty($user_info['email'])) {
 
     </div>
 
-    <!-- 🔥 POSTER DOWNLOAD SCRIPT -->
     <script>
+    // 🔥 SMART WHATSAPP OPENER (Mobile vs Desktop)
+    function openWhatsApp(phone, text) {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const encodedText = encodeURIComponent(text);
+        
+        if (isMobile) {
+            // On Mobile: Directly open the app
+            window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+        } else {
+            // On Desktop: Directly open WhatsApp Web in a new tab (bypasses the "Continue to WhatsApp Web" screen)
+            window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+        }
+    }
+
+    // 🔥 POSTER DOWNLOAD SCRIPT
     function downloadPoster() {
         const posterArea = document.getElementById('poster-area');
         const btns = document.querySelector('.no-print');
         
-        // Hide buttons temporarily for screenshot
         btns.style.display = 'none';
 
         html2canvas(posterArea, {
-            scale: 2, // High resolution
-            useCORS: true, // For external images
+            scale: 2,
+            useCORS: true,
             backgroundColor: "#ffffff"
         }).then(canvas => {
             let link = document.createElement('a');
@@ -214,7 +224,6 @@ if ($user_info && !empty($user_info['email'])) {
             link.href = canvas.toDataURL('image/png');
             link.click();
             
-            // Show buttons again
             btns.style.display = 'block';
         }).catch(err => {
             alert("Poster download failed. " + err);
