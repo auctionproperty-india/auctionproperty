@@ -150,7 +150,6 @@ function getWhatsAppData($member) {
     $msg .= "🌐 *वेबसाइट:* {$site_url}\n\n";
     $msg .= "🤝 कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक इस मैसेज का रिप्लाई करें।\n\n";
     
-    // 🔥 UPDATED SIGN-OFF HERE
     $msg .= "*Team* 🏢\n";
     $msg .= "*Prime Property India* 🇮🇳✨";
 
@@ -179,7 +178,6 @@ function generateEmailLink($member) {
     $body .= "वेबसाइट: {$site_url}\n\n";
     $body .= "कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक हमें रिप्लाई करें।\n\n";
     
-    // 🔥 UPDATED EMAIL SIGN-OFF HERE
     $body .= "Team\n";
     $body .= "Prime Property India";
     
@@ -222,10 +220,11 @@ function renderTree($nodes, $level = 0) {
         }
         $html .= ' <span class="badge bg-light text-dark" style="font-weight:400;"><i class="fas fa-map-pin"></i> ' . $cityDisplay . '</span>';
         
+        // 🔥 ACTION BUTTONS (Changed to Share)
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
             $msg_js = json_encode($wa_data['msg']);
-            $html .= '<button type="button" onclick=\'openWhatsApp("'.$wa_data['phone'].'", '.$msg_js.')\' class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send WhatsApp"><i class="fab fa-whatsapp"></i></button>';
+            $html .= '<button type="button" onclick=\'shareProfile("'.$wa_data['phone'].'", '.$msg_js.')\' class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
         }
         if($email_link) {
             $html .= '<a href="'.$email_link.'" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
@@ -322,7 +321,7 @@ if (!empty($selected_city)) {
                                         <?php if($wa_data): 
                                             $msg_js = json_encode($wa_data['msg']);
                                         ?>
-                                            <button type="button" onclick='openWhatsApp("<?= $wa_data['phone'] ?>", <?= $msg_js ?>)' class="btn btn-success btn-sm"><i class="fab fa-whatsapp"></i></button>
+                                            <button type="button" onclick='shareProfile("<?= $wa_data['phone'] ?>", <?= $msg_js ?>)' class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
                                         <?php endif; ?>
                                         <?php if($email_link): ?>
                                             <a href="<?= $email_link ?>" class="btn btn-primary btn-sm"><i class="fas fa-envelope"></i></a>
@@ -410,15 +409,135 @@ if (!empty($selected_city)) {
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- 🔥 HIDDEN PROFESSIONAL BANNER TEMPLATE (For Share) -->
+<!-- ============================================================ -->
+<div id="share-banner" style="position:absolute; left:-9999px; top:0; width:1080px; height:1080px; background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; font-family:'Poppins', sans-serif; padding: 60px; box-sizing: border-box; border: 10px solid #fbbf24;">
+    
+    <!-- Logo & Title -->
+    <div style="font-family: 'Montserrat', sans-serif; font-size: 65px; font-weight: 900; color: #fbbf24; line-height: 1.1; text-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        PRIME PROPERTY<br>INDIA
+    </div>
+    <p style="font-size: 24px; color: #cbd5e1; margin-top: 15px; margin-bottom: 50px; letter-spacing: 3px;">YOUR TRUSTED AUCTION PARTNER</p>
+
+    <!-- Main Content Box -->
+    <div style="background: rgba(255,255,255,0.05); border-radius: 30px; padding: 50px 40px; border: 2px solid rgba(251,191,36,0.3); width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+        <h1 style="font-size: 55px; margin-bottom: 20px; color: white;">Welcome to Our Family! 🙏</h1>
+        
+        <p style="font-size: 32px; color: #e2e8f0; margin-bottom: 40px; line-height: 1.4;">
+            Explore Premium <b>Bank Auction</b> Properties & <b>Exchange</b> Your Property.
+        </p>
+        
+        <div style="display: flex; justify-content: center; gap: 60px; margin-top: 40px;">
+            <div style="text-align: center;">
+                <div style="background: #fbbf24; color: #0f172a; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 45px; margin: 0 auto 15px auto;">
+                    <i class="fas fa-university"></i>
+                </div>
+                <p style="font-size: 24px; font-weight: bold; color: #f8fafc;">Bank Auctions</p>
+            </div>
+            <div style="text-align: center;">
+                <div style="background: #fbbf24; color: #0f172a; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 45px; margin: 0 auto 15px auto;">
+                    <i class="fas fa-exchange-alt"></i>
+                </div>
+                <p style="font-size: 24px; font-weight: bold; color: #f8fafc;">Exchange Property</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <p style="font-size: 30px; color: #fbbf24; margin-top: 60px; font-weight: bold;">
+        🌐 www.primepropertyindia.onrender.com
+    </p>
+</div>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
-// 🔥 SMART WHATSAPP OPENER FUNCTION
-function openWhatsApp(phone, text) {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+// 🔥 SMART SHARE FUNCTION (Image + Text)
+async function shareProfile(phone, text) {
+    const banner = document.getElementById('share-banner');
     const encodedText = encodeURIComponent(text);
     
-    if (isMobile) {
-        window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-    } else {
+    // Mobile Share API
+    if (navigator.share) {
+        try {
+            // Temporarily show banner to render it
+            banner.style.left = '0';
+            banner.style.top = '0';
+            banner.style.zIndex = '-1';
+
+            const canvas = await html2canvas(banner, {
+                scale: 1, // 1080x1080 is already high res
+                useCORS: true,
+                backgroundColor: null,
+                logging: false
+            });
+            
+            // Hide banner again
+            banner.style.left = '-9999px';
+
+            canvas.toBlob(async function(blob) {
+                const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
+                
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Prime Property India',
+                        text: text
+                    });
+                } else {
+                    // Fallback if images can't be shared
+                    await navigator.share({
+                        title: 'Prime Property India',
+                        text: text
+                    });
+                }
+            }, 'image/png');
+            return;
+        } catch (err) {
+            console.log("Share failed, falling back to clipboard", err);
+        }
+    }
+
+    // Desktop Fallback: Copy Image to Clipboard + Open WhatsApp
+    try {
+        banner.style.left = '0';
+        banner.style.top = '0';
+        banner.style.zIndex = '-1';
+
+        const canvas = await html2canvas(banner, {
+            scale: 1,
+            useCORS: true,
+            backgroundColor: null,
+            logging: false
+        });
+
+        banner.style.left = '-9999px';
+
+        canvas.toBlob(async function(blob) {
+            try {
+                // Copy image to clipboard
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                
+                // Open WhatsApp Web
+                window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+                
+                alert("✅ Professional Banner Copied!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
+            } catch (err) {
+                // Fallback: Download image and open WhatsApp
+                const link = document.createElement('a');
+                link.download = 'PrimeProperty_Banner.png';
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                
+                window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+                alert("Banner downloaded! WhatsApp Web is opening. Please attach the downloaded image manually.");
+            }
+        }, 'image/png');
+
+    } catch (err) {
+        banner.style.left = '-9999px';
+        alert("Error creating banner. Proceeding to WhatsApp with text only.");
         window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
     }
 }
