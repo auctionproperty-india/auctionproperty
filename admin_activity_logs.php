@@ -449,12 +449,13 @@ $view_counts_cache = [];
                             $total_views = $view_counts_cache[$cache_key];
                             $popup_url = "admin_view_history_popup.php?user_id={$log['user_id']}&prop_id={$prop_id}";
                             
+                            // 🔥 FIX: Now even "1 time" is a clickable link
                             if ($total_views >= 3) {
-                                $view_badge = "<a href='{$popup_url}' target='_blank' class='badge bg-success text-decoration-none' style='font-size:0.8rem;'><i class='fas fa-eye'></i> {$total_views} times</a>";
+                                $view_badge = "<a href='{$popup_url}' target='_blank' class='badge bg-success text-decoration-none' style='font-size:0.8rem;' title='Click to see user details & history'><i class='fas fa-eye'></i> {$total_views} times</a>";
                             } elseif ($total_views == 2) {
-                                $view_badge = "<a href='{$popup_url}' target='_blank' class='badge bg-primary text-decoration-none' style='font-size:0.8rem;'><i class='fas fa-eye'></i> {$total_views} times</a>";
+                                $view_badge = "<a href='{$popup_url}' target='_blank' class='badge bg-primary text-decoration-none' style='font-size:0.8rem;' title='Click to see user details & history'><i class='fas fa-eye'></i> {$total_views} times</a>";
                             } elseif ($total_views == 1) {
-                                $view_badge = "<span class='badge bg-secondary' style='font-size:0.8rem;'>1 time</span>";
+                                $view_badge = "<a href='{$popup_url}' target='_blank' class='badge bg-secondary text-decoration-none' style='font-size:0.8rem;' title='Click to see user details & history'><i class='fas fa-eye'></i> 1 time</a>";
                             }
                         }
                     ?>
