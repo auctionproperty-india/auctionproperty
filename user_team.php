@@ -220,7 +220,6 @@ function renderTree($nodes, $level = 0) {
         }
         $html .= ' <span class="badge bg-light text-dark" style="font-weight:400;"><i class="fas fa-map-pin"></i> ' . $cityDisplay . '</span>';
         
-        // 🔥 ACTION BUTTONS (Changed to Share)
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
             $msg_js = json_encode($wa_data['msg']);
@@ -498,7 +497,11 @@ async function shareProfile(phone, text) {
         }
     }
 
-    // Desktop Fallback: Copy Image to Clipboard + Open WhatsApp
+    // 🔥 DESKTOP FIX: Open WhatsApp FIRST to avoid popup blocker
+    const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+    window.open(waUrl, '_blank');
+
+    // Then generate and copy the image to clipboard
     try {
         banner.style.left = '0';
         banner.style.top = '0';
@@ -519,26 +522,23 @@ async function shareProfile(phone, text) {
                 const item = new ClipboardItem({ 'image/png': blob });
                 await navigator.clipboard.write([item]);
                 
-                // Open WhatsApp Web
-                window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
-                
+                // Show success message (Since WhatsApp is already open, we just alert)
                 alert("✅ Professional Banner Copied!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
             } catch (err) {
-                // Fallback: Download image and open WhatsApp
+                // Fallback if clipboard fails (download image)
                 const link = document.createElement('a');
                 link.download = 'PrimeProperty_Banner.png';
                 link.href = URL.createObjectURL(blob);
                 link.click();
                 
-                window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
                 alert("Banner downloaded! WhatsApp Web is opening. Please attach the downloaded image manually.");
             }
         }, 'image/png');
 
     } catch (err) {
         banner.style.left = '-9999px';
-        alert("Error creating banner. Proceeding to WhatsApp with text only.");
-        window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
+        // WhatsApp tab is already open, so just let the user know
+        alert("Image generation failed, but WhatsApp is open. You can send the text message.");
     }
 }
 
