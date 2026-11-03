@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 My Team – Smart City Normalization + City Dashboard
+// 👥 My Team – Smart City Normalization + Direct Contact
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -31,108 +31,44 @@ $known_cities = [
     'jaipur rajasthan', 'varanasi uttar pradesh', 'moshi pune'
 ];
 
-/**
- * Normalize city name to a canonical form.
- * Handles case, extra spaces, extra text like "Tejaji nagar indore" → "indore"
- */
 function normalizeCityName($city, $known_cities) {
     if (empty($city)) return '';
-    
-    // Clean up: lowercase, trim, remove extra spaces
     $city = trim(preg_replace('/\s+/', ' ', strtolower($city)));
-    
     if ($city === '') return '';
-    
-    // Try to match against known cities (longest match first for better accuracy)
     $sorted_known = $known_cities;
     usort($sorted_known, function($a, $b) { return strlen($b) - strlen($a); });
-    
     foreach ($sorted_known as $known) {
-        if (strpos($city, $known) !== false) {
-            return $known;
-        }
+        if (strpos($city, $known) !== false) return $known;
     }
-    
-    // If no match in known list, try common typo fixes
-    $typo_map = [
-        'indor'   => 'indore',
-        'indoor'  => 'indore',
-        'indor '  => 'indore',
-        'indea'   => 'indore',
-        'bhopl'   => 'bhopal',
-        'jiapur'  => 'jaipur',
-        'jaipr'   => 'jaipur',
-        'lucknw'  => 'lucknow',
-        'nagpure' => 'nagpur',
-    ];
-    
+    $typo_map = ['indor' => 'indore', 'indoor' => 'indore', 'indea' => 'indore', 'bhopl' => 'bhopal', 'jiapur' => 'jaipur', 'jaipr' => 'jaipur', 'lucknw' => 'lucknow', 'nagpure' => 'nagpur'];
     foreach ($typo_map as $typo => $correct) {
-        if (strpos($city, $typo) !== false) {
-            return $correct;
-        }
+        if (strpos($city, $typo) !== false) return $correct;
     }
-    
-    // Return cleaned original if no match
     return $city;
 }
 
-/**
- * Display name — Title Case of normalized name
- */
 function displayCityName($city) {
     if (empty($city)) return 'Unknown';
     return ucwords($city);
 }
 
-// ---- Fetch the entire referral tree with city ----
+// ---- Fetch the entire referral tree ----
 $sql = "
 WITH RECURSIVE team_tree AS (
-    SELECT 
-        u.id, 
-        u.name, 
-        u.email, 
-        u.phone,
-        u.created_at,
-        u.referred_by,
-        u.city,
-        0 as level,
-        ARRAY[u.id] as path,
-        p.name as package_name,
-        s.status as sub_status,
-        CASE WHEN s.status = 'active' AND s.end_date >= CURRENT_DATE THEN 1 ELSE 0 END as is_active_sub
+    SELECT u.id, u.name, u.email, u.phone, u.created_at, u.referred_by, u.city, 0 as level, ARRAY[u.id] as path,
+        p.name as package_name, s.status as sub_status, CASE WHEN s.status = 'active' AND s.end_date >= CURRENT_DATE THEN 1 ELSE 0 END as is_active_sub
     FROM users u 
-    LEFT JOIN (
-        SELECT DISTINCT ON (user_id) user_id, package_id, status, end_date
-        FROM subscriptions
-        WHERE status = 'active' AND end_date >= CURRENT_DATE
-        ORDER BY user_id, id DESC
-    ) s ON u.id = s.user_id
+    LEFT JOIN (SELECT DISTINCT ON (user_id) user_id, package_id, status, end_date FROM subscriptions WHERE status = 'active' AND end_date >= CURRENT_DATE ORDER BY user_id, id DESC) s ON u.id = s.user_id
     LEFT JOIN packages p ON s.package_id = p.id
     WHERE u.referred_by = :user_id
     
     UNION ALL
     
-    SELECT 
-        u.id, 
-        u.name, 
-        u.email, 
-        u.phone,
-        u.created_at,
-        u.referred_by,
-        u.city,
-        t.level + 1,
-        t.path || u.id,
-        p.name as package_name,
-        s.status as sub_status,
-        CASE WHEN s.status = 'active' AND s.end_date >= CURRENT_DATE THEN 1 ELSE 0 END as is_active_sub
+    SELECT u.id, u.name, u.email, u.phone, u.created_at, u.referred_by, u.city, t.level + 1, t.path || u.id,
+        p.name as package_name, s.status as sub_status, CASE WHEN s.status = 'active' AND s.end_date >= CURRENT_DATE THEN 1 ELSE 0 END as is_active_sub
     FROM users u
     INNER JOIN team_tree t ON u.referred_by = t.id
-    LEFT JOIN (
-        SELECT DISTINCT ON (user_id) user_id, package_id, status, end_date
-        FROM subscriptions
-        WHERE status = 'active' AND end_date >= CURRENT_DATE
-        ORDER BY user_id, id DESC
-    ) s ON u.id = s.user_id
+    LEFT JOIN (SELECT DISTINCT ON (user_id) user_id, package_id, status, end_date FROM subscriptions WHERE status = 'active' AND end_date >= CURRENT_DATE ORDER BY user_id, id DESC) s ON u.id = s.user_id
     LEFT JOIN packages p ON s.package_id = p.id
 )
 SELECT * FROM team_tree ORDER BY path;
@@ -142,28 +78,22 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([':user_id' => $user_id]);
 $team_members = $stmt->fetchAll();
 
-// ---- Normalize city for every member ----
 foreach ($team_members as &$m) {
     $m['city_normalized'] = normalizeCityName($m['city'] ?? '', $known_cities);
 }
 unset($m);
 
-// ---- Build nested array for tree rendering ----
 function buildTree($members, $parentId = null) {
     $branch = [];
     foreach ($members as $member) {
         if ($member['referred_by'] == $parentId) {
             $children = buildTree($members, $member['id']);
-            if ($children) {
-                $member['children'] = $children;
-            }
+            if ($children) { $member['children'] = $children; }
             $branch[] = $member;
         }
     }
     usort($branch, function($a, $b) {
-        if ($a['is_active_sub'] == $b['is_active_sub']) {
-            return strcmp($a['name'], $b['name']);
-        }
+        if ($a['is_active_sub'] == $b['is_active_sub']) { return strcmp($a['name'], $b['name']); }
         return $b['is_active_sub'] - $a['is_active_sub'];
     });
     return $branch;
@@ -172,32 +102,52 @@ function buildTree($members, $parentId = null) {
 $tree = buildTree($team_members, $user_id);
 $total_members = count($team_members);
 
-// ---- Compute city counts (using NORMALIZED city) ----
 $city_counts = [];
 foreach ($team_members as $m) {
     $city = trim($m['city_normalized'] ?? '');
-    if (!empty($city)) {
-        $city_counts[$city] = ($city_counts[$city] ?? 0) + 1;
-    }
+    if (!empty($city)) { $city_counts[$city] = ($city_counts[$city] ?? 0) + 1; }
 }
 arsort($city_counts);
 
-// ---- Helper functions ----
 function countSubtree($node) {
     $count = 1;
     if (isset($node['children']) && count($node['children']) > 0) {
-        foreach ($node['children'] as $child) {
-            $count += countSubtree($child);
-        }
+        foreach ($node['children'] as $child) { $count += countSubtree($child); }
     }
     return $count;
 }
 
 function safeDateFormat($dateStr) {
-    if (empty($dateStr) || strtotime($dateStr) === false) {
-        return 'Not Active';
-    }
+    if (empty($dateStr) || strtotime($dateStr) === false) { return 'Not Active'; }
     return date('d M Y', strtotime($dateStr));
+}
+
+// 🔥 HELPER FUNCTION TO GENERATE WHATSAPP/EMAIL LINKS
+function generateContactLinks($member, $type = 'whatsapp') {
+    $name = htmlspecialchars($member['name']);
+    $reg_date = safeDateFormat($member['created_at']);
+    $site_url = "https://primepropertyindia.onrender.com";
+
+    if ($type == 'whatsapp') {
+        if(empty($member['phone'])) return '';
+        $clean_phone = preg_replace('/[^0-9]/', '', $member['phone']);
+        if (strlen($clean_phone) == 10) $clean_phone = '91' . $clean_phone;
+        
+        $msg = "Namaste *{$name}* 👋,\n\n";
+        $msg .= "You joined our Prime Property system on *{$reg_date}*.\n\n";
+        $msg .= "We noticed you haven't visited any properties on our portal yet! Discover exclusive bank auction properties at great prices.\n\n";
+        $msg .= "🌐 Please visit our website to explore: {$site_url}\n\n";
+        $msg .= "Let us know if you need any assistance. ✨\n";
+        $msg .= "📞 *Prime Property Team*";
+        
+        return "https://wa.me/{$clean_phone}?text=" . urlencode($msg);
+    } 
+    elseif ($type == 'email') {
+        if(empty($member['email'])) return '';
+        $subject = "Explore Bank Auction Properties - Prime Property";
+        $body = "Namaste {$name},\n\nYou joined our Prime Property system on {$reg_date}.\n\nWe noticed you haven't visited any properties on our portal yet! Discover exclusive bank auction properties at great prices.\n\nPlease visit our website to explore: {$site_url}\n\nLet us know if you need any assistance.\n\nRegards,\nPrime Property Team";
+        return "mailto:{$member['email']}?subject=" . urlencode($subject) . "&body=" . urlencode($body);
+    }
 }
 
 function renderTree($nodes, $level = 0) {
@@ -209,14 +159,7 @@ function renderTree($nodes, $level = 0) {
         $packageBadge = '';
         
         if (!empty($node['package_name']) && $node['sub_status'] == 'active') {
-            $pkgColors = [
-                'Silver' => 'bg-secondary',
-                'Gold' => 'bg-warning text-dark',
-                'Platinum' => 'bg-primary',
-                'Diamond' => 'bg-info',
-                'Diamond Combo' => 'bg-info',
-                'Silver Combo' => 'bg-secondary',
-            ];
+            $pkgColors = ['Silver' => 'bg-secondary', 'Gold' => 'bg-warning text-dark', 'Platinum' => 'bg-primary', 'Diamond' => 'bg-info', 'Diamond Combo' => 'bg-info', 'Silver Combo' => 'bg-secondary'];
             $colorClass = $pkgColors[$node['package_name']] ?? 'bg-success';
             $packageBadge = ' <span class="badge ' . $colorClass . '">' . htmlspecialchars($node['package_name']) . '</span>';
         } else {
@@ -225,14 +168,14 @@ function renderTree($nodes, $level = 0) {
         
         $activeIcon = $node['is_active_sub'] ? ' <i class="fas fa-check-circle" style="color:#10b981;" title="Active Subscriber"></i>' : '';
         $icon = $hasChildren ? '📂' : '👤';
-        $cityDisplay = !empty($node['city_normalized']) 
-            ? htmlspecialchars(displayCityName($node['city_normalized'])) 
-            : '—';
+        $cityDisplay = !empty($node['city_normalized']) ? htmlspecialchars(displayCityName($node['city_normalized'])) : '—';
         
-        $searchData = 'data-name="' . strtolower(htmlspecialchars($node['name'])) . '" 
-                        data-email="' . strtolower(htmlspecialchars($node['email'])) . '" 
-                        data-city="' . strtolower(htmlspecialchars($node['city_normalized'] ?? '')) . '"';
+        $searchData = 'data-name="' . strtolower(htmlspecialchars($node['name'])) . '" data-email="' . strtolower(htmlspecialchars($node['email'])) . '" data-city="' . strtolower(htmlspecialchars($node['city_normalized'] ?? '')) . '"';
         
+        // 🔥 Generate Links
+        $wa_link = generateContactLinks($node, 'whatsapp');
+        $email_link = generateContactLinks($node, 'email');
+
         $html .= '<li style="margin-bottom:8px; border-left:2px solid #e2e8f0; padding-left:12px;" ' . $searchData . '>';
         $html .= '<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:'.($level==0?'#f1f5f9':'transparent').'; border-radius:8px; flex-wrap:wrap;">';
         $html .= '<span style="font-size:1.2rem;">' . $icon . '</span>';
@@ -243,7 +186,18 @@ function renderTree($nodes, $level = 0) {
             $html .= ' <span class="badge bg-light text-dark border" style="font-weight:600;">👥 ' . ($totalInSubtree - 1) . ' members</span>';
         }
         $html .= ' <span class="badge bg-light text-dark" style="font-weight:400;"><i class="fas fa-map-pin"></i> ' . $cityDisplay . '</span>';
-        $html .= '<span style="font-size:0.7rem; color:#94a3b8; margin-left:auto;">Joined: ' . safeDateFormat($node['created_at']) . '</span>';
+        
+        // 🔥 ACTION BUTTONS ADDED HERE
+        $html .= '<div class="ms-auto d-flex gap-1">';
+        if($wa_link) {
+            $html .= '<a href="'.$wa_link.'" target="_blank" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send WhatsApp"><i class="fab fa-whatsapp"></i></a>';
+        }
+        if($email_link) {
+            $html .= '<a href="'.$email_link.'" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
+        }
+        $html .= '</div>';
+
+        $html .= '<span style="font-size:0.7rem; color:#94a3b8; margin-left:10px;">Joined: ' . safeDateFormat($node['created_at']) . '</span>';
         $html .= '</div>';
         if ($hasChildren) {
             $html .= renderTree($node['children'], $level + 1);
@@ -259,102 +213,34 @@ function renderTree($nodes, $level = 0) {
 // ============================================================
 $selected_city = isset($_GET['city']) ? trim($_GET['city']) : '';
 if (!empty($selected_city)) {
-    // Normalize the requested city
     $selected_city_normalized = normalizeCityName($selected_city, $known_cities);
-    
-    // Filter members from this city (using normalized city)
     $city_members = array_filter($team_members, function($m) use ($selected_city_normalized) {
         return trim($m['city_normalized'] ?? '') == $selected_city_normalized;
     });
-    
-    // Sort by name
-    usort($city_members, function($a, $b) {
-        return strcmp($a['name'], $b['name']);
-    });
+    usort($city_members, function($a, $b) { return strcmp($a['name'], $b['name']); });
     
     $city_count = count($city_members);
     $city_display = displayCityName($selected_city_normalized);
     ?>
     <style>
-        .city-detail-container {
-            background: white;
-            border-radius: 24px;
-            padding: 25px;
-            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
-        }
-        .city-detail-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .city-detail-header h4 {
-            font-weight: 700;
-            margin: 0;
-        }
-        .city-detail-header h4 i {
-            color: #2563eb;
-        }
-        .back-btn {
-            background: #e2e8f0;
-            border: none;
-            border-radius: 30px;
-            padding: 8px 20px;
-            font-weight: 600;
-            color: #1e293b;
-            text-decoration: none;
-            transition: 0.2s;
-        }
-        .back-btn:hover {
-            background: #cbd5e1;
-            text-decoration: none;
-            color: #0f172a;
-        }
-        .city-member-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-        .city-member-table th {
-            background: #f1f5f9;
-            font-weight: 600;
-            color: #475569;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.5px;
-            padding: 10px 12px;
-            text-align: left;
-        }
-        .city-member-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-        }
-        .city-member-table tr:hover td {
-            background: #f8fafc;
-        }
-        .no-members-msg {
-            padding: 30px;
-            text-align: center;
-            color: #94a3b8;
-        }
-        @media (max-width: 768px) {
-            .city-member-table { font-size: 0.75rem; }
-            .city-member-table th, .city-member-table td { padding: 6px 8px; }
-            .city-detail-header { flex-direction: column; align-items: flex-start; }
-        }
+        .city-detail-container { background: white; border-radius: 24px; padding: 25px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04); }
+        .city-detail-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .city-detail-header h4 { font-weight: 700; margin: 0; }
+        .city-detail-header h4 i { color: #2563eb; }
+        .back-btn { background: #e2e8f0; border: none; border-radius: 30px; padding: 8px 20px; font-weight: 600; color: #1e293b; text-decoration: none; transition: 0.2s; }
+        .back-btn:hover { background: #cbd5e1; text-decoration: none; color: #0f172a; }
+        .city-member-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .city-member-table th { background: #f1f5f9; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; padding: 10px 12px; text-align: left; }
+        .city-member-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .city-member-table tr:hover td { background: #f8fafc; }
+        .no-members-msg { padding: 30px; text-align: center; color: #94a3b8; }
+        @media (max-width: 768px) { .city-member-table { font-size: 0.75rem; } .city-member-table th, .city-member-table td { padding: 6px 8px; } .city-detail-header { flex-direction: column; align-items: flex-start; } }
     </style>
     <div class="container-fluid">
         <div class="city-detail-container">
             <div class="city-detail-header">
                 <h4><i class="fas fa-map-pin"></i> <?= htmlspecialchars($city_display) ?> (<?= $city_count ?> members)</h4>
-                <div>
-                    <a href="user_team.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to My Team</a>
-                </div>
+                <div><a href="user_team.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to My Team</a></div>
             </div>
             <?php if ($city_count > 0): ?>
                 <div class="table-responsive">
@@ -368,10 +254,14 @@ if (!empty($selected_city)) {
                                 <th>Package</th>
                                 <th>Status</th>
                                 <th>Joined</th>
+                                <th>Action</th> <!-- 🔥 New Column -->
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($city_members as $m): ?>
+                            <?php foreach ($city_members as $m): 
+                                $wa_link = generateContactLinks($m, 'whatsapp');
+                                $email_link = generateContactLinks($m, 'email');
+                            ?>
                             <tr>
                                 <td><strong><?= htmlspecialchars($m['name']) ?></strong></td>
                                 <td><?= htmlspecialchars($m['email']) ?></td>
@@ -392,6 +282,13 @@ if (!empty($selected_city)) {
                                     <?php endif; ?>
                                 </td>
                                 <td><?= safeDateFormat($m['created_at']) ?></td>
+                                <!-- 🔥 ACTION BUTTONS ADDED HERE -->
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <?php if($wa_link): ?><a href="<?= $wa_link ?>" target="_blank" class="btn btn-success btn-sm"><i class="fab fa-whatsapp"></i></a><?php endif; ?>
+                                        <?php if($email_link): ?><a href="<?= $email_link ?>" class="btn btn-primary btn-sm"><i class="fas fa-envelope"></i></a><?php endif; ?>
+                                    </div>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -406,105 +303,32 @@ if (!empty($selected_city)) {
     include 'footer.php';
     exit;
 }
-
-// ============================================================
-// 👥 DEFAULT VIEW (Tree + City Dashboard)
-// ============================================================
 ?>
+
+<!-- ============================================================ -->
+<!-- DEFAULT VIEW (Tree + City Dashboard) -->
+<!-- ============================================================ -->
 <style>
-    .team-container {
-        background: white;
-        border-radius: 24px;
-        padding: 25px;
-        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04);
-    }
-    .team-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        padding-bottom: 15px;
-        border-bottom: 2px solid #f1f5f9;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
+    .team-container { background: white; border-radius: 24px; padding: 25px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.04); }
+    .team-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f1f5f9; flex-wrap: wrap; gap: 10px; }
     .team-header h4 { font-weight: 700; margin: 0; }
     .team-search { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .team-search input {
-        border-radius: 30px;
-        padding: 6px 16px;
-        border: 1px solid #e2e8f0;
-        font-size: 0.9rem;
-        min-width: 200px;
-    }
-    .team-search input:focus {
-        outline: none;
-        border-color: #2563eb;
-        box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-    }
+    .team-search input { border-radius: 30px; padding: 6px 16px; border: 1px solid #e2e8f0; font-size: 0.9rem; min-width: 200px; }
+    .team-search input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
     .team-tree { padding: 10px 0; }
     .team-tree ul { margin: 0; }
     .team-tree li { transition: all 0.2s; cursor: default; }
     .team-tree li:hover > div { background: #f8fafc; }
     .team-tree li.hidden-item { display: none !important; }
 
-    .city-dashboard {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-bottom: 20px;
-        padding: 10px 0;
-        border-bottom: 1px solid #e2e8f0;
-    }
-    .city-card {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 10px 16px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        transition: 0.2s;
-        cursor: default;
-    }
+    .city-dashboard { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+    .city-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; transition: 0.2s; cursor: default; }
     .city-card:hover { background: #eef2ff; border-color: #2563eb; }
     .city-card .city-name { font-weight: 600; color: #0f172a; }
-    .city-card .city-count {
-        background: #2563eb;
-        color: white;
-        border-radius: 30px;
-        padding: 2px 10px;
-        font-size: 0.8rem;
-        font-weight: 700;
-    }
-    .city-card .view-all-btn {
-        background: transparent;
-        border: none;
-        color: #2563eb;
-        font-weight: 600;
-        font-size: 0.8rem;
-        cursor: pointer;
-        padding: 2px 8px;
-        border-radius: 20px;
-        transition: 0.2s;
-        text-decoration: none;
-    }
-    .city-card .view-all-btn:hover {
-        background: #2563eb;
-        color: white;
-        text-decoration: none;
-    }
-    .clear-filter-btn {
-        background: #e2e8f0;
-        border: none;
-        border-radius: 30px;
-        padding: 4px 16px;
-        font-size: 0.8rem;
-        cursor: pointer;
-        color: #475569;
-        font-weight: 600;
-        display: none;
-    }
+    .city-card .city-count { background: #2563eb; color: white; border-radius: 30px; padding: 2px 10px; font-size: 0.8rem; font-weight: 700; }
+    .city-card .view-all-btn { background: transparent; border: none; color: #2563eb; font-weight: 600; font-size: 0.8rem; cursor: pointer; padding: 2px 8px; border-radius: 20px; transition: 0.2s; text-decoration: none; }
+    .city-card .view-all-btn:hover { background: #2563eb; color: white; text-decoration: none; }
+    .clear-filter-btn { background: #e2e8f0; border: none; border-radius: 30px; padding: 4px 16px; font-size: 0.8rem; cursor: pointer; color: #475569; font-weight: 600; display: none; }
     .clear-filter-btn:hover { background: #cbd5e1; }
     .clear-filter-btn.show { display: inline-block; }
 </style>
@@ -520,15 +344,11 @@ if (!empty($selected_city)) {
             </div>
         </div>
 
-        <!-- City Dashboard (now normalized) -->
         <?php if (!empty($city_counts)): ?>
         <div class="city-dashboard">
             <?php foreach ($city_counts as $city => $count): ?>
                 <div class="city-card">
-                    <span class="city-name">
-                        <i class="fas fa-map-pin" style="color:#2563eb;"></i> 
-                        <?= htmlspecialchars(displayCityName($city)) ?>
-                    </span>
+                    <span class="city-name"><i class="fas fa-map-pin" style="color:#2563eb;"></i> <?= htmlspecialchars(displayCityName($city)) ?></span>
                     <span class="city-count"><?= $count ?></span>
                     <a href="?city=<?= urlencode($city) ?>" class="view-all-btn">View All</a>
                 </div>
@@ -572,16 +392,10 @@ function filterTeam(searchText) {
             el.classList.add('hidden-item');
         }
     });
-    if (matched) {
-        clearBtn.classList.add('show');
-    } else {
-        clearBtn.classList.remove('show');
-    }
+    if (matched) { clearBtn.classList.add('show'); } else { clearBtn.classList.remove('show'); }
 }
-
 function clearFilter() {
-    const searchInput = document.getElementById('teamSearch');
-    searchInput.value = '';
+    document.getElementById('teamSearch').value = '';
     filterTeam('');
 }
 </script>
