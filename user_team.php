@@ -181,7 +181,7 @@ function generateEmailLink($member) {
     $body .= "Team\n";
     $body .= "Prime Property India";
     
-    // 🔥 FIX 3: rawurlencode is used instead of urlencode to fix the '+' signs in mobile email apps. And added target blank via HTML link.
+    // 🔥 rawurlencode fixes the '+' signs. target="_blank" fixes desktop opening.
     return "mailto:{$member['email']}?subject=" . rawurlencode($subject) . "&body=" . rawurlencode($body);
 }
 
@@ -223,8 +223,8 @@ function renderTree($nodes, $level = 0) {
         
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
-            $msg_js = json_encode($wa_data['msg']);
-            $html .= '<button type="button" onclick=\'shareProfile("'.$wa_data['phone'].'", '.$msg_js.', this)\' class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
+            // 🔥 FIX: Passing data via data-attributes to prevent JS string breakage
+            $html .= '<button type="button" data-phone="'.$wa_data['phone'].'" data-msg="'.htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8').'" onclick="shareProfile(this)" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
         }
         if($email_link) {
             $html .= '<a href="'.$email_link.'" target="_blank" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
@@ -318,13 +318,11 @@ if (!empty($selected_city)) {
                                 <td><?= safeDateFormat($m['created_at']) ?></td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <?php if($wa_data): 
-                                            $msg_js = json_encode($wa_data['msg']);
-                                        ?>
-                                            <button type="button" onclick='shareProfile("<?= $wa_data['phone'] ?>", <?= $msg_js ?>, this)' class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
+                                        <?php if($wa_data): ?>
+                                            <!-- 🔥 FIX: Data attributes here as well -->
+                                            <button type="button" data-phone="<?= $wa_data['phone'] ?>" data-msg="<?= htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8') ?>" onclick="shareProfile(this)" class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
                                         <?php endif; ?>
                                         <?php if($email_link): ?>
-                                            <!-- 🔥 FIX 3: Added target="_blank" so it opens on desktop too -->
                                             <a href="<?= $email_link ?>" target="_blank" class="btn btn-primary btn-sm" title="Send Email"><i class="fas fa-envelope"></i></a>
                                         <?php endif; ?>
                                     </div>
@@ -454,101 +452,112 @@ if (!empty($selected_city)) {
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
 // 🔥 SMART SHARE FUNCTION (Image + Text)
-async function shareProfile(phone, text, btnElement) {
+async function shareProfile(btnElement) {
+    // Read data from attributes to prevent JS string breakage
+    const phone = btnElement.getAttribute('data-phone');
+    const text = btnElement.getAttribute('data-msg');
+    
     const banner = document.getElementById('share-banner');
     const encodedText = encodeURIComponent(text);
-    // Better mobile detection
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     // Button Loading State
     const originalBtnHTML = btnElement.innerHTML;
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wait...';
     btnElement.disabled = true;
 
-    // Move banner to visible area but behind everything
+    // 🔥 DESKTOP FIX: Open blank window SYNCHRONOUSLY to prevent Popup Blocker
+    let waWindow = null;
+    if (!isMobile) {
+        waWindow = window.open('about:blank', '_blank');
+    }
+
+    // Show banner for capture
     banner.style.left = '0';
     banner.style.top = '0';
     banner.style.zIndex = '-1';
 
-    // 1. Generate the image blob
-    let canvas;
     try {
-        canvas = await html2canvas(banner, {
+        const canvas = await html2canvas(banner, {
             scale: 1,
             useCORS: true,
             backgroundColor: '#0f172a',
             logging: false
         });
-    } catch (err) {
         banner.style.left = '-9999px';
-        alert("Error creating banner. Opening WhatsApp with text only.");
-        // Fallback to text only
-        if (isMobile) window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-        else window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
-        
-        btnElement.innerHTML = originalBtnHTML;
-        btnElement.disabled = false;
-        return;
-    }
 
-    // Hide it back
-    banner.style.left = '-9999px';
+        canvas.toBlob(async function(blob) {
+            const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
 
-    canvas.toBlob(async function(blob) {
-        const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
-        
-        // ==========================================
-        // 📱 MOBILE LOGIC
-        // ==========================================
-        if (isMobile) {
-            if (navigator.share && navigator.canShare) {
-                try {
-                    if (navigator.canShare({ files: [file] })) {
+            // ==========================================
+            // 📱 MOBILE LOGIC
+            // ==========================================
+            if (isMobile) {
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    try {
                         await navigator.share({
                             files: [file],
                             title: 'Prime Property India',
                             text: text
                         });
                         btnElement.innerHTML = '<i class="fas fa-check"></i> Shared';
-                        setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 2000);
-                        return; // Success!
+                    } catch (err) {
+                        console.log("Share failed", err);
+                        // Fallback to direct app link
+                        window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+                        btnElement.innerHTML = originalBtnHTML;
                     }
-                } catch (err) {
-                    console.log("Mobile native share failed", err);
+                } else {
+                    // Fallback to direct app link
+                    window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+                    btnElement.innerHTML = originalBtnHTML;
+                }
+                setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 2000);
+                return;
+            }
+
+            // ==========================================
+            // 💻 DESKTOP LOGIC
+            // ==========================================
+            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+            
+            try {
+                // Copy to clipboard
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                
+                // Redirect the synchronously opened blank window
+                if (waWindow) {
+                    waWindow.location.href = waUrl;
+                } else {
+                    window.open(waUrl, '_blank');
+                }
+                
+                btnElement.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
+                
+            } catch (err) {
+                // Fallback if clipboard fails
+                btnElement.innerHTML = '<i class="fas fa-times"></i> Blocked';
+                alert("Your browser blocked automatic image copying.\n\nOpening WhatsApp Web now. Please take a screenshot of the banner or download it manually.");
+                
+                if (waWindow) {
+                    waWindow.location.href = waUrl;
+                } else {
+                    window.open(waUrl, '_blank');
                 }
             }
             
-            // 🔥 FIX 1: Mobile Fallback (Direct App Open with Text only if image share fails)
-            window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-            btnElement.innerHTML = originalBtnHTML;
-            btnElement.disabled = false;
-            return;
-        }
+            setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 3000);
 
-        // ==========================================
-        // 💻 DESKTOP LOGIC
-        // ==========================================
-        try {
-            // 1. Copy to clipboard FIRST
-            const item = new ClipboardItem({ 'image/png': blob });
-            await navigator.clipboard.write([item]);
-            
-            // 2. Then open WhatsApp Web
-            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
-            window.open(waUrl, '_blank');
-            
-            btnElement.innerHTML = '<i class="fas fa-check"></i> Copied!';
-            alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
-            
-        } catch (err) {
-            btnElement.innerHTML = '<i class="fas fa-times"></i> Failed';
-            alert("Your browser blocked automatic image copying. Please take a screenshot of the banner image behind this window and paste it manually.");
-            window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
-        }
-        
-        setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; }, 3000);
-        
-    }, 'image/png');
+        }, 'image/png');
+    } catch (err) {
+        banner.style.left = '-9999px';
+        if (waWindow) waWindow.close();
+        alert("Error creating banner. Please try again.");
+        btnElement.innerHTML = originalBtnHTML;
+        btnElement.disabled = false;
+    }
 }
 
 function filterTeam(searchText) {
