@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🏠 Admin/Sales - View Property Details (With WhatsApp & Poster)
+// 🏠 Admin/Sales - View Property Details (With Privacy Settings)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -8,6 +8,8 @@ require_once __DIR__ . '/functions.php';
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'sales'])) {
     die("<h3 style='color:red; text-align:center; margin-top:50px;'>Access Denied. Please login.</h3>");
 }
+
+$is_admin = ($_SESSION['role'] == 'admin'); // 🔥 Check if Admin
 
 $prop_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $user_id = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
@@ -36,7 +38,7 @@ if ($user_id) {
 // मुख्य इमेज का URL
 $img_url = !empty($prop['image_url']) ? htmlspecialchars($prop['image_url']) : 'https://via.placeholder.com/800x400?text=No+Image';
 
-// 🔥 WhatsApp मैसेज तैयार करें
+// 🔥 WhatsApp मैसेज तैयार करें (छुपी हुई जानकारी के साथ)
 $wa_link = '';
 $email_link = '';
 if ($user_info && !empty($user_info['phone'])) {
@@ -46,9 +48,10 @@ if ($user_info && !empty($user_info['phone'])) {
     $wa_message = "Hello " . $user_info['name'] . ",\n\n";
     $wa_message .= "मैंने देखा कि आपने हमारी वेबसाइट पर यह प्रॉपर्टी देखी थी:\n\n";
     $wa_message .= "🏠 *" . $prop['title'] . "*\n";
-    $wa_message .= "📍 Location: " . $prop['city'] . ", " . $prop['locality'] . "\n";
+    $wa_message .= "📍 City: " . $prop['city'] . ", " . $prop['state'] . "\n"; // 🔥 सिर्फ सिटी और स्टेट
     $wa_message .= "💰 Price: ₹" . number_format($prop['price']) . "\n";
     $wa_message .= "🏦 Bank: " . $prop['bank_name'] . "\n\n";
+    // 🔥 एरिया और बोरोअर का नाम यहाँ से हटा दिया गया है
     $wa_message .= "क्या आप अभी भी इसमें इंटरेस्टेड हैं? अगर हाँ, तो मैं आपको और डिटेल्स भेज सकता हूँ या आपकी कॉल का इंतज़ार कर रहा हूँ।\n\n";
     $wa_message .= "Regards,\nPrime Property Team";
     
@@ -57,7 +60,7 @@ if ($user_info && !empty($user_info['phone'])) {
 
 if ($user_info && !empty($user_info['email'])) {
     $subject = "Regarding Property: " . $prop['title'];
-    $body = "Hello " . $user_info['name'] . ",\n\nI noticed you viewed this property on our website. Let me know if you need more details.\n\nProperty: " . $prop['title'] . "\nPrice: ₹" . number_format($prop['price']) . "\n\nRegards,\nPrime Property Team";
+    $body = "Hello " . $user_info['name'] . ",\n\nI noticed you viewed this property on our website. Let me know if you need more details.\n\nProperty: " . $prop['title'] . "\nCity: " . $prop['city'] . "\nPrice: ₹" . number_format($prop['price']) . "\n\nRegards,\nPrime Property Team";
     $email_link = "mailto:" . $user_info['email'] . "?subject=" . urlencode($subject) . "&body=" . urlencode($body);
 }
 ?>
@@ -128,7 +131,8 @@ if ($user_info && !empty($user_info['email'])) {
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h3 class="fw-bold mb-1 text-dark"><?= htmlspecialchars($prop['title'] ?? 'No Title') ?></h3>
-                        <p class="text-muted mb-2"><i class="fas fa-map-marker-alt text-danger"></i> <?= htmlspecialchars($prop['location'] ?? $prop['city'] ?? '') ?></p>
+                        <!-- 🔥 सिर्फ सिटी और स्टेट दिखेगा, फुल एड्रेस नहीं -->
+                        <p class="text-muted mb-2"><i class="fas fa-map-marker-alt text-danger"></i> <?= htmlspecialchars($prop['city'] ?? '') ?>, <?= htmlspecialchars($prop['state'] ?? '') ?></p>
                     </div>
                     <div class="price-badge"><i class="fas fa-tag me-1"></i> ₹ <?= number_format($prop['price'] ?? 0) ?></div>
                 </div>
@@ -155,22 +159,16 @@ if ($user_info && !empty($user_info['email'])) {
                         <div class="detail-value"><?= htmlspecialchars($prop['city'] ?? 'N/A') ?></div>
                     </div>
                     <div class="col-md-4 col-6">
-                        <div class="detail-label">Locality</div>
-                        <div class="detail-value"><?= htmlspecialchars($prop['locality'] ?? 'N/A') ?></div>
-                    </div>
-                    <div class="col-md-4 col-6">
                         <div class="detail-label">State</div>
                         <div class="detail-value"><?= htmlspecialchars($prop['state'] ?? 'N/A') ?></div>
                     </div>
-
                     <div class="col-md-4 col-6">
                         <div class="detail-label">Bank Name</div>
                         <div class="detail-value"><?= htmlspecialchars($prop['bank_name'] ?? 'N/A') ?></div>
                     </div>
-                    <div class="col-md-4 col-6">
-                        <div class="detail-label">Area (Sq Ft)</div>
-                        <div class="detail-value"><?= htmlspecialchars($prop['sqft'] ?? 'N/A') ?></div>
-                    </div>
+
+                    <!-- 🔥 Area (Sq Ft) और Borrower Name यहाँ से हटा दिया गया है -->
+
                     <div class="col-md-4 col-6">
                         <div class="detail-label">Auction Date</div>
                         <div class="detail-value"><?= !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A' ?></div>
@@ -179,9 +177,14 @@ if ($user_info && !empty($user_info['email'])) {
 
                 <hr class="my-4">
 
-                <!-- डिस्क्रिप्शन -->
-                <div class="detail-label">Description</div>
-                <p class="text-muted" style="font-size: 0.9rem;"><?= nl2br(htmlspecialchars($prop['description'] ?? 'No description available.')) ?></p>
+                <!-- 🔥 डिस्क्रिप्शन (सिर्फ एडमिन को दिखेगा, क्योंकि इसमें फुल एड्रेस हो सकता है) -->
+                <?php if($is_admin): ?>
+                    <div class="detail-label">Description (Admin Only)</div>
+                    <p class="text-muted" style="font-size: 0.9rem;"><?= nl2br(htmlspecialchars($prop['description'] ?? 'No description available.')) ?></p>
+                <?php else: ?>
+                    <div class="detail-label">Description</div>
+                    <p class="text-muted" style="font-size: 0.9rem;">Property details available upon request. Please contact the assigned sales representative.</p>
+                <?php endif; ?>
 
                 <!-- Watermark (Shows in downloaded image) -->
                 <div class="watermark mt-4 pt-3 border-top">
