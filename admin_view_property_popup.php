@@ -37,7 +37,7 @@ if ($user_id) {
 // मुख्य इमेज (CORS safe)
 $img_url = !empty($prop['image_url']) ? htmlspecialchars($prop['image_url']) : 'https://via.placeholder.com/1080x600/1e293b/fbbf24?text=Prime+Property+India';
 
-// 🔥 WhatsApp मैसेज तैयार करें (Professional Greeting)
+// 🔥 WhatsApp मैसेज तैयार करें (Professional Greeting + Area)
 $wa_phone = '';
 $wa_message = '';
 $email_link = '';
@@ -48,6 +48,7 @@ if ($user_info && !empty($user_info['phone'])) {
     $wa_phone = $clean_phone;
     
     $client_name = !empty($user_info['name']) ? $user_info['name'] : 'Valuable Client';
+    $sqft_display = !empty($prop['sqft']) ? $prop['sqft'] . ' Sq Ft' : 'N/A';
     
     // 🔥 Luxury & Professional Format
     $wa_message = "👑 *PRIME PROPERTY INDIA* 👑\n";
@@ -56,6 +57,7 @@ if ($user_info && !empty($user_info['phone'])) {
     $wa_message .= "We noticed you recently showed interest in this premium property on our website. We are here to assist you in securing your dream investment!\n\n";
     $wa_message .= "🏢 *Property:* " . $prop['title'] . "\n";
     $wa_message .= "📍 *Location:* " . $prop['city'] . ", " . $prop['state'] . "\n";
+    $wa_message .= "📏 *Area:* " . $sqft_display . "\n"; // 🔥 Added Area
     $wa_message .= "💰 *Reserve Price:* ₹" . number_format($prop['price']) . "\n";
     $wa_message .= "🏦 *Bank:* " . $prop['bank_name'] . "\n";
     $wa_message .= "📅 *Auction Date:* " . (!empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'TBA') . "\n\n";
@@ -170,6 +172,11 @@ if ($user_info && !empty($user_info['email'])) {
                         <div class="detail-label">Bank Name</div>
                         <div class="detail-value"><?= htmlspecialchars($prop['bank_name'] ?? 'N/A') ?></div>
                     </div>
+                    <!-- 🔥 Area Added here in on-screen view too -->
+                    <div class="col-md-4 col-6">
+                        <div class="detail-label">Area (Sq Ft)</div>
+                        <div class="detail-value"><?= htmlspecialchars($prop['sqft'] ?? 'N/A') ?></div>
+                    </div>
                     <div class="col-md-4 col-6">
                         <div class="detail-label">Auction Date</div>
                         <div class="detail-value"><?= !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A' ?></div>
@@ -243,6 +250,15 @@ if ($user_info && !empty($user_info['email'])) {
                 <div>
                     <p style="margin: 0; font-size: 16px; color: #94a3b8; text-transform: uppercase;">Property Type</p>
                     <h4 style="margin: 5px 0 0 0; font-size: 22px; color: #fff; font-weight: 700;"><?= htmlspecialchars($prop['type'] ?? 'N/A') ?></h4>
+                </div>
+            </div>
+
+            <!-- 🔥 Area Box Added to Grid -->
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 15px;">
+                <div style="background: #fbbf24; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #0f172a;"><i class="fas fa-ruler-combined"></i></div>
+                <div>
+                    <p style="margin: 0; font-size: 16px; color: #94a3b8; text-transform: uppercase;">Area</p>
+                    <h4 style="margin: 5px 0 0 0; font-size: 22px; color: #fff; font-weight: 700;"><?= htmlspecialchars($prop['sqft'] ?? 'N/A') ?> Sq Ft</h4>
                 </div>
             </div>
 
