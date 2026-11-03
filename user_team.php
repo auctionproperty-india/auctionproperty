@@ -201,12 +201,11 @@ function renderTree($nodes, $level = 0) {
         }
         $html .= ' <span class="badge bg-light text-dark" style="font-weight:400;"><i class="fas fa-map-pin"></i> ' . $cityDisplay . '</span>';
         
-        // 🔥 ACTION BUTTONS
+        // 🔥 ACTION BUTTONS (Using json_encode for safe JS string passing)
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
-            // JS safely handle message
-            $msg_js = addslashes(str_replace(array("\r\n", "\r", "\n"), "\\n", $wa_data['msg']));
-            $html .= '<button type="button" onclick="openWhatsApp(\''.$wa_data['phone'].'\', \''.$msg_js.'\')" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send WhatsApp"><i class="fab fa-whatsapp"></i></button>';
+            $msg_js = json_encode($wa_data['msg']);
+            $html .= '<button type="button" onclick=\'openWhatsApp("'.$wa_data['phone'].'", '.$msg_js.')\' class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send WhatsApp"><i class="fab fa-whatsapp"></i></button>';
         }
         if($email_link) {
             $html .= '<a href="'.$email_link.'" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
@@ -301,9 +300,9 @@ if (!empty($selected_city)) {
                                 <td>
                                     <div class="d-flex gap-1">
                                         <?php if($wa_data): 
-                                            $msg_js = addslashes(str_replace(array("\r\n", "\r", "\n"), "\\n", $wa_data['msg']));
+                                            $msg_js = json_encode($wa_data['msg']);
                                         ?>
-                                            <button type="button" onclick="openWhatsApp('<?= $wa_data['phone'] ?>', '<?= $msg_js ?>')" class="btn btn-success btn-sm"><i class="fab fa-whatsapp"></i></button>
+                                            <button type="button" onclick='openWhatsApp("<?= $wa_data['phone'] ?>", <?= $msg_js ?>)' class="btn btn-success btn-sm"><i class="fab fa-whatsapp"></i></button>
                                         <?php endif; ?>
                                         <?php if($email_link): ?>
                                             <a href="<?= $email_link ?>" class="btn btn-primary btn-sm"><i class="fas fa-envelope"></i></a>
