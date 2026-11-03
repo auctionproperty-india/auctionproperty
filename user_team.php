@@ -457,7 +457,7 @@ async function shareProfile(phone, text) {
     const encodedText = encodeURIComponent(text);
     
     // Mobile Share API
-    if (navigator.share) {
+    if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
         try {
             // Temporarily show banner to render it
             banner.style.left = '0';
@@ -497,8 +497,8 @@ async function shareProfile(phone, text) {
         }
     }
 
-    // 🔥 DESKTOP FIX: Open WhatsApp FIRST to avoid popup blocker
-    const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+    // 🔥 DESKTOP FIX: Use wa.me URL format which handles redirection perfectly
+    const waUrl = `https://wa.me/${phone}?text=${encodedText}`;
     window.open(waUrl, '_blank');
 
     // Then generate and copy the image to clipboard
@@ -523,7 +523,7 @@ async function shareProfile(phone, text) {
                 await navigator.clipboard.write([item]);
                 
                 // Show success message (Since WhatsApp is already open, we just alert)
-                alert("✅ Professional Banner Copied!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
+                alert("✅ Professional Banner Copied!\n\nWhatsApp is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
             } catch (err) {
                 // Fallback if clipboard fails (download image)
                 const link = document.createElement('a');
@@ -531,7 +531,7 @@ async function shareProfile(phone, text) {
                 link.href = URL.createObjectURL(blob);
                 link.click();
                 
-                alert("Banner downloaded! WhatsApp Web is opening. Please attach the downloaded image manually.");
+                alert("Banner downloaded! WhatsApp is opening. Please attach the downloaded image manually.");
             }
         }, 'image/png');
 
