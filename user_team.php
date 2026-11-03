@@ -456,46 +456,58 @@ async function shareProfile(phone, text) {
     const banner = document.getElementById('share-banner');
     const encodedText = encodeURIComponent(text);
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    // Mobile Share API
-    if (isMobile && navigator.share) {
-        try {
-            banner.style.left = '0';
-            banner.style.top = '0';
-            banner.style.zIndex = '-1';
 
-            const canvas = await html2canvas(banner, {
-                scale: 1,
-                useCORS: true,
-                backgroundColor: null,
-                logging: false
-            });
-            
-            banner.style.left = '-9999px';
+    // ==========================================
+    // 🔥 MOBILE LOGIC (Direct App Open / Native Share)
+    // ==========================================
+    if (isMobile) {
+        // 1. Try Native Share (Shares Image + Text together to WhatsApp)
+        if (navigator.share && navigator.canShare) {
+            try {
+                banner.style.left = '0';
+                banner.style.top = '0';
+                banner.style.zIndex = '-1';
 
-            canvas.toBlob(async function(blob) {
-                const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
+                const canvas = await html2canvas(banner, {
+                    scale: 1,
+                    useCORS: true,
+                    backgroundColor: null,
+                    logging: false
+                });
                 
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Prime Property India',
-                        text: text
-                    });
-                } else {
-                    await navigator.share({
-                        title: 'Prime Property India',
-                        text: text
-                    });
-                }
-            }, 'image/png');
-            return;
-        } catch (err) {
-            console.log("Share failed, falling back to clipboard", err);
+                banner.style.left = '-9999px';
+
+                canvas.toBlob(async function(blob) {
+                    const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
+                    
+                    if (navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: 'Prime Property India',
+                            text: text
+                        });
+                    } else {
+                        await navigator.share({
+                            title: 'Prime Property India',
+                            text: text
+                        });
+                    }
+                }, 'image/png');
+                return; // Stop execution here if native share works
+            } catch (err) {
+                console.log("Native share failed, falling back to app link", err);
+                banner.style.left = '-9999px';
+            }
         }
+
+        // 2. Fallback for older mobiles: Directly open WhatsApp App
+        window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+        return; // Stop execution here
     }
 
-    // 🔥 DESKTOP LOGIC
+    // ==========================================
+    // 🔥 DESKTOP LOGIC (WhatsApp Web + Clipboard Copy)
+    // ==========================================
     // 1. Open WhatsApp Web IMMEDIATELY (Synchronously on click) to bypass popup blockers
     const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
     const newWindow = window.open(waUrl, '_blank');
@@ -525,7 +537,6 @@ async function shareProfile(phone, text) {
                 await navigator.clipboard.write([item]);
                 alert("✅ Professional Banner Copied!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
             } catch (err) {
-                // Fallback if clipboard fails
                 const link = document.createElement('a');
                 link.download = 'PrimeProperty_Banner.png';
                 link.href = URL.createObjectURL(blob);
@@ -536,7 +547,6 @@ async function shareProfile(phone, text) {
 
     } catch (err) {
         banner.style.left = '-9999px';
-        // WhatsApp tab is already open
         alert("Image generation failed, but WhatsApp is open. You can send the text message.");
     }
 }
