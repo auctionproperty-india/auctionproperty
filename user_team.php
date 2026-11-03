@@ -455,23 +455,22 @@ if (!empty($selected_city)) {
 async function shareProfile(phone, text) {
     const banner = document.getElementById('share-banner');
     const encodedText = encodeURIComponent(text);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     // Mobile Share API
-    if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+    if (isMobile && navigator.share) {
         try {
-            // Temporarily show banner to render it
             banner.style.left = '0';
             banner.style.top = '0';
             banner.style.zIndex = '-1';
 
             const canvas = await html2canvas(banner, {
-                scale: 1, // 1080x1080 is already high res
+                scale: 1,
                 useCORS: true,
                 backgroundColor: null,
                 logging: false
             });
             
-            // Hide banner again
             banner.style.left = '-9999px';
 
             canvas.toBlob(async function(blob) {
@@ -484,7 +483,6 @@ async function shareProfile(phone, text) {
                         text: text
                     });
                 } else {
-                    // Fallback if images can't be shared
                     await navigator.share({
                         title: 'Prime Property India',
                         text: text
@@ -497,11 +495,16 @@ async function shareProfile(phone, text) {
         }
     }
 
-    // 🔥 DESKTOP FIX: Use wa.me URL format which handles redirection perfectly
-    const waUrl = `https://wa.me/${phone}?text=${encodedText}`;
-    window.open(waUrl, '_blank');
+    // 🔥 DESKTOP LOGIC
+    // 1. Open WhatsApp Web IMMEDIATELY (Synchronously on click) to bypass popup blockers
+    const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+    const newWindow = window.open(waUrl, '_blank');
+    
+    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+        alert("Popup blocked! Please allow popups for this site so WhatsApp can open automatically.");
+    }
 
-    // Then generate and copy the image to clipboard
+    // 2. Generate and copy image to clipboard
     try {
         banner.style.left = '0';
         banner.style.top = '0';
@@ -518,26 +521,22 @@ async function shareProfile(phone, text) {
 
         canvas.toBlob(async function(blob) {
             try {
-                // Copy image to clipboard
                 const item = new ClipboardItem({ 'image/png': blob });
                 await navigator.clipboard.write([item]);
-                
-                // Show success message (Since WhatsApp is already open, we just alert)
-                alert("✅ Professional Banner Copied!\n\nWhatsApp is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
+                alert("✅ Professional Banner Copied!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
             } catch (err) {
-                // Fallback if clipboard fails (download image)
+                // Fallback if clipboard fails
                 const link = document.createElement('a');
                 link.download = 'PrimeProperty_Banner.png';
                 link.href = URL.createObjectURL(blob);
                 link.click();
-                
-                alert("Banner downloaded! WhatsApp is opening. Please attach the downloaded image manually.");
+                alert("Banner downloaded! WhatsApp Web is opening. Please attach the downloaded image manually.");
             }
         }, 'image/png');
 
     } catch (err) {
         banner.style.left = '-9999px';
-        // WhatsApp tab is already open, so just let the user know
+        // WhatsApp tab is already open
         alert("Image generation failed, but WhatsApp is open. You can send the text message.");
     }
 }
