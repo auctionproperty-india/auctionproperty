@@ -67,7 +67,7 @@ if (!$view_company_logs) {
     $team_user_ids = $team_query->fetchAll(PDO::FETCH_COLUMN);
     
     if (empty($team_user_ids)) {
-        $team_user_ids = [0]; // Just to prevent empty IN clause
+        $team_user_ids = [0]; 
     }
     
     $placeholders = implode(',', array_fill(0, count($team_user_ids), '?'));
@@ -437,7 +437,8 @@ $view_counts_cache = [];
 
                         if (preg_match('/Property ID:\s*(\d+)/i', $details_text, $matches)) {
                             $prop_id = $matches[1];
-                            $link = "<a href='admin_view_property_popup.php?id={$prop_id}' target='_blank' style='font-weight:bold; color:#2563eb; text-decoration:underline;'>{$prop_id}</a>";
+                            // 🔥 FIXED LINK: Added user_id here
+                            $link = "<a href='admin_view_property_popup.php?id={$prop_id}&user_id={$log['user_id']}' target='_blank' style='font-weight:bold; color:#2563eb; text-decoration:underline;'>{$prop_id}</a>";
                             $details_text = preg_replace('/Property ID:\s*'.$prop_id.'/i', "Property ID: {$link}", $details_text);
 
                             $cache_key = $log['user_id'] . '_' . $prop_id;
@@ -449,7 +450,6 @@ $view_counts_cache = [];
                             $total_views = $view_counts_cache[$cache_key];
                             $popup_url = "admin_view_history_popup.php?user_id={$log['user_id']}&prop_id={$prop_id}";
                             
-                            // 🔥 FIX: Now even "1 time" is a clickable link
                             if ($total_views >= 3) {
                                 $view_badge = "<a href='{$popup_url}' target='_blank' class='badge bg-success text-decoration-none' style='font-size:0.8rem;' title='Click to see user details & history'><i class='fas fa-eye'></i> {$total_views} times</a>";
                             } elseif ($total_views == 2) {
