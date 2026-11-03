@@ -222,9 +222,8 @@ function renderTree($nodes, $level = 0) {
         
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
-            $js_msg = htmlspecialchars(json_encode($wa_data['msg']), ENT_QUOTES, 'UTF-8');
-            // 🔥 Using onclick with json encoded string to prevent any breakage
-            $html .= '<button type="button" onclick="shareProfile(\''.$wa_data['phone'].'\', '.$js_msg.', this)" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
+            // 🔥 FIX: Using data-attributes to prevent JS breakage
+            $html .= '<button type="button" data-phone="'.$wa_data['phone'].'" data-msg="'.htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8').'" onclick="shareProfile(this)" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
         }
         if($email_link) {
             $html .= '<a href="'.$email_link.'" target="_blank" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
@@ -318,11 +317,9 @@ if (!empty($selected_city)) {
                                 <td><?= safeDateFormat($m['created_at']) ?></td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <?php if($wa_data): 
-                                            $js_msg = htmlspecialchars(json_encode($wa_data['msg']), ENT_QUOTES, 'UTF-8');
-                                        ?>
-                                            <!-- 🔥 Using the same exact onclick as Tree View -->
-                                            <button type="button" onclick="shareProfile('<?= $wa_data['phone'] ?>', <?= $js_msg ?>, this)" class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
+                                        <?php if($wa_data): ?>
+                                            <!-- 🔥 FIX: Same data-attributes here -->
+                                            <button type="button" data-phone="<?= $wa_data['phone'] ?>" data-msg="<?= htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8') ?>" onclick="shareProfile(this)" class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
                                         <?php endif; ?>
                                         <?php if($email_link): ?>
                                             <a href="<?= $email_link ?>" target="_blank" class="btn btn-primary btn-sm" title="Send Email"><i class="fas fa-envelope"></i></a>
@@ -454,9 +451,10 @@ if (!empty($selected_city)) {
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
 // 🔥 SMART SHARE FUNCTION (Image + Text)
-async function shareProfile(phone, text, btnElement) {
-    // Both phone and text are passed directly from onclick now. 
-    // No more data-attributes parsing issues.
+async function shareProfile(btnElement) {
+    // Read data from attributes to prevent ANY JS string breakage
+    const phone = btnElement.getAttribute('data-phone');
+    const text = btnElement.getAttribute('data-msg');
     
     const banner = document.getElementById('share-banner');
     const encodedText = encodeURIComponent(text);
@@ -523,16 +521,15 @@ async function shareProfile(phone, text, btnElement) {
             // ==========================================
             // 💻 DESKTOP LOGIC
             // ==========================================
-            // Note: We use web.whatsapp.com directly.
             const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
             
             try {
-                // Copy to clipboard
+                // 1. Try to copy to clipboard
                 const item = new ClipboardItem({ 'image/png': blob });
                 await navigator.clipboard.write([item]);
                 btnElement.innerHTML = '<i class="fas fa-check"></i> Copied!';
                 
-                // Redirect blank window to WhatsApp Web
+                // 2. Redirect to WhatsApp Web
                 if (waWindow) {
                     waWindow.location.href = waUrl;
                 } else {
@@ -541,9 +538,22 @@ async function shareProfile(phone, text, btnElement) {
                 
                 alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
             } catch (err) {
-                btnElement.innerHTML = '<i class="fas fa-times"></i> Blocked';
-                if (waWindow) waWindow.close();
-                alert("Your browser blocked automatic image copying.\n\nPlease take a screenshot of the banner or download it manually.");
+                // 🔥 FALLBACK: If clipboard is blocked, DOWNLOAD image and open WA
+                const link = document.createElement('a');
+                link.download = 'PrimeProperty_Banner.png';
+                link.href = URL.createObjectURL(blob);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                if (waWindow) {
+                    waWindow.location.href = waUrl;
+                } else {
+                    window.open(waUrl, '_blank');
+                }
+                
+                btnElement.innerHTML = '<i class="fas fa-download"></i> Downloaded';
+                alert("Your browser blocked automatic image copying.\n\n✅ Banner Downloaded!\nWhatsApp Web is opening. Please attach the downloaded image (PrimeProperty_Banner.png) manually in the chat.");
             }
             
             setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.style.pointerEvents = 'auto'; }, 3000);
