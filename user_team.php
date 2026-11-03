@@ -129,17 +129,25 @@ function getWhatsAppData($member) {
     if(empty($member['phone'])) return null;
     
     $name = htmlspecialchars($member['name']);
+    $email = htmlspecialchars($member['email']); // 🔥 Email Added
     $reg_date = safeDateFormat($member['created_at']);
     $site_url = "https://primepropertyindia.onrender.com";
 
     $clean_phone = preg_replace('/[^0-9]/', '', $member['phone']);
     if (strlen($clean_phone) == 10) $clean_phone = '91' . $clean_phone;
     
-    // 🔥 Professional, Premium & Trust-Building Message
+    // 🔥 Ultimate Professional Message with Login & New Features
     $msg = "नमस्ते *{$name}* जी 🙏,\n\n";
     $msg .= "Prime Property परिवार में आपका स्वागत है! आपने *{$reg_date}* को हमारे पोर्टल से जुड़कर हमें अपना भरोसा दिया, इसके लिए धन्यवाद।\n\n";
-    $msg .= "🏦 *बैंक ऑक्शन* के जरिए हम आपको बाजार मूल्य से काफी कम कीमत पर सुरक्षित प्रॉपर्टी खरीदने का शानदार अवसर प्रदान करते हैं।\n\n";
-    $msg .= "हमने देखा है कि आपने अभी तक हमारे पोर्टल पर कोई भी प्रॉपर्टी नहीं खोजी है। अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
+    
+    $msg .= "🔑 *आपकी लॉगिन आईडी (Email):* {$email}\n";
+    $msg .= "कृपया अपना पासवर्ड डालकर हमारे पोर्टल पर लॉगिन करें।\n\n";
+    
+    $msg .= "🚀 *नया अपडेट:* हमारे पोर्टल पर अब *बैंक ऑक्शन* के साथ-साथ *Exchange Property* (प्रॉपर्टी एक्सचेंज) का ऑप्शन भी जुड़ चुका है! आप अपनी वर्तमान प्रॉपर्टी को एक्सचेंज भी कर सकते हैं।\n\n";
+    
+    $msg .= "🏦 बैंक ऑक्शन के जरिए हम आपको बाजार मूल्य से काफी कम कीमत पर सुरक्षित प्रॉपर्टी खरीदने का शानदार अवसर प्रदान करते हैं।\n\n";
+    
+    $msg .= "अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
     $msg .= "🌐 *वेबसाइट:* {$site_url}\n\n";
     $msg .= "🤝 कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक इस मैसेज का रिप्लाई करें।\n\n";
     $msg .= "शुभकामनाएं,\n";
@@ -151,14 +159,22 @@ function getWhatsAppData($member) {
 function generateEmailLink($member) {
     if(empty($member['email'])) return '';
     $name = htmlspecialchars($member['name']);
+    $email = htmlspecialchars($member['email']);
     $reg_date = safeDateFormat($member['created_at']);
     $site_url = "https://primepropertyindia.onrender.com";
 
-    $subject = "Prime Property - आपकी पसंद की प्रॉपर्टी खोजें";
+    $subject = "Prime Property - आपकी लॉगिन डिटेल्स और नए अपडेट्स";
     $body = "नमस्ते {$name} जी,\n\n";
     $body .= "Prime Property परिवार में आपका स्वागत है! आपने {$reg_date} को हमारे पोर्टल से जुड़कर हमें अपना भरोसा दिया, इसके लिए धन्यवाद।\n\n";
+    
+    $body .= "आपकी लॉगिन आईडी (Email): {$email}\n";
+    $body .= "कृपया अपना पासवर्ड डालकर हमारे पोर्टल पर लॉगिन करें।\n\n";
+    
+    $body .= "नया अपडेट: हमारे पोर्टल पर अब बैंक ऑक्शन के साथ-साथ Exchange Property (प्रॉपर्टी एक्सचेंज) का ऑप्शन भी जुड़ चुका है! आप अपनी वर्तमान प्रॉपर्टी को एक्सचेंज भी कर सकते हैं।\n\n";
+    
     $body .= "बैंक ऑक्शन के जरिए हम आपको बाजार मूल्य से काफी कम कीमत पर सुरक्षित प्रॉपर्टी खरीदने का शानदार अवसर प्रदान करते हैं।\n\n";
-    $body .= "हमने देखा है कि आपने अभी तक हमारे पोर्टल पर कोई भी प्रॉपर्टी नहीं खोजी है। अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
+    
+    $body .= "अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
     $body .= "वेबसाइट: {$site_url}\n\n";
     $body .= "कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक हमें रिप्लाई करें।\n\n";
     $body .= "शुभकामनाएं,\nPrime Property Team";
@@ -203,7 +219,7 @@ function renderTree($nodes, $level = 0) {
         }
         $html .= ' <span class="badge bg-light text-dark" style="font-weight:400;"><i class="fas fa-map-pin"></i> ' . $cityDisplay . '</span>';
         
-        // 🔥 ACTION BUTTONS (Using json_encode for safe JS string passing)
+        // 🔥 ACTION BUTTONS
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
             $msg_js = json_encode($wa_data['msg']);
