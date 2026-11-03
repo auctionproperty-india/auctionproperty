@@ -222,12 +222,11 @@ function renderTree($nodes, $level = 0) {
         
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
-            // 🔥 FIX: Changed to <a> tag for fallback + onclick handler
-            $wa_href = "https://wa.me/".$wa_data['phone']."?text=".rawurlencode($wa_data['msg']);
-            $html .= '<a href="'.$wa_href.'" target="_blank" onclick="shareProfile(event, this)" data-phone="'.$wa_data['phone'].'" data-msg="'.htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8').'" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px; color:white; text-decoration:none;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</a>';
+            // 🔥 Using <button> instead of <a> to prevent default browser redirects
+            $html .= '<button type="button" data-phone="'.$wa_data['phone'].'" data-msg="'.htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8').'" onclick="shareProfile(this)" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
         }
         if($email_link) {
-            $html .= '<a href="'.$email_link.'" target="_blank" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px; color:white; text-decoration:none;" title="Send Email"><i class="fas fa-envelope"></i></a>';
+            $html .= '<a href="'.$email_link.'" target="_blank" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
         }
         $html .= '</div>';
 
@@ -318,14 +317,12 @@ if (!empty($selected_city)) {
                                 <td><?= safeDateFormat($m['created_at']) ?></td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <?php if($wa_data): 
-                                            $wa_href = "https://wa.me/".$wa_data['phone']."?text=".rawurlencode($wa_data['msg']);
-                                        ?>
-                                            <!-- 🔥 FIX: Changed to <a> tag -->
-                                            <a href="<?= $wa_href ?>" target="_blank" onclick="shareProfile(event, this)" data-phone="<?= $wa_data['phone'] ?>" data-msg="<?= htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8') ?>" class="btn btn-success btn-sm" title="Share Profile" style="color:white; text-decoration:none;"><i class="fas fa-share-alt"></i> Share</a>
+                                        <?php if($wa_data): ?>
+                                            <!-- 🔥 Using <button> here as well -->
+                                            <button type="button" data-phone="<?= $wa_data['phone'] ?>" data-msg="<?= htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8') ?>" onclick="shareProfile(this)" class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
                                         <?php endif; ?>
                                         <?php if($email_link): ?>
-                                            <a href="<?= $email_link ?>" target="_blank" class="btn btn-primary btn-sm" title="Send Email" style="color:white; text-decoration:none;"><i class="fas fa-envelope"></i></a>
+                                            <a href="<?= $email_link ?>" target="_blank" class="btn btn-primary btn-sm" title="Send Email"><i class="fas fa-envelope"></i></a>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -454,13 +451,12 @@ if (!empty($selected_city)) {
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
 // 🔥 SMART SHARE FUNCTION (Image + Text)
-async function shareProfile(event, btnElement) {
-    event.preventDefault(); // 🔥 STOP default link opening until image is ready
-
+async function shareProfile(btnElement) {
     const phone = btnElement.getAttribute('data-phone');
     const text = btnElement.getAttribute('data-msg');
     const banner = document.getElementById('share-banner');
     const encodedText = encodeURIComponent(text);
+    // Strong mobile detection
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
 
     // Button Loading State
@@ -468,14 +464,10 @@ async function shareProfile(event, btnElement) {
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wait...';
     btnElement.style.pointerEvents = 'none';
 
-    // 🔥 DESKTOP FIX: Open blank window synchronously to prevent Popup Blocker
-    let waWindow = null;
-    if (!isMobile) {
-        waWindow = window.open('about:blank', '_blank');
-        if (waWindow) {
-            waWindow.document.write("<h2 style='text-align:center; margin-top:50px; font-family:sans-serif; color:#2563eb;'>⏳ Generating Banner...<br><br><small style='color:#64748b;'>Please wait, you will be redirected to WhatsApp shortly.</small></h2>");
-        }
-    }
+    // Show banner for capture
+    banner.style.left = '0';
+    banner.style.top = '0';
+    banner.style.zIndex = '-1';
 
     try {
         const canvas = await html2canvas(banner, {
@@ -484,12 +476,13 @@ async function shareProfile(event, btnElement) {
             backgroundColor: '#0f172a',
             logging: false
         });
+        banner.style.left = '-9999px';
 
         canvas.toBlob(async function(blob) {
             const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
 
             // ==========================================
-            // 📱 MOBILE LOGIC
+            // 📱 MOBILE LOGIC (Native Share)
             // ==========================================
             if (isMobile) {
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -501,44 +494,48 @@ async function shareProfile(event, btnElement) {
                         });
                         btnElement.innerHTML = '<i class="fas fa-check"></i> Shared';
                     } catch (err) {
-                        console.log("Share failed", err);
+                        console.log("Share cancelled/failed", err);
+                        // Fallback to direct app link (text only)
                         window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+                        btnElement.innerHTML = originalBtnHTML;
                     }
                 } else {
+                    // Fallback to direct app link (text only)
                     window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+                    btnElement.innerHTML = originalBtnHTML;
                 }
-                setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.style.pointerEvents = 'auto'; }, 2000);
+                setTimeout(() => { btnElement.style.pointerEvents = 'auto'; }, 2000);
                 return;
             }
 
             // ==========================================
-            // 💻 DESKTOP LOGIC
+            // 💻 DESKTOP LOGIC (Strictly direct to web.whatsapp.com)
             // ==========================================
+            // Note: We do NOT use api.whatsapp.com here to avoid the intermediate page
+            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+            
+            // Open WA Web instantly
+            window.open(waUrl, '_blank');
+
             try {
+                // Copy to clipboard
                 const item = new ClipboardItem({ 'image/png': blob });
                 await navigator.clipboard.write([item]);
                 btnElement.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                
-                if (waWindow) {
-                    waWindow.location.href = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
-                } else {
-                    window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
-                }
-                
                 alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V (or Cmd+V on Mac) inside the chat box to paste the banner, then hit Send.");
             } catch (err) {
                 btnElement.innerHTML = '<i class="fas fa-times"></i> Blocked';
-                if (waWindow) waWindow.close();
-                alert("Your browser blocked automatic image copying.\n\nPlease take a screenshot of the banner or download it manually.");
+                alert("WhatsApp Web is opening. Your browser blocked image copying.\n\nPlease take a screenshot of the banner.");
             }
+            
             setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.style.pointerEvents = 'auto'; }, 3000);
 
         }, 'image/png');
     } catch (err) {
-        if (waWindow) waWindow.close();
+        banner.style.left = '-9999px';
         btnElement.innerHTML = originalBtnHTML;
         btnElement.style.pointerEvents = 'auto';
-        alert("Error creating banner.");
+        alert("Error creating banner. Please try again.");
     }
 }
 
