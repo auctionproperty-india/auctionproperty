@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👥 My Team – Smart City Normalization + Direct Contact
+// 👥 My Team – Smart City Normalization + Direct Contact (Dynamic Promo)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -12,11 +12,24 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 }
 
 $user_id = $_SESSION['user_id'];
+
+// 🔥 FETCH DYNAMIC PROMO SETTINGS FROM DB
+$promo_banner_title = "Welcome to Our Family! 🙏"; 
+$promo_message_template = ""; 
+
+try {
+    $stmt = $pdo->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('promo_banner_title', 'promo_message_template')");
+    $stmt->execute();
+    $promos = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    if (!empty($promos['promo_banner_title'])) $promo_banner_title = $promos['promo_banner_title'];
+    if (!empty($promos['promo_message_template'])) $promo_message_template = $promos['promo_message_template'];
+} catch (Exception $e) {}
+
 include 'header.php'; 
 ?>
 
 <!-- ============================================================ -->
-<!-- 🔥 LUXURY PROFESSIONAL BANNER (Fixed Position) -->
+<!-- 🔥 LUXURY PROFESSIONAL BANNER (Dynamic Title) -->
 <!-- ============================================================ -->
 <div id="share-banner" style="position:absolute; left:-9999px; top:0; width:1080px; height:1080px; background: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; font-family:'Poppins', sans-serif; box-sizing: border-box; border: 12px solid #d4af37; overflow: hidden;">
 
@@ -44,14 +57,15 @@ include 'header.php';
         <div style="background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border-radius: 30px; padding: 50px 40px; border: 1px solid rgba(212, 175, 55, 0.3); box-shadow: 0 20px 40px rgba(0,0,0,0.5); width: 85%; margin: 0 auto;">
             <p style="font-size: 26px; color: #d4af37; margin-bottom: 10px; font-weight: 500; letter-spacing: 2px;">Dear</p>
             
-            <!-- 🔥 Dynamic Client Name Placeholder -->
             <h2 id="banner-client-name" style="font-family: 'Times New Roman', serif; font-size: 55px; margin: 0 0 20px 0; color: #ffffff; font-weight: 700; line-height: 1.2; word-wrap: break-word; text-shadow: 0 2px 10px rgba(255,255,255,0.2);">
                 Client Name
             </h2>
             
+            <!-- 🔥 DYNAMIC BANNER TITLE HERE -->
             <h3 style="font-size: 34px; color: #e2e8f0; font-weight: 300; margin-bottom: 30px; line-height: 1.4;">
-                Welcome to Our Family! 🙏
+                <?= htmlspecialchars($promo_banner_title) ?>
             </h3>
+            
             <p style="font-size: 22px; color: #cbd5e1; font-weight: 400; margin: 0; line-height: 1.6;">
                 Explore Premium <span style="color: #d4af37; font-weight: 700;">Bank Auction</span> Properties<br>& <span style="color: #d4af37; font-weight: 700;">Exchange</span> Your Property.
             </p>
@@ -292,48 +306,41 @@ function safeDateFormat($dateStr) {
 function getWhatsAppData($member) {
     if(empty($member['phone'])) return null;
     
+    global $promo_message_template;
+    $site_url = "https://primepropertyindia.onrender.com";
     $name = htmlspecialchars($member['name']);
     $email = htmlspecialchars($member['email']);
     $reg_date = safeDateFormat($member['created_at']);
-    $site_url = "https://primepropertyindia.onrender.com";
 
     $clean_phone = preg_replace('/[^0-9]/', '', $member['phone']);
     if (strlen($clean_phone) == 10) $clean_phone = '91' . $clean_phone;
     
-    $msg = "नमस्ते *{$name}* जी 🙏,\n\n";
-    $msg .= "Prime Property परिवार में आपका स्वागत है! आपने *{$reg_date}* को हमारे पोर्टल से जुड़कर हमें अपना भरोसा दिया, इसके लिए धन्यवाद।\n\n";
-    $msg .= "🔑 *आपकी लॉगिन आईडी (Email):* {$email}\n";
-    $msg .= "कृपया अपना पासवर्ड डालकर हमारे पोर्टल पर लॉगिन करें।\n\n";
-    $msg .= "🚀 *नया अपडेट:* हमारे पोर्टल पर अब *बैंक ऑक्शन* के साथ-साथ *Exchange Property* (प्रॉपर्टी एक्सचेंज) का ऑप्शन भी जुड़ चुका है! आप अपनी वर्तमान प्रॉपर्टी को एक्सचेंज भी कर सकते हैं।\n\n";
-    $msg .= "🏦 बैंक ऑक्शन के जरिए हम आपको बाजार मूल्य से काफी कम कीमत पर सुरक्षित प्रॉपर्टी खरीदने का शानदार अवसर प्रदान करते हैं।\n\n";
-    $msg .= "अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
-    $msg .= "🌐 *वेबसाइट:* {$site_url}\n\n";
-    $msg .= "🤝 कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक इस मैसेज का रिप्लाई करें।\n\n";
-    $msg .= "*Team* 🏢\n";
-    $msg .= "*Prime Property India* 🇮🇳✨";
+    // 🔥 Replace dynamic placeholders
+    $msg = $promo_message_template;
+    $msg = str_replace('{name}', $name, $msg);
+    $msg = str_replace('{email}', $email, $msg);
+    $msg = str_replace('{date}', $reg_date, $msg);
+    $msg = str_replace('{website}', $site_url, $msg);
 
     return ['phone' => $clean_phone, 'msg' => $msg, 'name' => $member['name']];
 }
 
 function generateEmailLink($member) {
     if(empty($member['email'])) return '';
+    global $promo_message_template;
+    $site_url = "https://primepropertyindia.onrender.com";
     $name = htmlspecialchars($member['name']);
     $email = htmlspecialchars($member['email']);
     $reg_date = safeDateFormat($member['created_at']);
-    $site_url = "https://primepropertyindia.onrender.com";
 
     $subject = "Prime Property - आपकी लॉगिन डिटेल्स और नए अपडेट्स";
-    $body = "नमस्ते {$name} जी,\n\n";
-    $body .= "Prime Property परिवार में आपका स्वागत है! आपने {$reg_date} को हमारे पोर्टल से जुड़कर हमें अपना भरोसा दिया, इसके लिए धन्यवाद।\n\n";
-    $body .= "आपकी लॉगिन आईडी (Email): {$email}\n";
-    $body .= "कृपया अपना पासवर्ड डालकर हमारे पोर्टल पर लॉगिन करें।\n\n";
-    $body .= "नया अपडेट: हमारे पोर्टल पर अब बैंक ऑक्शन के साथ-साथ Exchange Property (प्रॉपर्टी एक्सचेंज) का ऑप्शन भी जुड़ चुका है! आप अपनी वर्तमान प्रॉपर्टी को एक्सचेंज भी कर सकते हैं।\n\n";
-    $body .= "बैंक ऑक्शन के जरिए हम आपको बाजार मूल्य से काफी कम कीमत पर सुरक्षित प्रॉपर्टी खरीदने का शानदार अवसर प्रदान करते हैं।\n\n";
-    $body .= "अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
-    $body .= "वेबसाइट: {$site_url}\n\n";
-    $body .= "कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक हमें रिप्लाई करें।\n\n";
-    $body .= "Team\n";
-    $body .= "Prime Property India";
+    
+    // 🔥 Replace dynamic placeholders for Email
+    $body = $promo_message_template;
+    $body = str_replace('{name}', $name, $body);
+    $body = str_replace('{email}', $email, $body);
+    $body = str_replace('{date}', $reg_date, $body);
+    $body = str_replace('{website}', $site_url, $body);
     
     return "mailto:{$member['email']}?subject=" . rawurlencode($subject) . "&body=" . rawurlencode($body);
 }
