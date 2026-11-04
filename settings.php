@@ -18,7 +18,20 @@ $settings_keys = [
     'default_contact', 'company_bank_name', 'company_account_number', 
     'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent', 
     'spin_min_coins', 'spin_max_coins', 'company_qr_code',
-    'promo_banner_title', 'promo_message_template' // 🔥 NEW KEYS ADDED
+    'promo_banner_title', 'promo_message_template',
+    
+    // Email Toggles
+    'email_on_registration', 'email_on_daily_props', 'email_on_downline_reg',
+    'email_on_payout_req', 'email_on_payout_approved', 'email_on_package_buy', 'email_on_package_expired',
+
+    // Email Templates
+    'tpl_registration_subject', 'tpl_registration_body',
+    'tpl_downline_reg_subject', 'tpl_downline_reg_body',
+    'tpl_daily_props_subject', 'tpl_daily_props_body',
+    'tpl_payout_req_subject', 'tpl_payout_req_body',
+    'tpl_payout_approved_subject', 'tpl_payout_approved_body',
+    'tpl_package_buy_subject', 'tpl_package_buy_body',
+    'tpl_package_expired_subject', 'tpl_package_expired_body'
 ];
 
 // 🔒 Ensure all keys exist
@@ -99,9 +112,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             $message = "<div class='alert alert-success'>✅ Daily Spin Settings updated!</div>";
         }
         
-        // 4. SAVE QR CODE (using Supabase Storage)
+        // 4. SAVE QR CODE
         elseif ($action == 'save_qr') {
-            
             $old_qr = '';
             try {
                 $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = 'company_qr_code'");
@@ -109,43 +121,49 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $old_qr = $stmt->fetchColumn() ?: '';
             } catch (Exception $e) {}
             
-            // REMOVE QR CODE
             if (isset($_POST['remove_qr']) && $_POST['remove_qr'] == '1') {
-                if (!empty($old_qr)) {
-                    deleteCloudFileByUrl($old_qr);
-                }
+                if (!empty($old_qr)) deleteCloudFileByUrl($old_qr);
                 $saveSetting('company_qr_code', '');
                 $message = "<div class='alert alert-success'>✅ QR Code removed successfully!</div>";
-            } 
-            // UPLOAD NEW QR CODE
-            elseif(isset($_FILES['qr_code']) && $_FILES['qr_code']['error'] == 0) {
-                
+            } elseif(isset($_FILES['qr_code']) && $_FILES['qr_code']['error'] == 0) {
                 $uploaded_url = uploadFileToCloud($_FILES['qr_code'], 'qr_codes');
-                
                 if ($uploaded_url) {
-                    if (!empty($old_qr)) {
-                        deleteCloudFileByUrl($old_qr);
-                    }
-                    
+                    if (!empty($old_qr)) deleteCloudFileByUrl($old_qr);
                     $saveSetting('company_qr_code', $uploaded_url);
-                    $message = "<div class='alert alert-success'>✅ New QR Code uploaded successfully to <b>Supabase Cloud Storage</b>!</div>";
+                    $message = "<div class='alert alert-success'>✅ New QR Code uploaded!</div>";
                 } else {
-                    $message = "<div class='alert alert-danger'>❌ QR Code upload failed!<br>Please check your <b>SUPABASE_SERVICE_KEY</b> in Render environment variables and ensure the bucket <b>property-images</b> is Public.</div>";
+                    $message = "<div class='alert alert-danger'>❌ QR Code upload failed! Check keys/bucket.</div>";
                 }
             } else {
                 $message = "<div class='alert alert-warning'>⚠️ No file selected.</div>";
             }
         }
 
-        // 🔥 5. SAVE PROMO BANNER & MESSAGE (NEW)
+        // 🔥 5. SAVE PROMO BANNER & MESSAGE
         elseif ($action == 'save_promo') {
-            $banner_title = trim($_POST['promo_banner_title'] ?? '');
-            $message_template = trim($_POST['promo_message_template'] ?? '');
-            
-            $saveSetting('promo_banner_title', $banner_title);
-            $saveSetting('promo_message_template', $message_template);
-            
-            $message = "<div class='alert alert-success'>✅ Promo Banner & Message updated successfully!</div>";
+            $saveSetting('promo_banner_title', trim($_POST['promo_banner_title'] ?? ''));
+            $saveSetting('promo_message_template', trim($_POST['promo_message_template'] ?? ''));
+            $message = "<div class='alert alert-success'>✅ Promo Banner & Message updated!</div>";
+        }
+
+        // 🔥 6. SAVE EMAIL SETTINGS & TEMPLATES
+        elseif ($action == 'save_email_settings') {
+            // Save toggles (1 or 0)
+            $toggles = ['email_on_registration', 'email_on_daily_props', 'email_on_downline_reg', 'email_on_payout_req', 'email_on_payout_approved', 'email_on_package_buy', 'email_on_package_expired'];
+            foreach ($toggles as $key) {
+                $saveSetting($key, isset($_POST[$key]) ? '1' : '0');
+            }
+            // Save templates
+            $templates = [
+                'tpl_registration_subject', 'tpl_registration_body', 'tpl_downline_reg_subject', 'tpl_downline_reg_body',
+                'tpl_daily_props_subject', 'tpl_daily_props_body', 'tpl_payout_req_subject', 'tpl_payout_req_body',
+                'tpl_payout_approved_subject', 'tpl_payout_approved_body', 'tpl_package_buy_subject', 'tpl_package_buy_body',
+                'tpl_package_expired_subject', 'tpl_package_expired_body'
+            ];
+            foreach ($templates as $key) {
+                $saveSetting($key, trim($_POST[$key] ?? ''));
+            }
+            $message = "<div class='alert alert-success'>✅ Email Settings & Templates updated!</div>";
         }
     }
 }
@@ -420,7 +438,7 @@ if (!empty($qr)) {
         </div>
     </div>
 
-    <!-- 🔥 SECTION 5: PROMO MESSAGE & BANNER (NEW) -->
+    <!-- SECTION 5: PROMO MESSAGE & BANNER -->
     <div class="setting-card">
         <div class="setting-card-header">
             <h5><i class="fas fa-bullhorn me-2 text-danger"></i> Sales Team Promo Message & Banner</h5>
@@ -429,11 +447,11 @@ if (!empty($qr)) {
         <div class="setting-card-body">
             <div id="promo-view" class="view-mode row">
                 <div class="col-md-12">
-                    <span class="label">Banner Heading (जो इमेज के बीच में दिखेगा)</span>
+                    <span class="label">Banner Heading</span>
                     <div class="value"><?= htmlspecialchars($settings['promo_banner_title'] ?: 'Not Set') ?></div>
                 </div>
                 <div class="col-md-12 mt-3">
-                    <span class="label">Message Template (WhatsApp और Email के लिए)</span>
+                    <span class="label">Message Template</span>
                     <div class="value" style="white-space: pre-wrap; background:#f8fafc; padding:15px; border-radius:8px; font-size:0.9rem;"><?= htmlspecialchars($settings['promo_message_template'] ?: 'Not Set') ?></div>
                 </div>
             </div>
@@ -465,6 +483,99 @@ if (!empty($qr)) {
                     <div class="mt-3">
                         <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-save me-1"></i> Save Promo Settings</button>
                         <button type="button" class="btn btn-secondary btn-sm" onclick="cancelEdit('promo')">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🔥 SECTION 6: EMAIL NOTIFICATION SETTINGS -->
+    <div class="setting-card">
+        <div class="setting-card-header">
+            <h5><i class="fas fa-envelope me-2 text-primary"></i> Email Notification Settings</h5>
+            <button class="btn btn-sm btn-outline-primary btn-xs" onclick="toggleEdit('email')"><i class="fas fa-edit me-1"></i> Edit</button>
+        </div>
+        <div class="setting-card-body">
+            <div id="email-view" class="view-mode">
+                <div class="alert alert-info py-2 mb-0" style="font-size:0.85rem;">यहाँ से आप चुन सकते हैं कि किस-किस घटना पर ग्राहक को ईमेल जाए।</div>
+            </div>
+
+            <div id="email-edit" class="edit-mode">
+                <form method="POST">
+                    <input type="hidden" name="action" value="save_email_settings">
+                    <div class="row g-3">
+                        
+                        <!-- Toggles -->
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="email_on_registration" value="1" <?= ($settings['email_on_registration'] ?? '0') == '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold">Welcome Email (Registration)</label>
+                            </div>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="email_on_downline_reg" value="1" <?= ($settings['email_on_downline_reg'] ?? '0') == '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold">Downline Registered (Team Alert)</label>
+                            </div>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="email_on_daily_props" value="1" <?= ($settings['email_on_daily_props'] ?? '0') == '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold">Daily New Properties</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="email_on_payout_req" value="1" <?= ($settings['email_on_payout_req'] ?? '0') == '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold">Payout Request (To Admin)</label>
+                            </div>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="email_on_payout_approved" value="1" <?= ($settings['email_on_payout_approved'] ?? '0') == '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold">Payout Approved (To User)</label>
+                            </div>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="email_on_package_buy" value="1" <?= ($settings['email_on_package_buy'] ?? '0') == '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold">Package Purchased (To User)</label>
+                            </div>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="email_on_package_expired" value="1" <?= ($settings['email_on_package_expired'] ?? '0') == '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold">Package Expired (To User)</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <label class="fw-bold text-primary small mb-2 d-block">Edit Email Templates</label>
+                            
+                            <!-- Registration Email -->
+                            <div class="mb-3 p-3 bg-white rounded border">
+                                <label class="small fw-bold text-dark">Registration Email Body (Placeholder: {name}, {email}, {password})</label>
+                                <textarea name="tpl_registration_body" class="form-control" rows="3"><?= htmlspecialchars($settings['tpl_registration_body'] ?? '') ?></textarea>
+                            </div>
+
+                            <!-- Downline Email -->
+                            <div class="mb-3 p-3 bg-white rounded border">
+                                <label class="small fw-bold text-dark">Downline Email Body (Placeholder: {sponsor_name}, {downline_name}, {downline_email})</label>
+                                <textarea name="tpl_downline_reg_body" class="form-control" rows="3"><?= htmlspecialchars($settings['tpl_downline_reg_body'] ?? '') ?></textarea>
+                            </div>
+
+                            <!-- Daily Props Email -->
+                            <div class="mb-3 p-3 bg-white rounded border">
+                                <label class="small fw-bold text-dark">Daily Properties Email Body (Placeholder: {name}, {date}, {property_list})</label>
+                                <textarea name="tpl_daily_props_body" class="form-control" rows="3"><?= htmlspecialchars($settings['tpl_daily_props_body'] ?? '') ?></textarea>
+                            </div>
+
+                            <!-- Payout Approved Email -->
+                            <div class="mb-3 p-3 bg-white rounded border">
+                                <label class="small fw-bold text-dark">Payout Approved Email Body (Placeholder: {name}, {amount})</label>
+                                <textarea name="tpl_payout_approved_body" class="form-control" rows="3"><?= htmlspecialchars($settings['tpl_payout_approved_body'] ?? '') ?></textarea>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mt-3">
+                            <label class="fw-bold small text-danger">Verify Password *</label>
+                            <input type="password" name="admin_password" class="form-control" placeholder="Enter admin password" required>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i> Save Email Settings</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelEdit('email')">Cancel</button>
                     </div>
                 </form>
             </div>
