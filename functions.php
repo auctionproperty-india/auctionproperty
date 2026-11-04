@@ -425,9 +425,56 @@ if (!function_exists('sendEmailViaBrevo')) {
     }
 }
 
-// Old fallback (kept for compatibility, though we won't use it)
+// Old fallback (kept for compatibility)
 function sendEmailSMTP($to, $subject, $body, $from_email = null, $from_name = null) {
     return sendEmailViaBrevo($to, $subject, $body, $from_email, $from_name);
+}
+
+// ============================================================
+// 📧 CENTRAL EMAIL TRIGGER SYSTEM (Dynamic & Editable)
+// ============================================================
+if (!function_exists('sendSystemEmail')) {
+    function sendSystemEmail($event_type, $to_email, $data = []) {
+        global $pdo;
+
+        // 1. Check if Admin has enabled this email
+        $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
+        $stmt->execute(["email_on_{$event_type}"]);
+        if ($stmt->fetchColumn() !== '1') return false; // Agar OFF hai to return kar do
+
+        // 2. Fetch Subject & Body Template
+        $stmt = $pdo->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN (?, ?)");
+        $stmt->execute(["tpl_{$event_type}_subject", "tpl_{$event_type}_body"]);
+        $tpl = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+        $subject = $tpl["tpl_{$event_type}_subject"] ?? "Notification from Prime Property";
+        $body = $tpl["tpl_{$event_type}_body"] ?? "You have a new notification.";
+
+        // 3. Replace Placeholders (e.g. {name} -> Amit)
+        foreach ($data as $key => $value) {
+            $subject = str_replace("{{$key}}", $value, $subject);
+            $body = str_replace("{{$key}}", $value, $body);
+        }
+
+        // 4. Wrap in a beautiful HTML Container
+        $html_body = "
+        <div style='font-family: Arial, sans-serif; background: #f4f7fc; padding: 20px;'>
+            <div style='max-width: 600px; margin: 0 auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);'>
+                <div style='background: #0f172a; padding: 20px; text-align: center;'>
+                    <h2 style='color: #fbbf24; margin: 0;'>PRIME PROPERTY INDIA</h2>
+                </div>
+                <div style='padding: 30px; color: #334155; line-height: 1.6;'>
+                    {$body}
+                </div>
+                <div style='background: #f8fafc; padding: 15px; text-align: center; border-top: 1px solid #e2e8f0;'>
+                    <p style='margin: 0; color: #94a3b8; font-size: 12px;'>&copy; " . date('Y') . " Prime Property India.</p>
+                </div>
+            </div>
+        </div>";
+
+        // 5. Send via Brevo
+        return sendEmailViaBrevo($to_email, $subject, $html_body);
+    }
 }
 
 // ===== 🔄 DAILY SPIN SYSTEM =====
@@ -738,7 +785,6 @@ if (!function_exists('uploadAnyFile')) {
     }
 }
 
-// Backward-compat wrappers (old code uses these)
 if (!function_exists('uploadToSupabase')) {
     function uploadToSupabase($file, $folder = 'slip', $bucket_name = null) {
         $url = uploadFileToCloud($file, $folder);
@@ -795,7 +841,6 @@ if (!function_exists('cloudFileExists')) {
     }
 }
 
-// Legacy local upload (kept for backward compatibility)
 if (!function_exists('uploadFile')) {
     function uploadFile($file, $target_dir = 'uploads/') {
         if (!is_dir($target_dir)) mkdir($target_dir, 0777, true);
@@ -808,7 +853,6 @@ if (!function_exists('uploadFile')) {
     }
 }
 
-// ---- Safe Date Formatter ----
 if (!function_exists('safeDateFormat')) {
     function safeDateFormat($dateStr) {
         if (empty($dateStr) || strtotime($dateStr) === false) {
