@@ -162,6 +162,7 @@ function addAccountEntry($pdo, $type, $amount, $description, $category, $entry_d
     );
     return $pdo->exec($sql) !== false;
 }
+
 function getAccountBalance($pdo) {
     $income = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM account_entries WHERE type = 'income'")->fetchColumn();
     $expense = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM account_entries WHERE type = 'expense'")->fetchColumn();
@@ -178,6 +179,7 @@ function getUserWalletBalance($pdo, $user_id) {
     $stmt->execute([$user_id]);
     return (float) $stmt->fetchColumn();
 }
+
 function creditWallet($pdo, $user_id, $amount, $description, $reference_id = null, $batch_id = null) {
     if($amount <= 0) return false;
     $stmt = $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?");
@@ -185,6 +187,7 @@ function creditWallet($pdo, $user_id, $amount, $description, $reference_id = nul
     $stmt = $pdo->prepare("INSERT INTO wallet_transactions (user_id, amount, type, description, reference_id, batch_id) VALUES (?, ?, 'credit', ?, ?, ?)");
     return $stmt->execute([$user_id, $amount, $description, $reference_id, $batch_id]);
 }
+
 function debitWallet($pdo, $user_id, $amount, $description, $reference_id = null) {
     if($amount <= 0) return false;
     $balance = getUserWalletBalance($pdo, $user_id);
@@ -377,58 +380,54 @@ function saveImage($img) {
     return $path;
 }
 
-// ---- Email ----
-if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-} elseif (file_exists(__DIR__ . '/vendor/phpmailer/PHPMailer.php')) {
-    require_once __DIR__ . '/vendor/phpmailer/PHPMailer.php';
-    require_once __DIR__ . '/vendor/phpmailer/SMTP.php';
-    require_once __DIR__ . '/vendor/phpmailer/Exception.php';
-}
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-function sendEmailSMTP($to, $subject, $body, $from_email = null, $from_name = null) {
-    if (class_exists('PHPMailer\PHPMailer\PHPMailer')) {
-        if (!$from_email) $from_email = getenv('SMTP_FROM_EMAIL') ?: 'noreply@yourdomain.com';
-        if (!$from_name) $from_name = getenv('SMTP_FROM_NAME') ?: 'Prime Property';
-        $mail = new PHPMailer(true);
-        try {
-            $mail->isSMTP();
-            $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.sendgrid.net';
-            $mail->SMTPAuth   = true;
-            $mail->Username   = getenv('SMTP_USERNAME');
-            $mail->Password   = getenv('SMTP_PASSWORD');
-            $mail->SMTPSecure = getenv('SMTP_SECURE') ?: 'tls';
-            $mail->Port       = getenv('SMTP_PORT') ?: 587;
-            $mail->setFrom($from_email, $from_name);
-            $mail->addAddress($to);
-            $mail->isHTML(true);
-            $mail->Subject = $subject;
-            $mail->Body    = $body;
-            $mail->send();
-            return true;
-        } catch (Exception $e) {
-            error_log("SMTP send failed: " . $mail->ErrorInfo);
-            return sendMailFallback($to, $subject, $body, $from_email, $from_name);
+// ============================================================
+// 📧 SEND EMAIL VIA BREVO HTTP API (Bypasses SMTP Block)
+// ============================================================
+if (!function_exists('sendEmailViaBrevo')) {
+    function sendEmailViaBrevo($to, $subject, $body, $from_email = null, $from_name = null) {
+        $api_key = getenv('BREVO_API_KEY') ?: '';
+        if (empty($api_key)) {
+            error_log("Brevo API Key missing");
+            return false;
         }
-    } else {
-        return sendMailFallback($to, $subject, $body, $from_email, $from_name);
+
+        if (!$from_email) $from_email = getenv('SMTP_FROM_EMAIL') ?: 'backoffice.primepropertyindia@gmail.com';
+        if (!$from_name) $from_name = getenv('SMTP_FROM_NAME') ?: 'Prime Property India';
+
+        $data = [
+            "sender" => ["name" => $from_name, "email" => $from_email],
+            "to" => [["email" => $to]],
+            "subject" => $subject,
+            "htmlContent" => $body
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://api.brevo.com/v3/smtp/email');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'accept: application/json',
+            'api-key: ' . $api_key,
+            'content-type: application/json'
+        ]);
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http_code === 201 || $http_code === 200) {
+            return true;
+        } else {
+            error_log("Brevo API Error: HTTP $http_code - $response");
+            return false;
+        }
     }
 }
 
-function sendMailFallback($to, $subject, $body, $from_email = null, $from_name = null) {
-    if (!$from_email) $from_email = 'noreply@' . $_SERVER['HTTP_HOST'];
-    if (!$from_name) $from_name = 'Prime Property';
-    $headers = "MIME-Version: 1.0" . "\r\n";
-    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-    $headers .= "From: $from_name <$from_email>" . "\r\n";
-    return mail($to, $subject, $body, $headers);
-}
-
-function sendNewPropertyNotification($pdo, $property_id, $source = 'auction') {
-    return true;
+// Old fallback (kept for compatibility, though we won't use it)
+function sendEmailSMTP($to, $subject, $body, $from_email = null, $from_name = null) {
+    return sendEmailViaBrevo($to, $subject, $body, $from_email, $from_name);
 }
 
 // ===== 🔄 DAILY SPIN SYSTEM =====
@@ -438,6 +437,7 @@ function getCurrentSlot() {
     if ($hour >= 8 && $hour < 14) return 2;
     return 3;
 }
+
 function getSlotTimeRange($slot) {
     switch($slot) {
         case 1: return '12 AM – 8 AM';
@@ -446,6 +446,7 @@ function getSlotTimeRange($slot) {
         default: return 'Unknown';
     }
 }
+
 function getUserSpinData($pdo, $user_id, $slot = null) {
     if ($slot === null) $slot = getCurrentSlot();
     $today = date('Y-m-d');
@@ -465,12 +466,14 @@ function getUserSpinData($pdo, $user_id, $slot = null) {
         'id' => $data['id']
     ];
 }
+
 function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
     $sql = "SELECT id, title, price, city, image_url, bank_name, type, auction_date 
             FROM properties 
             WHERE status = 'available' 
             AND auction_date IS NOT NULL 
             AND auction_date >= CURRENT_DATE"; 
+
     if ($type) {
         if ($type == 'car') {
             $sql .= " AND (type ILIKE '%Car%' OR type ILIKE '%Vehicle%')";
@@ -514,11 +517,13 @@ function getRandomLowPriceProperty($pdo, $exclude_ids = [], $type = null) {
     }
     return $available[array_rand($available)];
 }
+
 function getSpinCoinSettings($pdo) {
     $min = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='spin_min_coins'")->fetchColumn();
     $max = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='spin_max_coins'")->fetchColumn();
     return ['min' => (float)$min ?: 3, 'max' => (float)$max ?: 7];
 }
+
 function performSpin($pdo, $user_id) {
     $today = date('Y-m-d');
     $slot = getCurrentSlot();
@@ -539,26 +544,33 @@ function performSpin($pdo, $user_id) {
     if ($spins_used >= 5) {
         return ['success' => false, 'message' => 'You have already used all spins for this slot.'];
     }
+
     $coin_settings = getSpinCoinSettings($pdo);
     $min_coin = $coin_settings['min'];
     $max_coin = $coin_settings['max'];
     $cap_per_slot = 22;
+
     $coin_amount = rand((int)$min_coin, (int)$max_coin);
     if ($coins_earned + $coin_amount > $cap_per_slot) {
         $coin_amount = $cap_per_slot - $coins_earned;
         if ($coin_amount < 1) $coin_amount = 0;
     }
+
     $new_spins = $spins_used + 1;
     $new_coins_earned = $coins_earned + $coin_amount;
+
     $stmt = $pdo->prepare("UPDATE user_spins SET spins_used = ?, coins_earned = ?, last_spin_at = CURRENT_TIMESTAMP WHERE user_id = ? AND slot_date = ? AND slot_number = ?");
     $stmt->execute([$new_spins, $new_coins_earned, $user_id, $today, $slot]);
+
     if ($coin_amount > 0) {
         $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$coin_amount, $user_id]);
     }
+
     $is_reward = ($new_spins == 5);
     if ($is_reward) {
         $pdo->prepare("UPDATE user_spins SET reward_given = TRUE WHERE user_id = ? AND slot_date = ? AND slot_number = ?")->execute([$user_id, $today, $slot]);
     }
+
     $show_property = true;
     if ($show_property) {
         if (!isset($_SESSION['shown_properties'])) {
@@ -606,8 +618,10 @@ function performSpin($pdo, $user_id) {
             'total_coins_earned' => $new_coins_earned
         ];
     }
+
     return $response;
 }
+
 function getSlotStatus($pdo, $user_id, $slot) {
     $data = getUserSpinData($pdo, $user_id, $slot);
     $spins = $data['spins_used'];
