@@ -13,7 +13,122 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 
 $user_id = $_SESSION['user_id'];
 include 'header.php'; 
+?>
 
+<!-- ============================================================ -->
+<!-- 🔥 HIDDEN PROFESSIONAL BANNER & JAVASCRIPT (Loaded on both views) -->
+<!-- ============================================================ -->
+<div id="share-banner" style="position:absolute; left:-9999px; top:0; width:1080px; height:1080px; background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; font-family:'Poppins', sans-serif; padding: 60px; box-sizing: border-box; border: 10px solid #fbbf24;">
+    <div style="font-family: 'Montserrat', sans-serif; font-size: 65px; font-weight: 900; color: #fbbf24; line-height: 1.1; text-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        PRIME PROPERTY<br>INDIA
+    </div>
+    <p style="font-size: 24px; color: #cbd5e1; margin-top: 15px; margin-bottom: 50px; letter-spacing: 3px;">YOUR TRUSTED AUCTION PARTNER</p>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 30px; padding: 50px 40px; border: 2px solid rgba(251,191,36,0.3); width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+        <h1 style="font-size: 55px; margin-bottom: 20px; color: white;">Welcome to Our Family! 🙏</h1>
+        <p style="font-size: 32px; color: #e2e8f0; margin-bottom: 40px; line-height: 1.4;">
+            Explore Premium <b>Bank Auction</b> Properties & <b>Exchange</b> Your Property.
+        </p>
+        <div style="display: flex; justify-content: center; gap: 60px; margin-top: 40px;">
+            <div style="text-align: center;">
+                <div style="background: #fbbf24; color: #0f172a; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 45px; margin: 0 auto 15px auto;"><i class="fas fa-university"></i></div>
+                <p style="font-size: 24px; font-weight: bold; color: #f8fafc;">Bank Auctions</p>
+            </div>
+            <div style="text-align: center;">
+                <div style="background: #fbbf24; color: #0f172a; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 45px; margin: 0 auto 15px auto;"><i class="fas fa-exchange-alt"></i></div>
+                <p style="font-size: 24px; font-weight: bold; color: #f8fafc;">Exchange Property</p>
+            </div>
+        </div>
+    </div>
+    <p style="font-size: 30px; color: #fbbf24; margin-top: 60px; font-weight: bold;">🌐 www.primepropertyindia.onrender.com</p>
+</div>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<script>
+async function shareProfile(btnElement) {
+    const btnData = JSON.parse(btnElement.getAttribute('data-json'));
+    const phone = btnData.phone;
+    const text = btnData.msg;
+    const encodedText = encodeURIComponent(text);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
+    const banner = document.getElementById('share-banner');
+
+    const originalBtnHTML = btnElement.innerHTML;
+    btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btnElement.style.pointerEvents = 'none';
+
+    // 🔥 DESKTOP FIX: Open blank window synchronously
+    let waWindow = null;
+    if (!isMobile) {
+        waWindow = window.open('about:blank', '_blank');
+        if (waWindow) {
+            waWindow.document.write("<h2 style='text-align:center; margin-top:50px; font-family:sans-serif; color:#2563eb;'>⏳ Generating Banner...<br><br><small style='color:#64748b;'>Please wait, redirecting to WhatsApp.</small></h2>");
+        }
+    }
+
+    banner.style.left = '0';
+    banner.style.top = '0';
+    banner.style.zIndex = '-1';
+
+    try {
+        const canvas = await html2canvas(banner, { scale: 1, useCORS: true, backgroundColor: '#0f172a', logging: false });
+        banner.style.left = '-9999px';
+
+        canvas.toBlob(async function(blob) {
+            const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
+
+            if (isMobile) {
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({ files: [file], title: 'Prime Property India', text: text });
+                        btnElement.innerHTML = '<i class="fas fa-check"></i> Shared';
+                    } catch (err) {
+                        window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+                    }
+                } else {
+                    window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+                }
+                setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.style.pointerEvents = 'auto'; }, 2000);
+                return;
+            }
+
+            // 💻 DESKTOP LOGIC
+            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+            
+            try {
+                // Try to Copy to Clipboard
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                btnElement.innerHTML = '<i class="fas fa-check"></i> Copied';
+            } catch (err) {
+                // 🔥 Fallback: If clipboard is blocked, force download
+                const link = document.createElement('a');
+                link.download = 'PrimeProperty_Banner.png';
+                link.href = URL.createObjectURL(blob);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                btnElement.innerHTML = '<i class="fas fa-download"></i> Downloaded';
+            }
+            
+            // Open WhatsApp
+            if (waWindow) waWindow.location.href = waUrl;
+            else window.open(waUrl, '_blank');
+            
+            setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.style.pointerEvents = 'auto'; }, 3000);
+        }, 'image/png');
+    } catch (err) {
+        banner.style.left = '-9999px';
+        if (waWindow) waWindow.close();
+        alert("Error creating banner.");
+        btnElement.innerHTML = originalBtnHTML;
+        btnElement.style.pointerEvents = 'auto';
+    }
+}
+</script>
+<!-- ============================================================ -->
+
+
+<?php
 // ============================================================
 // 🏙️ SMART CITY NORMALIZATION
 // ============================================================
@@ -138,18 +253,13 @@ function getWhatsAppData($member) {
     
     $msg = "नमस्ते *{$name}* जी 🙏,\n\n";
     $msg .= "Prime Property परिवार में आपका स्वागत है! आपने *{$reg_date}* को हमारे पोर्टल से जुड़कर हमें अपना भरोसा दिया, इसके लिए धन्यवाद।\n\n";
-    
     $msg .= "🔑 *आपकी लॉगिन आईडी (Email):* {$email}\n";
     $msg .= "कृपया अपना पासवर्ड डालकर हमारे पोर्टल पर लॉगिन करें।\n\n";
-    
     $msg .= "🚀 *नया अपडेट:* हमारे पोर्टल पर अब *बैंक ऑक्शन* के साथ-साथ *Exchange Property* (प्रॉपर्टी एक्सचेंज) का ऑप्शन भी जुड़ चुका है! आप अपनी वर्तमान प्रॉपर्टी को एक्सचेंज भी कर सकते हैं।\n\n";
-    
     $msg .= "🏦 बैंक ऑक्शन के जरिए हम आपको बाजार मूल्य से काफी कम कीमत पर सुरक्षित प्रॉपर्टी खरीदने का शानदार अवसर प्रदान करते हैं।\n\n";
-    
     $msg .= "अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
     $msg .= "🌐 *वेबसाइट:* {$site_url}\n\n";
     $msg .= "🤝 कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक इस मैसेज का रिप्लाई करें।\n\n";
-    
     $msg .= "*Team* 🏢\n";
     $msg .= "*Prime Property India* 🇮🇳✨";
 
@@ -166,18 +276,13 @@ function generateEmailLink($member) {
     $subject = "Prime Property - आपकी लॉगिन डिटेल्स और नए अपडेट्स";
     $body = "नमस्ते {$name} जी,\n\n";
     $body .= "Prime Property परिवार में आपका स्वागत है! आपने {$reg_date} को हमारे पोर्टल से जुड़कर हमें अपना भरोसा दिया, इसके लिए धन्यवाद।\n\n";
-    
     $body .= "आपकी लॉगिन आईडी (Email): {$email}\n";
     $body .= "कृपया अपना पासवर्ड डालकर हमारे पोर्टल पर लॉगिन करें।\n\n";
-    
     $body .= "नया अपडेट: हमारे पोर्टल पर अब बैंक ऑक्शन के साथ-साथ Exchange Property (प्रॉपर्टी एक्सचेंज) का ऑप्शन भी जुड़ चुका है! आप अपनी वर्तमान प्रॉपर्टी को एक्सचेंज भी कर सकते हैं।\n\n";
-    
     $body .= "बैंक ऑक्शन के जरिए हम आपको बाजार मूल्य से काफी कम कीमत पर सुरक्षित प्रॉपर्टी खरीदने का शानदार अवसर प्रदान करते हैं।\n\n";
-    
     $body .= "अपनी पसंद और बजट के अनुसार सबसे बेहतरीन प्रॉपर्टीज़ देखने के लिए नीचे दी गई लिंक पर क्लिक करें:\n\n";
     $body .= "वेबसाइट: {$site_url}\n\n";
     $body .= "कोई भी सवाल हो या साइट विजिट करना चाहें, तो बेझिझक हमें रिप्लाई करें।\n\n";
-    
     $body .= "Team\n";
     $body .= "Prime Property India";
     
@@ -222,8 +327,9 @@ function renderTree($nodes, $level = 0) {
         
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
-            // 🔥 FIX: Using htmlspecialchars with ENT_QUOTES directly in data-msg without urlencode
-            $html .= '<button type="button" data-phone="'.$wa_data['phone'].'" data-msg="'.htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8').'" onclick="shareProfile(this)" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
+            // 🔥 Using JSON to safely pass data
+            $btn_json = htmlspecialchars(json_encode($wa_data), ENT_QUOTES, 'UTF-8');
+            $html .= '<button type="button" data-json="'.$btn_json.'" onclick="shareProfile(this)" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
         }
         if($email_link) {
             $html .= '<a href="'.$email_link.'" target="_blank" class="btn btn-primary btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Send Email"><i class="fas fa-envelope"></i></a>';
@@ -242,7 +348,7 @@ function renderTree($nodes, $level = 0) {
 }
 
 // ============================================================
-// 🏙️ CITY DETAIL VIEW (if city parameter is set)
+// 🏙️ CITY DETAIL VIEW
 // ============================================================
 $selected_city = isset($_GET['city']) ? trim($_GET['city']) : '';
 if (!empty($selected_city)) {
@@ -317,9 +423,10 @@ if (!empty($selected_city)) {
                                 <td><?= safeDateFormat($m['created_at']) ?></td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <?php if($wa_data): ?>
-                                            <!-- 🔥 FIX: Same escaping here as well -->
-                                            <button type="button" data-phone="<?= $wa_data['phone'] ?>" data-msg="<?= htmlspecialchars($wa_data['msg'], ENT_QUOTES, 'UTF-8') ?>" onclick="shareProfile(this)" class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
+                                        <?php if($wa_data): 
+                                            $btn_json = htmlspecialchars(json_encode($wa_data), ENT_QUOTES, 'UTF-8');
+                                        ?>
+                                            <button type="button" data-json="<?= $btn_json ?>" onclick="shareProfile(this)" class="btn btn-success btn-sm" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>
                                         <?php endif; ?>
                                         <?php if($email_link): ?>
                                             <a href="<?= $email_link ?>" target="_blank" class="btn btn-primary btn-sm" title="Send Email"><i class="fas fa-envelope"></i></a>
@@ -407,158 +514,7 @@ if (!empty($selected_city)) {
     </div>
 </div>
 
-<!-- ============================================================ -->
-<!-- 🔥 HIDDEN PROFESSIONAL BANNER TEMPLATE (For Share) -->
-<!-- ============================================================ -->
-<div id="share-banner" style="position:absolute; left:-9999px; top:0; width:1080px; height:1080px; background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; font-family:'Poppins', sans-serif; padding: 60px; box-sizing: border-box; border: 10px solid #fbbf24;">
-    
-    <!-- Logo & Title -->
-    <div style="font-family: 'Montserrat', sans-serif; font-size: 65px; font-weight: 900; color: #fbbf24; line-height: 1.1; text-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-        PRIME PROPERTY<br>INDIA
-    </div>
-    <p style="font-size: 24px; color: #cbd5e1; margin-top: 15px; margin-bottom: 50px; letter-spacing: 3px;">YOUR TRUSTED AUCTION PARTNER</p>
-
-    <!-- Main Content Box -->
-    <div style="background: rgba(255,255,255,0.05); border-radius: 30px; padding: 50px 40px; border: 2px solid rgba(251,191,36,0.3); width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-        <h1 style="font-size: 55px; margin-bottom: 20px; color: white;">Welcome to Our Family! 🙏</h1>
-        
-        <p style="font-size: 32px; color: #e2e8f0; margin-bottom: 40px; line-height: 1.4;">
-            Explore Premium <b>Bank Auction</b> Properties & <b>Exchange</b> Your Property.
-        </p>
-        
-        <div style="display: flex; justify-content: center; gap: 60px; margin-top: 40px;">
-            <div style="text-align: center;">
-                <div style="background: #fbbf24; color: #0f172a; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 45px; margin: 0 auto 15px auto;">
-                    <i class="fas fa-university"></i>
-                </div>
-                <p style="font-size: 24px; font-weight: bold; color: #f8fafc;">Bank Auctions</p>
-            </div>
-            <div style="text-align: center;">
-                <div style="background: #fbbf24; color: #0f172a; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 45px; margin: 0 auto 15px auto;">
-                    <i class="fas fa-exchange-alt"></i>
-                </div>
-                <p style="font-size: 24px; font-weight: bold; color: #f8fafc;">Exchange Property</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <p style="font-size: 30px; color: #fbbf24; margin-top: 60px; font-weight: bold;">
-        🌐 www.primepropertyindia.onrender.com
-    </p>
-</div>
-
-<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
-// 🔥 SMART SHARE FUNCTION (Image + Text)
-async function shareProfile(btnElement) {
-    // Read data from attributes. Because we used htmlspecialchars in PHP,
-    // getAttribute will return the exact string with spaces and newlines!
-    const phone = btnElement.getAttribute('data-phone');
-    const text = btnElement.getAttribute('data-msg'); 
-    
-    const banner = document.getElementById('share-banner');
-    const encodedText = encodeURIComponent(text);
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
-
-    // Button Loading State
-    const originalBtnHTML = btnElement.innerHTML;
-    btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wait...';
-    btnElement.disabled = true;
-    btnElement.style.pointerEvents = 'none';
-
-    // 🔥 DESKTOP FIX: Open blank window synchronously
-    let waWindow = null;
-    if (!isMobile) {
-        waWindow = window.open('about:blank', '_blank');
-        if (waWindow) {
-            waWindow.document.write("<h2 style='text-align:center; margin-top:50px; font-family:sans-serif; color:#2563eb;'>⏳ Generating Banner...<br><br><small style='color:#64748b;'>Please wait, you will be redirected to WhatsApp shortly.</small></h2>");
-        }
-    }
-
-    // Show banner for capture
-    banner.style.left = '0';
-    banner.style.top = '0';
-    banner.style.zIndex = '-1';
-
-    try {
-        const canvas = await html2canvas(banner, {
-            scale: 1,
-            useCORS: true,
-            backgroundColor: '#0f172a',
-            logging: false
-        });
-        banner.style.left = '-9999px';
-
-        canvas.toBlob(async function(blob) {
-            const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
-
-            // ==========================================
-            // 📱 MOBILE LOGIC
-            // ==========================================
-            if (isMobile) {
-                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try {
-                        await navigator.share({
-                            files: [file],
-                            title: 'Prime Property India',
-                            text: text
-                        });
-                        btnElement.innerHTML = '<i class="fas fa-check"></i> Shared';
-                    } catch (err) {
-                        console.log("Share cancelled/failed", err);
-                        // Fallback: Direct app open (text only)
-                        window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-                        btnElement.innerHTML = originalBtnHTML;
-                    }
-                } else {
-                    // Fallback: Direct app open (text only)
-                    window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-                    btnElement.innerHTML = originalBtnHTML;
-                }
-                setTimeout(() => { btnElement.style.pointerEvents = 'auto'; }, 2000);
-                return;
-            }
-
-            // ==========================================
-            // 💻 DESKTOP LOGIC
-            // ==========================================
-            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
-            
-            try {
-                // Copy to clipboard
-                const item = new ClipboardItem({ 'image/png': blob });
-                await navigator.clipboard.write([item]);
-                btnElement.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                
-                // Redirect to WhatsApp
-                if (waWindow) {
-                    waWindow.location.href = waUrl;
-                } else {
-                    window.open(waUrl, '_blank');
-                }
-                
-                alert("✅ Banner Copied to Clipboard!\n\nWhatsApp Web is opening. Please press Ctrl+V inside the chat box to paste the banner.");
-            } catch (err) {
-                // Fallback if clipboard fails
-                btnElement.innerHTML = '<i class="fas fa-times"></i> Blocked';
-                if (waWindow) waWindow.close();
-                alert("Your browser blocked automatic image copying.\n\nPlease take a screenshot of the banner or download it manually.");
-            }
-            
-            setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.disabled = false; btnElement.style.pointerEvents = 'auto'; }, 3000);
-
-        }, 'image/png');
-    } catch (err) {
-        banner.style.left = '-9999px';
-        if (waWindow) waWindow.close();
-        btnElement.innerHTML = originalBtnHTML;
-        btnElement.disabled = false;
-        btnElement.style.pointerEvents = 'auto';
-        alert("Error creating banner. Please try again.");
-    }
-}
-
 function filterTeam(searchText) {
     const query = searchText.toLowerCase().trim();
     const items = document.querySelectorAll('#teamTree li');
