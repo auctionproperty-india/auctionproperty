@@ -16,30 +16,71 @@ include 'header.php';
 ?>
 
 <!-- ============================================================ -->
-<!-- 🔥 HIDDEN PROFESSIONAL BANNER & JAVASCRIPT (Loaded on both views) -->
+<!-- 🔥 LUXURY PROFESSIONAL BANNER (Dynamic Name Included) -->
 <!-- ============================================================ -->
-<div id="share-banner" style="position:absolute; left:-9999px; top:0; width:1080px; height:1080px; background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; font-family:'Poppins', sans-serif; padding: 60px; box-sizing: border-box; border: 10px solid #fbbf24;">
-    <div style="font-family: 'Montserrat', sans-serif; font-size: 65px; font-weight: 900; color: #fbbf24; line-height: 1.1; text-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-        PRIME PROPERTY<br>INDIA
-    </div>
-    <p style="font-size: 24px; color: #cbd5e1; margin-top: 15px; margin-bottom: 50px; letter-spacing: 3px;">YOUR TRUSTED AUCTION PARTNER</p>
-    <div style="background: rgba(255,255,255,0.05); border-radius: 30px; padding: 50px 40px; border: 2px solid rgba(251,191,36,0.3); width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-        <h1 style="font-size: 55px; margin-bottom: 20px; color: white;">Welcome to Our Family! 🙏</h1>
-        <p style="font-size: 32px; color: #e2e8f0; margin-bottom: 40px; line-height: 1.4;">
-            Explore Premium <b>Bank Auction</b> Properties & <b>Exchange</b> Your Property.
-        </p>
-        <div style="display: flex; justify-content: center; gap: 60px; margin-top: 40px;">
-            <div style="text-align: center;">
-                <div style="background: #fbbf24; color: #0f172a; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 45px; margin: 0 auto 15px auto;"><i class="fas fa-university"></i></div>
-                <p style="font-size: 24px; font-weight: bold; color: #f8fafc;">Bank Auctions</p>
+<div id="share-banner" style="position:absolute; left:-9999px; top:0; width:1080px; height:1080px; background: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; font-family:'Poppins', sans-serif; box-sizing: border-box; border: 12px solid #d4af37; position: relative; overflow: hidden;">
+
+    <!-- Background Decorative Glow Elements -->
+    <div style="position: absolute; top: -100px; left: -100px; width: 300px; height: 300px; background: #d4af37; opacity: 0.1; border-radius: 50%; filter: blur(100px);"></div>
+    <div style="position: absolute; bottom: -100px; right: -100px; width: 400px; height: 400px; background: #d4af37; opacity: 0.1; border-radius: 50%; filter: blur(100px);"></div>
+
+    <!-- Inner Golden Frame -->
+    <div style="border: 1px solid rgba(212, 175, 55, 0.4); width: 94%; height: 94%; display: flex; flex-direction: column; justify-content: space-between; padding: 40px; box-sizing: border-box; position: relative; z-index: 10; border-radius: 10px;">
+
+        <!-- Top Logo Section -->
+        <div>
+            <h1 style="margin: 0; font-family: 'Montserrat', sans-serif; font-size: 60px; font-weight: 900; color: #d4af37; letter-spacing: 4px; text-transform: uppercase; text-shadow: 0 4px 20px rgba(212, 175, 55, 0.4);">
+                PRIME PROPERTY
+            </h1>
+            <h2 style="margin: 5px 0 0 0; font-family: 'Montserrat', sans-serif; font-size: 28px; font-weight: 600; color: #ffffff; letter-spacing: 10px; text-transform: uppercase;">
+                INDIA
+            </h2>
+            <p style="margin: 15px 0 0 0; font-size: 16px; color: #94a3b8; letter-spacing: 4px; text-transform: uppercase; font-weight: 400;">
+                Your Trusted Auction Partner
+            </p>
+        </div>
+
+        <!-- Center Glassmorphism Card -->
+        <div style="background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border-radius: 30px; padding: 50px 40px; border: 1px solid rgba(212, 175, 55, 0.3); box-shadow: 0 20px 40px rgba(0,0,0,0.5); width: 85%; margin: 0 auto;">
+            <p style="font-size: 26px; color: #d4af37; margin-bottom: 10px; font-weight: 500; letter-spacing: 2px;">Dear</p>
+            
+            <!-- 🔥 Dynamic Client Name Placeholder -->
+            <h2 id="banner-client-name" style="font-family: 'Times New Roman', serif; font-size: 55px; margin: 0 0 20px 0; color: #ffffff; font-weight: 700; line-height: 1.2; word-wrap: break-word; text-shadow: 0 2px 10px rgba(255,255,255,0.2);">
+                Client Name
+            </h2>
+            
+            <h3 style="font-size: 34px; color: #e2e8f0; font-weight: 300; margin-bottom: 30px; line-height: 1.4;">
+                Welcome to Our Family! 🙏
+            </h3>
+            <p style="font-size: 22px; color: #cbd5e1; font-weight: 400; margin: 0; line-height: 1.6;">
+                Explore Premium <span style="color: #d4af37; font-weight: 700;">Bank Auction</span> Properties<br>& <span style="color: #d4af37; font-weight: 700;">Exchange</span> Your Property.
+            </p>
+        </div>
+
+        <!-- Bottom Icons Section -->
+        <div style="display: flex; justify-content: center; align-items: center; gap: 80px;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                <div style="background: rgba(212, 175, 55, 0.1); border: 2px solid #d4af37; width: 85px; height: 85px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 35px; color: #d4af37; box-shadow: 0 0 25px rgba(212, 175, 55, 0.3);">
+                    <i class="fas fa-university"></i>
+                </div>
+                <p style="font-size: 20px; font-weight: 600; color: #ffffff; margin: 0; letter-spacing: 1px;">Bank Auctions</p>
             </div>
-            <div style="text-align: center;">
-                <div style="background: #fbbf24; color: #0f172a; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 45px; margin: 0 auto 15px auto;"><i class="fas fa-exchange-alt"></i></div>
-                <p style="font-size: 24px; font-weight: bold; color: #f8fafc;">Exchange Property</p>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                <div style="background: rgba(212, 175, 55, 0.1); border: 2px solid #d4af37; width: 85px; height: 85px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 35px; color: #d4af37; box-shadow: 0 0 25px rgba(212, 175, 55, 0.3);">
+                    <i class="fas fa-exchange-alt"></i>
+                </div>
+                <p style="font-size: 20px; font-weight: 600; color: #ffffff; margin: 0; letter-spacing: 1px;">Exchange Property</p>
             </div>
         </div>
+
+        <!-- Website Footer -->
+        <div style="margin-top: 10px;">
+            <p style="font-size: 22px; color: #94a3b8; margin: 0; letter-spacing: 2px; background: rgba(0,0,0,0.3); padding: 10px 30px; border-radius: 50px; display: inline-block; border: 1px solid rgba(255,255,255,0.1);">
+                <i class="fas fa-globe" style="color: #d4af37; margin-right: 10px;"></i>
+                www.primepropertyindia.onrender.com
+            </p>
+        </div>
     </div>
-    <p style="font-size: 30px; color: #fbbf24; margin-top: 60px; font-weight: bold;">🌐 www.primepropertyindia.onrender.com</p>
 </div>
 
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
@@ -48,20 +89,25 @@ async function shareProfile(btnElement) {
     const btnData = JSON.parse(btnElement.getAttribute('data-json'));
     const phone = btnData.phone;
     const text = btnData.msg;
-    const encodedText = encodeURIComponent(text);
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
-    const banner = document.getElementById('share-banner');
+    const clientName = btnData.name;
+    
+    // 🔥 Inject Client Name into the Luxury Banner
+    document.getElementById('banner-client-name').innerText = clientName;
 
+    const banner = document.getElementById('share-banner');
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
+
+    // Button Loading State
     const originalBtnHTML = btnElement.innerHTML;
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     btnElement.style.pointerEvents = 'none';
 
-    // 🔥 DESKTOP FIX: Open blank window synchronously
+    // Desktop Popup Blocker Fix
     let waWindow = null;
     if (!isMobile) {
         waWindow = window.open('about:blank', '_blank');
         if (waWindow) {
-            waWindow.document.write("<h2 style='text-align:center; margin-top:50px; font-family:sans-serif; color:#2563eb;'>⏳ Generating Banner...<br><br><small style='color:#64748b;'>Please wait, redirecting to WhatsApp.</small></h2>");
+            waWindow.document.write("<h2 style='text-align:center; margin-top:50px; font-family:sans-serif; color:#2563eb;'>⏳ Generating Banner...<br><br><small style='color:#64748b;'>Please wait.</small></h2>");
         }
     }
 
@@ -70,47 +116,53 @@ async function shareProfile(btnElement) {
     banner.style.zIndex = '-1';
 
     try {
-        const canvas = await html2canvas(banner, { scale: 1, useCORS: true, backgroundColor: '#0f172a', logging: false });
+        // Small delay to ensure the new name is rendered by the browser before taking screenshot
+        await new Promise(r => setTimeout(r, 100)); 
+        
+        const canvas = await html2canvas(banner, { scale: 1, useCORS: true, backgroundColor: '#020617', logging: false });
         banner.style.left = '-9999px';
 
         canvas.toBlob(async function(blob) {
             const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
 
+            // 📱 MOBILE LOGIC (Native Share)
             if (isMobile) {
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                     try {
-                        await navigator.share({ files: [file], title: 'Prime Property India', text: text });
-                        btnElement.innerHTML = '<i class="fas fa-check"></i> Shared';
+                        await navigator.share({
+                            files: [file],
+                            title: 'Prime Property India',
+                            text: text
+                        });
+                        btnElement.innerHTML = '<i class="fas fa-check"></i>';
                     } catch (err) {
-                        window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+                        btnElement.innerHTML = originalBtnHTML;
                     }
                 } else {
-                    window.location.href = `whatsapp://send?phone=${phone}&text=${encodedText}`;
+                    window.location.href = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(text)}`;
+                    btnElement.innerHTML = originalBtnHTML;
                 }
-                setTimeout(() => { btnElement.innerHTML = originalBtnHTML; btnElement.style.pointerEvents = 'auto'; }, 2000);
+                setTimeout(() => { btnElement.style.pointerEvents = 'auto'; }, 2000);
                 return;
             }
 
-            // 💻 DESKTOP LOGIC
-            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
+            // 💻 DESKTOP LOGIC (Copy to Clipboard + Web)
+            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`;
             
             try {
-                // Try to Copy to Clipboard
                 const item = new ClipboardItem({ 'image/png': blob });
                 await navigator.clipboard.write([item]);
-                btnElement.innerHTML = '<i class="fas fa-check"></i> Copied';
+                btnElement.innerHTML = '<i class="fas fa-check"></i>';
             } catch (err) {
-                // 🔥 Fallback: If clipboard is blocked, force download
                 const link = document.createElement('a');
                 link.download = 'PrimeProperty_Banner.png';
                 link.href = URL.createObjectURL(blob);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                btnElement.innerHTML = '<i class="fas fa-download"></i> Downloaded';
+                btnElement.innerHTML = '<i class="fas fa-download"></i>';
             }
             
-            // Open WhatsApp
             if (waWindow) waWindow.location.href = waUrl;
             else window.open(waUrl, '_blank');
             
@@ -119,7 +171,7 @@ async function shareProfile(btnElement) {
     } catch (err) {
         banner.style.left = '-9999px';
         if (waWindow) waWindow.close();
-        alert("Error creating banner.");
+        alert("Error creating banner. Please try again.");
         btnElement.innerHTML = originalBtnHTML;
         btnElement.style.pointerEvents = 'auto';
     }
@@ -127,12 +179,11 @@ async function shareProfile(btnElement) {
 </script>
 <!-- ============================================================ -->
 
-
 <?php
 // ============================================================
 // 🏙️ SMART CITY NORMALIZATION
 // ============================================================
-$known_cities = [
+$known_cities = [ 
     'indore', 'bhopal', 'agra', 'jaipur', 'gwalior', 'lucknow', 
     'uttar pradesh', 'nagpur', 'jodhpur', 'patiala', 'delhi',
     'new delhi', 'surat', 'hisar', 'karnal', 'bharatpur', 
@@ -263,7 +314,8 @@ function getWhatsAppData($member) {
     $msg .= "*Team* 🏢\n";
     $msg .= "*Prime Property India* 🇮🇳✨";
 
-    return ['phone' => $clean_phone, 'msg' => $msg];
+    // 🔥 Added 'name' here for the banner
+    return ['phone' => $clean_phone, 'msg' => $msg, 'name' => $member['name']];
 }
 
 function generateEmailLink($member) {
@@ -327,7 +379,6 @@ function renderTree($nodes, $level = 0) {
         
         $html .= '<div class="ms-auto d-flex gap-1">';
         if($wa_data) {
-            // 🔥 Using JSON to safely pass data
             $btn_json = htmlspecialchars(json_encode($wa_data), ENT_QUOTES, 'UTF-8');
             $html .= '<button type="button" data-json="'.$btn_json.'" onclick="shareProfile(this)" class="btn btn-success btn-sm" style="padding:2px 8px; font-size:0.75rem; border-radius:6px;" title="Share Profile"><i class="fas fa-share-alt"></i> Share</button>';
         }
