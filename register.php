@@ -123,8 +123,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             ";
 
-            // Send the email (using the function from functions.php)
-            sendEmailSMTP($email, $subject, $email_body);
+            // 🔥 CHANGED: sendEmailSMTP se sendEmailViaBrevo kiya gaya hai
+            sendEmailViaBrevo($email, $subject, $email_body);
 
             $success = 'Account created! Please check your email for login details.';
         }
