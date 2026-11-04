@@ -7,12 +7,6 @@ require_once __DIR__ . '/functions.php';
 
 date_default_timezone_set('Asia/Kolkata');
 
-// 🔥 Security: Is script ko direct browser se chalane se rokne ke liye (Optional)
-// Agar aap chahte hain ki koi is URL ko open na kar sake, toh token verify karein
-// if (!isset($_GET['token']) || $_GET['token'] !== 'MY_SECRET_CRON_TOKEN') {
-//     die("Unauthorized access.");
-// }
-
 echo "Starting daily email process...\n";
 
 // 1. Fetch properties added in last 24 hours
@@ -36,7 +30,7 @@ foreach ($new_properties as $prop) {
     $grouped_properties[$city][] = $prop;
 }
 
-// 3. Fetch all users (excluding admins maybe, or include all)
+// 3. Fetch all users
 $users_stmt = $pdo->query("SELECT name, email, city FROM users WHERE role = 'user' AND status = 'active'");
 $users = $users_stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -46,10 +40,6 @@ $sent_count = 0;
 foreach ($users as $user) {
     $user_city = ucwords(strtolower(trim($user['city'])));
     
-    // Optional: If you only want to send properties of the user's city, uncomment below
-    // if (!isset($grouped_properties[$user_city])) { continue; }
-    
-    // For now, we send all new properties (or grouped by city)
     $email_body = "
     <div style='font-family: Arial, sans-serif; background: #f4f7fc; padding: 20px;'>
         <div style='max-width: 650px; margin: 0 auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);'>
@@ -72,9 +62,7 @@ foreach ($users as $user) {
             $sqft = $prop['sqft'] ? $prop['sqft'] . ' Sq Ft' : 'N/A';
             $auction_date = !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A';
             
-            // 🔥 LINK TO PROPERTY (Change this URL to your actual property details page)
-            // Assuming you have a property view page like view_property.php?id=123
-            // If you use a popup, you might link to user_dashboard.php?property_id=123
+            // 🔥 LINK TO PROPERTY
             $prop_link = "https://primepropertyindia.onrender.com/user_dashboard.php?view=all&property_id=" . $prop['id'];
 
             $email_body .= "
@@ -108,8 +96,8 @@ foreach ($users as $user) {
 
     $subject = "New Auction Properties Added - " . date('d M Y');
     
-    // Send Email
-    if (sendEmailSMTP($user['email'], $subject, $email_body)) {
+    // 🔥 CHANGED: sendEmailSMTP se sendEmailViaBrevo kiya gaya hai
+    if (sendEmailViaBrevo($user['email'], $subject, $email_body)) {
         $sent_count++;
         echo "Email sent to: {$user['email']}\n";
     } else {
