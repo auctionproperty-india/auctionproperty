@@ -36,68 +36,29 @@ $users = $users_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $sent_count = 0;
 
-// 4. Loop through users and send email
-foreach ($users as $user) {
-    $user_city = ucwords(strtolower(trim($user['city'])));
-    
-    $email_body = "
-    <div style='font-family: Arial, sans-serif; background: #f4f7fc; padding: 20px;'>
-        <div style='max-width: 650px; margin: 0 auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);'>
-            
-            <div style='background: #007bff; padding: 20px; text-align: center;'>
-                <h2 style='color: #fff; margin: 0;'>FindAuction by Prime Property</h2>
-            </div>
-            
-            <div style='padding: 20px;'>
-                <h3 style='color: #0f172a; margin-top: 0;'>Hello {$user['name']},</h3>
-                <p style='color: #475569; font-size: 15px;'>Here are the latest auctions recently added. Check them out before they are gone!</p>
-    ";
-
-    // Loop through grouped properties
-    foreach ($grouped_properties as $city => $props) {
-        $email_body .= "<h4 style='color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-top: 25px;'>{$city} ({$user_city})</h4>";
-        
-        foreach ($props as $prop) {
-            $price = number_format($prop['price']);
-            $sqft = $prop['sqft'] ? $prop['sqft'] . ' Sq Ft' : 'N/A';
-            $auction_date = !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A';
-            
-            // 🔥 LINK TO PROPERTY
-            $prop_link = "https://primepropertyindia.onrender.com/user_dashboard.php?view=all&property_id=" . $prop['id'];
-
-            $email_body .= "
-                <div style='padding: 15px 0; border-bottom: 1px solid #f1f5f9;'>
-                    <h3 style='margin: 0 0 8px 0;'>
-                        <a href='{$prop_link}' style='color: #2563eb; text-decoration: none;'>{$prop['title']}</a>
-                    </h3>
-                    <p style='margin: 0 0 5px 0; color: #475569; font-size: 14px;'>
-                        <strong>Bank:</strong> {$prop['bank_name']}
-                    </p>
-                    <p style='margin: 0 0 5px 0; color: #10b981; font-weight: bold; font-size: 16px;'>
-                        ₹ {$price}
-                    </p>
-                    <p style='margin: 0 0 10px 0; color: #64748b; font-size: 13px;'>
-                        Auction Date: {$auction_date} | Area: {$sqft}
-                    </p>
-                    <a href='{$prop_link}' style='color: #007bff; text-decoration: underline; font-size: 14px;'>View More Details...</a>
-                </div>
-            ";
-        }
+// 4. Build property list HTML once
+$property_list_html = "";
+foreach ($grouped_properties as $city => $props) {
+    $property_list_html .= "<h3 style='color:#2563eb; border-bottom:1px solid #eee; padding-bottom:5px;'>{$city}</h3>";
+    foreach ($props as $prop) {
+        $prop_link = "https://primepropertyindia.onrender.com/user_dashboard.php?view=all&property_id=" . $prop['id'];
+        $property_list_html .= "<div style='margin-bottom:15px;'>
+            <a href='{$prop_link}' style='font-weight:bold; color:#0f172a; text-decoration:none;'>{$prop['title']}</a><br>
+            <span style='color:#10b981; font-weight:bold;'>₹" . number_format($prop['price']) . "</span> | 
+            <span style='color:#64748b; font-size:13px;'>Bank: {$prop['bank_name']}</span>
+        </div>";
     }
+}
 
-    $email_body .= "
-            </div>
-            <div style='background: #f8fafc; padding: 15px; text-align: center; color: #94a3b8; font-size: 12px;'>
-                &copy; " . date('Y') . " Prime Property India. All rights reserved.
-            </div>
-        </div>
-    </div>
-    ";
-
-    $subject = "New Auction Properties Added - " . date('d M Y');
+// 5. Loop through users and send email
+foreach ($users as $user) {
+    $sent = sendSystemEmail('daily_props', $user['email'], [
+        'name' => $user['name'],
+        'date' => date('d M Y'),
+        'property_list' => $property_list_html
+    ]);
     
-    // 🔥 CHANGED: sendEmailSMTP se sendEmailViaBrevo kiya gaya hai
-    if (sendEmailViaBrevo($user['email'], $subject, $email_body)) {
+    if ($sent) {
         $sent_count++;
         echo "Email sent to: {$user['email']}\n";
     } else {
