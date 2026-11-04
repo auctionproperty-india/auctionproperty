@@ -16,9 +16,9 @@ include 'header.php';
 ?>
 
 <!-- ============================================================ -->
-<!-- 🔥 LUXURY PROFESSIONAL BANNER (Dynamic Name Included) -->
+<!-- 🔥 LUXURY PROFESSIONAL BANNER (Fixed Position) -->
 <!-- ============================================================ -->
-<div id="share-banner" style="position:absolute; left:-9999px; top:0; width:1080px; height:1080px; background: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; font-family:'Poppins', sans-serif; box-sizing: border-box; border: 12px solid #d4af37; position: relative; overflow: hidden;">
+<div id="share-banner" style="position:absolute; left:-9999px; top:0; width:1080px; height:1080px; background: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; font-family:'Poppins', sans-serif; box-sizing: border-box; border: 12px solid #d4af37; overflow: hidden;">
 
     <!-- Background Decorative Glow Elements -->
     <div style="position: absolute; top: -100px; left: -100px; width: 300px; height: 300px; background: #d4af37; opacity: 0.1; border-radius: 50%; filter: blur(100px);"></div>
@@ -91,18 +91,16 @@ async function shareProfile(btnElement) {
     const text = btnData.msg;
     const clientName = btnData.name;
     
-    // 🔥 Inject Client Name into the Luxury Banner
+    // Inject Client Name
     document.getElementById('banner-client-name').innerText = clientName;
 
     const banner = document.getElementById('share-banner');
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
 
-    // Button Loading State
     const originalBtnHTML = btnElement.innerHTML;
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     btnElement.style.pointerEvents = 'none';
 
-    // Desktop Popup Blocker Fix
     let waWindow = null;
     if (!isMobile) {
         waWindow = window.open('about:blank', '_blank');
@@ -111,21 +109,22 @@ async function shareProfile(btnElement) {
         }
     }
 
+    // Temporarily show banner for capture
     banner.style.left = '0';
     banner.style.top = '0';
     banner.style.zIndex = '-1';
 
     try {
-        // Small delay to ensure the new name is rendered by the browser before taking screenshot
         await new Promise(r => setTimeout(r, 100)); 
         
         const canvas = await html2canvas(banner, { scale: 1, useCORS: true, backgroundColor: '#020617', logging: false });
+        
+        // Hide it back
         banner.style.left = '-9999px';
 
         canvas.toBlob(async function(blob) {
             const file = new File([blob], 'PrimeProperty_Banner.png', { type: 'image/png' });
 
-            // 📱 MOBILE LOGIC (Native Share)
             if (isMobile) {
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                     try {
@@ -146,7 +145,6 @@ async function shareProfile(btnElement) {
                 return;
             }
 
-            // 💻 DESKTOP LOGIC (Copy to Clipboard + Web)
             const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`;
             
             try {
@@ -314,7 +312,6 @@ function getWhatsAppData($member) {
     $msg .= "*Team* 🏢\n";
     $msg .= "*Prime Property India* 🇮🇳✨";
 
-    // 🔥 Added 'name' here for the banner
     return ['phone' => $clean_phone, 'msg' => $msg, 'name' => $member['name']];
 }
 
