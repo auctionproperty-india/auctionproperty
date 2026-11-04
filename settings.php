@@ -17,7 +17,8 @@ $message = '';
 $settings_keys = [
     'default_contact', 'company_bank_name', 'company_account_number', 
     'company_ifsc', 'company_branch', 'tds_percent', 'admin_charge_percent', 
-    'spin_min_coins', 'spin_max_coins', 'company_qr_code'
+    'spin_min_coins', 'spin_max_coins', 'company_qr_code',
+    'promo_banner_title', 'promo_message_template' // 🔥 NEW KEYS ADDED
 ];
 
 // 🔒 Ensure all keys exist
@@ -119,11 +120,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             // UPLOAD NEW QR CODE
             elseif(isset($_FILES['qr_code']) && $_FILES['qr_code']['error'] == 0) {
                 
-                // 🔥 UPLOAD TO SUPABASE (No local fallback)
                 $uploaded_url = uploadFileToCloud($_FILES['qr_code'], 'qr_codes');
                 
                 if ($uploaded_url) {
-                    // Delete old QR from cloud if exists
                     if (!empty($old_qr)) {
                         deleteCloudFileByUrl($old_qr);
                     }
@@ -136,6 +135,17 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             } else {
                 $message = "<div class='alert alert-warning'>⚠️ No file selected.</div>";
             }
+        }
+
+        // 🔥 5. SAVE PROMO BANNER & MESSAGE (NEW)
+        elseif ($action == 'save_promo') {
+            $banner_title = trim($_POST['promo_banner_title'] ?? '');
+            $message_template = trim($_POST['promo_message_template'] ?? '');
+            
+            $saveSetting('promo_banner_title', $banner_title);
+            $saveSetting('promo_message_template', $message_template);
+            
+            $message = "<div class='alert alert-success'>✅ Promo Banner & Message updated successfully!</div>";
         }
     }
 }
@@ -404,6 +414,57 @@ if (!empty($qr)) {
                     <div class="mt-3">
                         <button type="submit" class="btn btn-info btn-sm text-white"><i class="fas fa-upload me-1"></i> Save QR Code</button>
                         <button type="button" class="btn btn-secondary btn-sm" onclick="cancelEdit('qr')">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🔥 SECTION 5: PROMO MESSAGE & BANNER (NEW) -->
+    <div class="setting-card">
+        <div class="setting-card-header">
+            <h5><i class="fas fa-bullhorn me-2 text-danger"></i> Sales Team Promo Message & Banner</h5>
+            <button class="btn btn-sm btn-outline-danger btn-xs" onclick="toggleEdit('promo')"><i class="fas fa-edit me-1"></i> Edit</button>
+        </div>
+        <div class="setting-card-body">
+            <div id="promo-view" class="view-mode row">
+                <div class="col-md-12">
+                    <span class="label">Banner Heading (जो इमेज के बीच में दिखेगा)</span>
+                    <div class="value"><?= htmlspecialchars($settings['promo_banner_title'] ?: 'Not Set') ?></div>
+                </div>
+                <div class="col-md-12 mt-3">
+                    <span class="label">Message Template (WhatsApp और Email के लिए)</span>
+                    <div class="value" style="white-space: pre-wrap; background:#f8fafc; padding:15px; border-radius:8px; font-size:0.9rem;"><?= htmlspecialchars($settings['promo_message_template'] ?: 'Not Set') ?></div>
+                </div>
+            </div>
+
+            <div id="promo-edit" class="edit-mode">
+                <form method="POST">
+                    <input type="hidden" name="action" value="save_promo">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="fw-bold small">Banner Heading</label>
+                            <input type="text" name="promo_banner_title" class="form-control" value="<?= htmlspecialchars($settings['promo_banner_title'] ?? '') ?>" placeholder="e.g. Happy Diwali Special Offer!">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="fw-bold small">Message Template</label>
+                            <textarea name="promo_message_template" class="form-control" rows="10"><?= htmlspecialchars($settings['promo_message_template'] ?? '') ?></textarea>
+                            <small class="text-danger mt-2 d-block">
+                                <b>⚠️ इन कोड्स को बदलें नहीं (Placeholders):</b><br>
+                                <code>{name}</code> = ग्राहक का नाम<br>
+                                <code>{email}</code> = ग्राहक की ईमेल<br>
+                                <code>{date}</code> = जॉइनिंग डेट<br>
+                                <code>{website}</code> = वेबसाइट लिंक
+                            </small>
+                        </div>
+                        <div class="col-md-4 mt-3">
+                            <label class="fw-bold small text-danger">Verify Password *</label>
+                            <input type="password" name="admin_password" class="form-control" placeholder="Enter admin password" required>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-save me-1"></i> Save Promo Settings</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelEdit('promo')">Cancel</button>
                     </div>
                 </form>
             </div>
