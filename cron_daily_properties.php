@@ -1,15 +1,38 @@
 <?php
 // ============================================================
-// ⏰ DAILY PROPERTY UPDATE EMAIL (CRON JOB)
+// ⏰ DAILY PROPERTY UPDATE EMAIL (CRON JOB - DYNAMIC TIME)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
 date_default_timezone_set('Asia/Kolkata');
 
-echo "Starting daily email process...\n";
+// 🔥 1. CHECK SCHEDULED TIME
+$settings_query = $pdo->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('daily_email_time', 'last_daily_email_date', 'email_on_daily_props')");
+$settings = $settings_query->fetchAll(PDO::FETCH_KEY_PAIR);
 
-// 1. Fetch properties added in last 24 hours
+$scheduled_time = $settings['daily_email_time'] ?? '06:30';
+$last_sent_date = $settings['last_daily_email_date'] ?? '';
+$is_enabled = ($settings['email_on_daily_props'] ?? '0') === '1';
+
+if (!$is_enabled) {
+    die("Email toggle is OFF. Exiting.\n");
+}
+
+$current_date = date('Y-m-d');
+$current_time = date('H:i');
+
+// Agar aaj bhej diya hai, to dobara mat bhejo
+if ($last_sent_date === $current_date) {
+    die("Emails already sent today ({$current_date}). Exiting.\n");
+}
+
+// Agar abhi ka time scheduled time se chota hai, to wait karo
+if ($current_time < $scheduled_time) {
+    die("Current time ({$current_time}) is before scheduled time ({$scheduled_time}). Exiting.\n");
+}
+
+// 🔥 2. FETCH PROPERTIES (Jo pichle 24 ghante me add hui hain)
 $stmt = $pdo->prepare("
     SELECT id, title, city, state, price, sqft, auction_date, bank_name, type, image_url 
     FROM properties 
@@ -23,60 +46,46 @@ if (empty($new_properties)) {
     die("No new properties added in the last 24 hours. Exiting.\n");
 }
 
-// 2. Group properties by City
+// 3. Group properties by City
 $grouped_properties = [];
 foreach ($new_properties as $prop) {
     $city = ucwords(strtolower(trim($prop['city'])));
     $grouped_properties[$city][] = $prop;
 }
 
-// 3. Fetch all active users
+// 4. Fetch users
 $users_stmt = $pdo->query("SELECT name, email, city FROM users WHERE role = 'user' AND status = 'active'");
 $users = $users_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$sent_count = 0;
-
-// 4. Build the property list HTML once (This will replace the {property_list} placeholder)
+// 5. Build property list HTML
 $property_list_html = "";
 foreach ($grouped_properties as $city => $props) {
     $property_list_html .= "<h3 style='color:#2563eb; border-bottom:1px solid #eee; padding-bottom:5px; margin-top:20px;'>{$city}</h3>";
-    
     foreach ($props as $prop) {
-        $price = number_format($prop['price']);
-        $sqft = $prop['sqft'] ? $prop['sqft'] . ' Sq Ft' : 'N/A';
-        $auction_date = !empty($prop['auction_date']) ? date('d M Y', strtotime($prop['auction_date'])) : 'N/A';
-        
-        // Link to user dashboard
         $prop_link = "https://primepropertyindia.onrender.com/user_dashboard.php?view=all&property_id=" . $prop['id'];
-        
         $property_list_html .= "
         <div style='padding: 10px 0; border-bottom: 1px solid #f1f5f9;'>
             <a href='{$prop_link}' style='color: #2563eb; text-decoration: none; font-weight: bold; font-size: 16px;'>{$prop['title']}</a><br>
-            <span style='color: #10b981; font-weight: bold; font-size: 15px;'>₹ {$price}</span> | 
+            <span style='color: #10b981; font-weight: bold; font-size: 15px;'>₹ " . number_format($prop['price']) . "</span> | 
             <span style='color: #64748b; font-size: 13px;'>Bank: {$prop['bank_name']}</span><br>
-            <span style='color: #64748b; font-size: 12px;'>Auction Date: {$auction_date} | Area: {$sqft}</span><br>
-            <a href='{$prop_link}' style='color: #007bff; text-decoration: underline; font-size: 13px; margin-top: 5px; display: inline-block;'>View More Details...</a>
-        </div>
-        ";
+            <a href='{$prop_link}' style='color: #007bff; text-decoration: underline; font-size: 13px;'>View Details</a>
+        </div>";
     }
 }
 
-// 5. Loop through users and send email using our Central Function
+// 6. Send Emails
+$sent_count = 0;
 foreach ($users as $user) {
-    
-    // Pass data to the central function (Template is fetched from DB)
     $sent = sendSystemEmail('daily_props', $user['email'], [
         'name' => $user['name'],
         'date' => date('d M Y'),
         'property_list' => $property_list_html
     ]);
-    
-    if ($sent) {
-        $sent_count++;
-        echo "Email sent to: {$user['email']}\n";
-    } else {
-        echo "Failed to send to: {$user['email']} (Check if email_on_daily_props is ON in Admin Settings)\n";
-    }
+    if ($sent) $sent_count++;
 }
+
+// 🔥 7. UPDATE LAST SENT DATE (Taki dobara na jaye)
+$update_stmt = $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'last_daily_email_date'");
+$update_stmt->execute([$current_date]);
 
 echo "Process completed. Total emails sent: {$sent_count}\n";
