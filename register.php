@@ -77,54 +77,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             unset($_SESSION['referral_code']);
 
-            // 🔥 ==========================================
-            // 🔥 SEND WELCOME EMAIL WITH LOGIN CREDENTIALS
-            // 🔥 ==========================================
-            $subject = "Welcome to Prime Property India - Your Login Details";
-            
-            $email_body = "
-            <div style='font-family: Arial, sans-serif; background: #f4f7fc; padding: 20px;'>
-                <div style='max-width: 600px; margin: 0 auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);'>
-                    
-                    <!-- Header -->
-                    <div style='background: #0f172a; padding: 25px; text-align: center;'>
-                        <h2 style='color: #fbbf24; margin: 0; font-size: 24px; letter-spacing: 1px;'>PRIME PROPERTY INDIA</h2>
-                        <p style='color: #94a3b8; margin: 5px 0 0 0; font-size: 14px;'>Your Trusted Auction Partner</p>
-                    </div>
-                    
-                    <!-- Body -->
-                    <div style='padding: 30px;'>
-                        <h3 style='color: #0f172a; margin-top: 0;'>नमस्ते {$name} जी,</h3>
-                        <p style='color: #475569; font-size: 15px; line-height: 1.6;'>
-                            आपका हमारे पोर्टल पर स्वागत है! आपका अकाउंट सफलतापूर्वक बन गया है। अब आप हमारे पोर्टल पर बैंक ऑक्शन की शानदार प्रॉपर्टीज देख सकते हैं।
-                        </p>
-                        
-                        <!-- Login Credentials Box -->
-                        <div style='background: #f8fafc; border-left: 4px solid #2563eb; padding: 15px; margin: 25px 0; border-radius: 0 8px 8px 0;'>
-                            <p style='margin: 0 0 10px 0; color: #1e293b; font-size: 15px;'><strong>🔑 लॉगिन आईडी (Email):</strong> {$email}</p>
-                            <p style='margin: 0; color: #1e293b; font-size: 15px;'><strong>🔒 पासवर्ड:</strong> {$password}</p>
-                        </div>
-                        
-                        <p style='color: #475569; font-size: 15px; line-height: 1.6;'>
-                            कृपया सुरक्षा के लिए लॉगिन करने के बाद अपना पासवर्ड बदल लें। नीचे दिए गए बटन पर क्लिक करके लॉगिन करें:
-                        </p>
-                        
-                        <!-- CTA Button -->
-                        <div style='text-align: center; margin-top: 30px; margin-bottom: 10px;'>
-                            <a href='https://primepropertyindia.onrender.com/login.php' style='background: #2563eb; color: #ffffff; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;'>Login to Portal</a>
-                        </div>
-                    </div>
-                    
-                    <!-- Footer -->
-                    <div style='background: #f8fafc; padding: 15px; text-align: center; border-top: 1px solid #e2e8f0;'>
-                        <p style='margin: 0; color: #94a3b8; font-size: 12px;'>&copy; " . date('Y') . " Prime Property India. All rights reserved.</p>
-                    </div>
-                </div>
-            </div>
-            ";
+            // 🔥 1. Send Welcome Email to the User
+            sendSystemEmail('registration', $email, [
+                'name' => $name,
+                'email' => $email,
+                'password' => $password
+            ]);
 
-            // 🔥 CHANGED: sendEmailSMTP se sendEmailViaBrevo kiya gaya hai
-            sendEmailViaBrevo($email, $subject, $email_body);
+            // 🔥 2. Send Notification to the Sponsor (Downline Reg)
+            if ($ref_by) {
+                $sponsor_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
+                $sponsor_stmt->execute([$ref_by]);
+                $sponsor_data = $sponsor_stmt->fetch();
+                if ($sponsor_data) {
+                    sendSystemEmail('downline_reg', $sponsor_data['email'], [
+                        'sponsor_name' => $sponsor_data['name'],
+                        'downline_name' => $name,
+                        'downline_email' => $email
+                    ]);
+                }
+            }
 
             $success = 'Account created! Please check your email for login details.';
         }
@@ -371,18 +343,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitBtn = document.getElementById('submitBtn');
     const form = document.getElementById('registerForm');
 
-    // 🔥 Only allow digits
     phoneInput.addEventListener('input', function(e) {
         this.value = this.value.replace(/[^0-9]/g, '');
-
-        if (this.value.length > 10) {
-            this.value = this.value.slice(0, 10);
-        }
-
+        if (this.value.length > 10) this.value = this.value.slice(0, 10);
         validatePhone(this.value);
     });
 
-    // 🔥 Prevent paste of invalid characters
     phoneInput.addEventListener('paste', function(e) {
         e.preventDefault();
         const pastedText = (e.clipboardData || window.clipboardData).getData('text');
@@ -391,15 +357,12 @@ document.addEventListener('DOMContentLoaded', function() {
         validatePhone(digits);
     });
 
-    // 🔥 Prevent typing invalid first digit
     phoneInput.addEventListener('keypress', function(e) {
         const currentValue = this.value;
-
         if (!/[0-9]/.test(e.key)) {
             e.preventDefault();
             return;
         }
-
         if (currentValue.length === 0 && !/[6-9]/.test(e.key)) {
             e.preventDefault();
             phoneStatus.className = 'phone-status invalid';
@@ -413,7 +376,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 🔥 Live Validation Function
     function validatePhone(value) {
         if (value.length === 0) {
             phoneStatus.className = 'phone-status';
@@ -421,7 +383,6 @@ document.addEventListener('DOMContentLoaded', function() {
             phoneInput.classList.remove('valid-phone', 'invalid-phone');
             return;
         }
-
         if (value.length < 10) {
             phoneStatus.className = 'phone-status invalid';
             phoneStatus.innerHTML = `⏳ ${10 - value.length} और अंक डालें`;
@@ -429,7 +390,6 @@ document.addEventListener('DOMContentLoaded', function() {
             phoneInput.classList.add('invalid-phone');
             return;
         }
-
         if (value.length === 10) {
             const validPattern = /^[6-9][0-9]{9}$/;
             if (validPattern.test(value)) {
@@ -446,11 +406,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 🔥 Form Submit Validation
     form.addEventListener('submit', function(e) {
         const phoneValue = phoneInput.value;
         const validPattern = /^[6-9][0-9]{9}$/;
-
         if (!validPattern.test(phoneValue)) {
             e.preventDefault();
             phoneStatus.className = 'phone-status invalid';
