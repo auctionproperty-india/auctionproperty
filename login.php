@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🔐 LOGIN PAGE
+// 🔐 LOGIN PAGE (FULLY FIXED)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -11,7 +11,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // अगर यूजर पहले से लॉगिन है, तो सीधे डैशबोर्ड भेजें
 if (isset($_SESSION['user_id'])) {
-    if ($_SESSION['role'] === 'admin') {
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
         header("Location: dashboard.php");
     } else {
         header("Location: user_dashboard.php");
@@ -25,7 +25,12 @@ $success = '';
 // 🔥 रजिस्ट्रेशन के बाद का सक्सेस मैसेज चेक करें
 if (isset($_SESSION['flash_success'])) {
     $success = $_SESSION['flash_success'];
-    unset($_SESSION['flash_success']); // एक बार दिखाने के बाद डिलीट कर दें
+    unset($_SESSION['flash_success']);
+}
+
+// 🔥 अगर किसी और डिवाइस पर लॉगिन करने की वजह से लॉगआउट हुआ है
+if (isset($_GET['msg']) && $_GET['msg'] === 'logged_out_elsewhere') {
+    $error = 'You have been logged out because you logged in from another device or your session expired.';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -39,15 +44,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
+        // पासवर्ड वेरिफाई करें
         if ($user && password_verify($password, $user['password'])) {
+            
             // अगर अकाउंट डिलीटेड या इनएक्टिव है
             if ($user['status'] === 'deleted' || $user['status'] === 'inactive') {
                 $error = 'Your account is inactive or deleted. Please contact support.';
             } else {
-                // लॉगिन सफल
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['name'] = $user['name'];
+                // 🔥 लॉगिन सफल: सभी ज़रूरी सेशन वेरिएबल्स सेट करें
+                $_SESSION['user_id']    = $user['id'];
+                $_SESSION['email']      = $user['email'];
+                $_SESSION['role']       = $user['role'];
+                $_SESSION['name']       = $user['name'];
+                $_SESSION['logged_in']  = true; // यह सबसे ज़रूरी है ताकि डैशबोर्ड आपको बाहर न निकाले
                 
                 // अगर एडमिन है तो एडमिन डैशबोर्ड, वरना यूजर डैशबोर्ड
                 if ($user['role'] === 'admin') {
