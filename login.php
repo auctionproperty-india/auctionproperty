@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🔐 LOGIN PAGE (FULLY FIXED)
+// 🔐 LOGIN PAGE (WITH SINGLE DEVICE SESSION TOKEN FIX)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -22,13 +22,13 @@ if (isset($_SESSION['user_id'])) {
 $error = '';
 $success = '';
 
-// 🔥 रजिस्ट्रेशन के बाद का सक्सेस मैसेज चेक करें
+// रजिस्ट्रेशन के बाद का सक्सेस मैसेज
 if (isset($_SESSION['flash_success'])) {
     $success = $_SESSION['flash_success'];
     unset($_SESSION['flash_success']);
 }
 
-// 🔥 अगर किसी और डिवाइस पर लॉगिन करने की वजह से लॉगआउट हुआ है
+// लॉगआउट मैसेज
 if (isset($_GET['msg']) && $_GET['msg'] === 'logged_out_elsewhere') {
     $error = 'You have been logged out because you logged in from another device or your session expired.';
 }
@@ -44,21 +44,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        // पासवर्ड वेरिफाई करें
         if ($user && password_verify($password, $user['password'])) {
             
-            // अगर अकाउंट डिलीटेड या इनएक्टिव है
             if ($user['status'] === 'deleted' || $user['status'] === 'inactive') {
                 $error = 'Your account is inactive or deleted. Please contact support.';
             } else {
-                // 🔥 लॉगिन सफल: सभी ज़रूरी सेशन वेरिएबल्स सेट करें
-                $_SESSION['user_id']    = $user['id'];
-                $_SESSION['email']      = $user['email'];
-                $_SESSION['role']       = $user['role'];
-                $_SESSION['name']       = $user['name'];
-                $_SESSION['logged_in']  = true; // यह सबसे ज़रूरी है ताकि डैशबोर्ड आपको बाहर न निकाले
+                // 🔥 नया Session Token जनरेट करें (Single Device Login के लिए)
+                $session_token = bin2hex(random_bytes(32));
+
+                // 🔥 डेटाबेस में टोकन अपडेट करें (ताकि डैशबोर्ड इसे चेक कर सके)
+                try {
+                    $update_token = $pdo->prepare("UPDATE users SET session_token = ? WHERE id = ?");
+                    $update_token->execute([$session_token, $user['id']]);
+                } catch (Exception $e) {
+                    // अगर डेटाबेस में session_token कॉलम नहीं है, तो यह एरर इग्नोर करें
+                    error_log("Session token update failed: " . $e->getMessage());
+                }
                 
-                // अगर एडमिन है तो एडमिन डैशबोर्ड, वरना यूजर डैशबोर्ड
+                // 🔥 लॉगिन सफल: सभी ज़रूरी सेशन वेरिएबल्स सेट करें
+                $_SESSION['user_id']       = $user['id'];
+                $_SESSION['email']         = $user['email'];
+                $_SESSION['role']          = $user['role'];
+                $_SESSION['name']          = $user['name'];
+                $_SESSION['logged_in']     = true;
+                $_SESSION['session_token'] = $session_token; // टोकन सेशन में सेव करें
+                
+                // डैशबोर्ड पर भेजें
                 if ($user['role'] === 'admin') {
                     header("Location: dashboard.php");
                 } else {
@@ -87,8 +98,6 @@ include 'header.php';
     .login-card .btn-primary:hover { background: #2563eb; transform: translateY(-2px); }
     .login-card .register-link { color: #1e3a8a; font-weight: 600; text-decoration: none; }
     .login-card .register-link:hover { text-decoration: underline; }
-    
-    /* Success & Error Message Styles */
     .login-card .error-msg { background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px; border-radius: 8px; color: #991b1b; font-size: 0.9rem; margin-bottom: 20px; }
     .login-card .success-msg { background: #dcfce7; border-left: 4px solid #16a34a; padding: 12px; border-radius: 8px; color: #14532d; font-size: 0.9rem; margin-bottom: 20px; }
 </style>
@@ -98,14 +107,12 @@ include 'header.php';
         <h2>Welcome Back</h2>
         <p class="sub">Sign in to your account</p>
 
-        <!-- 🔥 सक्सेस मैसेज दिखाएं -->
         <?php if ($success): ?>
             <div class="success-msg">
                 <i class="fas fa-check-circle me-1"></i> <?= htmlspecialchars($success) ?>
             </div>
         <?php endif; ?>
 
-        <!-- ❌ एरर मैसेज दिखाएं -->
         <?php if ($error): ?>
             <div class="error-msg">
                 <i class="fas fa-exclamation-circle me-1"></i> <?= htmlspecialchars($error) ?>
