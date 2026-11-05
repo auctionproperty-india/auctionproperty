@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – Grouped Auctions + View All Logic
+// 👤 User Dashboard – Grouped Auctions + View All Logic + Pagination
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -56,6 +56,11 @@ if (!is_array($search_types)) {
 }
 $search_types = array_values(array_filter($search_types, function($t) { return $t !== ''; }));
 
+// 🔥 PAGINATION SETUP
+$limit = 15;
+$page = isset($_GET['page']) && is_numeric($_GET['page']) && $_GET['page'] > 0 ? (int)$_GET['page'] : 1;
+$offset = ($page - 1) * $limit;
+
 // ============================================================
 // 🔥 COUNTERS & TOTALS
 // ============================================================
@@ -92,42 +97,60 @@ if(!empty($search_types)) {
 }
 if(!empty($search_min_price)) { $common_where .= " AND price >= ?"; $params[] = (float)$search_min_price; }
 if(!empty($search_max_price)) { $common_where .= " AND price <= ?"; $params[] = (float)$search_max_price; }
+if(!empty($search_date)) { $common_where .= " AND auction_date = ?"; $params[] = $search_date; }
 
-// ---- Fetch Properties based on Tab ----
+// ---- Fetch Properties based on Tab with Pagination ----
 $today_props = [];
 $upcoming_props = [];
 $past_props = [];
 $all_props = [];
+$total_pages = 1;
 
 if ($tab == 'auction') {
-    // 🔥 AUCTION TAB: Always fetch grouped (Today, Upcoming, Past)
-    
-    // TODAY'S AUCTIONS
-    $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') $common_where ORDER BY id DESC");
-    $stmt->execute($params);
-    $today_props = $stmt->fetchAll();
+    // Get Total Count for Pagination
+    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' $common_where");
+    $count_stmt->execute($params);
+    $total_items = $count_stmt->fetchColumn();
+    $total_pages = ceil($total_items / $limit);
 
-    // UPCOMING AUCTIONS
-    $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') $common_where ORDER BY price ASC");
+    // Fetch Paginated Data
+    $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
-    $upcoming_props = $stmt->fetchAll();
+    $fetched_props = $stmt->fetchAll();
 
-    // PAST AUCTIONS
-    $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') $common_where ORDER BY id DESC");
-    $stmt->execute($params);
-    $past_props = $stmt->fetchAll();
+    // Group the fetched data for the UI
+    $curr_date = date('Y-m-d');
+    foreach($fetched_props as $prop) {
+        if (($prop['auction_date'] == $curr_date || (isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty'))) {
+            $today_props[] = $prop;
+        } elseif (!empty($prop['auction_date']) && $prop['auction_date'] > $curr_date) {
+            $upcoming_props[] = $prop;
+        } else {
+            $past_props[] = $prop;
+        }
+    }
 
 } elseif ($tab == 'customer') {
-    // CUSTOMER TAB
-    $sql = "SELECT *, 'customer' as source FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where ORDER BY created_at DESC";
-    $stmt = $pdo->prepare($sql);
+    // Get Total Count for Pagination
+    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where");
+    $count_stmt->execute($params);
+    $total_items = $count_stmt->fetchColumn();
+    $total_pages = ceil($total_items / $limit);
+
+    // Fetch Paginated Data
+    $stmt = $pdo->prepare("SELECT *, 'customer' as source FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $all_props = $stmt->fetchAll();
 
 } elseif ($tab == 'exchange') {
-    // EXCHANGE TAB
-    $sql = "SELECT *, 'exchange' as source FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where ORDER BY created_at DESC";
-    $stmt = $pdo->prepare($sql);
+    // Get Total Count for Pagination
+    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where");
+    $count_stmt->execute($params);
+    $total_items = $count_stmt->fetchColumn();
+    $total_pages = ceil($total_items / $limit);
+
+    // Fetch Paginated Data
+    $stmt = $pdo->prepare("SELECT *, 'exchange' as source FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $all_props = $stmt->fetchAll();
 }
@@ -208,7 +231,57 @@ function renderDashboardCard($prop, $tab = 'auction') {
     <?php
 }
 
+// ---- Render Pagination ----
+function renderPagination($total_pages, $current_page, $params) {
+    if ($total_pages <= 1) return '';
+    
+    $html = '<nav aria-label="Page navigation" class="mt-5"><ul class="pagination justify-content-center flex-wrap">';
+    
+    // Previous
+    $prev_page = max(1, $current_page - 1);
+    $prev_link = '?' . http_build_query(array_merge($params, ['page' => $prev_page]));
+    $html .= '<li class="page-item ' . ($current_page <= 1 ? 'disabled' : '') . '"><a class="page-link" href="' . $prev_link . '">Previous</a></li>';
+    
+    // Page Numbers
+    $start = max(1, $current_page - 2);
+    $end = min($total_pages, $current_page + 2);
+    
+    if ($start > 1) {
+        $html .= '<li class="page-item"><a class="page-link" href="?' . http_build_query(array_merge($params, ['page' => 1])) . '">1</a></li>';
+        if ($start > 2) $html .= '<li class="page-item disabled"><span class="page-link">...</span></li>';
+    }
+    
+    for ($i = $start; $i <= $end; $i++) {
+        $html .= '<li class="page-item ' . ($i == $current_page ? 'active' : '') . '"><a class="page-link" href="?' . http_build_query(array_merge($params, ['page' => $i])) . '">' . $i . '</a></li>';
+    }
+    
+    if ($end < $total_pages) {
+        if ($end < $total_pages - 1) $html .= '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        $html .= '<li class="page-item"><a class="page-link" href="?' . http_build_query(array_merge($params, ['page' => $total_pages])) . '">' . $total_pages . '</a></li>';
+    }
+    
+    // Next
+    $next_page = min($total_pages, $current_page + 1);
+    $next_link = '?' . http_build_query(array_merge($params, ['page' => $next_page]));
+    $html .= '<li class="page-item ' . ($current_page >= $total_pages ? 'disabled' : '') . '"><a class="page-link" href="' . $next_link . '">Next</a></li>';
+    
+    $html .= '</ul></nav>';
+    return $html;
+}
+
 include 'header.php';
+
+// Pagination Params
+$pagination_params = [
+    'view' => $view,
+    'tab' => $tab,
+    'city' => $search_city,
+    'locality' => $search_locality,
+    'min_price' => $search_min_price,
+    'max_price' => $search_max_price,
+    'date' => $search_date
+];
+if (!empty($search_types)) $pagination_params['type'] = $search_types;
 ?>
 
 <style>
@@ -358,32 +431,30 @@ include 'header.php';
         <?php endif; ?>
 
         <!-- 1. TODAY'S AUCTIONS -->
-        <div class="section-title mt-4"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span></div>
         <?php if(count($today_props) > 0): ?>
+            <div class="section-title mt-4"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span></div>
             <div class="row"><?php foreach($today_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
-        <?php else: ?>
-            <div class="alert alert-light border text-center py-4 mb-4" style="border-radius:20px;"><p class="mb-0 text-muted fw-bold">📭 No auction today</p></div>
         <?php endif; ?>
-
-        <hr class="my-5">
 
         <!-- 2. UPCOMING AUCTIONS -->
-        <div class="section-title"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span></div>
         <?php if(count($upcoming_props) > 0): ?>
+            <div class="section-title mt-4"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span></div>
             <div class="row"><?php foreach($upcoming_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
-        <?php else: ?>
-            <div class="alert alert-light border text-center py-4 mb-4" style="border-radius:20px;"><p class="mb-0 text-muted fw-bold">📅 No upcoming auctions</p></div>
         <?php endif; ?>
-
-        <hr class="my-5">
 
         <!-- 3. PAST AUCTIONS -->
-        <div class="section-title"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions <span class="badge bg-secondary rounded-pill ms-2"><?= count($past_props) ?></span></div>
         <?php if(count($past_props) > 0): ?>
+            <div class="section-title mt-4"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions <span class="badge bg-secondary rounded-pill ms-2"><?= count($past_props) ?></span></div>
             <div class="row"><?php foreach($past_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
-        <?php else: ?>
-            <div class="alert alert-light border text-center py-4" style="border-radius:20px;"><p class="mb-0 text-muted fw-bold">📭 No past auctions</p></div>
         <?php endif; ?>
+
+        <!-- Empty State -->
+        <?php if(count($today_props) == 0 && count($upcoming_props) == 0 && count($past_props) == 0): ?>
+            <div class="alert alert-light border text-center py-4 mb-4" style="border-radius:20px;"><p class="mb-0 text-muted fw-bold">📭 No properties found</p></div>
+        <?php endif; ?>
+
+        <!-- Pagination Links -->
+        <?= renderPagination($total_pages, $page, $pagination_params) ?>
 
     <?php else: ?>
         
@@ -406,6 +477,8 @@ include 'header.php';
                     <?php renderDashboardCard($prop, $tab); ?>
                 <?php endforeach; ?>
             </div>
+            <!-- Pagination Links -->
+            <?= renderPagination($total_pages, $page, $pagination_params) ?>
         <?php else: ?>
             <div class="alert alert-light border text-center py-5" style="border-radius:20px;">
                 <i class="fas fa-search fa-3x text-muted mb-3"></i>
