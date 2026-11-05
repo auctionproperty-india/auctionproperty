@@ -8,7 +8,7 @@ require_once __DIR__ . '/functions.php';
 
 // 🛡️ SECURITY: Block Bad Bots & Rate Limiting
 blockBadBots();
-checkRateLimit(60, 60); // 60 requests per 60 seconds
+checkRateLimit(60, 60);
 
 $current_page = basename($_SERVER['PHP_SELF']);
 $hide_top_nav = !in_array($current_page, ['index.php', 'login.php', 'register.php']);
@@ -60,14 +60,12 @@ $can_view_activity_logs = false;
 
 if ($is_logged_in && $role == 'sales') {
     try {
-        // Fetch Sales Target & Permissions
         $target_query = $pdo->prepare("SELECT sales_target, can_view_live_users, can_view_paid_users, can_view_free_users, can_view_full_logs FROM users WHERE id = ?");
         $target_query->execute([$_SESSION['user_id']]);
         $sales_data = $target_query->fetch();
         
         $target_goal = (float)($sales_data['sales_target'] ?? 0) ?: 100000; 
         
-        // 🔥 Activity Logs Link Condition (Show if ANY of the 4 permissions is true)
         $can_view_activity_logs = (
             !empty($sales_data['can_view_live_users']) || 
             !empty($sales_data['can_view_paid_users']) || 
@@ -75,7 +73,6 @@ if ($is_logged_in && $role == 'sales') {
             !empty($sales_data['can_view_full_logs'])
         );
 
-        // Sum of Subscription Amounts from Users referred by this Sales person
         $achieved_query = $pdo->prepare("
             SELECT COALESCE(SUM(s.amount), 0) 
             FROM subscriptions s 
@@ -173,6 +170,9 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         input, textarea, select, [contenteditable="true"] { user-select: text !important; }
         body.top-nav-hidden { padding-top: 0; }
         
+        /* 🔥 यह CSS सुनिश्चित करता है कि पब्लिक पेजों पर साइडबार की जगह न रहे */
+        body.page-public .main-content { margin-left: 0 !important; }
+
         .impersonate-banner { position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; padding: 12px 20px; text-align: center; z-index: 99999; font-size: 0.9rem; font-weight: 500; display: flex; justify-content: center; align-items: center; gap: 14px; }
         .impersonate-banner .btn-exit { background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-decoration: none; }
         body.impersonate-mode { padding-top: 120px !important; }
@@ -272,11 +272,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .spin-wheel::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: #fff; border-radius: 50%; border: 4px solid #fbbf24; }
         .spin-pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #1e293b; z-index: 10; }
         
-        /* 🔥 TARGET PROGRESS BOX IN SIDEBAR */
         .target-box { background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; padding: 15px; margin: 10px 10px 20px 10px; }
     </style>
 </head>
-<body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= $is_impersonating ? 'impersonate-mode' : '' ?> <?= in_array($current_page, ['login.php', 'register.php']) ? 'page-login' : '' ?>">
+<!-- 🔥 यहाँ page-public क्लास जोड़ी गई है ताकि index, login और register पर साइडबार की जगह न रहे -->
+<body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= $is_impersonating ? 'impersonate-mode' : '' ?> <?= in_array($current_page, ['login.php', 'register.php', 'index.php']) ? 'page-public' : '' ?>">
 
 <?php if ($is_impersonating): ?>
 <div class="impersonate-banner">
@@ -328,7 +328,8 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 <?php endif; ?>
 
 <!-- EXISTING SIDEBAR (Logged in users) -->
-<?php if ($is_logged_in): ?>
+<!-- 🔥 यहाँ कंडीशन लगा दी गई है ताकि index, login, register पर साइडबार न दिखे -->
+<?php if ($is_logged_in && !in_array($current_page, ['index.php', 'login.php', 'register.php'])): ?>
 <div class="sidebar-overlay-main" id="sidebarOverlayMain" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
     <div class="brand"><i class="fas fa-building"></i> <span>Prime Property</span></div>
@@ -474,7 +475,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <a href="sales_lead_upload.php" class="<?= $current_page == 'sales_lead_upload.php' ? 'active' : '' ?>"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
         <a href="sales_lead_add.php" class="<?= $current_page == 'sales_lead_add.php' ? 'active' : '' ?>"><i class="fas fa-plus"></i> <span>Add Lead</span></a>
         
-        <!-- Referral Link & My Team -->
         <a href="user_referrals.php" class="<?= $current_page == 'user_referrals.php' ? 'active' : '' ?>">
             <i class="fas fa-link text-primary"></i> <span>Referral Link</span>
         </a>
@@ -482,14 +482,12 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             <i class="fas fa-user-friends text-info"></i> <span>My Team</span>
         </a>
 
-        <!-- 🔥 CONDITIONAL: Activity Logs (Only if Admin allowed ANY of the 4) -->
         <?php if (!empty($can_view_activity_logs)): ?>
             <a href="admin_activity_logs.php" class="<?= $current_page == 'admin_activity_logs.php' ? 'active' : '' ?>">
                 <i class="fas fa-shield-alt text-danger"></i> <span>Activity Logs</span>
             </a>
         <?php endif; ?>
 
-        <!-- Sales Target Box -->
         <div class="target-box shadow-sm">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span style="font-size:12px; font-weight:800; color:#475569;"><i class="fas fa-bullseye text-danger"></i> Target</span>
@@ -529,7 +527,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             </div>
         </div>
 
-        <!-- 🔥 Buy Search Engine Dropdown -->
         <div class="nav-section <?= ($current_page == 'user_packages.php') ? 'open' : '' ?>">
             <div class="nav-section-title <?= ($current_page == 'user_packages.php') ? 'active' : '' ?>" onclick="toggleSection(this)">
                 <i class="fas fa-search-dollar section-icon"></i><span>Buy Search Engine</span><i class="fas fa-chevron-right section-arrow"></i>
@@ -544,7 +541,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
             </div>
         </div>
         
-        <!-- BA LOGIC -->
         <?php if ($ba_status == 'active'): ?>
             <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>"><i class="fas fa-users"></i> <span>My Team</span></a>
             <a href="my_earnings.php" class="<?= $current_page == 'my_earnings.php' ? 'active' : '' ?>"><i class="fas fa-file-invoice-dollar"></i> <span>My Earnings</span></a>
@@ -554,7 +550,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <?php else: ?>
             <a href="apply_ba.php" class="<?= $current_page == 'apply_ba.php' ? 'active' : '' ?>"><i class="fas fa-handshake"></i> <span>Apply for BA</span></a>
         <?php endif; ?>
-        <!-- BA LOGIC END -->
 
         <a href="profile.php" class="<?= $current_page == 'profile.php' ? 'active' : '' ?>"><i class="fas fa-user-circle"></i> <span>Profile</span></a>
         <a href="support.php" class="<?= $current_page == 'support.php' ? 'active' : '' ?>"><i class="fas fa-headset"></i> <span>Support</span></a>
@@ -573,7 +568,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
 <!-- MAIN CONTENT -->
 <div class="main-content">
-    <?php if ($is_logged_in): ?>
+    <?php if ($is_logged_in && !in_array($current_page, ['index.php', 'login.php', 'register.php'])): ?>
     <div class="top-bar">
         <div class="d-flex align-items-center gap-2">
             <button class="hamburger-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
