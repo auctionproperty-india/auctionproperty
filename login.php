@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🔐 LOGIN PAGE (100% FIXED FOR SINGLE DEVICE)
+// 🔐 LOGIN PAGE (FULLY FIXED FOR SINGLE DEVICE LOGIN)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -47,27 +47,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user && password_verify($password, $user['password'])) {
             
             if ($user['status'] === 'deleted' || $user['status'] === 'inactive') {
-                $error = 'Your account is inactive or deleted.';
+                $error = 'Your account is inactive or deleted. Please contact support.';
             } else {
-                // 🔥 नया Session Token जनरेट करें
-                $session_token = bin2hex(random_bytes(32));
+                // 🔥 1. पुराना सेशन डिलीट करके नया सेशन ID जनरेट करें
+                session_regenerate_id(true); 
+                $current_session_id = session_id();
 
-                // डेटाबेस में टोकन अपडेट करें
+                // 🔥 2. डेटाबेस में 'active_session_id' को अपडेट करें (ताकि header.php पहचान सके)
                 try {
-                    $update_token = $pdo->prepare("UPDATE users SET session_token = ? WHERE id = ?");
-                    $update_token->execute([$session_token, $user['id']]);
+                    $update_session = $pdo->prepare("UPDATE users SET active_session_id = ? WHERE id = ?");
+                    $update_session->execute([$current_session_id, $user['id']]);
                 } catch (Exception $e) {
-                    // अगर कॉलम नहीं है तो यह एरर इग्नोर करेगा (लेकिन आपने SQL चला दिया है तो यह काम करेगा)
+                    error_log("Session ID update failed: " . $e->getMessage());
                 }
                 
-                // सेशन वेरिएबल्स सेट करें
-                $_SESSION['user_id']       = $user['id'];
-                $_SESSION['email']         = $user['email'];
-                $_SESSION['role']          = $user['role'];
-                $_SESSION['name']          = $user['name'];
-                $_SESSION['logged_in']     = true;
-                $_SESSION['session_token'] = $session_token; // यही टोकन आपकी header.php चेक करेगी
+                // 3. सेशन वेरिएबल्स सेट करें
+                $_SESSION['user_id']   = $user['id'];
+                $_SESSION['email']     = $user['email'];
+                $_SESSION['role']      = $user['role'];
+                $_SESSION['name']      = $user['name'];
+                $_SESSION['logged_in'] = true;
                 
+                // डैशबोर्ड पर भेजें
                 if ($user['role'] === 'admin') {
                     header("Location: dashboard.php");
                 } else {
