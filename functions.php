@@ -440,7 +440,7 @@ if (!function_exists('sendSystemEmail')) {
         // 1. Check if Admin has enabled this email
         $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
         $stmt->execute(["email_on_{$event_type}"]);
-        if ($stmt->fetchColumn() !== '1') return false; // Agar OFF hai to return kar do
+        if ($stmt->fetchColumn() !== '1') return false;
 
         // 2. Fetch Subject & Body Template
         $stmt = $pdo->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN (?, ?)");
@@ -450,13 +450,13 @@ if (!function_exists('sendSystemEmail')) {
         $subject = $tpl["tpl_{$event_type}_subject"] ?? "Notification from Prime Property";
         $body = $tpl["tpl_{$event_type}_body"] ?? "You have a new notification.";
 
-        // 3. Replace Placeholders (e.g. {name} -> Amit)
+        // 3. Replace Placeholders
         foreach ($data as $key => $value) {
             $subject = str_replace("{{$key}}", $value, $subject);
             $body = str_replace("{{$key}}", $value, $body);
         }
 
-        // 4. Wrap in a beautiful HTML Container
+        // 4. Wrap in HTML Container
         $html_body = "
         <div style='font-family: Arial, sans-serif; background: #f4f7fc; padding: 20px;'>
             <div style='max-width: 600px; margin: 0 auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);'>
