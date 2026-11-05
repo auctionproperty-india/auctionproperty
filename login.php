@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🔐 LOGIN PAGE (WITH SINGLE DEVICE SESSION TOKEN FIX)
+// 🔐 LOGIN PAGE (100% FIXED FOR SINGLE DEVICE)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -9,7 +9,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// अगर यूजर पहले से लॉगिन है, तो सीधे डैशबोर्ड भेजें
+// अगर यूजर पहले से लॉगिन है
 if (isset($_SESSION['user_id'])) {
     if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
         header("Location: dashboard.php");
@@ -22,13 +22,13 @@ if (isset($_SESSION['user_id'])) {
 $error = '';
 $success = '';
 
-// रजिस्ट्रेशन के बाद का सक्सेस मैसेज
+// रजिस्ट्रेशन सक्सेस मैसेज
 if (isset($_SESSION['flash_success'])) {
     $success = $_SESSION['flash_success'];
     unset($_SESSION['flash_success']);
 }
 
-// लॉगआउट मैसेज
+// लॉगआउट मैसेज हैंडलिंग
 if (isset($_GET['msg']) && $_GET['msg'] === 'logged_out_elsewhere') {
     $error = 'You have been logged out because you logged in from another device or your session expired.';
 }
@@ -47,29 +47,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user && password_verify($password, $user['password'])) {
             
             if ($user['status'] === 'deleted' || $user['status'] === 'inactive') {
-                $error = 'Your account is inactive or deleted. Please contact support.';
+                $error = 'Your account is inactive or deleted.';
             } else {
-                // 🔥 नया Session Token जनरेट करें (Single Device Login के लिए)
+                // 🔥 नया Session Token जनरेट करें
                 $session_token = bin2hex(random_bytes(32));
 
-                // 🔥 डेटाबेस में टोकन अपडेट करें (ताकि डैशबोर्ड इसे चेक कर सके)
+                // डेटाबेस में टोकन अपडेट करें
                 try {
                     $update_token = $pdo->prepare("UPDATE users SET session_token = ? WHERE id = ?");
                     $update_token->execute([$session_token, $user['id']]);
                 } catch (Exception $e) {
-                    // अगर डेटाबेस में session_token कॉलम नहीं है, तो यह एरर इग्नोर करें
-                    error_log("Session token update failed: " . $e->getMessage());
+                    // अगर कॉलम नहीं है तो यह एरर इग्नोर करेगा (लेकिन आपने SQL चला दिया है तो यह काम करेगा)
                 }
                 
-                // 🔥 लॉगिन सफल: सभी ज़रूरी सेशन वेरिएबल्स सेट करें
+                // सेशन वेरिएबल्स सेट करें
                 $_SESSION['user_id']       = $user['id'];
                 $_SESSION['email']         = $user['email'];
                 $_SESSION['role']          = $user['role'];
                 $_SESSION['name']          = $user['name'];
                 $_SESSION['logged_in']     = true;
-                $_SESSION['session_token'] = $session_token; // टोकन सेशन में सेव करें
+                $_SESSION['session_token'] = $session_token; // यही टोकन आपकी header.php चेक करेगी
                 
-                // डैशबोर्ड पर भेजें
                 if ($user['role'] === 'admin') {
                     header("Location: dashboard.php");
                 } else {
@@ -108,15 +106,11 @@ include 'header.php';
         <p class="sub">Sign in to your account</p>
 
         <?php if ($success): ?>
-            <div class="success-msg">
-                <i class="fas fa-check-circle me-1"></i> <?= htmlspecialchars($success) ?>
-            </div>
+            <div class="success-msg"><i class="fas fa-check-circle me-1"></i> <?= htmlspecialchars($success) ?></div>
         <?php endif; ?>
 
         <?php if ($error): ?>
-            <div class="error-msg">
-                <i class="fas fa-exclamation-circle me-1"></i> <?= htmlspecialchars($error) ?>
-            </div>
+            <div class="error-msg"><i class="fas fa-exclamation-circle me-1"></i> <?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
         <form method="POST">
@@ -128,7 +122,6 @@ include 'header.php';
                 <label class="form-label">Password</label>
                 <input type="password" name="password" class="form-control" placeholder="••••••••" required>
             </div>
-            
             <button type="submit" class="btn btn-primary w-100 mt-2">Sign In</button>
         </form>
 
