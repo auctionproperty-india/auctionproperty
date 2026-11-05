@@ -338,15 +338,15 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
 
         <?php if($tab == 'auction'): ?>
             <?php if($total_today_display > 0 || count($today_props) > 0): ?>
-                <div class="section-title"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= $total_today_display ?></span></div>
+                <div class="section-title"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions in India <span class="badge bg-danger rounded-pill ms-2"><?= $total_today_display ?></span></div>
                 <div class="row"><?php foreach($today_props as $prop) renderPropertyCard($prop, $show_images, true); ?></div>
             <?php endif; ?>
             <?php if($total_upcoming_display > 0 || count($upcoming_props) > 0): ?>
-                <div class="section-title mt-4"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions <span class="badge bg-primary rounded-pill ms-2"><?= $total_upcoming_display ?></span></div>
+                <div class="section-title mt-4"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions in India <span class="badge bg-primary rounded-pill ms-2"><?= $total_upcoming_display ?></span></div>
                 <div class="row"><?php foreach($upcoming_props as $prop) renderPropertyCard($prop, $show_images, false); ?></div>
             <?php endif; ?>
             <?php if($total_past_display > 0 || count($past_props) > 0): ?>
-                <div class="section-title mt-4"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions <span class="badge bg-secondary rounded-pill ms-2"><?= $total_past_display ?></span></div>
+                <div class="section-title mt-4"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions in India <span class="badge bg-secondary rounded-pill ms-2"><?= $total_past_display ?></span></div>
                 <div class="row"><?php foreach($past_props as $prop) renderPropertyCard($prop, $show_images, false); ?></div>
             <?php endif; ?>
             <?php if($total_today_display == 0 && $total_upcoming_display == 0 && $total_past_display == 0): ?>
