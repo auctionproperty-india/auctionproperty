@@ -2,28 +2,19 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// 🔥 आपकी ईमेल आईडी यहाँ कोड के अंदर डाली गई है
-$test_email = "hr.primepropertyindia@gmail.com"; 
-
-$subject = "Test Email from Prime Property";
-$body = "
-<div style='font-family: Arial, sans-serif; padding: 20px; text-align: center;'>
-    <h1 style='color: #10b981;'>✅ Success!</h1>
-    <p style='font-size: 16px;'>Agar yeh email aapko mila hai, to iska matlab aapka Brevo API setup perfectly kaam kar raha hai.</p>
-    <p style='color: #64748b;'>Ab aap apni website par naye users ko automatic welcome email bhej sakte hain.</p>
-</div>
-";
-
-// 🔥 CHANGED: sendEmailSMTP se sendEmailViaBrevo kiya gaya hai
-if (sendEmailViaBrevo($test_email, $subject, $body)) {
-    echo "<div style='text-align: center; margin-top: 50px; font-family: sans-serif;'>";
-    echo "<h2 style='color:green;'>✅ Test Email Sent Successfully!</h2>";
-    echo "<p>Please check your inbox (hr.primepropertyindia@gmail.com).</p>";
-    echo "</div>";
-} else {
-    echo "<div style='text-align: center; margin-top: 50px; font-family: sans-serif;'>";
-    echo "<h2 style='color:red;'>❌ Failed to send email.</h2>";
-    echo "<p>Please check your Render Environment Variables (BREVO_API_KEY) and Logs.</p>";
-    echo "</div>";
+$to = $_GET['to'] ?? '';
+if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+    die("Usage: test_email.php?to=your@email.com");
 }
-?>
+
+$ok = sendEmailViaBrevo(
+    $to,
+    "Test Email from Prime Property",
+    "<h2>Test Email OK</h2><p>Ye email Brevo API se bheja gaya hai.</p>"
+);
+
+if ($ok) {
+    echo "SENT OK - Brevo ne email accept kar liya. Ab inbox/spam check karo.";
+} else {
+    echo "FAILED - Brevo API ne email reject kiya. Render logs me 'Brevo API Error' dekho.";
+}
