@@ -43,15 +43,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters.';
     } else {
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+        // 🔥 चेक करें कि ईमेल पहले से है या नहीं और उसका स्टेटस क्या है
+        $stmt = $pdo->prepare("SELECT id, status FROM users WHERE email = ?");
         $stmt->execute([$email]);
-        $email_exists = $stmt->fetch();
+        $existing_user = $stmt->fetch();
 
+        // फोन नंबर चेक करें
         $stmt = $pdo->prepare("SELECT id FROM users WHERE phone = ?");
         $stmt->execute([$phone_clean]);
         $phone_exists = $stmt->fetch();
 
-        if ($email_exists) {
+        // अगर ईमेल पहले से है लेकिन डिलीटेड है, तो उसे नया मानें
+        if ($existing_user && $existing_user['status'] !== 'deleted') {
             $error = 'Email already registered.';
         } elseif ($phone_exists) {
             $error = '❌ This Mobile Number is already registered!';
@@ -64,19 +67,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
             $new_code = generateReferralCode();
 
-            $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, city, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
-            $stmt->execute([$name, $email, $phone_clean, $city, $hashed, $new_code, $ref_by]);
+            // अगर यूजर पहले डिलीट हुआ था (Soft Delete), तो उसे अपडेट करें
+            if ($existing_user) {
+                $stmt = $pdo->prepare("UPDATE users SET name=?, phone=?, city=?, password=?, referral_code=?, referred_by=?, status='active', created_at=NOW() WHERE id=?");
+                $stmt->execute([$name, $phone_clean, $city, $hashed, $new_code, $ref_by, $existing_user['id']]);
+            } else {
+                // बिल्कुल नया यूजर बनाएं
+                $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, city, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
+                $stmt->execute([$name, $email, $phone_clean, $city, $hashed, $new_code, $ref_by]);
+            }
 
             unset($_SESSION['referral_code']);
 
             // 🔥 1. Send Welcome Email to the User
-            sendSystemEmail('registration', $email, [
+            $welcome_sent = sendSystemEmail('registration', $email, [
                 'name' => $name,
                 'email' => $email,
                 'password' => $password
             ]);
+            
+            // Render लॉग्स में चेक करने के लिए कि ईमेल गया या नहीं
+            error_log("Welcome Email sent to $email: " . ($welcome_sent ? 'SUCCESS' : 'FAILED'));
 
-            // 🔥 2. Send Notification to the Sponsor (Downline Reg)
+            // 🔥 2. Send Notification to the Sponsor (Upline)
             if ($ref_by) {
                 $sponsor_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
                 $sponsor_stmt->execute([$ref_by]);
@@ -90,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $success = 'Account created! Please check your email for login details.';
+            $success = 'Account created! Please check your email/spam for login details.';
         }
     }
 }
