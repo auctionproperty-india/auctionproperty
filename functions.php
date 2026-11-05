@@ -440,15 +440,24 @@ if (!function_exists('sendSystemEmail')) {
         // 1. Check if Admin has enabled this email
         $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
         $stmt->execute(["email_on_{$event_type}"]);
-        if ($stmt->fetchColumn() !== '1') return false;
+        $toggle_val = $stmt->fetchColumn();
+        
+        // 🔥 FIX: PostgreSQL returns '1', 't', 'true', 1. We use loose comparison to catch all.
+        if ($toggle_val != '1' && $toggle_val != 1 && $toggle_val != 'true' && $toggle_val != 't') {
+            error_log("Email toggle for $event_type is OFF in DB. Value: " . var_export($toggle_val, true));
+            return false;
+        }
 
         // 2. Fetch Subject & Body Template
         $stmt = $pdo->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN (?, ?)");
         $stmt->execute(["tpl_{$event_type}_subject", "tpl_{$event_type}_body"]);
         $tpl = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
-        $subject = $tpl["tpl_{$event_type}_subject"] ?? "Notification from Prime Property";
-        $body = $tpl["tpl_{$event_type}_body"] ?? "You have a new notification.";
+        $subject = $tpl["tpl_{$event_type}_subject"] ?? "";
+        $body = $tpl["tpl_{$event_type}_body"] ?? "";
+
+        if (empty($subject)) $subject = "Notification from Prime Property";
+        if (empty($body)) $body = "You have a new notification.";
 
         // 3. Replace Placeholders
         foreach ($data as $key => $value) {
@@ -473,7 +482,11 @@ if (!function_exists('sendSystemEmail')) {
         </div>";
 
         // 5. Send via Brevo
-        return sendEmailViaBrevo($to_email, $subject, $html_body);
+        $sent = sendEmailViaBrevo($to_email, $subject, $html_body);
+        if (!$sent) {
+            error_log("Failed to send email via Brevo for event: $event_type to $to_email");
+        }
+        return $sent;
     }
 }
 
