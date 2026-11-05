@@ -7,7 +7,6 @@ require_once __DIR__ . '/functions.php';
 
 date_default_timezone_set('Asia/Kolkata');
 
-// 🔥 1. CHECK SCHEDULED TIME
 $settings_query = $pdo->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('daily_email_time', 'last_daily_email_date', 'email_on_daily_props')");
 $settings = $settings_query->fetchAll(PDO::FETCH_KEY_PAIR);
 
@@ -22,17 +21,17 @@ if (!$is_enabled) {
 $current_date = date('Y-m-d');
 $current_time = date('H:i');
 
-// Agar aaj bhej diya hai, to dobara mat bhejo
+$scheduled_timestamp = strtotime($scheduled_time);
+$scheduled_time_clean = date('H:i', $scheduled_timestamp);
+
 if ($last_sent_date === $current_date) {
     die("Emails already sent today ({$current_date}). Exiting.\n");
 }
 
-// Agar abhi ka time scheduled time se chota hai, to wait karo
-if ($current_time < $scheduled_time) {
-    die("Current time ({$current_time}) is before scheduled time ({$scheduled_time}). Exiting.\n");
+if (strtotime($current_time) < strtotime($scheduled_time_clean)) {
+    die("Current time ({$current_time}) is before scheduled time ({$scheduled_time_clean}). Exiting.\n");
 }
 
-// 🔥 2. FETCH PROPERTIES (Jo pichle 24 ghante me add hui hain)
 $stmt = $pdo->prepare("
     SELECT id, title, city, state, price, sqft, auction_date, bank_name, type, image_url 
     FROM properties 
@@ -43,21 +42,19 @@ $stmt->execute();
 $new_properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 if (empty($new_properties)) {
+    $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'last_daily_email_date'")->execute([$current_date]);
     die("No new properties added in the last 24 hours. Exiting.\n");
 }
 
-// 3. Group properties by City
 $grouped_properties = [];
 foreach ($new_properties as $prop) {
     $city = ucwords(strtolower(trim($prop['city'])));
     $grouped_properties[$city][] = $prop;
 }
 
-// 4. Fetch users
 $users_stmt = $pdo->query("SELECT name, email, city FROM users WHERE role = 'user' AND status = 'active'");
 $users = $users_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// 5. Build property list HTML
 $property_list_html = "";
 foreach ($grouped_properties as $city => $props) {
     $property_list_html .= "<h3 style='color:#2563eb; border-bottom:1px solid #eee; padding-bottom:5px; margin-top:20px;'>{$city}</h3>";
@@ -73,7 +70,6 @@ foreach ($grouped_properties as $city => $props) {
     }
 }
 
-// 6. Send Emails
 $sent_count = 0;
 foreach ($users as $user) {
     $sent = sendSystemEmail('daily_props', $user['email'], [
@@ -84,8 +80,8 @@ foreach ($users as $user) {
     if ($sent) $sent_count++;
 }
 
-// 🔥 7. UPDATE LAST SENT DATE (Taki dobara na jaye)
 $update_stmt = $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'last_daily_email_date'");
 $update_stmt->execute([$current_date]);
 
 echo "Process completed. Total emails sent: {$sent_count}\n";
+?>
