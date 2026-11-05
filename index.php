@@ -6,16 +6,12 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/functions.php';
 
-// 🛡️ SECURITY: Block Bad Bots & Rate Limiting
 blockBadBots();
 checkRateLimit(30, 60);
 
-// ---- Safe Date Formatter ----
 if (!function_exists('safeDateFormat')) {
     function safeDateFormat($dateStr) {
-        if (empty($dateStr) || strtotime($dateStr) === false) {
-            return 'N/A';
-        }
+        if (empty($dateStr) || strtotime($dateStr) === false) return 'N/A';
         return date('d M Y', strtotime($dateStr));
     }
 }
@@ -26,9 +22,7 @@ if (!function_exists('tableHasColumn')) {
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?");
             $stmt->execute([$table, $column]);
             return $stmt->fetchColumn() > 0;
-        } catch (Exception $e) {
-            return false;
-        }
+        } catch (Exception $e) { return false; }
     }
 }
 
@@ -40,7 +34,6 @@ $show_images = userHasActiveSubscription($pdo, $user_id);
 
 $all_types = ['Flat', 'Plot', 'Shop', 'Land', 'House', 'Land & Building', 'Car/Vehicle', 'Commercial', 'Office', 'Row House', 'Bungalow', 'Other'];
 
-// 🔥 Search parameters
 $search_city      = $_GET['city'] ?? '';
 $search_locality  = $_GET['locality'] ?? '';
 $search_types     = $_GET['type'] ?? [];
@@ -59,7 +52,6 @@ $limit = 15;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) && $_GET['page'] > 0 ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
 
-// 🔥 TOTAL COUNTS
 $total_auction = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'available'")->fetchColumn();
 $total_customer = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE listing_type = 'sale' OR listing_type IS NULL")->fetchColumn();
 $total_exchange = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status='approved' AND listing_type='exchange'")->fetchColumn();
@@ -107,7 +99,8 @@ if ($tab == 'auction') {
     $total_items = $count_stmt->fetchColumn();
     $total_pages = ceil($total_items / $limit);
 
-    $sql = $base_sql . " ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset";
+    // 🔥 ORDER BY id DESC (यहाँ भी बदलाव किया गया है)
+    $sql = $base_sql . " ORDER BY id DESC LIMIT $limit OFFSET $offset";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params_props);
     $fetched_props = $stmt->fetchAll();
@@ -134,7 +127,7 @@ if ($tab == 'auction') {
     $total_items = $count_stmt->fetchColumn();
     $total_pages = ceil($total_items / $limit);
 
-    $stmt = $pdo->prepare("SELECT *, 'customer' as source FROM user_properties WHERE $customer_where ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset");
+    $stmt = $pdo->prepare("SELECT *, 'customer' as source FROM user_properties WHERE $customer_where ORDER BY id DESC LIMIT $limit OFFSET $offset");
     $stmt->execute($count_params);
     $customer_props = $stmt->fetchAll();
 
@@ -152,12 +145,11 @@ if ($tab == 'auction') {
     $total_items = $count_stmt->fetchColumn();
     $total_pages = ceil($total_items / $limit);
 
-    $ex_stmt = $pdo->prepare("SELECT *, 'exchange' as source FROM user_properties WHERE $exchange_where ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset");
+    $ex_stmt = $pdo->prepare("SELECT *, 'exchange' as source FROM user_properties WHERE $exchange_where ORDER BY id DESC LIMIT $limit OFFSET $offset");
     $ex_stmt->execute($ex_params);
     $exchange_props = $ex_stmt->fetchAll();
 }
 
-// Helper: Render Property Card
 function renderPropertyCard($prop, $show_images, $is_today = false) {
     global $pdo, $user_id;
     $gradients = [
@@ -207,7 +199,6 @@ function renderPropertyCard($prop, $show_images, $is_today = false) {
     <?php
 }
 
-// Helper: Render Pagination
 function renderIndexPagination($total_pages, $current_page, $params) {
     if ($total_pages <= 1) return '';
     $html = '<nav aria-label="Page navigation" class="mt-5"><ul class="pagination justify-content-center flex-wrap">';
@@ -246,7 +237,6 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
         .search-box .btn-primary:hover { transform:scale(1.02); box-shadow:0 8px 25px rgba(37,99,235,0.3); }
         .search-box .btn-reset { border-radius:30px; padding:12px 20px; background:#f1f5f9; color:#475569; border:none; font-weight:600; }
         .search-box .btn-reset:hover { background:#e2e8f0; color:#1e293b; }
-
         .type-selector-wrapper { position: relative; }
         .type-selector-btn { width: 100%; border: none; background: #f1f5f9; border-radius: 20px; padding: 12px 20px; font-size: 0.95rem; text-align: left; cursor: pointer; transition: all 0.2s; display: flex; justify-content: space-between; align-items: center; color: #1e293b; }
         .type-selector-btn:hover { background: #e2e8f0; }
@@ -258,7 +248,6 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
         .type-checkbox-item:hover { background: #f8fafc; }
         .type-checkbox-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #2563eb; margin: 0; }
         .type-checkbox-item.checked { background: #eff6ff; font-weight: 700; color: #1e40af; }
-
         .section-title { font-weight:800; color:#0f172a; margin-bottom:20px; position:relative; }
         .section-title i { margin-right:10px; }
         .property-card:hover { transform:translateY(-10px); box-shadow:0 30px 60px -15px rgba(0,0,0,0.2) !important; }
@@ -275,7 +264,6 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
 </head>
 <body>
     <div class="container mt-4">
-        <!-- SEARCH BOX -->
         <div class="search-box">
             <form method="GET" class="row g-3 align-items-center" id="searchForm">
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
@@ -316,7 +304,6 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
             <?php endif; ?>
         </div>
 
-        <!-- Tabs -->
         <ul class="nav nav-tabs mb-4">
             <li class="nav-item"><a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?<?= http_build_query(array_merge($pagination_params, ['tab' => 'auction', 'page' => 1])) ?>"><i class="fas fa-gavel me-2"></i>Auction Properties <span class="badge-count"><?= $total_auction ?></span></a></li>
             <li class="nav-item"><a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?<?= http_build_query(array_merge($pagination_params, ['tab' => 'customer', 'page' => 1])) ?>"><i class="fas fa-home me-2"></i>Customer Properties <span class="badge-count"><?= $total_customer ?></span></a></li>
