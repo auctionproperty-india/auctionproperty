@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters.';
     } else {
-        // 🔥 चेक करें कि ईमेल पहले से है या नहीं और उसका स्टेटस क्या है
+        // चेक करें कि ईमेल पहले से है या नहीं
         $stmt = $pdo->prepare("SELECT id, status FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $existing_user = $stmt->fetch();
@@ -80,14 +80,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             unset($_SESSION['referral_code']);
 
             // 🔥 1. Send Welcome Email to the User
-            $welcome_sent = sendSystemEmail('registration', $email, [
+            sendSystemEmail('registration', $email, [
                 'name' => $name,
                 'email' => $email,
                 'password' => $password
             ]);
-            
-            // Render लॉग्स में चेक करने के लिए कि ईमेल गया या नहीं
-            error_log("Welcome Email sent to $email: " . ($welcome_sent ? 'SUCCESS' : 'FAILED'));
 
             // 🔥 2. Send Notification to the Sponsor (Upline)
             if ($ref_by) {
@@ -103,7 +100,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $success = 'Account created! Please check your email/spam for login details.';
+            // 🔥 3. REDIRECT TO LOGIN (Taaki refresh karne par form dobara submit na ho)
+            $_SESSION['flash_success'] = 'Account created successfully! Please check your email for login details.';
+            header("Location: login.php");
+            exit; // Script ko yahin rok dein
         }
     }
 }
@@ -147,9 +147,6 @@ include 'header.php';
 
         <?php if ($error): ?>
             <div class="error-msg mb-3"><?= htmlspecialchars($error) ?></div>
-        <?php endif; ?>
-        <?php if ($success): ?>
-            <div class="success-msg mb-3"><?= htmlspecialchars($success) ?> <a href="login.php" class="login-link">Login now</a></div>
         <?php endif; ?>
 
         <form method="POST" id="registerForm">
