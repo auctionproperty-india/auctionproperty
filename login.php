@@ -1,10 +1,31 @@
 <?php
+// ============================================================
+// 🔐 LOGIN PAGE
+// ============================================================
 require_once __DIR__ . '/db.php';
-$error = '';
+require_once __DIR__ . '/functions.php';
 
-// 🔥 SHOW MESSAGE IF LOGGED OUT FROM ANOTHER DEVICE
-if (isset($_GET['msg']) && $_GET['msg'] == 'logged_out_elsewhere') {
-    $error = 'You have been logged out because your account was accessed from another device.';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// अगर यूजर पहले से लॉगिन है, तो सीधे डैशबोर्ड भेजें
+if (isset($_SESSION['user_id'])) {
+    if ($_SESSION['role'] === 'admin') {
+        header("Location: dashboard.php");
+    } else {
+        header("Location: user_dashboard.php");
+    }
+    exit;
+}
+
+$error = '';
+$success = '';
+
+// 🔥 रजिस्ट्रेशन के बाद का सक्सेस मैसेज चेक करें
+if (isset($_SESSION['flash_success'])) {
+    $success = $_SESSION['flash_success'];
+    unset($_SESSION['flash_success']); // एक बार दिखाने के बाद डिलीट कर दें
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -12,33 +33,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
 
     if (empty($email) || empty($password)) {
-        $error = 'Please enter email and password.';
+        $error = 'Please enter both email and password.';
     } else {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND status = 'active'");
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password'])) {
-            // 🔥 Start New Session ID
-            session_regenerate_id(true);
-            
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['user_name'] = $user['name'];
-            $_SESSION['email'] = $user['email'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['is_super_admin'] = !empty($user['is_super_admin']) ? true : false;
-
-            // 🔥 SAVE SESSION ID TO DB (Single Login Logic)
-            $pdo->prepare("UPDATE users SET active_session_id = ? WHERE id = ?")->execute([session_id(), $user['id']]);
-
-            if ($user['role'] == 'admin' || $user['role'] == 'sub_admin') {
-                header("Location: admin_dashboard.php");
-            } elseif ($user['role'] == 'sales') {
-                header("Location: sales_dashboard.php");
+            // अगर अकाउंट डिलीटेड या इनएक्टिव है
+            if ($user['status'] === 'deleted' || $user['status'] === 'inactive') {
+                $error = 'Your account is inactive or deleted. Please contact support.';
             } else {
-                header("Location: user_dashboard.php");
+                // लॉगिन सफल
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['role'] = $user['role'];
+                $_SESSION['name'] = $user['name'];
+                
+                // अगर एडमिन है तो एडमिन डैशबोर्ड, वरना यूजर डैशबोर्ड
+                if ($user['role'] === 'admin') {
+                    header("Location: dashboard.php");
+                } else {
+                    header("Location: user_dashboard.php");
+                }
+                exit;
             }
-            exit;
         } else {
             $error = 'Invalid email or password.';
         }
@@ -47,87 +65,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 include 'header.php';
 ?>
+
 <style>
-    .login-container {
-        min-height: 80vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-    }
-    .login-card {
-        background: rgba(255, 255, 255, 0.92);
-        backdrop-filter: blur(8px);
-        border-radius: 30px;
-        padding: 40px 35px;
-        max-width: 450px;
-        width: 100%;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-        border: 1px solid rgba(255,255,255,0.3);
-    }
-    .login-card h2 {
-        font-weight: 700;
-        color: #0f172a;
-        margin-bottom: 8px;
-    }
-    .login-card p.sub {
-        color: #64748b;
-        margin-bottom: 25px;
-        font-size: 0.95rem;
-    }
-    .login-card .form-label {
-        font-weight: 600;
-        color: #1e293b;
-    }
-    .login-card .form-control {
-        border-radius: 12px;
-        padding: 12px 16px;
-        border: 1px solid #e2e8f0;
-        background: #f8fafc;
-    }
-    .login-card .form-control:focus {
-        border-color: #1e3a8a;
-        box-shadow: 0 0 0 3px rgba(30,58,138,0.1);
-    }
-    .login-card .btn-primary {
-        background: #1e3a8a;
-        border: none;
-        padding: 12px;
-        border-radius: 12px;
-        font-weight: 600;
-        transition: all 0.3s;
-    }
-    .login-card .btn-primary:hover {
-        background: #2563eb;
-        transform: translateY(-2px);
-    }
-    .login-card .register-link {
-        color: #1e3a8a;
-        font-weight: 600;
-        text-decoration: none;
-    }
-    .login-card .register-link:hover {
-        text-decoration: underline;
-    }
-    .login-card .error-msg {
-        background: #fef2f2;
-        border-left: 4px solid #dc2626;
-        padding: 12px;
-        border-radius: 8px;
-        color: #991b1b;
-        font-size: 0.9rem;
-    }
-    @media (max-width: 576px) {
-        .login-card { padding: 30px 20px; }
-    }
+    .login-container { min-height: 80vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .login-card { background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(8px); border-radius: 30px; padding: 40px 35px; max-width: 450px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.3); }
+    .login-card h2 { font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    .login-card p.sub { color: #64748b; margin-bottom: 25px; font-size: 0.95rem; }
+    .login-card .form-label { font-weight: 600; color: #1e293b; }
+    .login-card .form-control { border-radius: 12px; padding: 12px 16px; border: 1px solid #e2e8f0; background: #f8fafc; }
+    .login-card .form-control:focus { border-color: #1e3a8a; box-shadow: 0 0 0 3px rgba(30,58,138,0.1); }
+    .login-card .btn-primary { background: #1e3a8a; border: none; padding: 12px; border-radius: 12px; font-weight: 600; transition: all 0.3s; }
+    .login-card .btn-primary:hover { background: #2563eb; transform: translateY(-2px); }
+    .login-card .register-link { color: #1e3a8a; font-weight: 600; text-decoration: none; }
+    .login-card .register-link:hover { text-decoration: underline; }
+    
+    /* Success & Error Message Styles */
+    .login-card .error-msg { background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px; border-radius: 8px; color: #991b1b; font-size: 0.9rem; margin-bottom: 20px; }
+    .login-card .success-msg { background: #dcfce7; border-left: 4px solid #16a34a; padding: 12px; border-radius: 8px; color: #14532d; font-size: 0.9rem; margin-bottom: 20px; }
 </style>
+
 <div class="login-container">
     <div class="login-card">
         <h2>Welcome Back</h2>
         <p class="sub">Sign in to your account</p>
 
+        <!-- 🔥 सक्सेस मैसेज दिखाएं -->
+        <?php if ($success): ?>
+            <div class="success-msg">
+                <i class="fas fa-check-circle me-1"></i> <?= htmlspecialchars($success) ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- ❌ एरर मैसेज दिखाएं -->
         <?php if ($error): ?>
-            <div class="error-msg mb-3"><?= htmlspecialchars($error) ?></div>
+            <div class="error-msg">
+                <i class="fas fa-exclamation-circle me-1"></i> <?= htmlspecialchars($error) ?>
+            </div>
         <?php endif; ?>
 
         <form method="POST">
@@ -139,12 +112,12 @@ include 'header.php';
                 <label class="form-label">Password</label>
                 <input type="password" name="password" class="form-control" placeholder="••••••••" required>
             </div>
-            <button type="submit" class="btn btn-primary w-100">Sign In</button>
+            
+            <button type="submit" class="btn btn-primary w-100 mt-2">Sign In</button>
         </form>
 
-        <p class="text-center mt-4">
-            Don't have an account? <a href="register.php" class="register-link">Create one</a>
-        </p>
+        <p class="text-center mt-4">Don't have an account? <a href="register.php" class="register-link">Create one</a></p>
     </div>
 </div>
+
 <?php include 'footer.php'; ?>
