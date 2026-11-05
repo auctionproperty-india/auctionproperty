@@ -35,7 +35,7 @@ $active_sub = $sub_stmt->fetch();
 
 if ($active_sub) {
     if ((!empty($active_sub['plan_price']) && $active_sub['plan_price'] > 0) || (strtolower($active_sub['plan_name']) !== 'free' && $active_sub['plan_name'] !== 'No Plan')) {
-        $ba_status = 'active'; // Treat paid users as active BA
+        $ba_status = 'active'; 
     }
 }
 
@@ -66,7 +66,6 @@ $offset = ($page - 1) * $limit;
 // ============================================================
 $count_city_str = '%' . $user_city . '%';
 
-// 1. User City Counts (For Dashboard Header)
 $total_city = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND city ILIKE ?");
 $total_city->execute([$count_city_str]);
 $count_total_city = $total_city->fetchColumn();
@@ -79,7 +78,6 @@ $total_past = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'ava
 $total_past->execute([$count_city_str]);
 $count_past_city = $total_past->fetchColumn();
 
-// 2. Global Counts (For Tabs)
 $global_auction = $pdo->query("SELECT COUNT(*) FROM properties WHERE status = 'available'")->fetchColumn();
 $global_customer = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL)")->fetchColumn();
 $global_exchange = $pdo->query("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange'")->fetchColumn();
@@ -107,18 +105,16 @@ $all_props = [];
 $total_pages = 1;
 
 if ($tab == 'auction') {
-    // Get Total Count for Pagination
     $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' $common_where");
     $count_stmt->execute($params);
     $total_items = $count_stmt->fetchColumn();
     $total_pages = ceil($total_items / $limit);
 
-    // Fetch Paginated Data
-    $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset");
+    // 🔥 ORDER BY id DESC (यहाँ बदलाव किया गया है ताकि नई प्रॉपर्टी सबसे ऊपर आए)
+    $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY id DESC LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $fetched_props = $stmt->fetchAll();
 
-    // Group the fetched data for the UI
     $curr_date = date('Y-m-d');
     foreach($fetched_props as $prop) {
         if (($prop['auction_date'] == $curr_date || (isset($prop['auction_start_time']) && $prop['auction_start_time'] == 'Private Treaty'))) {
@@ -131,26 +127,22 @@ if ($tab == 'auction') {
     }
 
 } elseif ($tab == 'customer') {
-    // Get Total Count for Pagination
     $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where");
     $count_stmt->execute($params);
     $total_items = $count_stmt->fetchColumn();
     $total_pages = ceil($total_items / $limit);
 
-    // Fetch Paginated Data
-    $stmt = $pdo->prepare("SELECT *, 'customer' as source FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset");
+    $stmt = $pdo->prepare("SELECT *, 'customer' as source FROM user_properties WHERE status = 'approved' AND (listing_type = 'sale' OR listing_type IS NULL) $common_where ORDER BY id DESC LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $all_props = $stmt->fetchAll();
 
 } elseif ($tab == 'exchange') {
-    // Get Total Count for Pagination
     $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where");
     $count_stmt->execute($params);
     $total_items = $count_stmt->fetchColumn();
     $total_pages = ceil($total_items / $limit);
 
-    // Fetch Paginated Data
-    $stmt = $pdo->prepare("SELECT *, 'exchange' as source FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset");
+    $stmt = $pdo->prepare("SELECT *, 'exchange' as source FROM user_properties WHERE status = 'approved' AND listing_type = 'exchange' $common_where ORDER BY id DESC LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $all_props = $stmt->fetchAll();
 }
@@ -184,7 +176,6 @@ function renderDashboardCard($prop, $tab = 'auction') {
             <?php endif; ?>
             
             <div class="card-body p-4 d-flex flex-column">
-                <!-- Header -->
                 <div class="d-flex justify-content-between align-items-start mb-3 gap-2">
                     <div style="flex: 1; min-width: 0;">
                         <span class="d-inline-block text-truncate w-100" style="font-size:0.7rem; font-weight:700; text-transform:uppercase; background:rgba(255,255,255,0.15); padding:6px 12px; border-radius:8px; color:<?= $text_color ?>;">
@@ -199,24 +190,20 @@ function renderDashboardCard($prop, $tab = 'auction') {
                     <?php endif; ?>
                 </div>
 
-                <!-- Title -->
                 <h5 class="fw-bold mb-3" style="font-size:1.15rem; line-height:1.35; min-height:2.7em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;" title="<?= htmlspecialchars($prop['title']) ?>">
                     <?= htmlspecialchars($prop['title']) ?>
                 </h5>
 
                 <div class="mt-auto">
-                    <!-- Price -->
                     <div class="mb-2">
                         <div style="font-size:0.65rem; text-transform:uppercase; opacity:0.75; letter-spacing:1px; font-weight:700;">Reserve Price</div>
                         <div style="font-size:1.7rem; font-weight:900; letter-spacing:-0.5px;">₹ <?= indianCurrencyFormat($prop['price']) ?></div>
                     </div>
                     
-                    <!-- City -->
                     <div class="mb-4 d-flex align-items-center gap-2" style="font-size:1.05rem; font-weight:700; opacity:0.95;">
                         <i class="fas fa-map-marker-alt" style="color:#fbbf24; font-size:1.1rem;"></i> <?= htmlspecialchars($prop['city'] ?? '') ?>
                     </div>
                     
-                    <!-- Button -->
                     <div>
                         <?php if($tab == 'exchange'): ?>
                             <a href="exchange_interest.php?id=<?= $prop['id'] ?>" class="btn w-100" style="background:#fbbf24; color:#000; font-weight:800; border-radius:12px; padding:10px;" onclick="return confirm('Owner को notification भेजें?')">🤝 I'm Interested</a>
@@ -234,44 +221,32 @@ function renderDashboardCard($prop, $tab = 'auction') {
 // ---- Render Pagination ----
 function renderPagination($total_pages, $current_page, $params) {
     if ($total_pages <= 1) return '';
-    
     $html = '<nav aria-label="Page navigation" class="mt-5"><ul class="pagination justify-content-center flex-wrap">';
-    
-    // Previous
     $prev_page = max(1, $current_page - 1);
     $prev_link = '?' . http_build_query(array_merge($params, ['page' => $prev_page]));
     $html .= '<li class="page-item ' . ($current_page <= 1 ? 'disabled' : '') . '"><a class="page-link" href="' . $prev_link . '">Previous</a></li>';
-    
-    // Page Numbers
     $start = max(1, $current_page - 2);
     $end = min($total_pages, $current_page + 2);
-    
     if ($start > 1) {
         $html .= '<li class="page-item"><a class="page-link" href="?' . http_build_query(array_merge($params, ['page' => 1])) . '">1</a></li>';
         if ($start > 2) $html .= '<li class="page-item disabled"><span class="page-link">...</span></li>';
     }
-    
     for ($i = $start; $i <= $end; $i++) {
         $html .= '<li class="page-item ' . ($i == $current_page ? 'active' : '') . '"><a class="page-link" href="?' . http_build_query(array_merge($params, ['page' => $i])) . '">' . $i . '</a></li>';
     }
-    
     if ($end < $total_pages) {
         if ($end < $total_pages - 1) $html .= '<li class="page-item disabled"><span class="page-link">...</span></li>';
         $html .= '<li class="page-item"><a class="page-link" href="?' . http_build_query(array_merge($params, ['page' => $total_pages])) . '">' . $total_pages . '</a></li>';
     }
-    
-    // Next
     $next_page = min($total_pages, $current_page + 1);
     $next_link = '?' . http_build_query(array_merge($params, ['page' => $next_page]));
     $html .= '<li class="page-item ' . ($current_page >= $total_pages ? 'disabled' : '') . '"><a class="page-link" href="' . $next_link . '">Next</a></li>';
-    
     $html .= '</ul></nav>';
     return $html;
 }
 
 include 'header.php';
 
-// Pagination Params
 $pagination_params = [
     'view' => $view,
     'tab' => $tab,
@@ -285,26 +260,23 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
 ?>
 
 <style>
+    /* (स्टाइल वही रहेगा जो आपके पास पहले से है) */
     .search-box { background:#ffffff; padding:20px 25px; border-radius:20px; box-shadow:0 10px 30px -10px rgba(0,0,0,0.08); border:1px solid #e2e8f0; margin-bottom:20px; }
     .search-box .form-control { border:none; background:#f1f5f9; border-radius:16px; padding:12px 20px; font-size:0.95rem; }
     .search-box .btn-primary { border-radius:20px; padding:12px 30px; background:linear-gradient(135deg, #1e3a8a, #2563eb); border:none; font-weight:600; }
     .search-box .btn-reset { border-radius:20px; padding:12px 20px; background:#f1f5f9; color:#475569; border:none; font-weight:600; }
-    
     .type-selector-wrapper { position: relative; }
     .type-selector-btn { width: 100%; border: none; background: #f1f5f9; border-radius: 16px; padding: 12px 20px; font-size: 0.95rem; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; color: #1e293b; }
     .type-panel { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: #fff; border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; padding: 10px; z-index: 100; max-height: 300px; overflow-y: auto; min-width: 260px; }
     .type-panel-header { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 0.75rem; color: #64748b; font-weight: 700; display: flex; justify-content: space-between; }
     .type-checkbox-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; cursor: pointer; font-size: 0.88rem; }
     .type-checkbox-item.checked { background: #eff6ff; font-weight: 700; color: #1e40af; }
-
     .nav-tabs .nav-link { font-weight:600; color:#475569; border: none; padding:12px 20px; }
     .nav-tabs .nav-link.active { background: transparent; border-bottom: 3px solid #2563eb; color: #2563eb; }
     .nav-tabs .nav-link .badge-count { background: #e2e8f0; color: #1e293b; font-size: 0.7rem; padding: 2px 10px; border-radius: 30px; margin-left: 8px; font-weight: 700; }
     .nav-tabs .nav-link.active .badge-count { background: #2563eb; color: #ffffff; }
-    
     .section-title { font-weight: 800; color: #0f172a; margin-bottom: 20px; font-size: 1.2rem; }
     .section-title i { margin-right: 10px; }
-
     .premium-modal .modal-content { background: linear-gradient(145deg, #0b1120, #1a2332); border: 2px solid rgba(255, 215, 0, 0.3); border-radius: 32px; color: #fff; }
     .premium-modal .modal-title { font-size: 1.5rem; font-weight: 800; color: #fbbf24; }
     .premium-modal .btn-gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); border: none; color: #0f172a; font-weight: 700; padding: 10px 30px; border-radius: 50px; }
@@ -312,7 +284,6 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
 
 <div class="container-fluid mt-2">
     
-    <!-- 🔥 BA Apply Banner (Only for normal users without paid plan) -->
     <?php if ($ba_status == 'none'): ?>
     <div class="alert alert-warning border-0 shadow-sm mb-4 d-flex justify-content-between align-items-center flex-wrap" style="border-radius: 16px; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);">
         <div>
@@ -327,7 +298,6 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
     </div>
     <?php endif; ?>
     
-    <!-- SEARCH BOX (Show only in All View) -->
     <?php if ($view == 'all'): ?>
         <div class="search-box">
             <form method="GET" class="row g-3 align-items-center">
@@ -378,29 +348,12 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
         </div>
     <?php endif; ?>
 
-    <!-- TABS (Always Visible) -->
     <ul class="nav nav-tabs mb-4">
-        <li class="nav-item">
-            <a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?view=<?= $view ?>&tab=auction&city=<?= urlencode($search_city) ?>">
-                <i class="fas fa-gavel me-2"></i>Auction
-                <span class="badge-count"><?= $global_auction ?></span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?view=<?= $view ?>&tab=customer&city=<?= urlencode($search_city) ?>">
-                <i class="fas fa-home me-2"></i>Customer
-                <span class="badge-count"><?= $global_customer ?></span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link <?= ($tab=='exchange')?'active':'' ?>" href="?view=<?= $view ?>&tab=exchange&city=<?= urlencode($search_city) ?>">
-                <i class="fas fa-exchange-alt me-2"></i>Exchange
-                <span class="badge-count"><?= $global_exchange ?></span>
-            </a>
-        </li>
+        <li class="nav-item"><a class="nav-link <?= ($tab=='auction')?'active':'' ?>" href="?view=<?= $view ?>&tab=auction&city=<?= urlencode($search_city) ?>"><i class="fas fa-gavel me-2"></i>Auction <span class="badge-count"><?= $global_auction ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= ($tab=='customer')?'active':'' ?>" href="?view=<?= $view ?>&tab=customer&city=<?= urlencode($search_city) ?>"><i class="fas fa-home me-2"></i>Customer <span class="badge-count"><?= $global_customer ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= ($tab=='exchange')?'active':'' ?>" href="?view=<?= $view ?>&tab=exchange&city=<?= urlencode($search_city) ?>"><i class="fas fa-exchange-alt me-2"></i>Exchange <span class="badge-count"><?= $global_exchange ?></span></a></li>
     </ul>
 
-    <!-- 🔥 DASHBOARD VIEW (Counters, if not in 'all' view) -->
     <?php if ($view == 'dashboard'): ?>
         <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; background: #fff;">
             <div class="card-body d-flex flex-wrap justify-content-between align-items-center py-3">
@@ -418,66 +371,45 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
         </div>
     <?php endif; ?>
 
-    <!-- CONTENT AREA -->
     <?php if ($tab == 'auction'): ?>
-        
         <?php if ($view == 'all'): ?>
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold m-0"><i class="fas fa-building text-primary"></i> All Auction Properties</h5>
-                <a href="user_dashboard.php" class="btn btn-outline-secondary fw-bold" style="border-radius:20px;">
-                    <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
-                </a>
+                <a href="user_dashboard.php" class="btn btn-outline-secondary fw-bold" style="border-radius:20px;"><i class="fas fa-arrow-left me-1"></i> Back to Dashboard</a>
             </div>
         <?php endif; ?>
 
-        <!-- 1. TODAY'S AUCTIONS -->
         <?php if(count($today_props) > 0): ?>
             <div class="section-title mt-4"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span></div>
             <div class="row"><?php foreach($today_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
         <?php endif; ?>
 
-        <!-- 2. UPCOMING AUCTIONS -->
         <?php if(count($upcoming_props) > 0): ?>
             <div class="section-title mt-4"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span></div>
             <div class="row"><?php foreach($upcoming_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
         <?php endif; ?>
 
-        <!-- 3. PAST AUCTIONS -->
         <?php if(count($past_props) > 0): ?>
             <div class="section-title mt-4"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions <span class="badge bg-secondary rounded-pill ms-2"><?= count($past_props) ?></span></div>
             <div class="row"><?php foreach($past_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
         <?php endif; ?>
 
-        <!-- Empty State -->
         <?php if(count($today_props) == 0 && count($upcoming_props) == 0 && count($past_props) == 0): ?>
             <div class="alert alert-light border text-center py-4 mb-4" style="border-radius:20px;"><p class="mb-0 text-muted fw-bold">📭 No properties found</p></div>
         <?php endif; ?>
 
-        <!-- Pagination Links -->
         <?= renderPagination($total_pages, $page, $pagination_params) ?>
 
     <?php else: ?>
-        
-        <!-- CUSTOMER / EXCHANGE GRID -->
         <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
-            <h5 class="fw-bold m-0">
-                <i class="fas fa-building text-primary"></i> All <?= ucfirst($tab) ?> Properties
-                <span class="badge bg-primary rounded-pill ms-2"><?= count($all_props) ?></span>
-            </h5>
+            <h5 class="fw-bold m-0"><i class="fas fa-building text-primary"></i> All <?= ucfirst($tab) ?> Properties <span class="badge bg-primary rounded-pill ms-2"><?= count($all_props) ?></span></h5>
             <?php if ($view == 'all'): ?>
-                <a href="user_dashboard.php" class="btn btn-outline-secondary fw-bold" style="border-radius:20px;">
-                    <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
-                </a>
+                <a href="user_dashboard.php" class="btn btn-outline-secondary fw-bold" style="border-radius:20px;"><i class="fas fa-arrow-left me-1"></i> Back to Dashboard</a>
             <?php endif; ?>
         </div>
         
         <?php if (count($all_props) > 0): ?>
-            <div class="row">
-                <?php foreach ($all_props as $prop): ?>
-                    <?php renderDashboardCard($prop, $tab); ?>
-                <?php endforeach; ?>
-            </div>
-            <!-- Pagination Links -->
+            <div class="row"><?php foreach ($all_props as $prop): ?><?php renderDashboardCard($prop, $tab); ?><?php endforeach; ?></div>
             <?= renderPagination($total_pages, $page, $pagination_params) ?>
         <?php else: ?>
             <div class="alert alert-light border text-center py-5" style="border-radius:20px;">
@@ -486,12 +418,10 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
                 <p class="text-muted">Try adjusting your search filters or search in a different city.</p>
             </div>
         <?php endif; ?>
-
     <?php endif; ?>
-
 </div>
 
-<!-- ====== 🔥 SPIN WHEEL MODAL ====== -->
+<!-- (मॉडल और जावास्क्रिप्ट का कोड वही रहेगा जो आपके पास पहले से है) -->
 <div class="modal fade" id="spinWheelModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius: 24px; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; border: 2px solid #fbbf24;">
@@ -504,20 +434,15 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
                     <div class="spin-pointer"></div>
                     <div class="spin-wheel" id="visualSpinWheel"></div>
                 </div>
-
                 <div class="mb-3">
                     <span class="badge bg-light text-dark fs-6">Your Coins: <strong id="modalCoinBalance"><?= number_format($user_coins ?? 0) ?></strong></span>
                 </div>
-                
-                <button type="button" class="btn btn-warning btn-lg w-100 fw-bold rounded-pill" id="spinBtn" onclick="startSpinAnimation()">
-                    <i class="fas fa-sync-alt"></i> SPIN NOW
-                </button>
+                <button type="button" class="btn btn-warning btn-lg w-100 fw-bold rounded-pill" id="spinBtn" onclick="startSpinAnimation()"><i class="fas fa-sync-alt"></i> SPIN NOW</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Property Result Modal -->
 <div class="modal fade" id="propertyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff;">
@@ -525,17 +450,12 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
                 <h5 class="modal-title"><i class="fas fa-home me-2" style="color: #fbbf24;"></i> You Won!</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body text-center p-4">
-                <div id="propertyModalContent"></div>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                <a href="#" id="viewPropertyLink" class="btn btn-primary w-100" target="_blank">View Details</a>
-            </div>
+            <div class="modal-body text-center p-4"><div id="propertyModalContent"></div></div>
+            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);"><a href="#" id="viewPropertyLink" class="btn btn-primary w-100" target="_blank">View Details</a></div>
         </div>
     </div>
 </div>
 
-<!-- Admin Notification Popup -->
 <?php if ($notification): ?>
 <div class="modal fade premium-modal" id="notificationModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -564,105 +484,69 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <?php endif; ?>
 
-<!-- ====== SPIN WHEEL JS LOGIC ====== -->
 <script>
 let isSpinning = false;
 let currentRotation = 0;
-
 function startSpinAnimation() {
     if (isSpinning) return;
     isSpinning = true;
-    
     const btn = document.getElementById('spinBtn');
     const wheel = document.getElementById('visualSpinWheel');
-    
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Spinning...';
-
     const spins = Math.floor(Math.random() * 5) + 5; 
     const extraAngle = Math.floor(Math.random() * 360);
     currentRotation += (spins * 360) + extraAngle;
-    
     wheel.style.transform = `rotate(${currentRotation}deg)`;
-
     setTimeout(() => {
-        fetch('spin_ajax.php')
-            .then(res => res.json())
-            .then(data => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-sync-alt"></i> SPIN NOW';
-                isSpinning = false;
-
-                if (data.success) {
-                    if (data.coins > 0) {
-                        animateCoins(data.coins);
-                    }
-                    
-                    const spinModalEl = document.getElementById('spinWheelModal');
-                    const spinModal = bootstrap.Modal.getInstance(spinModalEl);
-                    
-                    if (data.show_property && data.property) {
-                        if (spinModal) spinModal.hide();
-                        spinModalEl.addEventListener('hidden.bs.modal', function () {
-                            showPropertyWin(data.property);
-                        }, { once: true });
-                    } else {
-                        setTimeout(() => {
-                            if (spinModal) spinModal.hide();
-                            showToast(`🪙 +${data.coins} Coins Won!`, '#10b981');
-                        }, 1000);
-                    }
+        fetch('spin_ajax.php').then(res => res.json()).then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync-alt"></i> SPIN NOW';
+            isSpinning = false;
+            if (data.success) {
+                if (data.coins > 0) animateCoins(data.coins);
+                const spinModalEl = document.getElementById('spinWheelModal');
+                const spinModal = bootstrap.Modal.getInstance(spinModalEl);
+                if (data.show_property && data.property) {
+                    if (spinModal) spinModal.hide();
+                    spinModalEl.addEventListener('hidden.bs.modal', function () { showPropertyWin(data.property); }, { once: true });
                 } else {
-                    alert('Error: ' + (data.message || 'Try again later.'));
+                    setTimeout(() => { if (spinModal) spinModal.hide(); showToast(`🪙 +${data.coins} Coins Won!`, '#10b981'); }, 1000);
                 }
-            })
-            .catch(err => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-sync-alt"></i> SPIN NOW';
-                isSpinning = false;
-                alert('Connection error. Try again.');
-            });
+            } else { alert('Error: ' + (data.message || 'Try again later.')); }
+        }).catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync-alt"></i> SPIN NOW';
+            isSpinning = false;
+            alert('Connection error. Try again.');
+        });
     }, 4200); 
 }
-
 function animateCoins(coinsToAdd) {
     const el = document.getElementById('headerCoinBalance');
     const modalEl = document.getElementById('modalCoinBalance');
     if (!el) return;
-    
     let start = parseInt(el.textContent.replace(/,/g, '')) || 0;
     let end = start + coinsToAdd;
     let duration = 1000;
     let startTime = null;
-
     function step(timestamp) {
         if (!startTime) startTime = timestamp;
         let progress = Math.min((timestamp - startTime) / duration, 1);
         let current = Math.floor(progress * (end - start) + start);
-        
         el.textContent = current.toLocaleString();
         if (modalEl) modalEl.textContent = current.toLocaleString();
-        
         if (progress < 1) window.requestAnimationFrame(step);
     }
     window.requestAnimationFrame(step);
 }
-
 function showPropertyWin(prop) {
     const icon = (prop.type && prop.type.toLowerCase().includes('car')) ? '🚗' : '🏠';
     const imageHtml = prop.image_url ? `<img src="${prop.image_url}" style="width:100%; max-height:150px; object-fit:cover; border-radius:12px; margin-bottom:12px;">` : '';
-    
-    document.getElementById('propertyModalContent').innerHTML = `
-        ${imageHtml}
-        <h5 class="fw-bold">${icon} ${prop.title}</h5>
-        <p class="text-warning fw-bold fs-4">₹ ${parseInt(prop.price).toLocaleString('en-IN')}</p>
-        <p><i class="fas fa-map-pin"></i> ${prop.city || 'N/A'}</p>
-    `;
+    document.getElementById('propertyModalContent').innerHTML = `${imageHtml}<h5 class="fw-bold">${icon} ${prop.title}</h5><p class="text-warning fw-bold fs-4">₹ ${parseInt(prop.price).toLocaleString('en-IN')}</p><p><i class="fas fa-map-pin"></i> ${prop.city || 'N/A'}</p>`;
     document.getElementById('viewPropertyLink').href = `property_detail.php?id=${prop.id}&source=auction`;
-    
     new bootstrap.Modal(document.getElementById('propertyModal')).show();
 }
-
 function showToast(msg, bgColor) {
     const toast = document.createElement('div');
     toast.style.cssText = `position:fixed; bottom:20px; right:20px; background:${bgColor}; color:white; padding:16px 24px; border-radius:12px; font-weight:bold; box-shadow:0 10px 30px rgba(0,0,0,0.2); z-index:9999;`;
@@ -670,38 +554,10 @@ function showToast(msg, bgColor) {
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
 }
-
-function toggleTypePanel(e) {
-    e.stopPropagation();
-    const panel = document.getElementById('typePanel');
-    panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
-}
-function onTypeChange(cb) {
-    const label = cb.closest('.type-checkbox-item');
-    if (cb.checked) label.classList.add('checked');
-    else label.classList.remove('checked');
-    updateTypeLabel();
-}
-function updateTypeLabel() {
-    const checked = document.querySelectorAll('#typePanel input[type="checkbox"]:checked');
-    const labelEl = document.getElementById('typeLabel');
-    if (checked.length === 0) labelEl.textContent = 'All Types';
-    else if (checked.length === 1) labelEl.textContent = checked[0].value;
-    else labelEl.textContent = checked[0].value + ' +' + (checked.length - 1) + ' more';
-}
-function clearAllTypes(e) {
-    e.stopPropagation();
-    document.querySelectorAll('#typePanel input[type="checkbox"]').forEach(cb => {
-        cb.checked = false;
-        cb.closest('.type-checkbox-item').classList.remove('checked');
-    });
-    updateTypeLabel();
-}
-document.addEventListener('click', function(e) {
-    const panel = document.getElementById('typePanel');
-    const wrapper = document.querySelector('.type-selector-wrapper');
-    if (panel && wrapper && !wrapper.contains(e.target)) panel.style.display = 'none';
-});
+function toggleTypePanel(e) { e.stopPropagation(); const panel = document.getElementById('typePanel'); panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none'; }
+function onTypeChange(cb) { const label = cb.closest('.type-checkbox-item'); if (cb.checked) label.classList.add('checked'); else label.classList.remove('checked'); updateTypeLabel(); }
+function updateTypeLabel() { const checked = document.querySelectorAll('#typePanel input[type="checkbox"]:checked'); const labelEl = document.getElementById('typeLabel'); if (checked.length === 0) labelEl.textContent = 'All Types'; else if (checked.length === 1) labelEl.textContent = checked[0].value; else labelEl.textContent = checked[0].value + ' +' + (checked.length - 1) + ' more'; }
+function clearAllTypes(e) { e.stopPropagation(); document.querySelectorAll('#typePanel input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.closest('.type-checkbox-item').classList.remove('checked'); }); updateTypeLabel(); }
+document.addEventListener('click', function(e) { const panel = document.getElementById('typePanel'); const wrapper = document.querySelector('.type-selector-wrapper'); if (panel && wrapper && !wrapper.contains(e.target)) panel.style.display = 'none'; });
 </script>
-
 <?php include 'footer.php'; ?>
