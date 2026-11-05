@@ -104,13 +104,32 @@ $past_props = [];
 $all_props = [];
 $total_pages = 1;
 
+// 🔥 UI Counters for sections
+$total_today_display = 0;
+$total_upcoming_display = 0;
+$total_past_display = 0;
+
 if ($tab == 'auction') {
+    // 🔥 Get exact counts for display (Today, Upcoming, Past)
+    $c_today = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty') $common_where");
+    $c_today->execute($params);
+    $total_today_display = $c_today->fetchColumn();
+
+    $c_upcoming = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') $common_where");
+    $c_upcoming->execute($params);
+    $total_upcoming_display = $c_upcoming->fetchColumn();
+
+    $c_past = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty') $common_where");
+    $c_past->execute($params);
+    $total_past_display = $c_past->fetchColumn();
+
+    // Main Pagination Count
     $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE status = 'available' $common_where");
     $count_stmt->execute($params);
     $total_items = $count_stmt->fetchColumn();
     $total_pages = ceil($total_items / $limit);
 
-    // 🔥 ORDER BY id DESC (यहाँ बदलाव किया गया है ताकि नई प्रॉपर्टी सबसे ऊपर आए)
+    // Fetch Paginated Data
     $stmt = $pdo->prepare("SELECT *, 'auction' as source FROM properties WHERE status = 'available' $common_where ORDER BY id DESC LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $fetched_props = $stmt->fetchAll();
@@ -379,22 +398,22 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
             </div>
         <?php endif; ?>
 
-        <?php if(count($today_props) > 0): ?>
-            <div class="section-title mt-4"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= count($today_props) ?></span></div>
+        <?php if($total_today_display > 0 || count($today_props) > 0): ?>
+            <div class="section-title mt-4"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= $total_today_display ?></span></div>
             <div class="row"><?php foreach($today_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
         <?php endif; ?>
 
-        <?php if(count($upcoming_props) > 0): ?>
-            <div class="section-title mt-4"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions <span class="badge bg-primary rounded-pill ms-2"><?= count($upcoming_props) ?></span></div>
+        <?php if($total_upcoming_display > 0 || count($upcoming_props) > 0): ?>
+            <div class="section-title mt-4"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions <span class="badge bg-primary rounded-pill ms-2"><?= $total_upcoming_display ?></span></div>
             <div class="row"><?php foreach($upcoming_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
         <?php endif; ?>
 
-        <?php if(count($past_props) > 0): ?>
-            <div class="section-title mt-4"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions <span class="badge bg-secondary rounded-pill ms-2"><?= count($past_props) ?></span></div>
+        <?php if($total_past_display > 0 || count($past_props) > 0): ?>
+            <div class="section-title mt-4"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions <span class="badge bg-secondary rounded-pill ms-2"><?= $total_past_display ?></span></div>
             <div class="row"><?php foreach($past_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
         <?php endif; ?>
 
-        <?php if(count($today_props) == 0 && count($upcoming_props) == 0 && count($past_props) == 0): ?>
+        <?php if($total_today_display == 0 && $total_upcoming_display == 0 && $total_past_display == 0): ?>
             <div class="alert alert-light border text-center py-4 mb-4" style="border-radius:20px;"><p class="mb-0 text-muted fw-bold">📭 No properties found</p></div>
         <?php endif; ?>
 
