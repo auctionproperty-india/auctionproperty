@@ -276,10 +276,12 @@ $pagination_params = [
     'date' => $search_date
 ];
 if (!empty($search_types)) $pagination_params['type'] = $search_types;
+
+// 🔥 Set Location Text for Section Titles
+$location_text = ($view == 'all') ? 'in India' : 'in ' . htmlspecialchars($user_city ?: 'Your City');
 ?>
 
 <style>
-    /* (स्टाइल वही रहेगा जो आपके पास पहले से है) */
     .search-box { background:#ffffff; padding:20px 25px; border-radius:20px; box-shadow:0 10px 30px -10px rgba(0,0,0,0.08); border:1px solid #e2e8f0; margin-bottom:20px; }
     .search-box .form-control { border:none; background:#f1f5f9; border-radius:16px; padding:12px 20px; font-size:0.95rem; }
     .search-box .btn-primary { border-radius:20px; padding:12px 30px; background:linear-gradient(135deg, #1e3a8a, #2563eb); border:none; font-weight:600; }
@@ -399,17 +401,17 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
         <?php endif; ?>
 
         <?php if($total_today_display > 0 || count($today_props) > 0): ?>
-            <div class="section-title mt-4"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <span class="badge bg-danger rounded-pill ms-2"><?= $total_today_display ?></span></div>
+            <div class="section-title mt-4"><i class="fas fa-bolt" style="color:#dc2626;"></i> Today's Auctions <?= $location_text ?> <span class="badge bg-danger rounded-pill ms-2"><?= $total_today_display ?></span></div>
             <div class="row"><?php foreach($today_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
         <?php endif; ?>
 
         <?php if($total_upcoming_display > 0 || count($upcoming_props) > 0): ?>
-            <div class="section-title mt-4"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions <span class="badge bg-primary rounded-pill ms-2"><?= $total_upcoming_display ?></span></div>
+            <div class="section-title mt-4"><i class="fas fa-clock" style="color:#2563eb;"></i> Upcoming Auctions <?= $location_text ?> <span class="badge bg-primary rounded-pill ms-2"><?= $total_upcoming_display ?></span></div>
             <div class="row"><?php foreach($upcoming_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
         <?php endif; ?>
 
         <?php if($total_past_display > 0 || count($past_props) > 0): ?>
-            <div class="section-title mt-4"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions <span class="badge bg-secondary rounded-pill ms-2"><?= $total_past_display ?></span></div>
+            <div class="section-title mt-4"><i class="fas fa-history" style="color:#64748b;"></i> Past Auctions <?= $location_text ?> <span class="badge bg-secondary rounded-pill ms-2"><?= $total_past_display ?></span></div>
             <div class="row"><?php foreach($past_props as $prop) renderDashboardCard($prop, 'auction'); ?></div>
         <?php endif; ?>
 
@@ -440,7 +442,6 @@ if (!empty($search_types)) $pagination_params['type'] = $search_types;
     <?php endif; ?>
 </div>
 
-<!-- (मॉडल और जावास्क्रिप्ट का कोड वही रहेगा जो आपके पास पहले से है) -->
 <div class="modal fade" id="spinWheelModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius: 24px; background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; border: 2px solid #fbbf24;">
