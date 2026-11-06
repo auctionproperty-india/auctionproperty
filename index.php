@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 🏠 Home Page – With Sub-Filters (Today, Upcoming, Past)
+// 🏠 Home Page – With Sub-Filters (Today, Upcoming) & Search Logic
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/header.php';
@@ -88,25 +88,26 @@ $where_clause_cust = implode(" AND ", $where_cust);
 
 // Fetch Properties Data
 $auction_props = []; $customer_props = []; $exchange_props = []; $total_pages = 1;
-$total_today_display = 0; $total_upcoming_display = 0; $total_past_display = 0;
+$total_today_display = 0; $total_upcoming_display = 0;
 
 if ($tab == 'auction') {
     $base_where = "status = 'available' $where_clause_props";
     
+    // 🔥 Search Logic: Agar Date ya City search ki hai to "Past" bhi dikhao, warna sirf Today/Upcoming
     if(!empty($search_date)) {
         $time_where = " AND auction_date = '" . $search_date . "'";
+    } elseif(!empty($search_city) || !empty($search_locality) || !empty($search_types)) {
+        $time_where = ""; // Show all properties (including past) for city/type search
     } else {
         if ($time_filter == 'upcoming') {
             $time_where = " AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty')";
-        } elseif ($time_filter == 'past') {
-            $time_where = " AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty')";
         } else {
             $time_filter = 'today'; // force today
             $time_where = " AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty')";
         }
     }
 
-    // Counts for Pills
+    // Counts for Pills (Sirf Today aur Upcoming ka)
     $c_today = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE $base_where AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty')");
     $c_today->execute($params_props);
     $total_today_display = $c_today->fetchColumn();
@@ -114,10 +115,6 @@ if ($tab == 'auction') {
     $c_upcoming = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE $base_where AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty')");
     $c_upcoming->execute($params_props);
     $total_upcoming_display = $c_upcoming->fetchColumn();
-
-    $c_past = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE $base_where AND auction_date < CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty')");
-    $c_past->execute($params_props);
-    $total_past_display = $c_past->fetchColumn();
 
     // Main Pagination
     $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE $base_where $time_where");
@@ -232,7 +229,7 @@ $pagination_params = [
     'tab' => $tab, 'city' => $search_city, 'locality' => $search_locality, 'min_price' => $search_min_price, 'max_price' => $search_max_price, 'date' => $search_date
 ];
 if (!empty($search_types)) $pagination_params['type'] = $search_types;
-if ($tab == 'auction' && empty($search_date)) $pagination_params['time_filter'] = $time_filter;
+if ($tab == 'auction' && empty($search_date) && empty($search_city)) $pagination_params['time_filter'] = $time_filter;
 ?>
 <!DOCTYPE html>
 <html lang="hi">
@@ -327,17 +324,14 @@ if ($tab == 'auction' && empty($search_date)) $pagination_params['time_filter'] 
 
         <?php if($tab == 'auction'): ?>
             
-            <!-- 🔥 Sub-Filters (Today, Upcoming, Past) -->
-            <?php if(empty($search_date)): ?>
+            <!-- 🔥 Sub-Filters (Today, Upcoming) -->
+            <?php if(empty($search_date) && empty($search_city)): ?>
             <div class="d-flex gap-2 mb-4 flex-wrap">
                 <a href="?<?= http_build_query(array_merge($pagination_params, ['time_filter'=>'today', 'page'=>1])) ?>" class="btn <?= $time_filter=='today' ? 'btn-danger' : 'btn-outline-danger' ?> fw-bold rounded-pill px-4 shadow-sm">
                     <i class="fas fa-bolt me-1"></i> Today's (<?= $total_today_display ?>)
                 </a>
                 <a href="?<?= http_build_query(array_merge($pagination_params, ['time_filter'=>'upcoming', 'page'=>1])) ?>" class="btn <?= $time_filter=='upcoming' ? 'btn-primary' : 'btn-outline-primary' ?> fw-bold rounded-pill px-4 shadow-sm">
                     <i class="fas fa-clock me-1"></i> Upcoming (<?= $total_upcoming_display ?>)
-                </a>
-                <a href="?<?= http_build_query(array_merge($pagination_params, ['time_filter'=>'past', 'page'=>1])) ?>" class="btn <?= $time_filter=='past' ? 'btn-secondary' : 'btn-outline-secondary' ?> fw-bold rounded-pill px-4 shadow-sm">
-                    <i class="fas fa-history me-1"></i> Past (<?= $total_past_display ?>)
                 </a>
             </div>
             <?php endif; ?>
@@ -351,7 +345,7 @@ if ($tab == 'auction' && empty($search_date)) $pagination_params['time_filter'] 
                 </div>
                 <?= renderIndexPagination($total_pages, $page, $pagination_params) ?>
             <?php else: ?>
-                <div class="no-auction-msg"><i class="fas fa-calendar-times"></i><p class="mt-2 fw-bold">📭 No <?= ucfirst($time_filter) ?> properties found</p></div>
+                <div class="no-auction-msg"><i class="fas fa-calendar-times"></i><p class="mt-2 fw-bold">📭 No properties found</p></div>
             <?php endif; ?>
 
         <?php elseif($tab == 'customer'): ?>
