@@ -43,6 +43,9 @@ $search_date      = $_GET['date']  ?? '';
 $tab              = $_GET['tab'] ?? 'auction';
 $time_filter      = $_GET['time_filter'] ?? 'today'; // Default today
 
+// 🔥 Search Active check (Sirf tab true hoga jab user ne form submit kiya ho)
+$is_search_active = (isset($_GET['city']) || isset($_GET['locality']) || isset($_GET['date']) || isset($_GET['type']) || isset($_GET['min_price']) || isset($_GET['max_price']));
+
 if (!is_array($search_types)) {
     $search_types = $search_types === '' ? [] : [$search_types];
 }
@@ -93,10 +96,10 @@ $total_today_display = 0; $total_upcoming_display = 0;
 if ($tab == 'auction') {
     $base_where = "status = 'available' $where_clause_props";
     
-    // 🔥 Search Logic: Agar Date ya City search ki hai to "Past" bhi dikhao, warna sirf Today/Upcoming
+    // 🔥 Logic: Agar Date/City search ki hai to "Past" bhi dikhao, warna sirf Today/Upcoming
     if(!empty($search_date)) {
         $time_where = " AND auction_date = '" . $search_date . "'";
-    } elseif(!empty($search_city) || !empty($search_locality) || !empty($search_types)) {
+    } elseif($is_search_active) {
         $time_where = ""; // Show all properties (including past) for city/type search
     } else {
         if ($time_filter == 'upcoming') {
@@ -107,7 +110,7 @@ if ($tab == 'auction') {
         }
     }
 
-    // Counts for Pills (Sirf Today aur Upcoming ka)
+    // Counts for Pills
     $c_today = $pdo->prepare("SELECT COUNT(*) FROM properties WHERE $base_where AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty')");
     $c_today->execute($params_props);
     $total_today_display = $c_today->fetchColumn();
@@ -229,7 +232,7 @@ $pagination_params = [
     'tab' => $tab, 'city' => $search_city, 'locality' => $search_locality, 'min_price' => $search_min_price, 'max_price' => $search_max_price, 'date' => $search_date
 ];
 if (!empty($search_types)) $pagination_params['type'] = $search_types;
-if ($tab == 'auction' && empty($search_date) && empty($search_city)) $pagination_params['time_filter'] = $time_filter;
+if ($tab == 'auction' && !$is_search_active) $pagination_params['time_filter'] = $time_filter;
 ?>
 <!DOCTYPE html>
 <html lang="hi">
@@ -325,7 +328,7 @@ if ($tab == 'auction' && empty($search_date) && empty($search_city)) $pagination
         <?php if($tab == 'auction'): ?>
             
             <!-- 🔥 Sub-Filters (Today, Upcoming) -->
-            <?php if(empty($search_date) && empty($search_city)): ?>
+            <?php if(!$is_search_active && empty($search_date)): ?>
             <div class="d-flex gap-2 mb-4 flex-wrap">
                 <a href="?<?= http_build_query(array_merge($pagination_params, ['time_filter'=>'today', 'page'=>1])) ?>" class="btn <?= $time_filter=='today' ? 'btn-danger' : 'btn-outline-danger' ?> fw-bold rounded-pill px-4 shadow-sm">
                     <i class="fas fa-bolt me-1"></i> Today's (<?= $total_today_display ?>)
