@@ -45,12 +45,16 @@ $tab  = $_GET['tab'] ?? 'auction';
 $time_filter = $_GET['time_filter'] ?? 'today'; // Default today
 
 // ---- Search Parameters ----
+// 🔥 Auto-fill user's city for dashboard view
 $search_city      = $_GET['city'] ?? ($view == 'dashboard' ? $user_city : ''); 
 $search_locality  = $_GET['locality'] ?? '';
 $search_types     = $_GET['type'] ?? [];
 $search_min_price = $_GET['min_price'] ?? '';
 $search_max_price = $_GET['max_price'] ?? '';
 $search_date      = $_GET['date']  ?? '';
+
+// 🔥 Search Active check (Sirf tab true hoga jab user ne form submit kiya ho)
+$is_search_active = (isset($_GET['city']) || isset($_GET['locality']) || isset($_GET['date']) || isset($_GET['type']) || isset($_GET['min_price']) || isset($_GET['max_price']));
 
 if (!is_array($search_types)) {
     $search_types = $search_types === '' ? [] : [$search_types];
@@ -106,11 +110,11 @@ $total_upcoming_display = 0;
 if ($tab == 'auction') {
     $base_where = "status = 'available' $common_where";
     
-    // 🔥 Search Logic: Agar Date ya City search ki hai to "Past" bhi dikhao, warna sirf Today/Upcoming
+    // 🔥 Logic: Agar Date/City search ki hai to "Past" bhi dikhao, warna sirf Today/Upcoming
     if(!empty($search_date)) {
         $time_where = " AND auction_date = '" . $search_date . "'";
-    } elseif(!empty($search_city) || !empty($search_locality) || !empty($search_types)) {
-        $time_where = ""; // Show all properties (including past) for city/type search
+    } elseif($is_search_active) {
+        $time_where = ""; // Show all matching properties (including past)
     } else {
         if ($time_filter == 'upcoming') {
             $time_where = " AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty')";
@@ -271,7 +275,7 @@ $pagination_params = [
     'date' => $search_date
 ];
 if (!empty($search_types)) $pagination_params['type'] = $search_types;
-if ($tab == 'auction' && empty($search_date) && empty($search_city)) $pagination_params['time_filter'] = $time_filter;
+if ($tab == 'auction' && !$is_search_active) $pagination_params['time_filter'] = $time_filter;
 
 // 🔥 Set Location Text for Section Titles
 $location_text = ($view == 'all') ? 'in India' : 'in ' . htmlspecialchars($user_city ?: 'Your City');
@@ -381,6 +385,7 @@ $location_text = ($view == 'all') ? 'in India' : 'in ' . htmlspecialchars($user_
                 <div class="d-flex gap-2 flex-wrap mt-2 mt-md-0">
                     <span class="badge bg-primary fs-6 rounded-pill px-3 py-2">Total: <?= $count_total_city ?></span>
                     <span class="badge bg-danger fs-6 rounded-pill px-3 py-2">Today: <?= $count_today_city ?></span>
+                    <!-- 🔥 Past Count hata diya gaya hai -->
                     <a href="user_dashboard.php?view=all&tab=auction" class="btn btn-sm btn-outline-primary fw-bold ms-2" style="border-radius:20px;">More Properties <i class="fas fa-arrow-right ms-1"></i></a>
                 </div>
             </div>
@@ -395,8 +400,8 @@ $location_text = ($view == 'all') ? 'in India' : 'in ' . htmlspecialchars($user_
             </div>
         <?php endif; ?>
 
-        <!-- 🔥 Sub-Filters (Today, Upcoming) -->
-        <?php if(empty($search_date) && empty($search_city)): ?>
+        <!-- 🔥 Sub-Filters (Today, Upcoming) - Ab hamesha dikhega -->
+        <?php if(!$is_search_active && empty($search_date)): ?>
         <div class="d-flex gap-2 mb-4 flex-wrap">
             <a href="?<?= http_build_query(array_merge($pagination_params, ['time_filter'=>'today', 'page'=>1])) ?>" class="btn <?= $time_filter=='today' ? 'btn-danger' : 'btn-outline-danger' ?> fw-bold rounded-pill px-4 shadow-sm">
                 <i class="fas fa-bolt me-1"></i> Today's (<?= $total_today_display ?>)
