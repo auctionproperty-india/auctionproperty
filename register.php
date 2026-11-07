@@ -1,8 +1,7 @@
 <?php
 // ============================================================
-// ✅ REGISTER – With Referral Code + City + Mobile Validation + Welcome Email
+// ✅ REGISTER – With State, Referral, City, Mobile Validation
 // ============================================================
-
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
@@ -22,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
     $city = trim($_POST['city'] ?? '');
+    $state = trim($_POST['state'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirm = $_POST['confirm_password'] ?? '';
 
@@ -32,8 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $phone_clean = preg_replace('/[^0-9]/', '', $phone);
 
-    if (empty($name) || empty($email) || empty($password) || empty($city) || empty($phone)) {
-        $error = 'All fields are required (Name, Email, Phone, City, Password).';
+    if (empty($name) || empty($email) || empty($password) || empty($city) || empty($state) || empty($phone)) {
+        $error = 'All fields are required (Name, Email, Phone, City, State, Password).';
     }
     elseif (!preg_match('/^[6-9][0-9]{9}$/', $phone_clean)) {
         $error = '❌ Invalid Mobile Number! 10 digit का सही Mobile Number डालें (6, 7, 8, 9 से शुरू होना चाहिए)।';
@@ -43,17 +43,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters.';
     } else {
-        // चेक करें कि ईमेल पहले से है या नहीं
         $stmt = $pdo->prepare("SELECT id, status FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $existing_user = $stmt->fetch();
 
-        // फोन नंबर चेक करें
         $stmt = $pdo->prepare("SELECT id FROM users WHERE phone = ?");
         $stmt->execute([$phone_clean]);
         $phone_exists = $stmt->fetch();
 
-        // अगर ईमेल पहले से है लेकिन डिलीटेड है, तो उसे नया मानें
         if ($existing_user && $existing_user['status'] !== 'deleted') {
             $error = 'Email already registered.';
         } elseif ($phone_exists) {
@@ -67,26 +64,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
             $new_code = generateReferralCode();
 
-            // अगर यूजर पहले डिलीट हुआ था (Soft Delete), तो उसे अपडेट करें
             if ($existing_user) {
-                $stmt = $pdo->prepare("UPDATE users SET name=?, phone=?, city=?, password=?, referral_code=?, referred_by=?, status='active', created_at=NOW() WHERE id=?");
-                $stmt->execute([$name, $phone_clean, $city, $hashed, $new_code, $ref_by, $existing_user['id']]);
+                $stmt = $pdo->prepare("UPDATE users SET name=?, phone=?, city=?, state=?, password=?, referral_code=?, referred_by=?, status='active', created_at=NOW() WHERE id=?");
+                $stmt->execute([$name, $phone_clean, $city, $state, $hashed, $new_code, $ref_by, $existing_user['id']]);
             } else {
-                // बिल्कुल नया यूजर बनाएं
-                $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, city, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
-                $stmt->execute([$name, $email, $phone_clean, $city, $hashed, $new_code, $ref_by]);
+                $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, city, state, password, referral_code, referred_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
+                $stmt->execute([$name, $email, $phone_clean, $city, $state, $hashed, $new_code, $ref_by]);
             }
 
             unset($_SESSION['referral_code']);
 
-            // 🔥 1. Send Welcome Email to the User
+            // Welcome Email
             sendSystemEmail('registration', $email, [
                 'name' => $name,
                 'email' => $email,
                 'password' => $password
             ]);
 
-            // 🔥 2. Send Notification to the Sponsor (Upline)
+            // Downline Email
             if ($ref_by) {
                 $sponsor_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
                 $sponsor_stmt->execute([$ref_by]);
@@ -100,10 +95,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // 🔥 3. REDIRECT TO LOGIN (Taaki refresh karne par form dobara submit na ho)
             $_SESSION['flash_success'] = 'Account created successfully! Please check your email for login details.';
             header("Location: login.php");
-            exit; // Script ko yahin rok dein
+            exit;
         }
     }
 }
@@ -121,13 +115,11 @@ include 'header.php';
     .register-card .form-control:focus { border-color: #1e3a8a; box-shadow: 0 0 0 3px rgba(30,58,138,0.1); }
     .register-card .btn-primary { background: #1e3a8a; border: none; padding: 12px; border-radius: 12px; font-weight: 600; transition: all 0.3s; }
     .register-card .btn-primary:hover { background: #2563eb; transform: translateY(-2px); }
-    .register-card .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; transform: none; }
     .register-card .login-link { color: #1e3a8a; font-weight: 600; text-decoration: none; }
     .register-card .login-link:hover { text-decoration: underline; }
     .register-card .error-msg { background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px; border-radius: 8px; color: #991b1b; font-size: 0.9rem; }
     .register-card .success-msg { background: #dcfce7; border-left: 4px solid #16a34a; padding: 12px; border-radius: 8px; color: #14532d; }
     .referral-info { background: #f0f5ff; border-radius: 10px; padding: 10px 14px; font-size: 0.9rem; color: #1e3a8a; border: 1px solid #dbeafe; margin-top: 5px; display: <?= (isset($_SESSION['referral_code']) && !empty($_SESSION['referral_code'])) ? 'block' : 'none' ?>; }
-    .referral-info i { margin-right: 6px; }
     .phone-input-wrapper { position: relative; }
     .phone-input-wrapper .country-prefix { position: absolute; top: 50%; left: 16px; transform: translateY(-50%); color: #64748b; font-weight: 600; pointer-events: none; }
     .phone-input-wrapper input { padding-left: 55px !important; letter-spacing: 2px; font-weight: 600; }
@@ -136,7 +128,6 @@ include 'header.php';
     .phone-status { font-size: 0.75rem; margin-top: 4px; font-weight: 600; display: none; }
     .phone-status.valid { color: #16a34a; display: block; }
     .phone-status.invalid { color: #dc2626; display: block; }
-    .phone-status small { font-weight: 500; }
     @media (max-width: 576px) { .register-card { padding: 30px 20px; } }
 </style>
 
@@ -160,7 +151,11 @@ include 'header.php';
                 </div>
                 <div class="phone-status" id="phoneStatus"></div>
             </div>
-            <div class="mb-3"><label class="form-label">City <span style="color:#dc2626;">*</span></label><input type="text" name="city" class="form-control" required minlength="2"></div>
+            <div class="mb-3"><label class="form-label">City <span style="color:#dc2626;">*</span></label><input type="text" name="city" class="form-control" required minlength="2" placeholder="e.g. Indore"></div>
+            
+            <!-- 🔥 NAYA: State Input -->
+            <div class="mb-3"><label class="form-label">State <span style="color:#dc2626;">*</span></label><input type="text" name="state" class="form-control" required minlength="2" placeholder="e.g. Madhya Pradesh"></div>
+            
             <div class="mb-3"><label class="form-label">Password <span style="color:#dc2626;">*</span></label><input type="password" name="password" class="form-control" required minlength="6"></div>
             <div class="mb-3"><label class="form-label">Confirm Password <span style="color:#dc2626;">*</span></label><input type="password" name="confirm_password" class="form-control" required minlength="6"></div>
 
