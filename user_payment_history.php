@@ -5,6 +5,9 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
+// 🔥 भारतीय समय (IST) सेट करें
+date_default_timezone_set('Asia/Kolkata');
+
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
     header("Location: login.php");
     exit;
@@ -38,7 +41,7 @@ include 'header.php';
                 <table class="table table-hover mb-0">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-4">Date</th>
+                            <th class="ps-4">Date & Time (IST)</th>
                             <th>Package Name</th>
                             <th>Amount</th>
                             <th>Status</th>
@@ -49,7 +52,10 @@ include 'header.php';
                         <?php if(count($history) > 0): ?>
                             <?php foreach($history as $h): ?>
                             <tr>
-                                <td class="ps-4 fw-bold"><?= date('d M Y, h:i A', strtotime($h['created_at'])) ?></td>
+                                <td class="ps-4 fw-bold">
+                                    <!-- 🔥 यहाँ टाइम फॉर्मेट हो रहा है -->
+                                    <?= date('d M Y, h:i A', strtotime($h['created_at'])) ?>
+                                </td>
                                 <td><?= htmlspecialchars($h['package_name']) ?> <?= $h['is_ba_package'] ? '<span class="badge bg-primary ms-1">BA</span>' : '' ?></td>
                                 <td class="fw-bold">₹<?= number_format($h['amount'], 2) ?></td>
                                 <td>
