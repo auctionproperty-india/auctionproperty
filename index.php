@@ -96,16 +96,14 @@ $total_today_display = 0; $total_upcoming_display = 0;
 if ($tab == 'auction') {
     $base_where = "status = 'available' $where_clause_props";
     
-    // 🔥 Logic: Agar Date/City search ki hai to "Past" bhi dikhao, warna sirf Today/Upcoming
+    // 🔥 FIX: अब सर्च करने पर भी Today/Upcoming का फिल्टर हटेगा नहीं
     if(!empty($search_date)) {
         $time_where = " AND auction_date = '" . $search_date . "'";
-    } elseif($is_search_active) {
-        $time_where = ""; // Show all properties (including past) for city/type search
     } else {
         if ($time_filter == 'upcoming') {
             $time_where = " AND auction_date > CURRENT_DATE AND (auction_start_time IS NULL OR auction_start_time != 'Private Treaty')";
         } else {
-            $time_filter = 'today'; // force today
+            $time_filter = 'today'; 
             $time_where = " AND (auction_date = CURRENT_DATE OR auction_start_time = 'Private Treaty')";
         }
     }
@@ -232,7 +230,7 @@ $pagination_params = [
     'tab' => $tab, 'city' => $search_city, 'locality' => $search_locality, 'min_price' => $search_min_price, 'max_price' => $search_max_price, 'date' => $search_date
 ];
 if (!empty($search_types)) $pagination_params['type'] = $search_types;
-if ($tab == 'auction' && !$is_search_active) $pagination_params['time_filter'] = $time_filter;
+if ($tab == 'auction') $pagination_params['time_filter'] = $time_filter;
 ?>
 <!DOCTYPE html>
 <html lang="hi">
@@ -327,8 +325,7 @@ if ($tab == 'auction' && !$is_search_active) $pagination_params['time_filter'] =
 
         <?php if($tab == 'auction'): ?>
             
-            <!-- 🔥 Sub-Filters (Today, Upcoming) -->
-            <?php if(!$is_search_active && empty($search_date)): ?>
+            <!-- 🔥 Sub-Filters (Today, Upcoming) - अब हमेशा दिखेंगे -->
             <div class="d-flex gap-2 mb-4 flex-wrap">
                 <a href="?<?= http_build_query(array_merge($pagination_params, ['time_filter'=>'today', 'page'=>1])) ?>" class="btn <?= $time_filter=='today' ? 'btn-danger' : 'btn-outline-danger' ?> fw-bold rounded-pill px-4 shadow-sm">
                     <i class="fas fa-bolt me-1"></i> Today's (<?= $total_today_display ?>)
@@ -337,7 +334,6 @@ if ($tab == 'auction' && !$is_search_active) $pagination_params['time_filter'] =
                     <i class="fas fa-clock me-1"></i> Upcoming (<?= $total_upcoming_display ?>)
                 </a>
             </div>
-            <?php endif; ?>
 
             <!-- Grid -->
             <?php if(count($auction_props) > 0): ?>
