@@ -43,7 +43,6 @@ $search_date      = $_GET['date']  ?? '';
 $tab              = $_GET['tab'] ?? 'auction';
 $time_filter      = $_GET['time_filter'] ?? 'today'; // Default today
 
-// 🔥 Search Active check (Sirf tab true hoga jab user ne form submit kiya ho)
 $is_search_active = (isset($_GET['city']) || isset($_GET['locality']) || isset($_GET['date']) || isset($_GET['type']) || isset($_GET['min_price']) || isset($_GET['max_price']));
 
 if (!is_array($search_types)) {
@@ -94,9 +93,12 @@ $auction_props = []; $customer_props = []; $exchange_props = []; $total_pages = 
 $total_today_display = 0; $total_upcoming_display = 0;
 
 if ($tab == 'auction') {
-    $base_where = "status = 'available' $where_clause_props";
+    // 🔥 FIX: यहाँ AND की गलती सुधारी गई है
+    $base_where = "status = 'available'";
+    if (!empty($where_clause_props)) {
+        $base_where .= " AND " . $where_clause_props;
+    }
     
-    // 🔥 FIX: अब सर्च करने पर भी Today/Upcoming का फिल्टर हटेगा नहीं
     if(!empty($search_date)) {
         $time_where = " AND auction_date = '" . $search_date . "'";
     } else {
@@ -325,7 +327,7 @@ if ($tab == 'auction') $pagination_params['time_filter'] = $time_filter;
 
         <?php if($tab == 'auction'): ?>
             
-            <!-- 🔥 Sub-Filters (Today, Upcoming) - अब हमेशा दिखेंगे -->
+            <!-- 🔥 Sub-Filters (Today, Upcoming) -->
             <div class="d-flex gap-2 mb-4 flex-wrap">
                 <a href="?<?= http_build_query(array_merge($pagination_params, ['time_filter'=>'today', 'page'=>1])) ?>" class="btn <?= $time_filter=='today' ? 'btn-danger' : 'btn-outline-danger' ?> fw-bold rounded-pill px-4 shadow-sm">
                     <i class="fas fa-bolt me-1"></i> Today's (<?= $total_today_display ?>)
