@@ -12,6 +12,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
 }
 
 $user_id = $_SESSION['user_id'];
+$error_msg = '';
 
 $stmt = $pdo->prepare("SELECT ba_status, name FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
@@ -81,11 +82,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_payment'])) {
         }
     }
 
-    $pdo->prepare("INSERT INTO subscriptions (user_id, package_id, amount, payment_screenshot, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())")->execute([$user_id, $package_id, $amount_paid, $image_url]);
-    $pdo->prepare("UPDATE users SET ba_status = 'pending' WHERE id = ?")->execute([$user_id]);
-
-    header("Location: user_dashboard.php?msg=ba_submitted");
-    exit;
+    try {
+        $pdo->prepare("INSERT INTO subscriptions (user_id, package_id, amount, payment_screenshot, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())")->execute([$user_id, $package_id, $amount_paid, $image_url]);
+        $pdo->prepare("UPDATE users SET ba_status = 'pending' WHERE id = ?")->execute([$user_id]);
+        
+        header("Location: user_dashboard.php?msg=ba_submitted");
+        exit;
+    } catch (PDOException $e) {
+        $error_msg = "Database Error: " . $e->getMessage(); // Agar dobara error aaye to ye message dikhega
+    }
 }
 
 include 'header.php';
@@ -124,6 +129,10 @@ include 'header.php';
                 <h2 class="fw-bold mb-2"><i class="fas fa-handshake text-primary"></i> Business Associate (BA) Program</h2>
                 <p class="text-muted">Select a training package to get your Referral Link and Team Access.</p>
             </div>
+
+            <?php if (!empty($error_msg)): ?>
+                <div class="alert alert-danger fw-bold text-center shadow-sm" style="border-radius:12px;"><?= htmlspecialchars($error_msg) ?></div>
+            <?php endif; ?>
 
             <?php if ($step == 1): ?>
                 <form action="apply_ba.php" method="GET">
