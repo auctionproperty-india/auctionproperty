@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📋 Admin – Pending Subscriptions (Full Updated with MLM Income + Referrer)
+// 📋 Admin – Pending Subscriptions (Full Updated with Reason)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -29,9 +29,8 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
         die("All fields are required.");
     }
 
-    // Fetch subscription data
     $sub_stmt = $pdo->prepare("
-        SELECT s.*, p.duration_months, p.referral_bonus, u.referred_by, u.id as user_id 
+        SELECT s.*, p.duration_months, p.referral_bonus, p.is_ba_package, u.referred_by, u.id as user_id 
         FROM subscriptions s 
         JOIN packages p ON s.package_id = p.id 
         JOIN users u ON s.user_id = u.id 
@@ -40,10 +39,7 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
     $sub_stmt->execute([$sub_id]);
     $data = $sub_stmt->fetch();
 
-    if (!$data) {
-        die("Subscription not found.");
-    }
-
+    if (!$data) die("Subscription not found.");
     if ($data['status'] == 'active') {
         header("Location: admin_subscriptions.php?msg=already_active");
         exit;
@@ -67,22 +63,25 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
         $pdo->prepare("UPDATE subscriptions SET status = 'cancelled' WHERE user_id = ? AND id != ? AND status = 'pending'")
             ->execute([$data['user_id'], $sub_id]);
 
-        // 4. Update user's activation_date
+        // 4. Update user's activation_date & BA Status (If it's a BA package)
         $pdo->prepare("UPDATE users SET activation_date = ? WHERE id = ?")
             ->execute([$start_date, $data['user_id']]);
+        
+        if ($data['is_ba_package']) {
+            $pdo->prepare("UPDATE users SET ba_status = 'active' WHERE id = ?")->execute([$data['user_id']]);
+        }
 
-        // 5. Referral Bonus (Old System - if applicable)
+        // 5. Referral Bonus
         if ($data['referred_by'] && $data['referral_bonus'] > 0) {
             $check = $pdo->prepare("SELECT id FROM user_referral_earnings WHERE user_id = ? AND referred_user_id = ? AND package_id = ?");
             $check->execute([$data['referred_by'], $data['user_id'], $package_id]);
             if ($check->rowCount() == 0) {
-                $pdo->prepare("INSERT INTO user_referral_earnings (user_id, referred_user_id, package_id, amount, status) 
-                               VALUES (?, ?, ?, ?, 'pending')")
+                $pdo->prepare("INSERT INTO user_referral_earnings (user_id, referred_user_id, package_id, amount, status) VALUES (?, ?, ?, ?, 'pending')")
                     ->execute([$data['referred_by'], $data['user_id'], $package_id, $data['referral_bonus']]);
             }
         }
 
-        // 6. Add Income Entry (Accounting)
+        // 6. Add Income Entry
         if (function_exists('addAccountEntry')) {
             $user_stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
             $user_stmt->execute([$data['user_id']]);
@@ -94,7 +93,7 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
             addAccountEntry($pdo, 'income', $amount, $description, 'Auction Subscription', $start_date);
         }
 
-        // 7. DISTRIBUTE MLM INCOME (Direct + Team Turnover)
+        // 7. DISTRIBUTE MLM INCOME
         if (function_exists('distributeIncome')) {
             distributeIncome($pdo, $data['user_id'], $amount, $package_id);
         }
@@ -104,25 +103,37 @@ if (isset($_POST['activate_sub']) && isset($_POST['sub_id'])) {
         exit;
     } catch (Exception $e) {
         $pdo->rollBack();
-        error_log("Approval error: " . $e->getMessage());
-        die("❌ Error approving subscription. Please try again or contact support. Error: " . $e->getMessage());
+        die("❌ Error: " . $e->getMessage());
     }
 }
 
-// ---- Reject ----
+// ---- Reject with Reason ----
 if (isset($_GET['reject'])) {
     if (!hasEditPermission('subscriptions', $pdo)) {
-        die("<div class='alert alert-danger m-5'>❌ You do not have permission to reject subscriptions.</div>");
+        die("<div class='alert alert-danger m-5'>❌ No permission.</div>");
     }
     $sub_id = (int)$_GET['reject'];
-    $pdo->prepare("UPDATE subscriptions SET status = 'rejected' WHERE id = ?")->execute([$sub_id]);
+    $reason = $_GET['reason'] ?? '';
+    
+    // Get user ID and check if BA package
+    $check_stmt = $pdo->prepare("SELECT s.user_id, p.is_ba_package FROM subscriptions s JOIN packages p ON s.package_id = p.id WHERE s.id = ?");
+    $check_stmt->execute([$sub_id]);
+    $sub_data = $check_stmt->fetch();
+
+    // Update subscription
+    $pdo->prepare("UPDATE subscriptions SET status = 'rejected', rejection_reason = ? WHERE id = ?")->execute([$reason, $sub_id]);
+    
+    // 🔥 Reset BA Status if it was a BA package
+    if ($sub_data && $sub_data['is_ba_package']) {
+        $pdo->prepare("UPDATE users SET ba_status = 'none' WHERE id = ?")->execute([$sub_data['user_id']]);
+    }
+    
     header("Location: admin_subscriptions.php?msg=rejected");
     exit;
 }
 
 include 'header.php';
 
-// ---- Fetch pending subscriptions WITH REFERRER ----
 $pendings = $pdo->query("
     SELECT s.*, u.name as uname, u.id as user_id, ref.name as referrer_name, ref.id as referrer_id, p.title as ptitle, pk.name as pkg_name 
     FROM subscriptions s 
@@ -140,14 +151,10 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
 <div class="card-premium">
     <h4><i class="fas fa-clock me-2"></i>Pending Subscriptions</h4>
 
-    <?php
-    if (isset($_GET['msg'])) {
-        $msg = $_GET['msg'];
-        if ($msg == 'approved') echo "<div class='alert alert-success'>✅ Activated! Income distributed to sponsors.</div>";
-        elseif ($msg == 'rejected') echo "<div class='alert alert-warning'>⛔ Rejected!</div>";
-        elseif ($msg == 'already_active') echo "<div class='alert alert-info'>ℹ️ This subscription was already active.</div>";
-    }
-    ?>
+    <?php if (isset($_GET['msg'])): ?>
+        <?php if ($_GET['msg'] == 'approved'): ?><div class='alert alert-success'>✅ Activated! Income distributed.</div><?php endif; ?>
+        <?php if ($_GET['msg'] == 'rejected'): ?><div class='alert alert-warning'>⛔ Rejected & BA status reset!</div><?php endif; ?>
+    <?php endif; ?>
 
     <?php if (count($pendings) > 0): ?>
         <div class="table-responsive">
@@ -155,86 +162,52 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
                 <thead>
                     <tr>
                         <th>User</th>
-                        <th>Referrer (Upline)</th>
+                        <th>Referrer</th>
                         <th>Package</th>
                         <th>Amount</th>
                         <th>UTR</th>
                         <th>Slip</th>
-                        <?php if (hasEditPermission('subscriptions', $pdo)): ?>
-                            <th>Actions</th>
-                        <?php endif; ?>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($pendings as $p): ?>
                         <tr>
-                            <td>
-                                <!-- Clickable User Name -->
-                                <a href="javascript:void(0)" onclick="openUserPopup(<?= $p['user_id'] ?>)" class="fw-bold text-primary text-decoration-none">
-                                    <?= htmlspecialchars($p['uname']) ?>
-                                </a>
-                            </td>
-                            <td>
-                                <?php if (!empty($p['referrer_name'])): ?>
-                                    <!-- Clickable Referrer Name -->
-                                    <a href="javascript:void(0)" onclick="openUserPopup(<?= $p['referrer_id'] ?>)" class="text-info text-decoration-none">
-                                        👤 <?= htmlspecialchars($p['referrer_name']) ?>
-                                    </a>
-                                <?php else: ?>
-                                    <span class="text-muted">—</span>
-                                <?php endif; ?>
-                            </td>
+                            <td><a href="javascript:void(0)" onclick="openUserPopup(<?= $p['user_id'] ?>)" class="fw-bold text-primary"><?= htmlspecialchars($p['uname']) ?></a></td>
+                            <td><?= !empty($p['referrer_name']) ? htmlspecialchars($p['referrer_name']) : '—' ?></td>
                             <td><?= htmlspecialchars($p['pkg_name']) ?></td>
                             <td>₹<?= $p['amount'] ?></td>
                             <td><?= htmlspecialchars($p['utr'] ?? 'N/A') ?></td>
                             <td>
                                 <?php 
-                                $slip_url = '';
-                                $slip_display = '<span class="text-muted">No slip</span>';
-                                if (!empty($p['slip_path'])) {
-                                    $base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
-                                    $slip_url = $base_url . '/' . ltrim($p['slip_path'], '/');
-                                    $full_path = __DIR__ . '/' . $p['slip_path'];
-                                    if (file_exists($full_path)) {
-                                        $slip_display = '<a href="' . $slip_url . '" target="_blank" class="btn btn-sm btn-info">📷 View</a>';
-                                    } else {
-                                        $slip_display = '<span class="text-danger">File missing</span>';
-                                    }
+                                if (!empty($p['payment_screenshot'])) {
+                                    $base_url = (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
+                                    echo '<a href="'.$base_url.'/'.$p['payment_screenshot'].'" target="_blank" class="btn btn-sm btn-info">📷 View</a>';
+                                } else {
+                                    echo '<span class="text-danger">No slip</span>';
                                 }
-                                echo $slip_display;
                                 ?>
                             </td>
-                            <?php if (hasEditPermission('subscriptions', $pdo)): ?>
-                                <td>
-                                    <form method="POST" style="min-width:400px;">
-                                        <input type="hidden" name="sub_id" value="<?= $p['id'] ?>">
-                                        <div class="row g-2">
-                                            <div class="col-4">
-                                                <label class="form-label small">Amount</label>
-                                                <input type="number" step="0.01" name="amount" class="form-control form-control-sm" value="<?= $p['amount'] ?>" required>
-                                            </div>
-                                            <div class="col-4">
-                                                <label class="form-label small">Package</label>
-                                                <select name="package_id" class="form-select form-select-sm" required>
-                                                    <?php foreach ($packages as $pkg): ?>
-                                                        <option value="<?= $pkg['id'] ?>" <?= ($pkg['id'] == $p['package_id']) ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars($pkg['name']) ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                            <div class="col-4">
-                                                <label class="form-label small">Start Date</label>
-                                                <input type="date" name="start_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required>
-                                            </div>
+                            <td>
+                                <form method="POST" style="min-width:350px;">
+                                    <input type="hidden" name="sub_id" value="<?= $p['id'] ?>">
+                                    <div class="row g-2">
+                                        <div class="col-6"><input type="number" name="amount" class="form-control form-control-sm" value="<?= $p['amount'] ?>" required></div>
+                                        <div class="col-6"><input type="date" name="start_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required></div>
+                                        <div class="col-12">
+                                            <select name="package_id" class="form-select form-select-sm" required>
+                                                <?php foreach ($packages as $pkg): ?>
+                                                    <option value="<?= $pkg['id'] ?>" <?= ($pkg['id'] == $p['package_id']) ? 'selected' : '' ?>><?= htmlspecialchars($pkg['name']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
                                         </div>
-                                        <div class="mt-2">
-                                            <button type="submit" name="activate_sub" class="btn btn-success btn-sm" onclick="return confirm('Activate this subscription? MLM Income will be distributed to the sponsor.')">✅ Approve</button>
-                                            <a href="?reject=<?= $p['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Reject this subscription?')">❌ Reject</a>
-                                        </div>
-                                    </form>
-                                </td>
-                            <?php endif; ?>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button type="submit" name="activate_sub" class="btn btn-success btn-sm">✅ Approve</button>
+                                        <button type="button" onclick="rejectWithReason(<?= $p['id'] ?>)" class="btn btn-sm btn-danger">❌ Reject</button>
+                                    </div>
+                                </form>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -249,6 +222,12 @@ $packages = $pdo->query("SELECT * FROM packages ORDER BY name")->fetchAll();
 function openUserPopup(userId) {
     if (!userId || userId == 0) return;
     window.open('admin_user_popup.php?id=' + userId, 'UserDetailsPopup', 'width=800,height=700,scrollbars=yes,resizable=yes');
+}
+function rejectWithReason(id) {
+    let reason = prompt("Enter rejection reason (Optional but recommended):");
+    if (reason !== null) { // If user didn't click Cancel
+        window.location.href = "?reject=" + id + "&reason=" + encodeURIComponent(reason);
+    }
 }
 </script>
 
