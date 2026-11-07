@@ -1,11 +1,11 @@
 <?php
 // ============================================================
-// 💳 User Payment History
+// 💳 User Payment History (Exact IST Timezone Fixed)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
-// 🔥 भारतीय समय (IST) सेट करें
+// डिफ़ॉल्ट टाइमज़ोन सेट करें
 date_default_timezone_set('Asia/Kolkata');
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] == 'admin') {
@@ -53,8 +53,17 @@ include 'header.php';
                             <?php foreach($history as $h): ?>
                             <tr>
                                 <td class="ps-4 fw-bold">
-                                    <!-- 🔥 यहाँ टाइम फॉर्मेट हो रहा है -->
-                                    <?= date('d M Y, h:i A', strtotime($h['created_at'])) ?>
+                                    <?php 
+                                    // 🔥 Timezone Fix: DB से UTC टाइम लेकर IST में कन्वर्ट करें
+                                    try {
+                                        $utc_date = new DateTime($h['created_at'], new DateTimeZone('UTC'));
+                                        $utc_date->setTimezone(new DateTimeZone('Asia/Kolkata'));
+                                        echo $utc_date->format('d M Y, h:i A');
+                                    } catch (Exception $e) {
+                                        // अगर कभी टाइम फॉर्मेट में दिक्कत आए तो सामान्य तरीके से दिखाएं
+                                        echo date('d M Y, h:i A', strtotime($h['created_at']));
+                                    }
+                                    ?>
                                 </td>
                                 <td><?= htmlspecialchars($h['package_name']) ?> <?= $h['is_ba_package'] ? '<span class="badge bg-primary ms-1">BA</span>' : '' ?></td>
                                 <td class="fw-bold">₹<?= number_format($h['amount'], 2) ?></td>
