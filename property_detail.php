@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // 📄 Property Detail – Full Detail for Paid / Basic for Free
-// (Updated: Fixed Free User vs Local City User Message)
+// (Updated: Added Favorite City Feature)
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -39,6 +39,24 @@ if ($source == 'auction') {
 }
 
 if(!$prop) { die("Property not found!"); }
+
+// ============================================================
+// 🔥 FAVORITE CITY LOGIC
+// ============================================================
+$property_city = trim($prop['city'] ?? '');
+$is_favorite = false;
+
+if (!empty($property_city)) {
+    try {
+        $stmt_fav = $pdo->prepare("SELECT id FROM user_favorite_cities WHERE user_id = ? AND city = ?");
+        $stmt_fav->execute([$user_id, $property_city]);
+        if ($stmt_fav->fetch()) {
+            $is_favorite = true;
+        }
+    } catch (Exception $e) {
+        // अगर टेबल नहीं बनी है तो एरर इग्नोर करें
+    }
+}
 
 // ============================================================
 // 🔥 LOGIC: Check Access (Free User vs Local City vs All India)
@@ -158,9 +176,18 @@ if (!$has_subscription && $source == 'auction') {
                     </div>
 
                     <div class="card-body p-4" style="background: #f8fafc;">
-                        <div class="text-center mb-4">
-                            <h4 class="fw-bold"><?= htmlspecialchars($prop['title']) ?></h4>
+                        
+                        <!-- 🔥 FAVORITE BUTTON (Locked View) -->
+                        <div class="text-center mb-3">
+                            <h4 class="fw-bold mb-2"><?= htmlspecialchars($prop['title']) ?></h4>
                             <span class="badge bg-primary px-3 py-2 rounded-pill">Bank Auction</span>
+                            <?php if(!empty($property_city)): ?>
+                            <div class="mt-3">
+                                <button type="button" id="favBtn" class="btn <?= $is_favorite ? 'btn-warning' : 'btn-outline-warning' ?> fw-bold rounded-pill px-4" onclick="toggleFavorite('<?= htmlspecialchars($property_city) ?>')">
+                                    <i class="fas fa-star"></i> <span id="favBtnText"><?= $is_favorite ? 'Remove ' . htmlspecialchars($property_city) . ' from Favorites' : 'Add ' . htmlspecialchars($property_city) . ' to Favorites' ?></span>
+                                </button>
+                            </div>
+                            <?php endif; ?>
                         </div>
 
                         <!-- Visible Basic Info -->
@@ -208,13 +235,10 @@ if (!$has_subscription && $source == 'auction') {
                                 <h4 class="fw-bold text-dark mb-2">Unlock Full Property Details</h4>
                                 
                                 <?php if ($is_city_mismatch): ?>
-                                    <!-- Local City Package User, but looking at another city -->
                                     <p class="text-danger fw-bold mb-4 small">⚠️ You have a Local City Package. Kindly buy All India Access package to view properties outside <?= htmlspecialchars($user_city) ?>.</p>
                                 <?php elseif ($is_free_user): ?>
-                                    <!-- Free User -->
                                     <p class="text-primary fw-bold mb-4 small">🔒 Kindly buy any package - Local City access or All India access, whichever you want now.</p>
                                 <?php else: ?>
-                                    <!-- Default Fallback -->
                                     <p class="text-muted mb-4 small">Get access to Area (Sq Ft), EMD, Contact Info, Address & more.</p>
                                 <?php endif; ?>
                                 
@@ -262,6 +286,36 @@ if (!$has_subscription && $source == 'auction') {
             </div>
         </div>
     </div>
+
+    <!-- 🔥 FAVORITE JS -->
+    <script>
+    function toggleFavorite(city) {
+        const btn = document.getElementById('favBtn');
+        const btnText = document.getElementById('favBtnText');
+        
+        const formData = new FormData();
+        formData.append('city', city);
+
+        fetch('favorite_city_ajax.php', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                if (data.action === 'added') {
+                    btn.classList.remove('btn-outline-warning');
+                    btn.classList.add('btn-warning');
+                    btnText.textContent = 'Remove ' + city + ' from Favorites';
+                } else {
+                    btn.classList.remove('btn-warning');
+                    btn.classList.add('btn-outline-warning');
+                    btnText.textContent = 'Add ' + city + ' to Favorites';
+                }
+            } else {
+                alert(data.message);
+            }
+        }).catch(err => console.error(err));
+    }
+    </script>
+
     <?php 
     include 'footer.php'; 
     exit;
@@ -648,6 +702,16 @@ if ($source == 'auction') {
                                 <span class="sb-badge ms-1" style="background:#d1fae5; color:#065f46; border-color:#6ee7b7;"><i class="fas fa-home"></i> Customer Listed</span>
                             <?php endif; ?>
                         </div>
+                        
+                        <!-- 🔥 FAVORITE BUTTON (Paid View) -->
+                        <?php if(!empty($property_city)): ?>
+                        <div class="mt-3">
+                            <button type="button" id="favBtn" class="btn <?= $is_favorite ? 'btn-warning' : 'btn-outline-warning' ?> fw-bold rounded-pill px-4" onclick="toggleFavorite('<?= htmlspecialchars($property_city) ?>')">
+                                <i class="fas fa-star"></i> <span id="favBtnText"><?= $is_favorite ? 'Remove ' . htmlspecialchars($property_city) . ' from Favorites' : 'Add ' . htmlspecialchars($property_city) . ' to Favorites' ?></span>
+                            </button>
+                        </div>
+                        <?php endif; ?>
+
                     </div>
                     <div class="sb-price-tag">
                         <div class="label">Reserve Price</div>
@@ -860,16 +924,14 @@ if ($source == 'auction') {
     </div>
 </div>
 
-<!-- 🔥 Gallery JS: Click thumbnail to swap main image -->
+<!-- 🔥 Gallery & Favorite JS -->
 <script>
 function swapMainImage(url, elem) {
-    // Swap main image
     const mainImg = document.getElementById('mainImageDisplay');
     const mainLink = document.getElementById('mainImageLink');
     if (mainImg) mainImg.src = url;
     if (mainLink) mainLink.href = url;
 
-    // Highlight selected thumbnail
     document.querySelectorAll('.sb-gallery-item').forEach(el => {
         el.style.borderColor = '#e8edf4';
         el.style.boxShadow = 'none';
@@ -879,10 +941,35 @@ function swapMainImage(url, elem) {
         elem.style.boxShadow = '0 8px 22px rgba(37,99,235,0.3)';
     }
 
-    // Scroll to main image
     if (mainImg) {
         mainImg.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+}
+
+function toggleFavorite(city) {
+    const btn = document.getElementById('favBtn');
+    const btnText = document.getElementById('favBtnText');
+    
+    const formData = new FormData();
+    formData.append('city', city);
+
+    fetch('favorite_city_ajax.php', { method: 'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            if (data.action === 'added') {
+                btn.classList.remove('btn-outline-warning');
+                btn.classList.add('btn-warning');
+                btnText.textContent = 'Remove ' + city + ' from Favorites';
+            } else {
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-outline-warning');
+                btnText.textContent = 'Add ' + city + ' to Favorites';
+            }
+        } else {
+            alert(data.message);
+        }
+    }).catch(err => console.error(err));
 }
 </script>
 
