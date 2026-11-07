@@ -132,6 +132,15 @@ if ($is_logged_in && $role == 'user') {
     $user_coins = $user_sidebar['coins'] ?? 0;
     $ba_status = $user_sidebar['ba_status'] ?? 'none';
 
+    // 🔥 Check if last BA request was rejected
+    if ($ba_status == 'pending' || $ba_status == 'none') {
+        $rej_stmt = $pdo->prepare("SELECT status FROM subscriptions WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+        $rej_stmt->execute([$user_id]);
+        if ($rej_stmt->fetchColumn() == 'rejected') {
+            $ba_status = 'none'; // Show Apply Button
+        }
+    }
+
     $sub_info = safeFetch($pdo, "SELECT s.start_date, s.end_date, p.name as plan_name, p.price as plan_price 
                                  FROM subscriptions s 
                                  LEFT JOIN packages p ON s.package_id = p.id 
@@ -328,7 +337,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 <?php endif; ?>
 
 <!-- EXISTING SIDEBAR (Logged in users) -->
-<!-- 🔥 यहाँ कंडीशन लगा दी गई है ताकि index, login, register पर साइडबार न दिखे -->
 <?php if ($is_logged_in && !in_array($current_page, ['index.php', 'login.php', 'register.php'])): ?>
 <div class="sidebar-overlay-main" id="sidebarOverlayMain" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="mainSidebar">
@@ -540,6 +548,9 @@ $current_imp_session = $is_impersonating ? session_id() : '';
                 </a>
             </div>
         </div>
+
+        <!-- 🔥 NEW: Payment History Link -->
+        <a href="user_payment_history.php" class="<?= $current_page == 'user_payment_history.php' ? 'active' : '' ?>"><i class="fas fa-history text-info"></i> <span>Payment History</span></a>
         
         <?php if ($ba_status == 'active'): ?>
             <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>"><i class="fas fa-users"></i> <span>My Team</span></a>
