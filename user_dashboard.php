@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – With Sub-Filters (Today, Upcoming) & BA Reject Alert
+// 👤 User Dashboard – With Sub-Filters & Video Meeting Button
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -283,6 +283,15 @@ if ($tab == 'auction') $pagination_params['time_filter'] = $time_filter;
         <i class="fas fa-clock"></i> <strong>BA Application Pending:</strong> Your application is under review.
     </div>
     <?php endif; ?>
+
+    <!-- 🔥 VIDEO MEETING BUTTON (NEW) -->
+    <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex justify-content-between align-items-center flex-wrap" style="border-radius: 16px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);">
+        <div>
+            <h5 class="fw-bold text-dark mb-1"><i class="fas fa-video text-danger"></i> Join Video Meeting</h5>
+            <p class="text-muted mb-0" style="font-size:0.95rem;">Click here to check your scheduled video meetings or join a live call.</p>
+        </div>
+        <a href="user_meetings.php" class="btn btn-danger fw-bold px-4 py-2 mt-2 mt-md-0" style="border-radius: 20px;">My Meetings <i class="fas fa-arrow-right ms-1"></i></a>
+    </div>
     
     <!-- Rest of the file remains exactly the same... -->
     <?php if ($view == 'all'): ?>
