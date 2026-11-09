@@ -179,7 +179,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         input, textarea, select, [contenteditable="true"] { user-select: text !important; }
         body.top-nav-hidden { padding-top: 0; }
         
-        /* 🔥 यह CSS सुनिश्चित करता है कि पब्लिक पेजों पर साइडबार की जगह न रहे */
         body.page-public .main-content { margin-left: 0 !important; }
 
         .impersonate-banner { position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; padding: 12px 20px; text-align: center; z-index: 99999; font-size: 0.9rem; font-weight: 500; display: flex; justify-content: center; align-items: center; gap: 14px; }
@@ -284,7 +283,6 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         .target-box { background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; padding: 15px; margin: 10px 10px 20px 10px; }
     </style>
 </head>
-<!-- 🔥 यहाँ page-public क्लास जोड़ी गई है ताकि index, login और register पर साइडबार की जगह न रहे -->
 <body class="role-<?= $is_logged_in ? $role : 'guest' ?> <?= $hide_top_nav ? 'top-nav-hidden' : '' ?> <?= $is_impersonating ? 'impersonate-mode' : '' ?> <?= in_array($current_page, ['login.php', 'register.php', 'index.php']) ? 'page-public' : '' ?>">
 
 <?php if ($is_impersonating): ?>
@@ -348,6 +346,11 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <!-- ============================================================ -->
         <a href="admin_dashboard.php" class="<?= $current_page == 'admin_dashboard.php' ? 'active' : '' ?>">
             <i class="fas fa-th-large"></i> <span>Dashboard</span>
+        </a>
+
+        <!-- 🔥 ADMIN MEETING LINK -->
+        <a href="admin_create_meeting.php" class="<?= $current_page == 'admin_create_meeting.php' ? 'active' : '' ?>">
+            <i class="fas fa-video text-danger"></i> <span>Create Meeting</span>
         </a>
 
         <!-- 🔷 1. PROPERTIES -->
@@ -478,6 +481,12 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         <!-- SALES SIDEBAR -->
         <!-- ============================================================ -->
         <a href="sales_dashboard.php" class="<?= $current_page == 'sales_dashboard.php' ? 'active' : '' ?>"><i class="fas fa-th-large"></i> <span>Dashboard</span></a>
+        
+        <!-- 🔥 SALES MEETING LINK -->
+        <a href="admin_create_meeting.php" class="<?= $current_page == 'admin_create_meeting.php' ? 'active' : '' ?>">
+            <i class="fas fa-video text-danger"></i> <span>Create Meeting</span>
+        </a>
+
         <a href="sales_properties.php" class="<?= $current_page == 'sales_properties.php' ? 'active' : '' ?>"><i class="fas fa-building"></i> <span>All Properties</span></a>
         <a href="sales_leads.php" class="<?= $current_page == 'sales_leads.php' ? 'active' : '' ?>"><i class="fas fa-tasks"></i> <span>My Leads</span></a>
         <a href="sales_lead_upload.php" class="<?= $current_page == 'sales_lead_upload.php' ? 'active' : '' ?>"><i class="fas fa-upload"></i> <span>Upload Leads</span></a>
@@ -551,6 +560,9 @@ $current_imp_session = $is_impersonating ? session_id() : '';
 
         <!-- 🔥 NEW: Payment History Link -->
         <a href="user_payment_history.php" class="<?= $current_page == 'user_payment_history.php' ? 'active' : '' ?>"><i class="fas fa-history text-info"></i> <span>Payment History</span></a>
+        
+        <!-- 🔥 NEW: User Video Meetings Link -->
+        <a href="user_meetings.php" class="<?= $current_page == 'user_meetings.php' ? 'active' : '' ?>"><i class="fas fa-video text-danger"></i> <span>Video Meetings</span></a>
         
         <?php if ($ba_status == 'active'): ?>
             <a href="user_team.php" class="<?= $current_page == 'user_team.php' ? 'active' : '' ?>"><i class="fas fa-users"></i> <span>My Team</span></a>
