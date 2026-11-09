@@ -179,6 +179,7 @@ $current_imp_session = $is_impersonating ? session_id() : '';
         input, textarea, select, [contenteditable="true"] { user-select: text !important; }
         body.top-nav-hidden { padding-top: 0; }
         
+        /* 🔥 यह CSS सुनिश्चित करता है कि पब्लिक पेजों पर साइडबार की जगह न रहे */
         body.page-public .main-content { margin-left: 0 !important; }
 
         .impersonate-banner { position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; padding: 12px 20px; text-align: center; z-index: 99999; font-size: 0.9rem; font-weight: 500; display: flex; justify-content: center; align-items: center; gap: 14px; }
