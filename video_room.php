@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📹 Video Room (Jitsi Meet + Dynamic Fake Chat & Viewers)
+// 📹 Video Room (Jitsi Meet + Multi-host Access)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -13,20 +13,35 @@ if (!isset($_SESSION['user_id'])) {
 $code = $_GET['code'] ?? '';
 if (empty($code)) { die("Invalid meeting link."); }
 
-// 🔥 फेक यूजर्स का काउंट सेट करें (URL में &fakes=500 लिखकर बढ़ा सकते हैं)
 $fake_viewers = isset($_GET['fakes']) ? (int)$_GET['fakes'] : 100; 
 
-// वेरिफाई करें कि मीटिंग मौजूद है और यूजर इसका हकदार है
 $stmt = $pdo->prepare("SELECT * FROM video_meetings WHERE meeting_code = ?");
 $stmt->execute([$code]);
 $meeting = $stmt->fetch();
 
 if (!$meeting) { die("Meeting not found."); }
 
-$is_host = ($_SESSION['user_id'] == $meeting['host_id']);
-$is_client = ($_SESSION['user_id'] == $meeting['user_id']);
+$current_user_id = $_SESSION['user_id'];
+$current_role = $_SESSION['role'] ?? 'user';
 
-if (!$is_host && !$is_client && $_SESSION['role'] != 'admin') {
+// 🔥 AUTHORIZATION LOGIC (कौन जॉइन कर सकता है)
+$can_join = false;
+
+if ($current_role == 'admin') {
+    $can_join = true; // एडमिन हमेशा जॉइन कर सकता है
+} elseif ($meeting['is_public']) {
+    $can_join = true; // पब्लिक मीटिंग में कोई भी जॉइन कर सकता है
+} elseif ($meeting['user_id'] == $current_user_id) {
+    $can_join = true; // खास यूजर
+} else {
+    // चेक करें कि कहीं यह यूजर Co-host में से एक है या नहीं
+    $host_ids = explode(',', $meeting['host_ids']);
+    if (in_array($current_user_id, $host_ids)) {
+        $can_join = true;
+    }
+}
+
+if (!$can_join) {
     die("You are not authorized to join this meeting.");
 }
 
@@ -46,79 +61,41 @@ $display_name = $_SESSION['name'] ?? 'User';
         .layout { display: flex; height: 100vh; }
         #meet-container { flex: 1; height: 100%; }
         
-        /* 🔥 Fake Live Chat Sidebar */
         .fake-chat-sidebar {
-            width: 300px;
-            background: #1e293b;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            border-left: 1px solid #334155;
+            width: 300px; background: #1e293b; color: white; display: flex; flex-direction: column; border-left: 1px solid #334155;
         }
         .chat-header {
-            padding: 15px;
-            background: #0f172a;
-            border-bottom: 1px solid #334155;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 15px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;
         }
         .live-badge {
-            background: #ef4444;
-            color: white;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            animation: pulse 1.5s infinite;
+            background: #ef4444; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; animation: pulse 1.5s infinite;
         }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         .chat-messages {
-            flex: 1;
-            padding: 15px;
-            overflow-y: auto;
-            font-size: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            flex: 1; padding: 15px; overflow-y: auto; font-size: 14px; display: flex; flex-direction: column; gap: 10px;
         }
         .chat-msg {
-            background: #334155;
-            padding: 8px 12px;
-            border-radius: 8px;
-            animation: slideIn 0.3s ease-out;
+            background: #334155; padding: 8px 12px; border-radius: 8px; animation: slideIn 0.3s ease-out;
         }
         .chat-msg .name { color: #38bdf8; font-weight: bold; font-size: 12px; display: block; margin-bottom: 2px; }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body>
 
 <div class="layout">
-    <!-- असली वीडियो कॉल यहाँ चलेगा -->
     <div id="meet-container"></div>
 
-    <!-- 🔥 फेक चैट और काउंटर यहाँ दिखेगा -->
     <div class="fake-chat-sidebar">
         <div class="chat-header">
             <div class="fw-bold"><i class="fas fa-comments"></i> Live Chat</div>
             <div class="live-badge"><i class="fas fa-circle"></i> <span id="viewerCount"><?= $fake_viewers ?></span> Watching</div>
         </div>
-        <div class="chat-messages" id="chatMessages">
-            <!-- मैसेजज JavaScript से आएंगे -->
-        </div>
+        <div class="chat-messages" id="chatMessages"></div>
     </div>
 </div>
 
 <script>
-    // 1. Jitsi Meet Setup
     const domain = 'meet.jit.si';
     const options = {
         roomName: 'PrimePropertyMeeting_<?= htmlspecialchars($code) ?>',
@@ -139,67 +116,42 @@ $display_name = $_SESSION['name'] ?? 'User';
     };
     const api = new JitsiMeetExternalAPI(domain, options);
 
-    // 2. 🔥 Fake Chat & Viewer Count Logic
     const fakeNames = ["Rahul S.", "Priya M.", "Amit K.", "Neha T.", "Vikram R.", "Sneha P.", "Arjun D.", "Kiran B.", "Rohit V.", "Anjali D."];
     const fakeMessages = [
-        "Hello everyone! 👋",
-        "Is this property still available?",
-        "Location is really good.",
-        "Price kya final hai?",
-        "Can you share the brochure?",
-        "Very interested, please share details.",
-        "Nice property!",
-        "What is the EMI plan?",
-        "I have visited this place, it's awesome.",
-        "Any negotiation possible?",
-        "Documents clear hain kya?",
-        "Brokerage charges kya hain?"
+        "Hello everyone! 👋", "Is this property still available?", "Location is really good.", "Price kya final hai?",
+        "Can you share the brochure?", "Very interested, please share details.", "Nice property!", "What is the EMI plan?",
+        "I have visited this place, it's awesome.", "Any negotiation possible?", "Documents clear hain kya?", "Brokerage charges kya hain?"
     ];
 
     const chatBox = document.getElementById('chatMessages');
     const viewerCountEl = document.getElementById('viewerCount');
-    
-    // 🔥 बेस काउंट (PHP से आ रहा है)
     let baseFakes = <?= $fake_viewers ?>; 
 
-    function getRandom(min, max) {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
+    function getRandom(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
     function addFakeMessage() {
         const name = fakeNames[getRandom(0, fakeNames.length - 1)];
         const msg = fakeMessages[getRandom(0, fakeMessages.length - 1)];
-
         const msgDiv = document.createElement('div');
         msgDiv.className = 'chat-msg';
         msgDiv.innerHTML = `<span class="name">${name}</span>${msg}`;
-        
         chatBox.appendChild(msgDiv);
         chatBox.scrollTop = chatBox.scrollHeight; 
-
-        if (chatBox.children.length > 20) {
-            chatBox.removeChild(chatBox.firstChild);
-        }
+        if (chatBox.children.length > 20) chatBox.removeChild(chatBox.firstChild);
     }
 
-    // हर 4 से 8 सेकंड में एक नया फेक मैसेज आएगा
     setInterval(addFakeMessage, getRandom(4000, 8000));
     setTimeout(addFakeMessage, 1000);
     setTimeout(addFakeMessage, 3000);
 
-    // 🔥 फेक व्यूअर काउंट (जो आपने सेट किया है उसके आस-पास घूमेगा)
     setInterval(() => {
         let currentCount = parseInt(viewerCountEl.innerText);
-        let change = getRandom(-2, 4); // 2 कम या 4 ज्यादा
+        let change = getRandom(-2, 4); 
         let newCount = currentCount + change;
-        
-        // बेस काउंट से 10 कम या 20 ज्यादा तक ही जाने दें
         if (newCount < baseFakes - 10) newCount = baseFakes - 10; 
         if (newCount > baseFakes + 20) newCount = baseFakes + 20; 
-        
         viewerCountEl.innerText = newCount;
-    }, 8000); // हर 8 सेकंड में बदलेगा
-
+    }, 8000);
 </script>
 
 </body>
