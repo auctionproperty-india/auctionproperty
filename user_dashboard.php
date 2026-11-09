@@ -1,10 +1,13 @@
 <?php
 // ============================================================
-// 👤 User Dashboard – With Sub-Filters & Video Meeting Button
+// 👤 User Dashboard – With Sub-Filters & 30-Min Meeting Alert
 // ============================================================
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
+
+// 🔥 भारतीय समय (IST) सेट करें
+date_default_timezone_set('Asia/Kolkata');
 
 blockBadBots();
 checkRateLimit(30, 60);
@@ -48,6 +51,23 @@ if ($ba_status == 'none' || $ba_status == 'pending') {
         $ba_status = 'none'; // Show apply button
         $rej_reason = $last_req['rejection_reason'] ?? '';
     }
+}
+
+// 🔥 CHECK FOR UPCOMING VIDEO MEETING (Only 30 mins before)
+$upcoming_meeting = null;
+try {
+    $meet_stmt = $pdo->prepare("
+        SELECT * FROM video_meetings 
+        WHERE user_id = ? 
+        AND scheduled_at <= (NOW() + INTERVAL '30 minutes')
+        AND scheduled_at >= (NOW() - INTERVAL '2 hours')
+        AND status = 'scheduled'
+        ORDER BY scheduled_at ASC LIMIT 1
+    ");
+    $meet_stmt->execute([$user_id]);
+    $upcoming_meeting = $meet_stmt->fetch();
+} catch (Exception $e) {
+    // Ignore error if table doesn't exist yet
 }
 
 // ---- Views and Tabs ----
@@ -284,14 +304,25 @@ if ($tab == 'auction') $pagination_params['time_filter'] = $time_filter;
     </div>
     <?php endif; ?>
 
-    <!-- 🔥 VIDEO MEETING BUTTON (NEW) -->
-    <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex justify-content-between align-items-center flex-wrap" style="border-radius: 16px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);">
+    <!-- 🔥 UPCOMING MEETING ALERT (Only shows 30 mins before) -->
+    <?php if ($upcoming_meeting): ?>
+    <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex justify-content-between align-items-center flex-wrap" style="border-radius: 16px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-left: 5px solid #dc2626;">
         <div>
             <h5 class="fw-bold text-dark mb-1"><i class="fas fa-video text-danger"></i> Join Video Meeting</h5>
-            <p class="text-muted mb-0" style="font-size:0.95rem;">Click here to check your scheduled video meetings or join a live call.</p>
+            <p class="text-dark mb-0 fw-bold" style="font-size:0.95rem;">
+                Your meeting "<strong><?= htmlspecialchars($upcoming_meeting['title']) ?></strong>" is scheduled at 
+                <?php 
+                    $utc_date = new DateTime($upcoming_meeting['scheduled_at'], new DateTimeZone('UTC'));
+                    $utc_date->setTimezone(new DateTimeZone('Asia/Kolkata'));
+                    echo $utc_date->format('h:i A'); 
+                ?>. Click here to join.
+            </p>
         </div>
-        <a href="user_meetings.php" class="btn btn-danger fw-bold px-4 py-2 mt-2 mt-md-0" style="border-radius: 20px;">My Meetings <i class="fas fa-arrow-right ms-1"></i></a>
+        <a href="video_room.php?code=<?= htmlspecialchars($upcoming_meeting['meeting_code']) ?>" class="btn btn-danger fw-bold px-4 py-2 mt-2 mt-md-0" style="border-radius: 20px;" target="_blank">
+            Join Now <i class="fas fa-video ms-1"></i>
+        </a>
     </div>
+    <?php endif; ?>
     
     <!-- Rest of the file remains exactly the same... -->
     <?php if ($view == 'all'): ?>
