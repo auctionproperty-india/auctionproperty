@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📹 Video Room (Jitsi Meet + Fake Chat & Viewer Count)
+// 📹 Video Room (Jitsi Meet + Dynamic Fake Chat & Viewers)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -12,6 +12,9 @@ if (!isset($_SESSION['user_id'])) {
 
 $code = $_GET['code'] ?? '';
 if (empty($code)) { die("Invalid meeting link."); }
+
+// 🔥 फेक यूजर्स का काउंट सेट करें (URL में &fakes=500 लिखकर बढ़ा सकते हैं)
+$fake_viewers = isset($_GET['fakes']) ? (int)$_GET['fakes'] : 100; 
 
 // वेरिफाई करें कि मीटिंग मौजूद है और यूजर इसका हकदार है
 $stmt = $pdo->prepare("SELECT * FROM video_meetings WHERE meeting_code = ?");
@@ -106,7 +109,7 @@ $display_name = $_SESSION['name'] ?? 'User';
     <div class="fake-chat-sidebar">
         <div class="chat-header">
             <div class="fw-bold"><i class="fas fa-comments"></i> Live Chat</div>
-            <div class="live-badge"><i class="fas fa-circle"></i> <span id="viewerCount">42</span> Watching</div>
+            <div class="live-badge"><i class="fas fa-circle"></i> <span id="viewerCount"><?= $fake_viewers ?></span> Watching</div>
         </div>
         <div class="chat-messages" id="chatMessages">
             <!-- मैसेजज JavaScript से आएंगे -->
@@ -137,7 +140,7 @@ $display_name = $_SESSION['name'] ?? 'User';
     const api = new JitsiMeetExternalAPI(domain, options);
 
     // 2. 🔥 Fake Chat & Viewer Count Logic
-    const fakeNames = ["Rahul S.", "Priya M.", "Amit K.", "Neha T.", "Vikram R.", "Sneha P.", "Arjun D.", "Kiran B."];
+    const fakeNames = ["Rahul S.", "Priya M.", "Amit K.", "Neha T.", "Vikram R.", "Sneha P.", "Arjun D.", "Kiran B.", "Rohit V.", "Anjali D."];
     const fakeMessages = [
         "Hello everyone! 👋",
         "Is this property still available?",
@@ -148,11 +151,16 @@ $display_name = $_SESSION['name'] ?? 'User';
         "Nice property!",
         "What is the EMI plan?",
         "I have visited this place, it's awesome.",
-        "Any negotiation possible?"
+        "Any negotiation possible?",
+        "Documents clear hain kya?",
+        "Brokerage charges kya hain?"
     ];
 
     const chatBox = document.getElementById('chatMessages');
     const viewerCountEl = document.getElementById('viewerCount');
+    
+    // 🔥 बेस काउंट (PHP से आ रहा है)
+    let baseFakes = <?= $fake_viewers ?>; 
 
     function getRandom(min, max) {
         return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -174,20 +182,23 @@ $display_name = $_SESSION['name'] ?? 'User';
         }
     }
 
-    // हर 5 से 10 सेकंड में एक नया फेक मैसेज आएगा
-    setInterval(addFakeMessage, getRandom(5000, 10000));
+    // हर 4 से 8 सेकंड में एक नया फेक मैसेज आएगा
+    setInterval(addFakeMessage, getRandom(4000, 8000));
     setTimeout(addFakeMessage, 1000);
     setTimeout(addFakeMessage, 3000);
 
-    // 🔥 फेक व्यूअर काउंट (35 से 60 के बीच)
+    // 🔥 फेक व्यूअर काउंट (जो आपने सेट किया है उसके आस-पास घूमेगा)
     setInterval(() => {
         let currentCount = parseInt(viewerCountEl.innerText);
-        let change = getRandom(-2, 3); 
+        let change = getRandom(-2, 4); // 2 कम या 4 ज्यादा
         let newCount = currentCount + change;
-        if (newCount < 35) newCount = 35; 
-        if (newCount > 60) newCount = 60; 
+        
+        // बेस काउंट से 10 कम या 20 ज्यादा तक ही जाने दें
+        if (newCount < baseFakes - 10) newCount = baseFakes - 10; 
+        if (newCount > baseFakes + 20) newCount = baseFakes + 20; 
+        
         viewerCountEl.innerText = newCount;
-    }, 10000);
+    }, 8000); // हर 8 सेकंड में बदलेगा
 
 </script>
 
