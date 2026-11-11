@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// ✏️ Edit User – Preserves original subscription amount
+// ✏️ Edit User – Preserves original subscription amount & BA Status
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -90,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         $package_id = $_POST['package_id'] ? (int)$_POST['package_id'] : null;
         $custom_duration = !empty($_POST['custom_duration']) ? (int)$_POST['custom_duration'] : 0;
         $status = $_POST['status'];
+        $ba_status = $_POST['ba_status'] ?? 'none'; // 🔥 NEW: BA Status
         $new_password = trim($_POST['new_password']);
         $new_referrer_id = isset($_POST['new_referrer']) && $_POST['new_referrer'] !== '' ? (int)$_POST['new_referrer'] : null;
 
@@ -106,16 +107,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
 
         $pdo->beginTransaction();
         try {
+            // 🔥 UPDATE users table with BA Status
             $stmt = $pdo->prepare("
                 UPDATE users 
                 SET name = ?, email = ?, phone = ?, 
                     created_at = COALESCE(?, created_at),
                     activation_date = COALESCE(?, activation_date),
                     status = ?,
+                    ba_status = ?,
                     referred_by = COALESCE(?, referred_by)
                 WHERE id = ?
             ");
-            $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $new_referrer_id, $user_id]);
+            $stmt->execute([$name, $email, $phone, $registration_date, $activation_date, $status, $ba_status, $new_referrer_id, $user_id]);
 
             if (!empty($new_password)) {
                 $hashed = password_hash($new_password, PASSWORD_DEFAULT);
@@ -157,7 +160,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                 }
 
                 if ($sub_id) {
-                    // 🔥 UPDATE without touching amount column
                     $stmt = $pdo->prepare("
                         UPDATE subscriptions 
                         SET package_id = ?, start_date = ?, end_date = ?
@@ -165,7 +167,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                     ");
                     $stmt->execute([$package_id, $new_start, $new_end, $sub_id]);
                 } else {
-                    // 🔥 INSERT new subscription - use package price as default (since there is no prior amount)
                     $pkg_price = 0;
                     foreach ($packages as $pkg) {
                         if ($pkg['id'] == $package_id) {
@@ -196,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
 
             $referrer_name = $new_referrer_name;
 
-            $success = "✅ User updated successfully! (Subscription amount preserved: ₹" . number_format($sub_amount, 2) . ")";
+            $success = "✅ User updated successfully!";
             if ($new_referrer_name != 'None') {
                 $success .= " New Referrer: <strong>" . htmlspecialchars($new_referrer_name) . "</strong>";
             }
@@ -270,14 +271,25 @@ include 'header.php';
                             <label class="form-label">Phone</label>
                             <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($user['phone']) ?>">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Status</label>
+                        <div class="col-md-3">
+                            <label class="form-label">Account Status</label>
                             <select name="status" class="form-control">
                                 <option value="active" <?= $user['status'] == 'active' ? 'selected' : '' ?>>Active</option>
                                 <option value="blocked" <?= $user['status'] == 'blocked' ? 'selected' : '' ?>>Blocked</option>
                                 <option value="inactive" <?= $user['status'] == 'inactive' ? 'selected' : '' ?>>Inactive</option>
                             </select>
                         </div>
+                        
+                        <!-- 🔥 NEW: BA STATUS OPTION -->
+                        <div class="col-md-3">
+                            <label class="form-label text-primary">BA Status</label>
+                            <select name="ba_status" class="form-control border-primary">
+                                <option value="none" <?= ($user['ba_status'] ?? 'none') == 'none' ? 'selected' : '' ?>>None (Normal User)</option>
+                                <option value="pending" <?= ($user['ba_status'] ?? 'none') == 'pending' ? 'selected' : '' ?>>Pending (Applied)</option>
+                                <option value="active" <?= ($user['ba_status'] ?? 'none') == 'active' ? 'selected' : '' ?>>Active (Business Associate)</option>
+                            </select>
+                        </div>
+
                         <div class="col-md-6">
                             <label class="form-label">Registration Date</label>
                             <input type="date" name="registration_date" class="form-control" value="<?= safeDateFormat($user['created_at']) ?>">
@@ -311,7 +323,6 @@ include 'header.php';
                                    min="0" max="120" placeholder="Leave empty to use package duration" value="0">
                         </div>
 
-                        <!-- 🔥 SUBSCRIPTION AMOUNT DISPLAY (read-only) -->
                         <div class="col-md-6">
                             <label class="form-label">Subscription Amount (Original)</label>
                             <div class="amount-display">
@@ -321,7 +332,6 @@ include 'header.php';
                             </div>
                         </div>
 
-                        <!-- 🔥 LIVE EXPIRY PREVIEW -->
                         <div class="col-md-6">
                             <label class="form-label">Expiry Date Preview</label>
                             <div class="expiry-preview">
