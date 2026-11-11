@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📹 User - My Video Meetings (Includes Public Meetings)
+// 📹 User - My Video Meetings (With BA Filter)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -12,15 +12,24 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// 🔥 PUBLIC मीटिंग्स और अपनी मीटिंग्स दोनों निकालें
-$stmt = $pdo->prepare("
-    SELECT m.*, u.name as host_name 
-    FROM video_meetings m 
-    JOIN users u ON m.host_id = u.id 
-    WHERE m.user_id = ? OR m.is_public = TRUE 
-    ORDER BY m.id DESC
-");
-$stmt->execute([$user_id]);
+// 🔥 यूजर का BA स्टेटस चेक करें
+$user_stmt = $pdo->prepare("SELECT ba_status FROM users WHERE id = ?");
+$user_stmt->execute([$user_id]);
+$user_ba = $user_stmt->fetchColumn() ?: 'none';
+
+// 🔥 SQL क्वेरी: अगर मीटिंग 'ba_only' है, तो सिर्फ 'active' BA वालों को दिखेगी
+$sql = "SELECT m.*, u.name as host_name 
+        FROM video_meetings m 
+        JOIN users u ON m.host_id = u.id 
+        WHERE (m.is_public = TRUE OR m.user_id = ?) 
+        AND (
+            m.target_audience = 'all' 
+            OR (m.target_audience = 'ba_only' AND ? = 'active')
+        )
+        ORDER BY m.id DESC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$user_id, $user_ba]);
 $meetings = $stmt->fetchAll();
 
 include 'header.php';
@@ -37,15 +46,14 @@ include 'header.php';
                         <div class="card-body p-4 text-center">
                             <div class="mb-3">
                                 <i class="fas fa-video fa-3x <?= $m['is_public'] ? 'text-success' : 'text-primary' ?> opacity-50"></i>
-                                <?php if($m['is_public']): ?>
-                                    <span class="badge bg-success position-absolute top-0 end-0 m-3">Public</span>
+                                <?php if($m['target_audience'] == 'ba_only'): ?>
+                                    <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-3">Exclusive BA</span>
                                 <?php endif; ?>
                             </div>
                             <h5 class="fw-bold"><?= htmlspecialchars($m['title']) ?></h5>
                             <p class="text-muted small mb-1">Host: <?= htmlspecialchars($m['host_name']) ?></p>
                             <?php if($m['scheduled_at']): ?>
                                 <?php 
-                                // Timezone change to IST
                                 $utc_date = new DateTime($m['scheduled_at'], new DateTimeZone('UTC'));
                                 $utc_date->setTimezone(new DateTimeZone('Asia/Kolkata'));
                                 ?>
@@ -61,7 +69,7 @@ include 'header.php';
             <?php endforeach; ?>
         <?php else: ?>
             <div class="col-12 text-center py-5">
-                <h5 class="text-muted">No meetings scheduled yet.</h5>
+                <h5 class="text-muted">No meetings available for you right now.</h5>
             </div>
         <?php endif; ?>
     </div>
