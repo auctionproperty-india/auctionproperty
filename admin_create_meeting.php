@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// 📹 Admin - Create Video Meeting (Public & Multi-Host)
+// 📹 Admin - Create Video Meeting (With Target Audience & Delete)
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
@@ -13,35 +13,39 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'sale
 $host_id = $_SESSION['user_id'];
 $success = '';
 
+// 🔥 Delete Meeting Logic
+if (isset($_GET['delete_id'])) {
+    $del_id = (int)$_GET['delete_id'];
+    $pdo->prepare("DELETE FROM video_meetings WHERE id = ?")->execute([$del_id]);
+    header("Location: admin_create_meeting.php?msg=deleted");
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_meeting'])) {
     $title = trim($_POST['title']);
     $user_id = !empty($_POST['user_id']) ? (int)$_POST['user_id'] : null;
     $scheduled_at = $_POST['scheduled_at'];
     $is_public = isset($_POST['is_public']) ? 1 : 0;
+    $target_audience = $_POST['target_audience'] ?? 'all'; // 🔥 NEW
     
-    // 🔥 मल्टीपल होस्ट सेलेक्ट करने के लिए
     $host_ids_arr = $_POST['host_ids'] ?? [];
     $host_ids_str = implode(',', array_map('intval', $host_ids_arr));
 
     $meeting_code = 'PP-' . strtoupper(bin2hex(random_bytes(4)));
     
     if (!empty($title)) {
-        // अगर पब्लिक मीटिंग है तो यूजर null होगा, वरना सेलेक्ट किया हुआ यूजर
         if ($is_public) $user_id = null;
 
-        $stmt = $pdo->prepare("INSERT INTO video_meetings (host_id, user_id, title, meeting_code, scheduled_at, is_public, host_ids) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$host_id, $user_id, $title, $meeting_code, $scheduled_at, $is_public, $host_ids_str]);
+        $stmt = $pdo->prepare("INSERT INTO video_meetings (host_id, user_id, title, meeting_code, scheduled_at, is_public, host_ids, target_audience) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$host_id, $user_id, $title, $meeting_code, $scheduled_at, $is_public, $host_ids_str, $target_audience]);
         $success = "Meeting created successfully!";
-    } else {
-        $success = "<span class='text-danger'>Please enter a title.</span>";
     }
 }
 
-// सभी यूजर्स की लिस्ट निकालें
 $users = $pdo->query("SELECT id, name, email FROM users WHERE role = 'user' ORDER BY name ASC")->fetchAll();
-// सभी Admins और Sales की लिस्ट (होस्ट के लिए)
 $hosts = $pdo->query("SELECT id, name, role FROM users WHERE role IN ('admin', 'sales') ORDER BY name ASC")->fetchAll();
 
+// Recent Meetings
 $recent_meetings = $pdo->query("
     SELECT m.*, u.name as user_name 
     FROM video_meetings m 
@@ -55,6 +59,9 @@ include 'header.php';
 <div class="container-fluid mt-4 mb-5">
     <h3 class="fw-bold mb-4"><i class="fas fa-video text-primary"></i> Create Video Meeting</h3>
 
+    <?php if(isset($_GET['msg']) && $_GET['msg'] == 'deleted'): ?>
+        <div class="alert alert-danger fw-bold">Meeting Deleted Successfully!</div>
+    <?php endif; ?>
     <?php if($success): ?><div class="alert alert-info fw-bold"><?= $success ?></div><?php endif; ?>
 
     <div class="row">
@@ -64,16 +71,27 @@ include 'header.php';
                     <form method="POST">
                         <div class="mb-3">
                             <label class="fw-bold small">Meeting Title</label>
-                            <input type="text" name="title" class="form-control" placeholder="e.g. Property Discussion" required>
+                            <input type="text" name="title" class="form-control" required>
                         </div>
 
-                        <!-- 🔥 Public Checkbox -->
+                        <!-- 🔥 Target Audience -->
+                        <div class="mb-3 p-3 bg-light rounded border">
+                            <label class="fw-bold small text-primary mb-2 d-block">Target Audience</label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="target_audience" id="aud_all" value="all" checked>
+                                <label class="form-check-label" for="aud_all">All Users</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="target_audience" id="aud_ba" value="ba_only">
+                                <label class="form-check-label" for="aud_ba">Only Active BA Users</label>
+                            </div>
+                        </div>
+
                         <div class="mb-3 p-3 bg-light rounded border">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" name="is_public" id="is_public" value="1" onchange="toggleUserSelect()">
-                                <label class="form-check-label fw-bold" for="is_public">All Users (Public Meeting)</label>
+                                <label class="form-check-label fw-bold" for="is_public">Public Meeting (Direct Join)</label>
                             </div>
-                            <small class="text-muted">अगर यह टिक है, तो सभी यूजर्स इस मीटिंग को जॉइन कर सकेंगे।</small>
                         </div>
 
                         <div class="mb-3" id="userSelectDiv">
@@ -87,20 +105,19 @@ include 'header.php';
                         </div>
 
                         <div class="mb-3">
-                            <label class="fw-bold small">Assign Co-Hosts (Multiple Selection)</label>
-                            <select name="host_ids[]" class="form-select" multiple size="4">
+                            <label class="fw-bold small">Assign Co-Hosts</label>
+                            <select name="host_ids[]" class="form-select" multiple size="3">
                                 <?php foreach($hosts as $h): ?>
                                     <option value="<?= $h['id'] ?>"><?= htmlspecialchars($h['name']) ?> (<?= strtoupper($h['role']) ?>)</option>
                                 <?php endforeach; ?>
                             </select>
-                            <small class="text-muted">Ctrl दबाकर एक से ज्यादा होस्ट चुनें।</small>
                         </div>
 
                         <div class="mb-3">
-                            <label class="fw-bold small">Scheduled Date & Time (Optional)</label>
+                            <label class="fw-bold small">Scheduled Date & Time</label>
                             <input type="datetime-local" name="scheduled_at" class="form-control">
                         </div>
-                        <button type="submit" name="create_meeting" class="btn btn-primary w-100 fw-bold"><i class="fas fa-plus"></i> Generate Meeting Link</button>
+                        <button type="submit" name="create_meeting" class="btn btn-primary w-100 fw-bold"><i class="fas fa-plus"></i> Generate Link</button>
                     </form>
                 </div>
             </div>
@@ -116,7 +133,7 @@ include 'header.php';
                                 <tr>
                                     <th>Title</th>
                                     <th>Type</th>
-                                    <th>Link Code</th>
+                                    <th>Link</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -125,12 +142,12 @@ include 'header.php';
                                 <tr>
                                     <td><?= htmlspecialchars($m['title']) ?></td>
                                     <td>
-                                        <?= $m['is_public'] ? '<span class="badge bg-success">Public</span>' : '<span class="badge bg-secondary">Private</span>' ?>
-                                        <?= !empty($m['host_ids']) ? '<br><small class="text-muted">Co-hosts assigned</small>' : '' ?>
+                                        <?= $m['target_audience'] == 'ba_only' ? '<span class="badge bg-warning text-dark">BA Only</span>' : '<span class="badge bg-info">All Users</span>' ?>
                                     </td>
                                     <td><code><?= htmlspecialchars($m['meeting_code']) ?></code></td>
                                     <td>
                                         <a href="video_room.php?code=<?= $m['meeting_code'] ?>" target="_blank" class="btn btn-sm btn-success"><i class="fas fa-video"></i> Join</a>
+                                        <a href="?delete_id=<?= $m['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this meeting?')"><i class="fas fa-trash"></i></a>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -144,16 +161,9 @@ include 'header.php';
 </div>
 
 <script>
-// अगर Public मीटिंग है, तो Specific User वाला डिब्बा छुपा दें
 function toggleUserSelect() {
     const isPublic = document.getElementById('is_public').checked;
-    const userDiv = document.getElementById('userSelectDiv');
-    if (isPublic) {
-        userDiv.style.display = 'none';
-    } else {
-        userDiv.style.display = 'block';
-    }
+    document.getElementById('userSelectDiv').style.display = isPublic ? 'none' : 'block';
 }
 </script>
-
 <?php include 'footer.php'; ?>
